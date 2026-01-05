@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>GAS 連線測試</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover { background: #45a049; }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #2a2a2a;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+    </style>
+</head>
+<body>
+    <h1>🔧 GAS 連線診斷工具</h1>
+    <p>請點擊下方按鈕測試你的 Google Apps Script 連線：</p>
+    
+    <button onclick="testConnection()">測試連線</button>
+    <button onclick="testLogin()">測試登入</button>
+    
+    <div id="result"></div>
+
+    <script>
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbw0sN21nJXfjezYL446-wgwTbLOCUziFGOEN8qsXYg7cYHsN5R4Sgn2dSyzoGtH0Xb5/exec';
+        
+        function log(message, isError = false) {
+            const result = document.getElementById('result');
+            result.className = isError ? 'error' : 'success';
+            result.textContent = message;
+        }
+
+        async function testConnection() {
+            log('正在測試連線...');
+            try {
+                const response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    redirect: 'follow',
+                    body: JSON.stringify({
+                        action: 'checkInit',
+                        payload: {}
+                    })
+                });
+
+                log(`✅ HTTP 狀態碼: ${response.status}\n\n回應內容:\n${await response.text()}`);
+            } catch (error) {
+                log(`❌ 連線失敗:\n${error.message}\n\n完整錯誤:\n${error.stack}`, true);
+            }
+        }
+
+        async function testLogin() {
+            log('正在測試登入...');
+            try {
+                const response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    redirect: 'follow',
+                    body: JSON.stringify({
+                        action: 'login',
+                        payload: {
+                            username: 'test',
+                            password: 'test123'
+                        }
+                    })
+                });
+
+                const data = await response.json();
+                log(`✅ 登入回應:\n${JSON.stringify(data, null, 2)}`);
+            } catch (error) {
+                log(`❌ 登入失敗:\n${error.message}\n\n完整錯誤:\n${error.stack}`, true);
+            }
+        }
+    </script>
+</body>
+</html>
