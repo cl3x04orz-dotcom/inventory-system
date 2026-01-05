@@ -13,15 +13,42 @@ export default function ReportPage({ user, apiUrl }) {
     const handleSearch = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setReportData(null); // Reset previous results
         try {
             const payload = {
                 startDate,
                 endDate,
+                // We still send these to backend, but we will also filter in frontend to be safe
                 location,
                 salesRep
             };
             const result = await callGAS(apiUrl, 'getSalesHistory', payload, user.token);
-            setReportData(result);
+
+            // FRONTEND FILTERING: Ensure exact/partial match as requested by user
+            let filteredData = result;
+            if (Array.isArray(result)) {
+                if (location.trim()) {
+                    const term = location.trim().toLowerCase();
+                    filteredData = filteredData.filter(item =>
+                        String(item.location || '').toLowerCase().includes(term)
+                    );
+                }
+                if (salesRep.trim()) {
+                    const term = salesRep.trim().toLowerCase();
+                    filteredData = filteredData.filter(item =>
+                        String(item.salesRep || '').toLowerCase().includes(term)
+                    );
+                }
+            } else {
+                filteredData = [];
+            }
+
+            if (location.trim() && filteredData.length === 0 && Array.isArray(result) && result.length > 0) {
+                // Should we optionaly warn user that backend returned data but it was filtered out?
+                // No, user wants "specified content only", empty result is better than wrong result.
+            }
+
+            setReportData(filteredData);
         } catch (error) {
             alert('查詢失敗: ' + error.message);
         } finally {
@@ -54,7 +81,7 @@ export default function ReportPage({ user, apiUrl }) {
                     <h1 className="text-2xl font-bold text-white flex items-center gap-2">
                         <FileText className="text-blue-400" /> 銷售查詢報表
                     </h1>
-                    <p className="text-slate-400 text-sm mt-1">查詢特定日期、地點或業務的銷售紀錄</p>
+                    <p className="text-slate-400 text-sm mt-1">查詢特定日期、銷售對象或業務的銷售紀錄</p>
                 </div>
             </div>
 
@@ -87,11 +114,11 @@ export default function ReportPage({ user, apiUrl }) {
                     </div>
                     <div className="space-y-1">
                         <label className="text-xs text-slate-400 flex items-center gap-1">
-                            <MapPin size={14} /> 地點 (選填)
+                            <MapPin size={14} /> 銷售對象
                         </label>
                         <input
                             type="text"
-                            placeholder="輸入地點關鍵字"
+                            placeholder="輸入銷售對象關鍵字"
                             className="input-field w-full"
                             value={location}
                             onChange={e => setLocation(e.target.value)}

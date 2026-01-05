@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { PlusCircle, Search } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { PlusCircle } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
 export default function PurchasePage({ user, apiUrl }) {
-    const [vendor, setVendor] = useState('');
+    // Each item now includes its own vendor field
     const [items, setItems] = useState([
-        { id: Date.now(), productName: '', quantity: '', unitPrice: '', expiryYear: new Date().getFullYear().toString(), expiryMonth: '', expiryDay: '' }
+        { id: Date.now(), vendor: '', productName: '', quantity: '', unitPrice: '', expiryYear: new Date().getFullYear().toString(), expiryMonth: '', expiryDay: '' }
     ]);
     const [suggestions, setSuggestions] = useState({ vendors: [], vendorProductMap: {} });
     const [loading, setLoading] = useState(false);
@@ -23,34 +23,32 @@ export default function PurchasePage({ user, apiUrl }) {
         if (user?.token) fetchSuggestions();
     }, [user.token, apiUrl]);
 
-    // Derived product suggestions (Memoized)
-    const productSuggestions = useMemo(() => {
-        if (vendor && suggestions.vendorProductMap[vendor]) {
-            return suggestions.vendorProductMap[vendor];
+    // Helper to get product list for a specific vendor
+    const getProductSuggestions = (currentVendor) => {
+        if (currentVendor && suggestions.vendorProductMap[currentVendor]) {
+            return suggestions.vendorProductMap[currentVendor];
         }
-        if (!vendor) {
-            const allProducts = new Set();
-            Object.values(suggestions.vendorProductMap || {}).forEach(list => list.forEach(p => allProducts.add(p)));
-            return Array.from(allProducts);
-        }
-        return [];
-    }, [vendor, suggestions]);
+        // If no vendor selected (or not found), show all unique products
+        const allProducts = new Set();
+        Object.values(suggestions.vendorProductMap || {}).forEach(list => list.forEach(p => allProducts.add(p)));
+        return Array.from(allProducts);
+    };
 
     const handleItemChange = (id, field, value) => {
         setItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
     };
 
     const addItem = () => {
-        const newItem = {
+        setItems(prev => [...prev, {
             id: Date.now() + Math.random(),
+            vendor: '',
             productName: '',
             quantity: '',
             unitPrice: '',
             expiryYear: new Date().getFullYear().toString(),
             expiryMonth: '',
             expiryDay: ''
-        };
-        setItems(prev => [...prev, newItem]);
+        }]);
     };
 
     const removeItem = (id) => {
@@ -78,17 +76,10 @@ export default function PurchasePage({ user, apiUrl }) {
         e.preventDefault();
 
         // VALIDATION STEP
-        if (!vendor.trim()) {
-            alert('錯誤：請輸入廠商名稱！');
-            const vendorInput = document.querySelector('input[list="vendors-list"]');
-            if (vendorInput) vendorInput.focus();
-            return;
-        }
-
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
-            if (!item.productName.trim() || !item.quantity || !item.unitPrice || !item.expiryYear || !item.expiryMonth || !item.expiryDay) {
-                alert(`錯誤：第 ${i + 1} 列資料不完整！\n請確認「產品名稱」、「數量」、「單價」、「有效期限 (年/月/日)」皆已填寫。`);
+            if (!item.vendor.trim() || !item.productName.trim() || !item.quantity || !item.unitPrice || !item.expiryYear || !item.expiryMonth || !item.expiryDay) {
+                alert(`錯誤：第 ${i + 1} 列資料不完整！\n請確認「廠商」、「產品名稱」、「數量」、「單價」、「有效期限」皆已填寫。`);
                 return;
             }
         }
@@ -99,6 +90,7 @@ export default function PurchasePage({ user, apiUrl }) {
             const m = item.expiryMonth.padStart(2, '0');
             const d = item.expiryDay.padStart(2, '0');
             return {
+                vendor: item.vendor,
                 productName: item.productName,
                 quantity: Number(item.quantity),
                 price: Number(item.unitPrice),
@@ -106,16 +98,23 @@ export default function PurchasePage({ user, apiUrl }) {
             };
         });
 
+        // The API expects { vendor, items: [...] } usually, but since vendor is now per-item,
+        // we might need to adjust the backend or payload structure.
+        // Assuming backend supports `vendor` inside items if top-level `vendor` is missing, 
+        // OR we just pass the first one as dummy if backend requires it.
+        // Let's look at the instruction: "addPurchaseService" implementation.
+        // It says: "const rowVendor = item.vendor || data.vendor;" 
+        // So it supports per-item vendor! Perfect.
+
         try {
             const result = await callGAS(apiUrl, 'addPurchase', {
-                vendor: vendor,
-                items: payloadItems
+                items: payloadItems,
+                operator: user.name // Explicitly pass operator name
             }, user.token);
 
             alert(`成功進貨 ${result.count} 筆商品！`);
             // Reset
-            setVendor('');
-            setItems([{ id: Date.now(), productName: '', quantity: '', unitPrice: '', expiryYear: new Date().getFullYear().toString(), expiryMonth: '', expiryDay: '' }]);
+            setItems([{ id: Date.now(), vendor: '', productName: '', quantity: '', unitPrice: '', expiryYear: new Date().getFullYear().toString(), expiryMonth: '', expiryDay: '' }]);
         } catch (err) {
             alert('進貨失敗: ' + err.message);
         } finally {
@@ -124,102 +123,114 @@ export default function PurchasePage({ user, apiUrl }) {
     };
 
     return (
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-[90rem] mx-auto p-4">
             <div className="glass-panel p-6">
                 <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 text-white">
                     <PlusCircle className="text-emerald-400" /> 批次進貨作業
                 </h2>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Header: Vendor */}
-                    <div className="p-6 bg-gradient-to-r from-slate-800/50 to-slate-800/30 rounded-xl border border-slate-700/50 shadow-lg">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                                <span className="text-2xl">🏢</span>
-                            </div>
-                            <div>
-                                <h3 className="text-sm font-semibold text-emerald-400">廠商資訊</h3>
-                                <p className="text-xs text-slate-500">請選擇或輸入廠商名稱</p>
-                            </div>
-                        </div>
-                        <input
-                            list="vendors-list"
-                            className="input-field w-full text-lg"
-                            placeholder="🔍 搜尋或輸入廠商名稱..."
-                            value={vendor}
-                            onChange={e => setVendor(e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, `item-0-product`)}
-                            autoFocus
-                        />
-                        <datalist id="vendors-list">
-                            {suggestions.vendors.map((v, i) => <option key={i} value={v} />)}
-                        </datalist>
-                    </div>
-
                     {/* Items Grid */}
                     <div className="space-y-3">
                         <div className="flex items-center justify-between px-2">
                             <h3 className="text-sm font-semibold text-slate-400">📦 商品清單</h3>
                             <span className="text-xs text-slate-600">共 {items.length} 項商品</span>
                         </div>
-                        {items.map((item, idx) => (
-                            <div key={item.id} className="group relative p-4 bg-gradient-to-r from-slate-800/40 to-slate-800/20 rounded-xl border border-slate-700/50 hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-900/10 transition-all duration-200">
-                                {/* Row Number Badge */}
-                                <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
-                                    <span className="text-xs font-bold text-emerald-400">{idx + 1}</span>
-                                </div>
 
-                                <div className="grid grid-cols-12 gap-3 items-end">
-                                    <div className="col-span-3">
-                                        <label className="text-xs font-medium text-slate-400 mb-1.5 block flex items-center gap-1">
-                                            <span>📦</span> 產品名稱
-                                        </label>
-                                        <input
-                                            id={`item-${idx}-product`}
-                                            list="products-list-bulk"
-                                            className="input-field w-full"
-                                            placeholder="輸入產品名稱..."
-                                            value={item.productName}
-                                            onChange={e => handleItemChange(item.id, 'productName', e.target.value)}
-                                            onKeyDown={(e) => handleKeyDown(e, `item-${idx}-qty`)}
-                                        />
+                        <datalist id="vendors-list">
+                            {suggestions.vendors.map((v, i) => <option key={i} value={v} />)}
+                        </datalist>
+
+                        {items.map((item, idx) => {
+                            const currentProductSuggestions = getProductSuggestions(item.vendor);
+
+                            return (
+                                <div key={item.id} className="group relative p-4 bg-gradient-to-r from-slate-800/40 to-slate-800/20 rounded-xl border border-slate-700/50 hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-900/10 transition-all duration-200">
+                                    {/* Number Badge */}
+                                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
+                                        <span className="text-[10px] font-bold text-emerald-400">{idx + 1}</span>
                                     </div>
-                                    <div className="col-span-2">
-                                        <label className="text-xs font-medium text-slate-400 mb-1.5 block flex items-center gap-1">
-                                            <span>🔢</span> 數量
-                                        </label>
-                                        <input
-                                            id={`item-${idx}-qty`}
-                                            type="number"
-                                            className="input-field w-full text-center"
-                                            placeholder="0"
-                                            value={item.quantity}
-                                            onChange={e => handleItemChange(item.id, 'quantity', e.target.value)}
-                                            onKeyDown={(e) => handleKeyDown(e, `item-${idx}-price`)}
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <label className="text-xs font-medium text-slate-400 mb-1.5 block flex items-center gap-1">
-                                            <span>💰</span> 單價
-                                        </label>
-                                        <input
-                                            id={`item-${idx}-price`}
-                                            type="number"
-                                            className="input-field w-full text-center"
-                                            placeholder="0"
-                                            value={item.unitPrice}
-                                            onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)}
-                                            onKeyDown={(e) => handleKeyDown(e, `item-${idx}-year`)}
-                                        />
-                                    </div>
-                                    <div className="col-span-4">
-                                        <label className="text-xs font-medium text-slate-400 mb-1.5 block flex items-center gap-1">
-                                            <span>📅</span> 有效期限
-                                        </label>
-                                        <div className="flex gap-2">
+
+                                    {/* Custom Grid Layout: 14 columns total for better spacing */}
+                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+
+                                        {/* Vendor (3 cols) */}
+                                        <div className="col-span-12 md:col-span-2">
+                                            <label className="text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1">
+                                                <span>🏢</span> 廠商
+                                            </label>
+                                            <input
+                                                id={`item-${idx}-vendor`}
+                                                list="vendors-list"
+                                                className="input-field w-full"
+                                                placeholder="廠商名稱"
+                                                value={item.vendor}
+                                                onChange={e => handleItemChange(item.id, 'vendor', e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(e, `item-${idx}-product`)}
+                                                autoFocus={idx === items.length - 1} // Auto focus on new row vendor
+                                            />
+                                        </div>
+
+                                        {/* Product (3 cols) */}
+                                        <div className="col-span-12 md:col-span-3">
+                                            <label className="text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1">
+                                                <span>📦</span> 產品名稱
+                                            </label>
+                                            <input
+                                                id={`item-${idx}-product`}
+                                                list={`products-list-${idx}`}
+                                                className="input-field w-full"
+                                                placeholder="產品名稱"
+                                                value={item.productName}
+                                                onChange={e => handleItemChange(item.id, 'productName', e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(e, `item-${idx}-qty`)}
+                                            />
+                                            <datalist id={`products-list-${idx}`}>
+                                                {currentProductSuggestions.map((n, i) => <option key={i} value={n} />)}
+                                            </datalist>
+                                        </div>
+
+                                        {/* Qty (2 cols) */}
+                                        <div className="col-span-6 md:col-span-2">
+                                            <label className="text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1">
+                                                <span>🔢</span> 數量
+                                            </label>
+                                            <input
+                                                id={`item-${idx}-qty`}
+                                                type="number"
+                                                className="input-field w-full text-center"
+                                                placeholder="0"
+                                                value={item.quantity}
+                                                onChange={e => handleItemChange(item.id, 'quantity', e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(e, `item-${idx}-price`)}
+                                            />
+                                        </div>
+
+                                        {/* Price (2 cols) */}
+                                        <div className="col-span-6 md:col-span-2">
+                                            <label className="text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1">
+                                                <span>💰</span> 單價
+                                            </label>
+                                            <input
+                                                id={`item-${idx}-price`}
+                                                type="number"
+                                                className="input-field w-full text-center"
+                                                placeholder="0"
+                                                value={item.unitPrice}
+                                                onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(e, `item-${idx}-year`)}
+                                            />
+                                        </div>
+
+                                        {/* Expiry (2 cols + delete btn space) */}
+                                        <div className="col-span-12 md:col-span-3 grid grid-cols-[1fr_auto_1fr_auto_1fr_auto] gap-1 relative">
+                                            <label className="absolute -top-6 left-0 text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1">
+                                                <span>📅</span> 有效期限
+                                            </label>
+
                                             <input
                                                 id={`item-${idx}-year`}
-                                                className="input-field w-full text-center font-mono"
+                                                className="input-field w-full text-center font-mono px-1"
                                                 placeholder="YYYY"
                                                 value={item.expiryYear}
                                                 onChange={e => handleItemChange(item.id, 'expiryYear', e.target.value)}
@@ -228,7 +239,7 @@ export default function PurchasePage({ user, apiUrl }) {
                                             <span className="text-slate-600 self-center">/</span>
                                             <input
                                                 id={`item-${idx}-month`}
-                                                className="input-field w-full text-center font-mono"
+                                                className="input-field w-full text-center font-mono px-1"
                                                 placeholder="MM"
                                                 value={item.expiryMonth}
                                                 onChange={e => handleItemChange(item.id, 'expiryMonth', e.target.value)}
@@ -238,8 +249,7 @@ export default function PurchasePage({ user, apiUrl }) {
                                             <input
                                                 id={`item-${idx}-day`}
                                                 type="number"
-                                                min="1" max="31"
-                                                className="input-field w-full text-center font-mono"
+                                                className="input-field w-full text-center font-mono px-1"
                                                 placeholder="DD"
                                                 value={item.expiryDay}
                                                 onChange={e => handleItemChange(item.id, 'expiryDay', e.target.value)}
@@ -249,36 +259,30 @@ export default function PurchasePage({ user, apiUrl }) {
                                                         if (idx === items.length - 1) {
                                                             addItem();
                                                         } else {
-                                                            const nextEl = document.getElementById(`item-${idx + 1}-product`);
+                                                            const nextEl = document.getElementById(`item-${idx + 1}-vendor`);
                                                             if (nextEl) nextEl.focus();
                                                         }
                                                     }
                                                 }}
                                             />
+
+                                            {/* Delete Button (inline) */}
+                                            {items.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeItem(item.id)}
+                                                    className="w-8 h-8 ml-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all flex items-center justify-center self-center"
+                                                    title="刪除此列"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
-                                    <div className="col-span-1 flex justify-center">
-                                        {items.length > 1 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => removeItem(item.id)}
-                                                className="w-8 h-8 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center"
-                                                title="刪除此列"
-                                            >
-                                                ✕
-                                            </button>
-                                        )}
-                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
-
-                    {/* Shared Datalist */}
-                    <datalist id="products-list-bulk">
-                        {productSuggestions.map((n, i) => <option key={i} value={n} />)}
-                    </datalist>
-
 
                     <div className="flex gap-4 mt-8 pt-6 border-t border-slate-700/50">
                         <button

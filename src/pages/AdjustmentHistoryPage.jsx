@@ -7,7 +7,6 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Default to current month or similar range if needed, here defaulting to Today for consistency with StocktakeHistory
     const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -19,6 +18,8 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                 endDate,
                 productName: searchTerm
             }, user.token);
+
+            console.log('Adjustment History Data:', data); // Debug log
 
             if (Array.isArray(data)) {
                 setRecords(data);
@@ -44,7 +45,7 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                        <ClipboardList className="text-blue-400" /> 庫存異動歷史
+                        <ClipboardList className="text-blue-400" /> 庫存異動
                     </h1>
                     <p className="text-slate-400 text-sm mt-1">查看庫存的手動調整記錄</p>
                 </div>
@@ -103,45 +104,60 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                             <tr>
                                 <th className="p-4">日期</th>
                                 <th className="p-4">商品名稱</th>
-                                <th className="p-4">批號</th>
-                                <th className="p-4 text-right">調整前</th>
-                                <th className="p-4 text-center"></th>
-                                <th className="p-4 text-right">調整後</th>
-                                <th className="p-4 text-right">差異</th>
+                                <th className="p-4">類型</th>
+                                <th className="p-4 text-right">數量</th>
                                 <th className="p-4">備註/原因</th>
                                 <th className="p-4">執行人</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
                             {loading ? (
-                                <tr><td colSpan="9" className="p-20 text-center text-slate-500">載入中...</td></tr>
+                                <tr><td colSpan="6" className="p-20 text-center text-slate-500">載入中...</td></tr>
                             ) : filtered.length > 0 ? (
                                 filtered.map((record, idx) => {
-                                    const diff = (record.afterQty || 0) - (record.beforeQty || 0);
+                                    const typeLabels = {
+                                        'SCRAP': '報廢',
+                                        'RETURN': '退貨',
+                                        'LOSS': '損耗',
+                                        'OTHER': '其他'
+                                    };
+
                                     return (
                                         <tr key={idx} className="hover:bg-white/5 transition-colors">
                                             <td className="p-4">
-                                                <div className="flex items-center gap-2 text-slate-300">
-                                                    <Calendar size={14} className="text-slate-500" />
-                                                    {record.date ? new Date(record.date).toLocaleDateString('zh-TW') : '-'}
+                                                <div className="flex flex-col gap-0.5 text-slate-300">
+                                                    <div className="flex items-center gap-2">
+                                                        <Calendar size={14} className="text-slate-500" />
+                                                        <span>{record.date ? new Date(record.date).toLocaleDateString('zh-TW') : '-'}</span>
+                                                    </div>
+                                                    <span className="text-xs text-slate-500 ml-6">
+                                                        {record.date ? new Date(record.date).toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit' }) : ''}
+                                                    </span>
                                                 </div>
                                             </td>
                                             <td className="p-4 font-medium text-white">{record.productName}</td>
-                                            <td className="p-4 text-slate-400 text-xs font-mono">{record.batchId || '-'}</td>
-                                            <td className="p-4 text-right font-mono text-slate-400">{record.beforeQty}</td>
-                                            <td className="p-4 text-center text-slate-600"><ArrowRight size={14} /></td>
-                                            <td className="p-4 text-right font-mono text-white">{record.afterQty}</td>
-                                            <td className={`p-4 text-right font-mono font-bold ${diff > 0 ? 'text-blue-400' : 'text-red-400'}`}>
-                                                {diff > 0 ? `+${diff}` : diff}
+                                            <td className="p-4">
+                                                <span className={`px-2 py-1 rounded text-xs font-medium ${record.type === 'SCRAP' ? 'bg-red-500/20 text-red-400' :
+                                                        record.type === 'RETURN' ? 'bg-blue-500/20 text-blue-400' :
+                                                            record.type === 'LOSS' ? 'bg-orange-500/20 text-orange-400' :
+                                                                'bg-slate-500/20 text-slate-400'
+                                                    }`}>
+                                                    {typeLabels[record.type] || record.type}
+                                                </span>
                                             </td>
-                                            <td className="p-4 text-slate-300 max-w-xs truncate" title={record.note}>{record.note || '-'}</td>
-                                            <td className="p-4 text-slate-400">{record.operator}</td>
+                                            <td className="p-4 text-right font-mono font-bold text-red-400">
+                                                -{record.quantity}
+                                            </td>
+                                            <td className="p-4 text-slate-300 max-w-xs truncate" title={record.note}>
+                                                {record.note || '-'}
+                                            </td>
+                                            <td className="p-4 text-slate-400">{record.operator || '-'}</td>
                                         </tr>
                                     );
                                 })
                             ) : (
                                 <tr>
-                                    <td colSpan="9" className="p-20 text-center">
+                                    <td colSpan="6" className="p-20 text-center">
                                         <div className="flex flex-col items-center gap-4">
                                             <Filter size={32} className="text-slate-600" />
                                             <p className="text-slate-500">沒有找到異動記錄</p>

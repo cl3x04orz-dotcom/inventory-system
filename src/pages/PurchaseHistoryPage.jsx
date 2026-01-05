@@ -19,6 +19,7 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
             }, user.token);
 
             if (Array.isArray(data)) {
+                console.log('Purchase History Data:', data); // Debug log
                 setRecords(data);
             }
         } catch (error) {
@@ -45,7 +46,7 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                        <Truck className="text-blue-400" /> 進貨歷史查詢
+                        <Truck className="text-blue-400" /> 進貨查詢
                     </h1>
                     <p className="text-slate-400 text-sm mt-1">查看完整的採購與入庫記錄</p>
                 </div>
@@ -128,17 +129,28 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                                         <td className="p-4">
                                             <div className="flex items-center gap-2 text-slate-300">
                                                 <Calendar size={14} className="text-slate-500" />
-                                                {record.date ? new Date(record.date).toLocaleDateString('zh-TW') : '-'}
+                                                <div className="flex flex-col">
+                                                    <span>{record.date ? new Date(record.date).toLocaleDateString('zh-TW') : '-'}</span>
+                                                    <span className="text-xs text-slate-500">
+                                                        {record.date ? new Date(record.date).toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit' }) : ''}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </td>
-                                        <td className="p-4 text-slate-300">{record.vendorName}</td>
+                                        <td className="p-4 text-slate-300">{record.vendorName || record.vendor || '-'}</td>
                                         <td className="p-4 font-medium text-white">{record.productName}</td>
                                         <td className="p-4 text-right font-mono text-blue-400">{record.quantity}</td>
-                                        <td className="p-4 text-right font-mono text-slate-400">${Number(record.unitPrice).toLocaleString()}</td>
-                                        <td className="p-4 text-right font-mono font-bold text-emerald-400">${Number(record.totalPrice).toLocaleString()}</td>
+                                        <td className="p-4 text-right font-mono text-slate-400">
+                                            ${(Number(record.unitPrice) || 0).toLocaleString()}
+                                        </td>
+                                        <td className="p-4 text-right font-mono font-bold text-emerald-400">
+                                            ${(Number(record.totalPrice) || 0).toLocaleString()}
+                                        </td>
                                         <td className="p-4 text-slate-400 text-xs">{record.expiry ? new Date(record.expiry).toLocaleDateString('zh-TW') : '-'}</td>
-                                        <td className="p-4 text-slate-400 flex items-center gap-1">
-                                            <User size={12} /> {record.operator}
+                                        <td className="p-4 text-slate-400">
+                                            <div className="flex items-center gap-1">
+                                                <User size={12} /> {record.operator || '-'}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))

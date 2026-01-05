@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, Search, Package, TrendingUp, PieChart, RefreshCw } from 'lucide-react';
+import { DollarSign, Search, TrendingUp, RefreshCw } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import { sortProducts } from '../utils/constants';
 
@@ -11,15 +11,19 @@ export default function InventoryValuationPage({ user, apiUrl }) {
     const fetchData = async () => {
         setLoading(true);
         try {
-            // Trying a specific endpoint for valuation which should include cost data
             const response = await callGAS(apiUrl, 'getInventoryValuation', {}, user.token);
+            console.log('Inventory Valuation Data:', response);
+
             if (Array.isArray(response)) {
-                setData(sortProducts(response, 'productName'));
+                // Backend returns: { name, totalQty, totalValue }
+                const sorted = sortProducts(response, 'name');
+                setData(sorted);
+            } else {
+                console.error('Valuation data is not an array:', response);
+                setData([]);
             }
         } catch (error) {
             console.error('Failed to fetch valuation:', error);
-            // Fallback: If specific endpoint fails, maybe try getInventory and warn about missing costs?
-            // For now, let's show the error
             alert('無法獲取庫存估值資料: ' + error.message);
         } finally {
             setLoading(false);
@@ -31,12 +35,11 @@ export default function InventoryValuationPage({ user, apiUrl }) {
     }, [user.token, apiUrl]);
 
     const filteredData = data.filter(item =>
-        String(item.productName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        String(item.batchId || '').toLowerCase().includes(searchTerm.toLowerCase())
+        String(item.name || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const totalValue = filteredData.reduce((sum, item) => sum + (Number(item.totalValue) || 0), 0);
-    const totalItems = filteredData.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+    const totalItems = filteredData.reduce((sum, item) => sum + (Number(item.totalQty) || 0), 0);
 
     return (
         <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
@@ -72,7 +75,7 @@ export default function InventoryValuationPage({ user, apiUrl }) {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                     <input
                         type="text"
-                        placeholder="搜尋產品或批號..."
+                        placeholder="搜尋產品名稱..."
                         className="input-field pl-10 w-full"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -94,7 +97,6 @@ export default function InventoryValuationPage({ user, apiUrl }) {
                         <thead className="bg-slate-800/50 text-slate-400 text-xs uppercase tracking-wider sticky top-0">
                             <tr>
                                 <th className="p-4">產品名稱</th>
-                                <th className="p-4">批號 / 效期</th>
                                 <th className="p-4 text-right">庫存數量</th>
                                 <th className="p-4 text-right">單位成本</th>
                                 <th className="p-4 text-right">總價值</th>
@@ -103,27 +105,27 @@ export default function InventoryValuationPage({ user, apiUrl }) {
                         </thead>
                         <tbody className="divide-y divide-white/5">
                             {loading ? (
-                                <tr><td colSpan="6" className="p-20 text-center text-slate-500">計算中...</td></tr>
+                                <tr><td colSpan="5" className="p-20 text-center text-slate-500">計算中...</td></tr>
                             ) : filteredData.length > 0 ? (
                                 filteredData.map((item, idx) => {
-                                    const percent = totalValue > 0 ? ((item.totalValue || 0) / totalValue * 100) : 0;
+                                    const qty = Number(item.totalQty) || 0;
+                                    const value = Number(item.totalValue) || 0;
+                                    const unitCost = qty > 0 ? (value / qty) : 0;
+                                    const percent = totalValue > 0 ? (value / totalValue * 100) : 0;
+
                                     return (
                                         <tr key={idx} className="hover:bg-white/5 transition-colors">
                                             <td className="p-4 font-medium text-white">
-                                                {item.productName}
-                                            </td>
-                                            <td className="p-4 text-slate-400 text-xs">
-                                                <div className="font-mono">{item.batchId || '-'}</div>
-                                                <div className="opacity-70">{item.expiry ? new Date(item.expiry).toLocaleDateString('zh-TW') : ''}</div>
+                                                {item.name}
                                             </td>
                                             <td className="p-4 text-right font-mono text-slate-300">
-                                                {item.quantity}
+                                                {qty.toLocaleString()}
                                             </td>
                                             <td className="p-4 text-right font-mono text-slate-400">
-                                                ${Number(item.unitCost || 0).toLocaleString()}
+                                                ${unitCost.toFixed(2)}
                                             </td>
                                             <td className="p-4 text-right font-mono font-bold text-yellow-400">
-                                                ${Number(item.totalValue || 0).toLocaleString()}
+                                                ${value.toLocaleString()}
                                             </td>
                                             <td className="p-4 text-right w-24">
                                                 <div className="flex items-center gap-2 justify-end">
@@ -141,7 +143,7 @@ export default function InventoryValuationPage({ user, apiUrl }) {
                                 })
                             ) : (
                                 <tr>
-                                    <td colSpan="6" className="p-20 text-center">
+                                    <td colSpan="5" className="p-20 text-center">
                                         <div className="flex flex-col items-center gap-4">
                                             <TrendingUp size={32} className="text-slate-600" />
                                             <p className="text-slate-500">無估值資料</p>

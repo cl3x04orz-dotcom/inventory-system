@@ -33,9 +33,15 @@ export const CASE_MAP = {
 
 export const sortProducts = (list, nameKey) => {
     return [...list].sort((a, b) => {
-        const indexA = PRODUCT_ORDER.indexOf(a[nameKey]);
-        const indexB = PRODUCT_ORDER.indexOf(b[nameKey]);
-        if (indexA === -1 && indexB === -1) return a[nameKey]?.localeCompare(b[nameKey]);
+        const nameA = String(a[nameKey] || '');
+        const nameB = String(b[nameKey] || '');
+
+        const indexA = PRODUCT_ORDER.indexOf(nameA);
+        const indexB = PRODUCT_ORDER.indexOf(nameB);
+
+        if (indexA === -1 && indexB === -1) {
+            return nameA.localeCompare(nameB);
+        }
         if (indexA === -1) return 1;
         if (indexB === -1) return -1;
         return indexA - indexB;
