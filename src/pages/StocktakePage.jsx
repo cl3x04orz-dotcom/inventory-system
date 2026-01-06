@@ -10,6 +10,7 @@ export default function StocktakePage({ user, apiUrl }) {
     const [submitting, setSubmitting] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [showDiffOnly, setShowDiffOnly] = useState(false);
+    const getRowKey = useCallback((item) => `${item.id}-${item.batchId || 'no-batch'}`, []);
 
     const fetchInventory = useCallback(async () => {
         setLoading(true);
@@ -23,7 +24,7 @@ export default function StocktakePage({ user, apiUrl }) {
                 // Here we keep it empty to force manual entry, or we could copy quantity
                 const initialData = {};
                 sorted.forEach(item => {
-                    initialData[item.id] = {
+                    initialData[getRowKey(item)] = {
                         physicalQty: '',
                         reason: '',
                         accountability: ''
@@ -61,10 +62,10 @@ export default function StocktakePage({ user, apiUrl }) {
     const getItemsToSubmit = () => {
         // Only submit items where physicalQty has been entered (is not empty string)
         return inventory.filter(item => {
-            const entry = stocktakeData[item.id];
+            const entry = stocktakeData[getRowKey(item)];
             return entry && entry.physicalQty !== '';
         }).map(item => {
-            const entry = stocktakeData[item.id];
+            const entry = stocktakeData[getRowKey(item)];
             const diff = calculateDiff(item.quantity, entry.physicalQty);
             return {
                 productId: item.id,
@@ -86,10 +87,13 @@ export default function StocktakePage({ user, apiUrl }) {
             return;
         }
 
-        // Validate reason for discrepancies
-        const missingReason = items.find(item => item.diff !== 0 && !item.reason);
-        if (missingReason) {
-            alert(`商品「${missingReason.productName}」有盤點差異，請填寫差異原因`);
+        // Validate reason and accountability for discrepancies
+        const missingInfo = items.find(item => item.diff !== 0 && (!item.reason || !item.accountability));
+        if (missingInfo) {
+            alert(`商品「${missingInfo.productName}」有盤點差異，請填寫差異原因與責任歸屬`);
+            const key = getRowKey(missingInfo);
+            if (!stocktakeData[key].reason) document.getElementById(`reason-${key}`)?.focus();
+            else document.getElementById(`acc-${key}`)?.focus();
             return;
         }
 
@@ -97,7 +101,7 @@ export default function StocktakePage({ user, apiUrl }) {
 
         setSubmitting(true);
         try {
-            await callGAS(apiUrl, 'submitStocktake', {
+            await callGAS(apiUrl, 'saveStocktake', {
                 date: new Date().toISOString().split('T')[0],
                 items,
                 operator: user.username
@@ -116,13 +120,14 @@ export default function StocktakePage({ user, apiUrl }) {
     };
 
     const filteredInventory = inventory.filter(item => {
-        const matchesSearch = item.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.batchId?.toLowerCase().includes(searchTerm.toLowerCase());
+        if (!item) return false;
+        const nameMatch = String(item.productName || '').toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSearch = nameMatch;
 
         if (!matchesSearch) return false;
 
         if (showDiffOnly) {
-            const entry = stocktakeData[item.id];
+            const entry = stocktakeData[getRowKey(item)];
             const diff = calculateDiff(item.quantity, entry?.physicalQty);
             return diff !== 0 && entry?.physicalQty !== '';
         }
@@ -165,7 +170,7 @@ export default function StocktakePage({ user, apiUrl }) {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                     <input
                         type="text"
-                        placeholder="搜尋產品或批號..."
+                        placeholder="搜尋產品名稱..."
                         className="input-field pl-10 w-full"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -188,8 +193,8 @@ export default function StocktakePage({ user, apiUrl }) {
                     <table className="w-full text-left text-sm relative">
                         <thead className="bg-slate-800 text-slate-400 text-xs uppercase tracking-wider sticky top-0 z-10 shadow-sm">
                             <tr>
-                                <th className="p-4 w-[25%]">產品資料</th>
-                                <th className="p-4 text-right w-[10%]">帳面庫存</th>
+                                <th className="p-4 w-[20%]">產品資料</th>
+                                <th className="p-4 w-[10%] text-right">帳面庫存</th>
                                 <th className="p-4 w-[15%]">實盤數量</th>
                                 <th className="p-4 text-center w-[10%]">差異</th>
                                 <th className="p-4 w-[20%]">差異原因</th>
@@ -200,61 +205,77 @@ export default function StocktakePage({ user, apiUrl }) {
                             {loading ? (
                                 <tr><td colSpan="6" className="p-20 text-center text-slate-500">載入庫存資料中...</td></tr>
                             ) : filteredInventory.length > 0 ? (
-                                filteredInventory.map((item) => {
-                                    const entry = stocktakeData[item.id] || { physicalQty: '', reason: '', accountability: '' };
+                                filteredInventory.map((item, idx) => {
+                                    if (!item) return null;
+                                    const rowKey = getRowKey(item);
+                                    const entry = stocktakeData[rowKey] || { physicalQty: '', reason: '', accountability: user.username || '' };
                                     const diff = calculateDiff(item.quantity, entry.physicalQty);
-                                    const hasDiff = entry.physicalQty !== '' && diff !== 0;
 
                                     return (
-                                        <tr key={item.id} className={`hover:bg-slate-800/30 transition-colors ${hasDiff ? 'bg-amber-500/5' : ''}`}>
+                                        <tr key={rowKey} className={`hover:bg-slate-800/30 transition-colors ${diff !== 0 && entry.physicalQty !== '' ? 'bg-amber-500/5' : ''}`}>
                                             <td className="p-4">
-                                                <div className="font-bold text-white">{item.productName}</div>
-                                                <div className="text-xs text-slate-500 font-mono mt-0.5">
-                                                    批號: {item.batchId || '-'}
-                                                </div>
+                                                <div className="font-bold text-white">{item.productName || '未命名商品'}</div>
                                             </td>
                                             <td className="p-4 text-right font-mono text-slate-400">
                                                 {item.quantity}
                                             </td>
                                             <td className="p-4">
                                                 <input
+                                                    id={`qty-${rowKey}`}
                                                     type="number"
-                                                    className={`input-field w-full text-right font-mono ${hasDiff ? 'border-amber-500/50 text-amber-200' : ''}`}
-                                                    placeholder="-"
+                                                    className={`input-field w-full text-right font-mono ${diff !== 0 && entry.physicalQty !== '' ? 'border-red-500/50 text-red-200' : ''}`}
+                                                    placeholder="0"
                                                     value={entry.physicalQty}
-                                                    onChange={(e) => handleInputChange(item.id, 'physicalQty', e.target.value)}
+                                                    onChange={(e) => handleInputChange(rowKey, 'physicalQty', e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            document.getElementById(`reason-${rowKey}`)?.focus();
+                                                        }
+                                                    }}
                                                     onWheel={(e) => e.target.blur()}
                                                 />
                                             </td>
                                             <td className="p-4 text-center">
-                                                {entry.physicalQty !== '' ? (
-                                                    <span className={`inline-flex items-center gap-1 font-mono font-bold ${diff === 0 ? 'text-green-500' : diff > 0 ? 'text-blue-400' : 'text-red-400'
-                                                        }`}>
-                                                        {diff > 0 ? `+${diff}` : diff}
-                                                        {diff !== 0 && <AlertTriangle size={12} />}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-slate-600">-</span>
-                                                )}
+                                                <span className={`inline-flex items-center gap-1 font-mono font-bold ${entry.physicalQty === '' || diff === 0 ? 'text-green-500' : 'text-red-500 underline'}`}>
+                                                    {entry.physicalQty !== '' ? (diff > 0 ? `+${diff}` : diff) : 0}
+                                                    {entry.physicalQty !== '' && diff !== 0 && <AlertTriangle size={12} />}
+                                                </span>
                                             </td>
                                             <td className="p-4">
                                                 <input
+                                                    id={`reason-${rowKey}`}
                                                     type="text"
                                                     className="input-field w-full text-xs"
-                                                    placeholder={hasDiff ? "必填..." : "選填"}
+                                                    placeholder={diff !== 0 && entry.physicalQty !== '' ? "必填..." : "選填"}
                                                     value={entry.reason}
-                                                    onChange={(e) => handleInputChange(item.id, 'reason', e.target.value)}
-                                                    disabled={entry.physicalQty === '' || diff === 0}
+                                                    onChange={(e) => handleInputChange(rowKey, 'reason', e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            document.getElementById(`acc-${rowKey}`)?.focus();
+                                                        }
+                                                    }}
                                                 />
                                             </td>
                                             <td className="p-4">
                                                 <input
+                                                    id={`acc-${rowKey}`}
                                                     type="text"
                                                     className="input-field w-full text-xs"
-                                                    placeholder="選填"
+                                                    placeholder={diff !== 0 && entry.physicalQty !== '' ? "必填..." : "選填"}
                                                     value={entry.accountability}
-                                                    onChange={(e) => handleInputChange(item.id, 'accountability', e.target.value)}
-                                                    disabled={entry.physicalQty === '' || diff === 0}
+                                                    onChange={(e) => handleInputChange(rowKey, 'accountability', e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            const nextItem = filteredInventory[idx + 1];
+                                                            if (nextItem) {
+                                                                const nextKey = getRowKey(nextItem);
+                                                                document.getElementById(`qty-${nextKey}`)?.focus();
+                                                            }
+                                                        }
+                                                    }}
                                                 />
                                             </td>
                                         </tr>

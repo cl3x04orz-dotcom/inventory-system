@@ -110,7 +110,7 @@ export default function PurchasePage({ user, apiUrl }) {
         try {
             const result = await callGAS(apiUrl, 'addPurchase', {
                 items: payloadItems,
-                operator: user.name, // Explicitly pass operator name
+                operator: user.username, // Explicitly pass operator name
                 paymentMethod: paymentMethod // 'CASH' or 'CREDIT'
             }, user.token);
 

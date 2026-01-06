@@ -57,7 +57,9 @@ export default function PayablePage({ user, apiUrl }) {
     };
 
     const filtered = records.filter(r =>
-        String(r.vendorName || r.vendor || '').toLowerCase().includes(searchTerm.toLowerCase())
+        String(r.vendorName || r.vendor || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(r.operator || r.buyer || r.salesRep || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(r.location || r.customer || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const totalAmount = filtered.reduce((sum, r) => sum + (Number(r.amount) || Number(r.total) || 0), 0);
@@ -97,7 +99,7 @@ export default function PayablePage({ user, apiUrl }) {
                     <thead className="bg-slate-800 text-slate-400 text-xs uppercase sticky top-0">
                         <tr>
                             <th className="p-4 w-10"></th>
-                            <th className="p-4">產生日期</th>
+                            <th className="p-4 text-center">產生日期</th>
                             <th className="p-4">廠商名稱</th>
                             <th className="p-4 text-right">金額</th>
                             <th className="p-4 text-center">狀態</th>
@@ -114,8 +116,16 @@ export default function PayablePage({ user, apiUrl }) {
                                         <td className="p-4 text-slate-500">
                                             {expandedRows.has(i) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                         </td>
-                                        <td className="p-4 text-slate-300">
-                                            {r.date ? new Date(r.date).toLocaleDateString('zh-TW') : '-'}
+                                        <td className="p-4 text-slate-300 text-center">
+                                            {r.date ? (() => {
+                                                const d = new Date(r.date);
+                                                const hasTime = r.date.toString().includes(':') || r.date.toString().includes('T');
+                                                return d.toLocaleDateString('zh-TW', {
+                                                    year: 'numeric', month: '2-digit', day: '2-digit'
+                                                }) + (hasTime ? ' ' + d.toLocaleTimeString('zh-TW', {
+                                                    hour: '2-digit', minute: '2-digit', hour12: false
+                                                }) : '');
+                                            })() : '-'}
                                         </td>
                                         <td className="p-4 font-medium text-white">{r.vendorName || r.vendor || '-'}</td>
                                         <td className="p-4 text-right font-mono font-bold text-rose-300">
