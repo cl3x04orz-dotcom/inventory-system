@@ -238,8 +238,8 @@ export default function SalesPage({ user, apiUrl }) {
 
         const payload = {
             salesRep: user.username,
-            location: location, // Still sending as location to backend
-            paymentType: paymentType,
+            customer: location, // Changed key to match backend 'customer'
+            paymentMethod: paymentType, // Changed key to match backend 'paymentMethod'
             salesData: rows.map(r => ({
                 productId: r.id,
                 picked: r.picked,

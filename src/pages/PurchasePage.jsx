@@ -9,6 +9,7 @@ export default function PurchasePage({ user, apiUrl }) {
     ]);
     const [suggestions, setSuggestions] = useState({ vendors: [], vendorProductMap: {} });
     const [loading, setLoading] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState('CASH'); // 'CASH' or 'CREDIT'
 
     // Fetch Suggestions
     useEffect(() => {
@@ -109,12 +110,14 @@ export default function PurchasePage({ user, apiUrl }) {
         try {
             const result = await callGAS(apiUrl, 'addPurchase', {
                 items: payloadItems,
-                operator: user.name // Explicitly pass operator name
+                operator: user.name, // Explicitly pass operator name
+                paymentMethod: paymentMethod // 'CASH' or 'CREDIT'
             }, user.token);
 
             alert(`成功進貨 ${result.count} 筆商品！`);
             // Reset
             setItems([{ id: Date.now(), vendor: '', productName: '', quantity: '', unitPrice: '', expiryYear: new Date().getFullYear().toString(), expiryMonth: '', expiryDay: '' }]);
+            setPaymentMethod('CASH'); // Reset payment method
         } catch (err) {
             alert('進貨失敗: ' + err.message);
         } finally {
@@ -125,9 +128,33 @@ export default function PurchasePage({ user, apiUrl }) {
     return (
         <div className="max-w-[90rem] mx-auto p-4">
             <div className="glass-panel p-6">
-                <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 text-white">
-                    <PlusCircle className="text-emerald-400" /> 批次進貨作業
-                </h2>
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold flex items-center gap-2 text-white">
+                        <PlusCircle className="text-emerald-400" /> 批次進貨作業
+                    </h2>
+
+                    {/* Payment Method Toggle */}
+                    <div className="flex bg-slate-800 p-1 rounded-lg border border-slate-600">
+                        <button
+                            onClick={() => setPaymentMethod('CASH')}
+                            className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${paymentMethod === 'CASH'
+                                ? 'bg-emerald-500 text-white shadow-lg'
+                                : 'text-slate-400 hover:text-white'
+                                }`}
+                        >
+                            現金進貨
+                        </button>
+                        <button
+                            onClick={() => setPaymentMethod('CREDIT')}
+                            className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${paymentMethod === 'CREDIT'
+                                ? 'bg-purple-500 text-white shadow-lg'
+                                : 'text-slate-400 hover:text-white'
+                                }`}
+                        >
+                            賒帳進貨
+                        </button>
+                    </div>
+                </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Items Grid */}
