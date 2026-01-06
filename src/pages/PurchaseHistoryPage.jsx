@@ -5,7 +5,8 @@ import { callGAS } from '../utils/api';
 export default function PurchaseHistoryPage({ user, apiUrl }) {
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [productSearch, setProductSearch] = useState('');
+    const [vendorSearch, setVendorSearch] = useState('');
     const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -14,8 +15,7 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
         try {
             const data = await callGAS(apiUrl, 'getPurchaseHistory', {
                 startDate,
-                endDate,
-                keyword: searchTerm
+                endDate
             }, user.token);
 
             if (Array.isArray(data)) {
@@ -28,16 +28,20 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
         } finally {
             setLoading(false);
         }
-    }, [apiUrl, user.token, startDate, endDate, searchTerm]);
+    }, [apiUrl, user.token, startDate, endDate]);
 
     useEffect(() => {
         fetchHistory();
     }, [fetchHistory]);
 
-    const filtered = records.filter(r =>
-        String(r.productName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        String(r.vendorName || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filtered = records.filter(r => {
+        const pName = String(r.productName || '').toLowerCase();
+        const vName = String(r.vendorName || r.vendor || '').toLowerCase();
+        const pSearch = productSearch.toLowerCase();
+        const vSearch = vendorSearch.toLowerCase();
+
+        return pName.includes(pSearch) && vName.includes(vSearch);
+    });
 
     const totalAmount = filtered.reduce((sum, r) => sum + (Number(r.totalPrice) || 0), 0);
 
@@ -69,15 +73,29 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                 <div className="mb-6 p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
                     <div className="flex flex-col md:flex-row gap-4 items-end">
                         <div className="flex-1 space-y-1.5 w-full">
-                            <label className="text-[10px] text-slate-500 font-bold uppercase px-1">關鍵字搜尋 (產品/廠商)</label>
+                            <label className="text-[10px] text-slate-500 font-bold uppercase px-1">產品名稱</label>
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                                 <input
                                     type="text"
-                                    placeholder="搜尋..."
+                                    placeholder="搜尋產品..."
                                     className="input-field pl-10 w-full"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    value={productSearch}
+                                    onChange={(e) => setProductSearch(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex-1 space-y-1.5 w-full">
+                            <label className="text-[10px] text-slate-500 font-bold uppercase px-1">廠商名稱</label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="搜尋廠商..."
+                                    className="input-field pl-10 w-full"
+                                    value={vendorSearch}
+                                    onChange={(e) => setVendorSearch(e.target.value)}
                                 />
                             </div>
                         </div>
