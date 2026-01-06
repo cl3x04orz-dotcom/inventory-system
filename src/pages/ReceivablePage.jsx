@@ -66,9 +66,17 @@ export default function ReceivablePage({ user, apiUrl }) {
         setExpandedRows(newExpanded);
     };
 
-    const filtered = records.filter(r =>
-        String(r.clientName || r.customer || r.location || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const getOperatorName = (r) => {
+        return r.salesRep || r.salesPerson || r.operator || r.Operator || r.buyer || '-';
+    };
+
+    const filtered = records.filter(r => {
+        const search = searchTerm.toLowerCase();
+        const client = String(r.clientName || r.customer || r.location || '').toLowerCase();
+        const rep = String(getOperatorName(r)).toLowerCase();
+        const id = String(r.id || '').toLowerCase();
+        return client.includes(search) || rep.includes(search) || id.includes(search);
+    });
 
     const totalAmount = filtered.reduce((sum, r) => sum + (Number(r.amount) || Number(r.total) || 0), 0);
 
@@ -125,8 +133,22 @@ export default function ReceivablePage({ user, apiUrl }) {
                                             {expandedRows.has(i) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                         </td>
                                         <td className="p-4 text-slate-300">
-                                            {/* Date only, time removed as backend only provides date */}
-                                            {r.date ? new Date(r.date).toLocaleDateString('zh-TW') : '-'}
+                                            {(() => {
+                                                const dateVal = r.serverTimestamp || r.timestamp || r.date;
+                                                if (!dateVal) return '-';
+
+                                                const d = new Date(dateVal);
+                                                // If invalid date, return original string
+                                                if (isNaN(d.getTime())) return String(dateVal);
+
+                                                return d.toLocaleString('zh-TW', {
+                                                    year: 'numeric',
+                                                    month: '2-digit',
+                                                    day: '2-digit',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                });
+                                            })()}
                                         </td>
                                         <td className="p-4 font-medium text-white">{r.clientName || r.customer || r.location || '-'}</td>
                                         <td className="p-4 text-right font-mono font-bold text-emerald-300">
@@ -150,7 +172,7 @@ export default function ReceivablePage({ user, apiUrl }) {
                                     </tr>
                                     {expandedRows.has(i) && (
                                         <tr className="bg-slate-900/30">
-                                            <td colSpan="5" className="p-4 pl-12">
+                                            <td colSpan="6" className="p-4 pl-12">
                                                 <div className="bg-slate-800 border-2 border-slate-600 rounded-lg overflow-hidden">
                                                     <table className="w-full text-sm">
                                                         <thead>
@@ -166,7 +188,7 @@ export default function ReceivablePage({ user, apiUrl }) {
                                                                 (r.items || r.products || r.salesData || []).map((item, idx) => (
                                                                     <tr key={idx} className="hover:bg-slate-700/30">
                                                                         <td className="py-3 px-4 text-slate-300">
-                                                                            {r.salesRep || r.salesPerson || '-'}
+                                                                            {getOperatorName(r) || r.operator || r.salesRep || '-'}
                                                                         </td>
                                                                         <td className="py-3 px-4 text-slate-200 font-medium">
                                                                             {item.productName || item.name || '-'}
@@ -186,6 +208,7 @@ export default function ReceivablePage({ user, apiUrl }) {
                                                             )}
                                                         </tbody>
                                                     </table>
+
                                                 </div>
                                             </td>
                                         </tr>
@@ -193,7 +216,7 @@ export default function ReceivablePage({ user, apiUrl }) {
                                 </React.Fragment>
                             ))
                         ) : (
-                            <tr><td colSpan="5" className="p-10 text-center text-slate-500">無應收帳款</td></tr>
+                            <tr><td colSpan="6" className="p-10 text-center text-slate-500">無應收帳款</td></tr>
                         )}
                     </tbody>
                 </table>

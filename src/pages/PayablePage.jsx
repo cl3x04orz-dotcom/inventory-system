@@ -56,11 +56,17 @@ export default function PayablePage({ user, apiUrl }) {
         setExpandedRows(newExpanded);
     };
 
-    const filtered = records.filter(r =>
-        String(r.vendorName || r.vendor || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        String(r.operator || r.buyer || r.salesRep || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        String(r.location || r.customer || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const getOperatorName = (r) => {
+        return r.operator || r.Operator || r.buyer || r.salesRep || r.salesPerson || '-';
+    };
+
+    const filtered = records.filter(r => {
+        const search = searchTerm.toLowerCase();
+        const vendor = String(r.vendorName || r.vendor || '').toLowerCase();
+        const op = String(getOperatorName(r)).toLowerCase();
+        const loc = String(r.location || r.customer || '').toLowerCase();
+        return vendor.includes(search) || op.includes(search) || loc.includes(search);
+    });
 
     const totalAmount = filtered.reduce((sum, r) => sum + (Number(r.amount) || Number(r.total) || 0), 0);
 
@@ -117,15 +123,22 @@ export default function PayablePage({ user, apiUrl }) {
                                             {expandedRows.has(i) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                         </td>
                                         <td className="p-4 text-slate-300 text-center">
-                                            {r.date ? (() => {
-                                                const d = new Date(r.date);
-                                                const hasTime = r.date.toString().includes(':') || r.date.toString().includes('T');
-                                                return d.toLocaleDateString('zh-TW', {
-                                                    year: 'numeric', month: '2-digit', day: '2-digit'
-                                                }) + (hasTime ? ' ' + d.toLocaleTimeString('zh-TW', {
-                                                    hour: '2-digit', minute: '2-digit', hour12: false
-                                                }) : '');
-                                            })() : '-'}
+                                            {(() => {
+                                                const dateVal = r.serverTimestamp || r.timestamp || r.date;
+                                                if (!dateVal) return '-';
+
+                                                const d = new Date(dateVal);
+                                                // If invalid date, return original string
+                                                if (isNaN(d.getTime())) return String(dateVal);
+
+                                                return d.toLocaleString('zh-TW', {
+                                                    year: 'numeric',
+                                                    month: '2-digit',
+                                                    day: '2-digit',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                });
+                                            })()}
                                         </td>
                                         <td className="p-4 font-medium text-white">{r.vendorName || r.vendor || '-'}</td>
                                         <td className="p-4 text-right font-mono font-bold text-rose-300">
@@ -165,7 +178,7 @@ export default function PayablePage({ user, apiUrl }) {
                                                                 (r.items || r.products || []).map((item, idx) => (
                                                                     <tr key={idx} className="hover:bg-slate-700/30">
                                                                         <td className="py-3 px-4 text-slate-300">
-                                                                            {r.operator || r.buyer || r.salesRep || '-'}
+                                                                            {getOperatorName(r)}
                                                                         </td>
                                                                         <td className="py-3 px-4 text-slate-200 font-medium">
                                                                             {item.productName || item.name || '-'}
@@ -185,6 +198,11 @@ export default function PayablePage({ user, apiUrl }) {
                                                             )}
                                                         </tbody>
                                                     </table>
+                                                    <div className="p-3 bg-slate-700/20 text-xs text-slate-400 flex gap-4 border-t border-slate-600">
+                                                        <span>單據編號: {r.id || '-'}</span>
+                                                        <span>操作員: {r.operator || r.Operator || r.buyer || '-'}</span>
+                                                        <span>位置: {r.location || r.customer || '-'}</span>
+                                                    </div>
                                                 </div>
                                             </td>
                                         </tr>

@@ -7,6 +7,7 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
+    const [type, setType] = useState('ALL');
     const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -36,9 +37,11 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
         if (user?.token) fetchHistory();
     }, [user.token, apiUrl, startDate, endDate]);
 
-    const filtered = records.filter(r =>
-        String(r.productName || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filtered = records.filter(r => {
+        const matchesTerm = String(r.productName || '').toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesType = type === 'ALL' || r.type === type;
+        return matchesTerm && matchesType;
+    });
 
     return (
         <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
@@ -65,6 +68,21 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
+                    </div>
+
+                    <div className="w-full md:w-32 space-y-1.5">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase px-1">類型</label>
+                        <select
+                            value={type}
+                            onChange={(e) => setType(e.target.value)}
+                            className="input-field w-full text-sm appearance-none bg-slate-900"
+                        >
+                            <option value="ALL">全部類型</option>
+                            <option value="SCRAP">報廢</option>
+                            <option value="RETURN">退貨</option>
+                            <option value="LOSS">損耗</option>
+                            <option value="OTHER">其他</option>
+                        </select>
                     </div>
 
                     <div className="w-full md:w-40 space-y-1.5">
@@ -138,9 +156,9 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                                             <td className="p-4 font-medium text-white">{record.productName}</td>
                                             <td className="p-4">
                                                 <span className={`px-2 py-1 rounded text-xs font-medium ${record.type === 'SCRAP' ? 'bg-red-500/20 text-red-400' :
-                                                        record.type === 'RETURN' ? 'bg-blue-500/20 text-blue-400' :
-                                                            record.type === 'LOSS' ? 'bg-orange-500/20 text-orange-400' :
-                                                                'bg-slate-500/20 text-slate-400'
+                                                    record.type === 'RETURN' ? 'bg-blue-500/20 text-blue-400' :
+                                                        record.type === 'LOSS' ? 'bg-orange-500/20 text-orange-400' :
+                                                            'bg-slate-500/20 text-slate-400'
                                                     }`}>
                                                     {typeLabels[record.type] || record.type}
                                                 </span>

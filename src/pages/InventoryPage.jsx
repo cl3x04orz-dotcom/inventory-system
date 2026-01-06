@@ -118,10 +118,20 @@ export default function InventoryPage({ user, apiUrl }) {
     };
 
     const filteredInventory = inventory.filter(item => {
-        const name = String(item.productName || '');
-        const batch = String(item.batchId || '');
+        const name = String(item.productName || '').toLowerCase();
         const term = searchTerm.toLowerCase();
-        return name.toLowerCase().includes(term) || batch.toLowerCase().includes(term);
+
+        // Priority: Match product name
+        if (name.includes(term)) return true;
+
+        // Optional: Match batch ID only if search term is somewhat specific (e.g., > 6 chars)
+        // This prevents short numeric searches from matching every UUID batch ID
+        if (term.length > 6) {
+            const batch = String(item.batchId || '').toLowerCase();
+            return batch.includes(term);
+        }
+
+        return false;
     });
 
     const stockItems = filteredInventory.filter(item => item.type === 'STOCK');
@@ -159,7 +169,8 @@ export default function InventoryPage({ user, apiUrl }) {
                             items.map((item, idx) => {
                                 const safetyLevel = safetyStocks[item.productName] || 0;
                                 const totalQty = productTotals[item.productName] || 0;
-                                const isLowStock = totalQty < safetyLevel && safetyLevel > 0;
+                                // Alert when total stock is LESS THAN OR EQUAL to safety level
+                                const isLowStock = safetyLevel > 0 && totalQty <= safetyLevel;
 
                                 return (
                                     <tr key={idx} className={`hover:bg-slate-800/40 transition-colors ${isLowStock ? 'bg-red-900/10' : ''}`}>

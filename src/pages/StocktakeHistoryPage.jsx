@@ -6,7 +6,7 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [diffOnly, setDiffOnly] = useState(false);
+    const [diffOnly, setDiffOnly] = useState(true);
 
     // 預設當天
     const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);

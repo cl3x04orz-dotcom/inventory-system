@@ -220,7 +220,7 @@ export default function ReportPage({ user, apiUrl }) {
                         <div className="p-4 border-b border-white/10 bg-white/5">
                             <h3 className="font-bold text-white">詳細銷售紀錄</h3>
                         </div>
-                        <div className="overflow-x-auto max-h-96">
+                        <div className="overflow-auto max-h-[600px]">
                             <table className="w-full text-left text-sm">
                                 <thead className="bg-slate-800/50 text-slate-400 sticky top-0">
                                     <tr>
@@ -235,7 +235,15 @@ export default function ReportPage({ user, apiUrl }) {
                                 <tbody className="divide-y divide-white/5 text-slate-300">
                                     {reportData.map((item, idx) => (
                                         <tr key={idx} className="hover:bg-white/5">
-                                            <td className="p-3 text-slate-400">{new Date(item.date).toLocaleDateString('zh-TW')}</td>
+                                            <td className="p-3 text-slate-400">
+                                                {new Date(item.date).toLocaleString('zh-TW', {
+                                                    year: 'numeric',
+                                                    month: '2-digit',
+                                                    day: '2-digit',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                })}
+                                            </td>
                                             <td className="p-3">{item.location}</td>
                                             <td className="p-3">{item.salesRep}</td>
                                             <td className="p-3 text-white">{item.productName}</td>
