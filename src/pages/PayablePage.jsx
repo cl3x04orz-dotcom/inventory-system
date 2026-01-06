@@ -5,13 +5,23 @@ import { callGAS } from '../utils/api';
 export default function PayablePage({ user, apiUrl }) {
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
+
+    // Search Filters
+    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const [vendorSearch, setVendorSearch] = useState('');
+    const [operatorSearch, setOperatorSearch] = useState('');
+
     const [expandedRows, setExpandedRows] = useState(new Set());
 
-    const fetchData = async () => {
+    const fetchData = React.useCallback(async () => {
         setLoading(true);
         try {
-            const data = await callGAS(apiUrl, 'getPayables', {}, user.token);
+            const payload = {};
+            if (startDate) payload.startDate = startDate;
+            if (endDate) payload.endDate = endDate;
+
+            const data = await callGAS(apiUrl, 'getPayables', payload, user.token);
             if (Array.isArray(data)) {
                 // Sort by date descending
                 const sorted = data.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -19,15 +29,15 @@ export default function PayablePage({ user, apiUrl }) {
             }
         } catch (error) {
             console.error('Failed to fetch payables:', error);
-            alert('獲取應付帳款失敗: ' + error.message);
+            // alert('獲取應付帳款失敗: ' + error.message);
         } finally {
             setLoading(false);
         }
-    };
+    }, [apiUrl, user.token, startDate, endDate]);
 
     useEffect(() => {
-        if (user?.token) fetchData();
-    }, [user.token, apiUrl]);
+        fetchData();
+    }, [fetchData]);
 
     const handleMarkAsPaid = async (recordId) => {
         if (!confirm('確定要將此筆帳款標記為已付款嗎？')) return;
@@ -61,11 +71,13 @@ export default function PayablePage({ user, apiUrl }) {
     };
 
     const filtered = records.filter(r => {
-        const search = searchTerm.toLowerCase();
         const vendor = String(r.vendorName || r.vendor || '').toLowerCase();
         const op = String(getOperatorName(r)).toLowerCase();
-        const loc = String(r.location || r.customer || '').toLowerCase();
-        return vendor.includes(search) || op.includes(search) || loc.includes(search);
+
+        const matchVendor = !vendorSearch || vendor.includes(vendorSearch.toLowerCase());
+        const matchOp = !operatorSearch || op.includes(operatorSearch.toLowerCase());
+
+        return matchVendor && matchOp;
     });
 
     const totalAmount = filtered.reduce((sum, r) => sum + (Number(r.amount) || Number(r.total) || 0), 0);
@@ -84,23 +96,56 @@ export default function PayablePage({ user, apiUrl }) {
                 </div>
             </div>
 
-            <div className="glass-panel p-4 flex gap-4">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                    <input
-                        type="text"
-                        placeholder="搜尋廠商名稱..."
-                        className="input-field pl-10 w-full"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+            {/* Filters */}
+            <div className="mb-6 p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                    <div className="space-y-1">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
+                        <input
+                            type="date"
+                            className="input-field w-full"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
+                        <input
+                            type="date"
+                            className="input-field w-full"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase px-1">廠商名稱</label>
+                        <input
+                            type="text"
+                            placeholder="輸入廠商..."
+                            className="input-field w-full"
+                            value={vendorSearch}
+                            onChange={(e) => setVendorSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase px-1">採購人員</label>
+                        <input
+                            type="text"
+                            placeholder="輸入姓名..."
+                            className="input-field w-full"
+                            value={operatorSearch}
+                            onChange={(e) => setOperatorSearch(e.target.value)}
+                        />
+                    </div>
+
+                    <button onClick={fetchData} className="btn-secondary h-[42px] px-6 flex items-center gap-2 justify-center">
+                        <RefreshCw size={18} /> 查詢
+                    </button>
                 </div>
-                <button onClick={fetchData} className="btn-secondary px-4">
-                    <RefreshCw size={18} />
-                </button>
             </div>
 
-            <div className="glass-panel p-0 overflow-hidden">
+            {/* Table */}
+            <div className="rounded-xl border border-slate-700/50 overflow-hidden">
                 <table className="w-full text-left text-sm">
                     <thead className="bg-slate-800 text-slate-400 text-xs uppercase sticky top-0">
                         <tr>
@@ -127,17 +172,16 @@ export default function PayablePage({ user, apiUrl }) {
                                                 const dateVal = r.serverTimestamp || r.timestamp || r.date;
                                                 if (!dateVal) return '-';
 
+                                                const dateStr = String(dateVal);
                                                 const d = new Date(dateVal);
-                                                // If invalid date, return original string
-                                                if (isNaN(d.getTime())) return String(dateVal);
+                                                if (isNaN(d.getTime())) return dateStr;
 
-                                                return d.toLocaleString('zh-TW', {
-                                                    year: 'numeric',
-                                                    month: '2-digit',
-                                                    day: '2-digit',
-                                                    hour: '2-digit',
-                                                    minute: '2-digit'
-                                                });
+                                                // If it's a date-only string like YYYY-MM-DD (length 10), don't show time
+                                                const isDateOnly = dateStr.length <= 10 && !dateStr.includes('T') && !dateStr.includes(':');
+
+                                                return isDateOnly
+                                                    ? d.toLocaleDateString('zh-TW')
+                                                    : d.toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
                                             })()}
                                         </td>
                                         <td className="p-4 font-medium text-white">{r.vendorName || r.vendor || '-'}</td>

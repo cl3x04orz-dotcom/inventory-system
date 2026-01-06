@@ -5,10 +5,16 @@ import { callGAS } from '../utils/api';
 export default function ReceivablePage({ user, apiUrl }) {
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
+
+    // Search Filters
+    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const [clientSearch, setClientSearch] = useState('');
+    const [operatorSearch, setOperatorSearch] = useState('');
+
     const [expandedRows, setExpandedRows] = useState(new Set());
 
-    const fetchData = async () => {
+    const fetchData = React.useCallback(async () => {
         setLoading(true);
         try {
             // Note: Currently fetching both receivables and sales history.
@@ -21,7 +27,11 @@ export default function ReceivablePage({ user, apiUrl }) {
             // The previous 'getSalesHistory' method was showing ALL sales (cash included) which is confusing.
             // If the user needs to see old broken records, they will appear in Sales History page, not Receivables.
 
-            const data = await callGAS(apiUrl, 'getReceivables', {}, user.token);
+            const payload = {};
+            if (startDate) payload.startDate = startDate;
+            if (endDate) payload.endDate = endDate;
+
+            const data = await callGAS(apiUrl, 'getReceivables', payload, user.token);
 
             if (Array.isArray(data)) {
                 // Sort by date descending (newest first)
@@ -34,11 +44,11 @@ export default function ReceivablePage({ user, apiUrl }) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [apiUrl, user.token, startDate, endDate]);
 
     useEffect(() => {
-        if (user?.token) fetchData();
-    }, [user.token, apiUrl]);
+        fetchData();
+    }, [fetchData]);
 
     const handleMarkAsPaid = async (recordId) => {
         if (!confirm('確定要將此筆帳款標記為已收款嗎？')) return;
@@ -67,15 +77,20 @@ export default function ReceivablePage({ user, apiUrl }) {
     };
 
     const getOperatorName = (r) => {
-        return r.salesRep || r.salesPerson || r.operator || r.Operator || r.buyer || '-';
+        const fields = [r.salesRep, r.salesPerson, r.operator, r.Operator, r.buyer];
+        // Find the first field that is NOT undefined, NOT null, and NOT string "Unknown"
+        const validName = fields.find(f => f && String(f).toLowerCase() !== 'unknown');
+        return validName || '-';
     };
 
     const filtered = records.filter(r => {
-        const search = searchTerm.toLowerCase();
         const client = String(r.clientName || r.customer || r.location || '').toLowerCase();
         const rep = String(getOperatorName(r)).toLowerCase();
-        const id = String(r.id || '').toLowerCase();
-        return client.includes(search) || rep.includes(search) || id.includes(search);
+
+        const matchClient = !clientSearch || client.includes(clientSearch.toLowerCase());
+        const matchOp = !operatorSearch || rep.includes(operatorSearch.toLowerCase());
+
+        return matchClient && matchOp;
     });
 
     const totalAmount = filtered.reduce((sum, r) => sum + (Number(r.amount) || Number(r.total) || 0), 0);
@@ -94,23 +109,56 @@ export default function ReceivablePage({ user, apiUrl }) {
                 </div>
             </div>
 
-            <div className="glass-panel p-4 flex gap-4">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                    <input
-                        type="text"
-                        placeholder="搜尋銷售對象..."
-                        className="input-field pl-10 w-full"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+            {/* Filters */}
+            <div className="mb-6 p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                    <div className="space-y-1">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
+                        <input
+                            type="date"
+                            className="input-field w-full"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
+                        <input
+                            type="date"
+                            className="input-field w-full"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase px-1">銷售對象/客戶</label>
+                        <input
+                            type="text"
+                            placeholder="輸入客戶..."
+                            className="input-field w-full"
+                            value={clientSearch}
+                            onChange={(e) => setClientSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase px-1">業務員</label>
+                        <input
+                            type="text"
+                            placeholder="輸入姓名..."
+                            className="input-field w-full"
+                            value={operatorSearch}
+                            onChange={(e) => setOperatorSearch(e.target.value)}
+                        />
+                    </div>
+
+                    <button onClick={fetchData} className="btn-secondary h-[42px] px-6 flex items-center gap-2 justify-center">
+                        <RefreshCw size={18} /> 查詢
+                    </button>
                 </div>
-                <button onClick={fetchData} className="btn-secondary px-4">
-                    <RefreshCw size={18} />
-                </button>
             </div>
 
-            <div className="glass-panel p-0 overflow-hidden">
+            {/* Table */}
+            <div className="rounded-xl border border-slate-700/50 overflow-hidden">
                 <table className="w-full text-left text-sm">
                     <thead className="bg-slate-800 text-slate-400 text-xs uppercase sticky top-0">
                         <tr>
@@ -137,17 +185,16 @@ export default function ReceivablePage({ user, apiUrl }) {
                                                 const dateVal = r.serverTimestamp || r.timestamp || r.date;
                                                 if (!dateVal) return '-';
 
+                                                // If it's a date-only string like YYYY-MM-DD (length 10), don't show time
+                                                const dateStr = String(dateVal);
                                                 const d = new Date(dateVal);
-                                                // If invalid date, return original string
-                                                if (isNaN(d.getTime())) return String(dateVal);
+                                                if (isNaN(d.getTime())) return dateStr;
 
-                                                return d.toLocaleString('zh-TW', {
-                                                    year: 'numeric',
-                                                    month: '2-digit',
-                                                    day: '2-digit',
-                                                    hour: '2-digit',
-                                                    minute: '2-digit'
-                                                });
+                                                const isDateOnly = dateStr.length <= 10 && !dateStr.includes('T') && !dateStr.includes(':');
+
+                                                return isDateOnly
+                                                    ? d.toLocaleDateString('zh-TW')
+                                                    : d.toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
                                             })()}
                                         </td>
                                         <td className="p-4 font-medium text-white">{r.clientName || r.customer || r.location || '-'}</td>
@@ -188,7 +235,7 @@ export default function ReceivablePage({ user, apiUrl }) {
                                                                 (r.items || r.products || r.salesData || []).map((item, idx) => (
                                                                     <tr key={idx} className="hover:bg-slate-700/30">
                                                                         <td className="py-3 px-4 text-slate-300">
-                                                                            {getOperatorName(r) || r.operator || r.salesRep || '-'}
+                                                                            {getOperatorName(r)}
                                                                         </td>
                                                                         <td className="py-3 px-4 text-slate-200 font-medium">
                                                                             {item.productName || item.name || '-'}
@@ -208,7 +255,11 @@ export default function ReceivablePage({ user, apiUrl }) {
                                                             )}
                                                         </tbody>
                                                     </table>
-
+                                                    <div className="p-3 bg-slate-700/20 text-xs text-slate-400 flex gap-4 border-t border-slate-600">
+                                                        <span>單據編號: {r.id || '-'}</span>
+                                                        <span>操作員: {r.operator || r.Operator || r.salesRep || '-'}</span>
+                                                        <span>付款方式: {r.paymentMethod || '信用資助'}</span>
+                                                    </div>
                                                 </div>
                                             </td>
                                         </tr>

@@ -8,12 +8,12 @@ export default function ReportPage({ user, apiUrl }) {
     const [location, setLocation] = useState('');
     const [salesRep, setSalesRep] = useState('');
     const [loading, setLoading] = useState(false);
-    const [reportData, setReportData] = useState(null);
+    const [reportData, setReportData] = useState([]);
 
-    const handleSearch = async (e) => {
-        e.preventDefault();
+    const fetchData = useCallback(async () => {
+        if (!startDate || !endDate) return;
         setLoading(true);
-        setReportData(null); // Reset previous results
+
         try {
             const payload = {
                 startDate,
@@ -54,6 +54,16 @@ export default function ReportPage({ user, apiUrl }) {
         } finally {
             setLoading(false);
         }
+    }, [startDate, endDate, location, salesRep, user.token, apiUrl]);
+
+    // Initial fetch and fetch on dependency change
+    React.useEffect(() => {
+        fetchData();
+    }, [fetchData]);
+
+    const handleSearch = (e) => {
+        e.preventDefault();
+        fetchData();
     };
 
     // Calculate summaries
@@ -74,189 +84,174 @@ export default function ReportPage({ user, apiUrl }) {
     const summaryList = productSummary ? Object.values(productSummary).sort((a, b) => b.qty - a.qty) : [];
 
     return (
-        <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                        <FileText className="text-blue-400" /> 銷售查詢報表
-                    </h1>
-                    <p className="text-slate-400 text-sm mt-1">查詢特定日期、銷售對象或業務的銷售紀錄</p>
-                </div>
-            </div>
-
-            {/* Filters */}
+        <div className="max-w-[90rem] mx-auto p-4">
             <div className="glass-panel p-6">
-                <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div className="space-y-1">
-                        <label className="text-xs text-slate-400 flex items-center gap-1">
-                            <Calendar size={14} /> 開始日期
-                        </label>
-                        <input
-                            type="date"
-                            required
-                            className="input-field w-full"
-                            value={startDate}
-                            onChange={e => setStartDate(e.target.value)}
-                        />
+                {/* Header Section */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-6 border-b border-slate-700/50 pb-6">
+                    <div>
+                        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+                            <FileText className="text-blue-400" /> 銷售查詢報表
+                        </h1>
+                        <p className="text-slate-400 text-sm mt-1">查詢特定日期、銷售對象或業務的銷售紀錄</p>
                     </div>
-                    <div className="space-y-1">
-                        <label className="text-xs text-slate-400 flex items-center gap-1">
-                            <Calendar size={14} /> 結束日期
-                        </label>
-                        <input
-                            type="date"
-                            required
-                            className="input-field w-full"
-                            value={endDate}
-                            onChange={e => setEndDate(e.target.value)}
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs text-slate-400 flex items-center gap-1">
-                            <MapPin size={14} /> 銷售對象
-                        </label>
-                        <input
-                            type="text"
-                            placeholder="輸入銷售對象關鍵字"
-                            className="input-field w-full"
-                            value={location}
-                            onChange={e => setLocation(e.target.value)}
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs text-slate-400 flex items-center gap-1">
-                            <User size={14} /> 業務員 (選填)
-                        </label>
-                        <input
-                            type="text"
-                            placeholder="輸入業務姓名"
-                            className="input-field w-full"
-                            value={salesRep}
-                            onChange={e => setSalesRep(e.target.value)}
-                        />
+
+                    {/* Summary Stats (Integrated in Header) */}
+                    {reportData && (
+                        <div className="flex gap-4">
+                            <div className="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                                <p className="text-xs text-slate-400 uppercase font-bold text-center">總銷售額</p>
+                                <p className="text-xl font-bold text-emerald-400 text-center">${totalSales.toLocaleString()}</p>
+                            </div>
+                            <div className="px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                                <p className="text-xs text-slate-400 uppercase font-bold text-center">總數量</p>
+                                <p className="text-xl font-bold text-blue-400 text-center">{totalQty.toLocaleString()}</p>
+                            </div>
+                            <div className="px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                                <p className="text-xs text-slate-400 uppercase font-bold text-center">總筆數</p>
+                                <p className="text-xl font-bold text-purple-400 text-center">{reportData.length}</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Filters */}
+                <form onSubmit={handleSearch} className="mb-6 p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase px-1">開始日期</label>
+                            <input
+                                type="date"
+                                required
+                                className="input-field w-full"
+                                value={startDate}
+                                onChange={e => setStartDate(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase px-1">結束日期</label>
+                            <input
+                                type="date"
+                                required
+                                className="input-field w-full"
+                                value={endDate}
+                                onChange={e => setEndDate(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase px-1">銷售對象/地點</label>
+                            <input
+                                type="text"
+                                placeholder="輸入關鍵字..."
+                                className="input-field w-full"
+                                value={location}
+                                onChange={e => setLocation(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex gap-2">
+                            <div className="space-y-1 flex-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase px-1">業務員</label>
+                                <input
+                                    type="text"
+                                    placeholder="姓名..."
+                                    className="input-field w-full"
+                                    value={salesRep}
+                                    onChange={e => setSalesRep(e.target.value)}
+                                />
+                            </div>
+                            <button
+                                onClick={handleSearch}
+                                disabled={loading}
+                                className="btn-primary py-2 px-6 flex items-center gap-2 self-end h-[42px]"
+                            >
+                                {loading ? '...' : <Search size={18} />} 查詢
+                            </button>
+                        </div>
                     </div>
                 </form>
-                <div className="mt-4 flex justify-end">
-                    <button
-                        onClick={handleSearch}
-                        disabled={loading}
-                        className="btn-primary py-2 px-6 flex items-center gap-2"
-                    >
-                        {loading ? '查詢中...' : <><Search size={18} /> 開始查詢</>}
-                    </button>
-                </div>
-            </div>
 
-            {/* Results */}
-            {reportData && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Summary Cards */}
-                    <div className="glass-panel p-6 flex items-center gap-4">
-                        <div className="p-3 rounded-full bg-emerald-500/20 text-emerald-400">
-                            <TrendingUp size={24} />
-                        </div>
-                        <div>
-                            <p className="text-sm text-slate-400">總銷售額</p>
-                            <p className="text-2xl font-bold text-white">${totalSales.toLocaleString()}</p>
-                        </div>
-                    </div>
-                    <div className="glass-panel p-6 flex items-center gap-4">
-                        <div className="p-3 rounded-full bg-blue-500/20 text-blue-400">
-                            <Package size={24} />
-                        </div>
-                        <div>
-                            <p className="text-sm text-slate-400">總銷售數量</p>
-                            <p className="text-2xl font-bold text-white">{totalQty.toLocaleString()} 瓶/個</p>
-                        </div>
-                    </div>
-                    <div className="glass-panel p-6 flex items-center gap-4">
-                        <div className="p-3 rounded-full bg-purple-500/20 text-purple-400">
-                            <FileText size={24} />
-                        </div>
-                        <div>
-                            <p className="text-sm text-slate-400">總筆數</p>
-                            <p className="text-2xl font-bold text-white">{reportData.length} 筆</p>
-                        </div>
-                    </div>
-
-                    {/* Detailed Table */}
-                    <div className="md:col-span-3 glass-panel p-0 overflow-hidden">
-                        <div className="p-4 border-b border-white/10 bg-white/5">
-                            <h3 className="font-bold text-white">商品銷售統計</h3>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left">
-                                <thead className="bg-slate-800/50 text-slate-400 text-sm uppercas">
-                                    <tr>
-                                        <th className="p-4 font-medium">商品名稱</th>
-                                        <th className="p-4 font-medium text-right">銷售數量</th>
-                                        <th className="p-4 font-medium text-right">銷售金額</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-white/10">
-                                    {summaryList.length > 0 ? (
-                                        summaryList.map((item, idx) => (
-                                            <tr key={idx} className="hover:bg-white/5 transition-colors">
-                                                <td className="p-4 text-white">{item.name}</td>
-                                                <td className="p-4 text-right text-slate-300">{item.qty}</td>
-                                                <td className="p-4 text-right text-emerald-400">${item.amount.toLocaleString()}</td>
-                                            </tr>
-                                        ))
-                                    ) : (
+                {/* Content Logic */}
+                {reportData && (
+                    <div className="space-y-6">
+                        {/* 1. Summary Table */}
+                        <div className="rounded-xl border border-slate-700/50 overflow-hidden">
+                            <div className="px-4 py-3 bg-slate-800/80 border-b border-slate-700/50 backdrop-blur-sm">
+                                <h3 className="font-bold text-white flex items-center gap-2">
+                                    <Package size={16} className="text-blue-400" /> 商品銷售統計
+                                </h3>
+                            </div>
+                            <div className="overflow-x-auto max-h-60">
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-800/50 text-slate-400 text-sm uppercase">
                                         <tr>
-                                            <td colSpan="3" className="p-8 text-center text-slate-500">
-                                                查無資料
-                                            </td>
+                                            <th className="p-4 font-medium">商品名稱</th>
+                                            <th className="p-4 font-medium text-right">銷售數量</th>
+                                            <th className="p-4 font-medium text-right">銷售金額</th>
                                         </tr>
-                                    )}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/10 bg-slate-900/30">
+                                        {summaryList.length > 0 ? (
+                                            summaryList.map((item, idx) => (
+                                                <tr key={idx} className="hover:bg-white/5 transition-colors">
+                                                    <td className="p-4 text-white">{item.name}</td>
+                                                    <td className="p-4 text-right text-slate-300">{item.qty}</td>
+                                                    <td className="p-4 text-right text-emerald-400">${item.amount.toLocaleString()}</td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan="3" className="p-8 text-center text-slate-500">查無資料</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </div>
 
-                    {/* Raw History List (Collapsible or Bottom) */}
-                    <div className="md:col-span-3 glass-panel p-0 overflow-hidden">
-                        <div className="p-4 border-b border-white/10 bg-white/5">
-                            <h3 className="font-bold text-white">詳細銷售紀錄</h3>
-                        </div>
-                        <div className="overflow-auto max-h-[600px]">
-                            <table className="w-full text-left text-sm">
-                                <thead className="bg-slate-800/50 text-slate-400 sticky top-0">
-                                    <tr>
-                                        <th className="p-3 font-medium">日期</th>
-                                        <th className="p-3 font-medium">地點</th>
-                                        <th className="p-3 font-medium">業務</th>
-                                        <th className="p-3 font-medium">商品</th>
-                                        <th className="p-3 font-medium text-right">數量</th>
-                                        <th className="p-3 font-medium text-right">金額</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-white/5 text-slate-300">
-                                    {reportData.map((item, idx) => (
-                                        <tr key={idx} className="hover:bg-white/5">
-                                            <td className="p-3 text-slate-400">
-                                                {new Date(item.date).toLocaleString('zh-TW', {
-                                                    year: 'numeric',
-                                                    month: '2-digit',
-                                                    day: '2-digit',
-                                                    hour: '2-digit',
-                                                    minute: '2-digit'
-                                                })}
-                                            </td>
-                                            <td className="p-3">{item.location}</td>
-                                            <td className="p-3">{item.salesRep}</td>
-                                            <td className="p-3 text-white">{item.productName}</td>
-                                            <td className="p-3 text-right">{item.soldQty}</td>
-                                            <td className="p-3 text-right">${item.totalAmount}</td>
+                        {/* 2. Detailed History List */}
+                        <div className="rounded-xl border border-slate-700/50 overflow-hidden">
+                            <div className="px-4 py-3 bg-slate-800/80 border-b border-slate-700/50 backdrop-blur-sm">
+                                <h3 className="font-bold text-white flex items-center gap-2">
+                                    <TrendingUp size={16} className="text-emerald-400" /> 詳細銷售紀錄
+                                </h3>
+                            </div>
+                            <div className="overflow-auto max-h-[600px]">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-slate-800/50 text-slate-400 sticky top-0 backdrop-blur-sm z-10">
+                                        <tr>
+                                            <th className="p-3 font-medium">日期</th>
+                                            <th className="p-3 font-medium">地點</th>
+                                            <th className="p-3 font-medium">業務</th>
+                                            <th className="p-3 font-medium">商品</th>
+                                            <th className="p-3 font-medium text-right">數量</th>
+                                            <th className="p-3 font-medium text-right">金額</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5 text-slate-300 bg-slate-900/30">
+                                        {reportData.map((item, idx) => (
+                                            <tr key={idx} className="hover:bg-white/5">
+                                                <td className="p-3 text-slate-400">
+                                                    {new Date(item.date).toLocaleString('zh-TW', {
+                                                        year: 'numeric',
+                                                        month: '2-digit',
+                                                        day: '2-digit',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
+                                                </td>
+                                                <td className="p-3">{item.location}</td>
+                                                <td className="p-3">{item.salesRep}</td>
+                                                <td className="p-3 text-white">{item.productName}</td>
+                                                <td className="p-3 text-right">{item.soldQty}</td>
+                                                <td className="p-3 text-right">${item.totalAmount}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 }
