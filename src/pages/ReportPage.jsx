@@ -139,7 +139,7 @@ export default function ReportPage({ user, apiUrl }) {
                             />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase px-1">銷售對象/地點</label>
+                            <label className="text-xs font-bold text-slate-500 uppercase px-1">銷售對象</label>
                             <input
                                 type="text"
                                 placeholder="輸入關鍵字..."
@@ -219,12 +219,12 @@ export default function ReportPage({ user, apiUrl }) {
                                 <table className="w-full text-left text-sm">
                                     <thead className="bg-slate-800/50 text-slate-400 sticky top-0 backdrop-blur-sm z-10">
                                         <tr>
-                                            <th className="p-3 font-medium">日期</th>
-                                            <th className="p-3 font-medium">地點</th>
-                                            <th className="p-3 font-medium">業務</th>
+                                            <th className="p-3 font-medium w-48">日期</th>
+                                            <th className="p-3 font-medium w-32">銷售對象</th>
+                                            <th className="p-3 font-medium w-32">業務</th>
                                             <th className="p-3 font-medium">商品</th>
-                                            <th className="p-3 font-medium text-right">數量</th>
-                                            <th className="p-3 font-medium text-right">金額</th>
+                                            <th className="p-3 font-medium text-right w-24">數量</th>
+                                            <th className="p-3 font-medium text-right w-32">金額</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-white/5 text-slate-300 bg-slate-900/30">

@@ -9,7 +9,6 @@ export default function StocktakePage({ user, apiUrl }) {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [showDiffOnly, setShowDiffOnly] = useState(false);
     const getRowKey = useCallback((item) => `${item.id}-${item.batchId || 'no-batch'}`, []);
 
     const fetchInventory = useCallback(async () => {
@@ -126,12 +125,6 @@ export default function StocktakePage({ user, apiUrl }) {
 
         if (!matchesSearch) return false;
 
-        if (showDiffOnly) {
-            const entry = stocktakeData[getRowKey(item)];
-            const diff = calculateDiff(item.quantity, entry?.physicalQty);
-            return diff !== 0 && entry?.physicalQty !== '';
-        }
-
         return true;
     });
 
@@ -176,15 +169,6 @@ export default function StocktakePage({ user, apiUrl }) {
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <label className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 border border-white/5 cursor-pointer hover:bg-slate-700 transition-colors">
-                    <input
-                        type="checkbox"
-                        checked={showDiffOnly}
-                        onChange={(e) => setShowDiffOnly(e.target.checked)}
-                        className="w-4 h-4 rounded border-slate-600 text-blue-500 focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-slate-300">僅顯示有差異項目</span>
-                </label>
             </div>
 
             {/* Table */}

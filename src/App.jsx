@@ -11,9 +11,14 @@ import StocktakePage from './pages/StocktakePage';
 import StocktakeHistoryPage from './pages/StocktakeHistoryPage';
 import ReceivablePage from './pages/ReceivablePage';
 import PayablePage from './pages/PayablePage';
+import SalesRankingPage from './pages/SalesRankingPage';
+import CustomerRankingPage from './pages/CustomerRankingPage';
+import ProfitAnalysisPage from './pages/ProfitAnalysisPage';
+import TurnoverRatePage from './pages/TurnoverRatePage';
 import {
     LayoutDashboard, ShoppingCart, Archive, LogOut, PackagePlus,
-    FileText, ClipboardList, DollarSign, CheckSquare, Wallet, ChevronDown
+    FileText, ClipboardList, DollarSign, CheckSquare, Wallet, ChevronDown,
+    TrendingUp, BarChart2, Users, Activity
 } from 'lucide-react';
 
 // Google Apps Script (GAS) API Endpoint
@@ -166,6 +171,21 @@ export default function App() {
                         <NavItem label="應收帳款" icon={Wallet} onClick={() => handlePageChange('receivable')} active={page === 'receivable'} />
                         <NavItem label="應付帳款" icon={Wallet} onClick={() => handlePageChange('payable')} active={page === 'payable'} />
                     </NavDropdown>
+
+                    {/* 數據分析 Group */}
+                    <NavDropdown
+                        id="analytics"
+                        label="數據分析"
+                        icon={TrendingUp}
+                        openDropdown={openDropdown}
+                        setOpenDropdown={setOpenDropdown}
+                        active={['salesRanking', 'customerRanking', 'profitAnalysis', 'turnoverRate'].includes(page)}
+                    >
+                        <NavItem label="商品銷售排行" icon={BarChart2} onClick={() => handlePageChange('salesRanking')} active={page === 'salesRanking'} />
+                        <NavItem label="客戶銷售排行" icon={Users} onClick={() => handlePageChange('customerRanking')} active={page === 'customerRanking'} />
+                        <NavItem label="毛利分析報表" icon={TrendingUp} onClick={() => handlePageChange('profitAnalysis')} active={page === 'profitAnalysis'} />
+                        <NavItem label="庫存周轉率" icon={Activity} onClick={() => handlePageChange('turnoverRate')} active={page === 'turnoverRate'} />
+                    </NavDropdown>
                 </nav>
 
                 <div className="flex items-center gap-4">
@@ -196,6 +216,10 @@ export default function App() {
                 {page === 'stocktakeHistory' && <StocktakeHistoryPage user={user} apiUrl={GAS_API_URL} />}
                 {page === 'receivable' && <ReceivablePage user={user} apiUrl={GAS_API_URL} />}
                 {page === 'payable' && <PayablePage user={user} apiUrl={GAS_API_URL} />}
+                {page === 'salesRanking' && <SalesRankingPage user={user} apiUrl={GAS_API_URL} />}
+                {page === 'customerRanking' && <CustomerRankingPage user={user} apiUrl={GAS_API_URL} />}
+                {page === 'profitAnalysis' && <ProfitAnalysisPage user={user} apiUrl={GAS_API_URL} />}
+                {page === 'turnoverRate' && <TurnoverRatePage user={user} apiUrl={GAS_API_URL} />}
             </main>
         </div>
     );
