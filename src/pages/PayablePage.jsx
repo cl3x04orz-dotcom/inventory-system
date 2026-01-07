@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Wallet, Search, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { callGAS } from '../utils/api';
+import { getLocalDateString } from '../utils/constants';
 
 export default function PayablePage({ user, apiUrl }) {
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(false);
 
     // Search Filters
-    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const [startDate, setStartDate] = useState(getLocalDateString());
+    const [endDate, setEndDate] = useState(getLocalDateString());
     const [vendorSearch, setVendorSearch] = useState('');
     const [operatorSearch, setOperatorSearch] = useState('');
 

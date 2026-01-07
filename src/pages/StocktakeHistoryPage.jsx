@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Calendar, AlertTriangle, CheckCircle, Filter, RefreshCw, ClipboardList } from 'lucide-react';
 import { callGAS } from '../utils/api';
+import { getLocalDateString } from '../utils/constants';
 
 export default function StocktakeHistoryPage({ user, apiUrl }) {
     const [records, setRecords] = useState([]);
@@ -9,8 +10,8 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
     const [diffOnly, setDiffOnly] = useState(true);
 
     // 預設當天
-    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const [startDate, setStartDate] = useState(getLocalDateString());
+    const [endDate, setEndDate] = useState(getLocalDateString());
 
     const fetchHistory = React.useCallback(async () => {
         setLoading(true);

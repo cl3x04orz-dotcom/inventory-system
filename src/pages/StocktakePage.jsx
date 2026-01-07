@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Save, Search, AlertTriangle, CheckSquare, RotateCcw, Package } from 'lucide-react';
 import { callGAS } from '../utils/api';
-import { sortProducts } from '../utils/constants';
+import { sortProducts, getLocalDateString } from '../utils/constants';
 
 export default function StocktakePage({ user, apiUrl }) {
     const [inventory, setInventory] = useState([]);
@@ -102,7 +102,7 @@ export default function StocktakePage({ user, apiUrl }) {
         setSubmitting(true);
         try {
             await callGAS(apiUrl, 'saveStocktake', {
-                date: new Date().toISOString().split('T')[0],
+                date: getLocalDateString(),
                 items,
                 operator: user.username
             }, user.token);

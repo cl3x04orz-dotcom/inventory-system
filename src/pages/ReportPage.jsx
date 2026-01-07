@@ -1,10 +1,11 @@
 import React, { useState, useCallback } from 'react';
 import { Search, Calendar, MapPin, User, FileText, TrendingUp, Package } from 'lucide-react';
 import { callGAS } from '../utils/api';
+import { getLocalDateString } from '../utils/constants';
 
 export default function ReportPage({ user, apiUrl }) {
-    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const [startDate, setStartDate] = useState(getLocalDateString());
+    const [endDate, setEndDate] = useState(getLocalDateString());
     const [location, setLocation] = useState('');
     const [salesRep, setSalesRep] = useState('');
     const [loading, setLoading] = useState(false);

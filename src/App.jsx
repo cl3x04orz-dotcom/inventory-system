@@ -13,15 +13,63 @@ import ReceivablePage from './pages/ReceivablePage';
 import PayablePage from './pages/PayablePage';
 import {
     LayoutDashboard, ShoppingCart, Archive, LogOut, PackagePlus,
-    FileText, ClipboardList, DollarSign, CheckSquare, Wallet
+    FileText, ClipboardList, DollarSign, CheckSquare, Wallet, ChevronDown
 } from 'lucide-react';
 
 // Google Apps Script (GAS) API Endpoint
 const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbw0sN21nJXfjezYL446-wgwTbLOCUziFGOEN8qsXYg7cYHsN5R4Sgn2dSyzoGtH0Xb5/exec';
 
+const NavDropdown = ({ label, icon: Icon, active, children, id, openDropdown, setOpenDropdown }) => {
+    const isOpen = openDropdown === id;
+
+    return (
+        <div className="relative">
+            <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenDropdown(isOpen ? null : id);
+                }}
+                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all duration-200 ${active
+                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-[0_0_15px_rgba(37,99,235,0.1)]'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                    }`}
+            >
+                <Icon size={18} />
+                <span className="font-medium">{label}</span>
+                <ChevronDown size={14} className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isOpen && (
+                <div
+                    className="absolute top-full left-0 mt-2 w-48 bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-xl shadow-2xl py-2 z-[100] animate-in fade-in slide-in-from-top-2 duration-200"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="flex flex-col gap-1 px-1">
+                        {children}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const NavItem = ({ label, onClick, active, icon: Icon }) => (
+    <button
+        onClick={onClick}
+        className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2 ${active
+            ? 'text-blue-400 bg-blue-600/10 font-bold'
+            : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+    >
+        {Icon && <Icon size={14} />}
+        {label}
+    </button>
+);
+
 export default function App() {
     const [user, setUser] = useState(null); // { token, role, name, ... }
     const [page, setPage] = useState('sales');
+    const [openDropdown, setOpenDropdown] = useState(null);
 
     // Check for saved user session on component mount
     React.useEffect(() => {
@@ -29,7 +77,16 @@ export default function App() {
         if (savedUser) {
             setUser(JSON.parse(savedUser));
         }
+
+        const handleGlobalClick = () => setOpenDropdown(null);
+        window.addEventListener('click', handleGlobalClick);
+        return () => window.removeEventListener('click', handleGlobalClick);
     }, []);
+
+    const handlePageChange = (newPage) => {
+        setPage(newPage);
+        setOpenDropdown(null);
+    };
 
     const handleLogin = (userData) => {
         setUser(userData);
@@ -48,84 +105,78 @@ export default function App() {
     return (
         <div className="min-h-screen flex flex-col">
             {/* Navbar */}
-            <header className="h-16 border-b border-slate-800 bg-slate-900/50 backdrop-blur flex justify-between items-center px-6 sticky top-0 z-50">
+            <header className="h-16 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md flex justify-between items-center px-6 sticky top-0 z-[60]">
                 <div className="font-bold text-xl tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
-                    INVENTORY <span className="font-light text-slate-400">SYSTEM</span>
+                    INVENTORY <span className="font-light text-slate-400 uppercase tracking-widest text-xs">System</span>
                 </div>
-                <nav className="flex gap-2">
-                    <button
-                        onClick={() => setPage('sales')}
-                        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${page === 'sales' ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-slate-400 hover:bg-slate-800'}`}
+
+                <nav className="flex gap-1">
+                    {/* 銷售管理 Group */}
+                    <NavDropdown
+                        id="sales"
+                        label="銷售管理"
+                        icon={ShoppingCart}
+                        openDropdown={openDropdown}
+                        setOpenDropdown={setOpenDropdown}
+                        active={['sales', 'report'].includes(page)}
                     >
-                        <ShoppingCart size={18} /> 銷售
-                    </button>
-                    <button
-                        onClick={() => setPage('inventory')}
-                        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${page === 'inventory' ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-slate-400 hover:bg-slate-800'}`}
+                        <NavItem label="商品銷售登錄" icon={ShoppingCart} onClick={() => handlePageChange('sales')} active={page === 'sales'} />
+                        <NavItem label="銷售查詢報表" icon={FileText} onClick={() => handlePageChange('report')} active={page === 'report'} />
+                    </NavDropdown>
+
+                    {/* 進貨管理 Group */}
+                    <NavDropdown
+                        id="purchase"
+                        label="進貨管理"
+                        icon={PackagePlus}
+                        openDropdown={openDropdown}
+                        setOpenDropdown={setOpenDropdown}
+                        active={['purchase', 'purchaseHistory'].includes(page)}
                     >
-                        <Archive size={18} /> 庫存
-                    </button>
-                    <button
-                        onClick={() => setPage('purchase')}
-                        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${page === 'purchase' ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-slate-400 hover:bg-slate-800'}`}
+                        <NavItem label="商品進貨登錄" icon={PackagePlus} onClick={() => handlePageChange('purchase')} active={page === 'purchase'} />
+                        <NavItem label="進貨查詢" icon={ClipboardList} onClick={() => handlePageChange('purchaseHistory')} active={page === 'purchaseHistory'} />
+                    </NavDropdown>
+
+                    {/* 庫存管理 Group */}
+                    <NavDropdown
+                        id="inventory"
+                        label="庫存管理"
+                        icon={Archive}
+                        openDropdown={openDropdown}
+                        setOpenDropdown={setOpenDropdown}
+                        active={['inventory', 'stocktake', 'valuation', 'adjustHistory', 'stocktakeHistory'].includes(page)}
                     >
-                        <PackagePlus size={18} /> 進貨
-                    </button>
-                    <button
-                        onClick={() => setPage('report')}
-                        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${page === 'report' ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-slate-400 hover:bg-slate-800'}`}
+                        <NavItem label="庫存檢視" icon={Archive} onClick={() => handlePageChange('inventory')} active={page === 'inventory'} />
+                        <NavItem label="庫存盤點" icon={CheckSquare} onClick={() => handlePageChange('stocktake')} active={page === 'stocktake'} />
+                        <NavItem label="庫存估值" icon={DollarSign} onClick={() => handlePageChange('valuation')} active={page === 'valuation'} />
+                        <div className="my-1 border-t border-slate-700/50" />
+                        <NavItem label="異動查詢" icon={FileText} onClick={() => handlePageChange('adjustHistory')} active={page === 'adjustHistory'} />
+                        <NavItem label="盤點歷史" icon={ClipboardList} onClick={() => handlePageChange('stocktakeHistory')} active={page === 'stocktakeHistory'} />
+                    </NavDropdown>
+
+                    {/* 財務管理 Group */}
+                    <NavDropdown
+                        id="accounting"
+                        label="財務帳務"
+                        icon={Wallet}
+                        openDropdown={openDropdown}
+                        setOpenDropdown={setOpenDropdown}
+                        active={['receivable', 'payable'].includes(page)}
                     >
-                        <FileText size={18} /> 銷售查詢
-                    </button>
-                    <button
-                        onClick={() => setPage('purchaseHistory')}
-                        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${page === 'purchaseHistory' ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-slate-400 hover:bg-slate-800'}`}
-                    >
-                        <ClipboardList size={18} /> 進貨查詢
-                    </button>
-                    <button
-                        onClick={() => setPage('adjustHistory')}
-                        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${page === 'adjustHistory' ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-slate-400 hover:bg-slate-800'}`}
-                    >
-                        <ClipboardList size={18} /> 異動查詢
-                    </button>
-                    <button
-                        onClick={() => setPage('valuation')}
-                        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${page === 'valuation' ? 'bg-yellow-600/20 text-yellow-400 border border-yellow-500/30' : 'text-slate-400 hover:bg-slate-800'}`}
-                    >
-                        <DollarSign size={18} /> 庫存估值
-                    </button>
-                    <button
-                        onClick={() => setPage('stocktake')}
-                        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${page === 'stocktake' ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-slate-400 hover:bg-slate-800'}`}
-                    >
-                        <CheckSquare size={18} /> 盤點
-                    </button>
-                    <button
-                        onClick={() => setPage('stocktakeHistory')}
-                        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${page === 'stocktakeHistory' ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30' : 'text-slate-400 hover:bg-slate-800'}`}
-                    >
-                        <ClipboardList size={18} /> 盤點歷史
-                    </button>
-                    <button
-                        onClick={() => setPage('receivable')}
-                        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${page === 'receivable' ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-400 hover:bg-slate-800'}`}
-                    >
-                        <Wallet size={18} /> 應收帳款
-                    </button>
-                    <button
-                        onClick={() => setPage('payable')}
-                        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${page === 'payable' ? 'bg-rose-600/20 text-rose-400 border border-rose-500/30' : 'text-slate-400 hover:bg-slate-800'}`}
-                    >
-                        <Wallet size={18} /> 應付帳款
-                    </button>
+                        <NavItem label="應收帳款" icon={Wallet} onClick={() => handlePageChange('receivable')} active={page === 'receivable'} />
+                        <NavItem label="應付帳款" icon={Wallet} onClick={() => handlePageChange('payable')} active={page === 'payable'} />
+                    </NavDropdown>
                 </nav>
+
                 <div className="flex items-center gap-4">
-                    <span className="text-sm text-slate-500 hidden md:inline">Hi, {user.username} ({user.role})</span>
+                    <div className="hidden md:flex flex-col items-end">
+                        <span className="text-xs font-bold text-blue-400 leading-none">{user.username}</span>
+                        <span className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">{user.role}</span>
+                    </div>
                     <button
                         onClick={handleLogout}
-                        className="p-2 text-slate-400 hover:text-red-400 transition-colors"
-                        title="登出"
+                        className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-all border border-transparent hover:border-red-400/20"
+                        title="登出系統"
                     >
                         <LogOut size={20} />
                     </button>

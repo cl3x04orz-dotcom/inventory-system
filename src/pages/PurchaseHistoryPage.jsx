@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Calendar, Filter, RefreshCw, ClipboardList, DollarSign, User, Truck } from 'lucide-react';
 import { callGAS } from '../utils/api';
+import { getLocalDateString } from '../utils/constants';
 
 export default function PurchaseHistoryPage({ user, apiUrl }) {
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(false);
     const [productSearch, setProductSearch] = useState('');
     const [vendorSearch, setVendorSearch] = useState('');
-    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const [startDate, setStartDate] = useState(getLocalDateString());
+    const [endDate, setEndDate] = useState(getLocalDateString());
 
     const fetchHistory = React.useCallback(async () => {
         setLoading(true);

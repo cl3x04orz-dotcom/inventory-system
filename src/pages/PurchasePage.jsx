@@ -4,8 +4,9 @@ import { callGAS } from '../utils/api';
 
 export default function PurchasePage({ user, apiUrl }) {
     // Each item now includes its own vendor field
+    const currentYear = new Date().getFullYear().toString();
     const [items, setItems] = useState([
-        { id: Date.now(), vendor: '', productName: '', quantity: '', unitPrice: '', expiryYear: new Date().getFullYear().toString(), expiryMonth: '', expiryDay: '' }
+        { id: Date.now(), vendor: '', productName: '', quantity: '', unitPrice: '', expiryYear: currentYear, expiryMonth: '', expiryDay: '' }
     ]);
     const [suggestions, setSuggestions] = useState({ vendors: [], vendorProductMap: {} });
     const [loading, setLoading] = useState(false);
@@ -46,7 +47,7 @@ export default function PurchasePage({ user, apiUrl }) {
             productName: '',
             quantity: '',
             unitPrice: '',
-            expiryYear: new Date().getFullYear().toString(),
+            expiryYear: currentYear,
             expiryMonth: '',
             expiryDay: ''
         }]);
@@ -116,7 +117,7 @@ export default function PurchasePage({ user, apiUrl }) {
 
             alert(`成功進貨 ${result.count} 筆商品！`);
             // Reset
-            setItems([{ id: Date.now(), vendor: '', productName: '', quantity: '', unitPrice: '', expiryYear: new Date().getFullYear().toString(), expiryMonth: '', expiryDay: '' }]);
+            setItems([{ id: Date.now(), vendor: '', productName: '', quantity: '', unitPrice: '', expiryYear: currentYear, expiryMonth: '', expiryDay: '' }]);
             setPaymentMethod('CASH'); // Reset payment method
         } catch (err) {
             alert('進貨失敗: ' + err.message);
