@@ -14,6 +14,7 @@ import PayablePage from './pages/PayablePage';
 import ProfitAnalysisPage from './pages/ProfitAnalysisPage';
 import TurnoverRatePage from './pages/TurnoverRatePage';
 import CostCalculationPage from './pages/CostCalculationPage';
+import ExpenditureManagementPage from './pages/ExpenditureManagementPage';
 import {
     LayoutDashboard, ShoppingCart, Archive, LogOut, PackagePlus,
     FileText, ClipboardList, DollarSign, CheckSquare, Wallet, ChevronDown,
@@ -158,6 +159,18 @@ export default function App() {
                         <NavItem label="盤點歷史" icon={ClipboardList} onClick={() => handlePageChange('stocktakeHistory')} active={page === 'stocktakeHistory'} />
                     </NavDropdown>
 
+                    {/* 支出管理 Group */}
+                    <NavDropdown
+                        id="expenditure"
+                        label="支出管理"
+                        icon={DollarSign}
+                        openDropdown={openDropdown}
+                        setOpenDropdown={setOpenDropdown}
+                        active={page === 'expenditureManagement'}
+                    >
+                        <NavItem label="支出登錄" icon={DollarSign} onClick={() => handlePageChange('expenditureManagement')} active={page === 'expenditureManagement'} />
+                    </NavDropdown>
+
                     {/* 財務管理 Group */}
                     <NavDropdown
                         id="accounting"
@@ -221,6 +234,7 @@ export default function App() {
                 {page === 'profitAnalysis' && <ProfitAnalysisPage user={user} apiUrl={GAS_API_URL} />}
                 {page === 'turnoverRate' && <TurnoverRatePage user={user} apiUrl={GAS_API_URL} />}
                 {page === 'costCalculation' && <CostCalculationPage user={user} apiUrl={GAS_API_URL} />}
+                {page === 'expenditureManagement' && <ExpenditureManagementPage user={user} apiUrl={GAS_API_URL} />}
             </main>
         </div>
     );
