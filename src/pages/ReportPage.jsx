@@ -64,6 +64,20 @@ export default function ReportPage({ user, apiUrl }) {
                     Number(item.salary || 0) + Number(item.linePay || 0) + Number(item.serviceFee || 0) +
                     Number(item.reserve || 0);
                 item.rowTotal = rowTotal;
+
+                // 模糊匹配結算金額欄位 (Expenditures L 欄)
+                const finalTotalKey = Object.keys(item).find(k => {
+                    const lowK = k.toLowerCase().trim();
+                    return lowK === 'finaltotal' ||
+                        lowK.includes('結算') ||
+                        lowK.includes('结算') ||
+                        lowK.includes('總支出金額') ||
+                        lowK.includes('总支出金额');
+                });
+
+                // 讀取值並確保是數字，如果找不到或為 0，則給予 fallback
+                const extractedValue = finalTotalKey ? Number(item[finalTotalKey]) : Number(item.finalTotal || 0);
+                item.displayFinalTotal = extractedValue;
             });
 
             setExpenseData(filteredExpenses);
@@ -91,6 +105,7 @@ export default function ReportPage({ user, apiUrl }) {
     const totalSales = reportData?.reduce((acc, item) => acc + (Number(item.totalAmount) || 0), 0) || 0;
     const totalQty = reportData?.reduce((acc, item) => acc + (Number(item.soldQty) || 0), 0) || 0;
     const totalExpenses = expenseData?.reduce((acc, item) => acc + (item.rowTotal || 0), 0) || 0;
+    const totalFinalTotal = expenseData?.reduce((acc, item) => acc + (Number(item.displayFinalTotal) || 0), 0) || 0;
 
     // Group by Product for summary table
     const productSummary = reportData?.reduce((acc, item) => {
@@ -124,6 +139,14 @@ export default function ReportPage({ user, apiUrl }) {
                                 <p className="text-xs text-slate-400 uppercase font-bold text-center">總銷售額</p>
                                 <p className="text-xl font-bold text-emerald-400 text-center">${totalSales.toLocaleString()}</p>
                             </div>
+                            <div className="px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                                <p className="text-xs text-slate-400 uppercase font-bold text-center">總支出</p>
+                                <p className="text-xl font-bold text-rose-400 text-center">${totalExpenses.toLocaleString()}</p>
+                            </div>
+                            <div className="px-4 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
+                                <p className="text-xs text-slate-400 uppercase font-bold text-center">結算金額</p>
+                                <p className="text-xl font-bold text-cyan-400 text-center">${totalFinalTotal.toLocaleString()}</p>
+                            </div>
                             <div className="px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20">
                                 <p className="text-xs text-slate-400 uppercase font-bold text-center">總數量</p>
                                 <p className="text-xl font-bold text-blue-400 text-center">{totalQty.toLocaleString()}</p>
@@ -131,10 +154,6 @@ export default function ReportPage({ user, apiUrl }) {
                             <div className="px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/20">
                                 <p className="text-xs text-slate-400 uppercase font-bold text-center">總筆數</p>
                                 <p className="text-xl font-bold text-purple-400 text-center">{reportData.length}</p>
-                            </div>
-                            <div className="px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/20">
-                                <p className="text-xs text-slate-400 uppercase font-bold text-center">總支出</p>
-                                <p className="text-xl font-bold text-rose-400 text-center">${totalExpenses.toLocaleString()}</p>
                             </div>
                         </div>
                     )}
@@ -322,10 +341,10 @@ export default function ReportPage({ user, apiUrl }) {
                                                         <td className="p-3">{item.salesRep}</td>
                                                         <td className="p-3 text-xs text-slate-400">{cats.join(', ')}</td>
                                                         <td className="p-3 text-right font-mono text-rose-400">
-                                                            ${item.rowTotal.toLocaleString()}
+                                                            ${(item.rowTotal || 0).toLocaleString()}
                                                         </td>
                                                         <td className="p-3 text-right font-mono font-bold text-emerald-400">
-                                                            ${(Number(item.finalTotal) || 0).toLocaleString()}
+                                                            ${(Number(item.displayFinalTotal) || 0).toLocaleString()}
                                                         </td>
                                                     </tr>
                                                 );
