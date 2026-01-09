@@ -31,29 +31,32 @@ export default function StocktakePage({ user, apiUrl }) {
             if (Array.isArray(data)) {
                 const sorted = sortProducts(data, 'productName');
 
-                // Update zero stock tracking
+                // Update zero stock tracking using functional update
                 const today = new Date().toISOString().split('T')[0];
-                const newZeroStockDates = { ...zeroStockDates };
 
-                sorted.forEach(item => {
-                    const qty = Number(item.quantity) || 0;
-                    const productKey = item.id;
+                setZeroStockDates(prevDates => {
+                    const newZeroStockDates = { ...prevDates };
 
-                    if (qty === 0) {
-                        // If not already tracked, start tracking
-                        if (!newZeroStockDates[productKey]) {
-                            newZeroStockDates[productKey] = today;
+                    sorted.forEach(item => {
+                        const qty = Number(item.quantity) || 0;
+                        const productKey = item.id;
+
+                        if (qty === 0) {
+                            // If not already tracked, start tracking
+                            if (!newZeroStockDates[productKey]) {
+                                newZeroStockDates[productKey] = today;
+                            }
+                        } else {
+                            // If stock is back, remove from tracking
+                            if (newZeroStockDates[productKey]) {
+                                delete newZeroStockDates[productKey];
+                            }
                         }
-                    } else {
-                        // If stock is back, remove from tracking
-                        if (newZeroStockDates[productKey]) {
-                            delete newZeroStockDates[productKey];
-                        }
-                    }
+                    });
+
+                    localStorage.setItem('zeroStockDates', JSON.stringify(newZeroStockDates));
+                    return newZeroStockDates;
                 });
-
-                setZeroStockDates(newZeroStockDates);
-                localStorage.setItem('zeroStockDates', JSON.stringify(newZeroStockDates));
 
                 setInventory(sorted);
 
@@ -76,7 +79,7 @@ export default function StocktakePage({ user, apiUrl }) {
         } finally {
             setLoading(false);
         }
-    }, [apiUrl, user.token, zeroStockDates]);
+    }, [apiUrl, user.token, getRowKey]);
 
     useEffect(() => {
         if (user?.token) fetchInventory();
@@ -226,7 +229,7 @@ export default function StocktakePage({ user, apiUrl }) {
 
                                 return (
                                     <tr key={rowKey} className={`hover:bg-slate-800/40 transition-colors ${isStockType && diff !== 0 && entry.physicalQty !== '' ? 'bg-amber-500/5' :
-                                            hasQuantity ? 'bg-orange-500/20 border-l-4 border-orange-500' : ''
+                                        hasQuantity ? 'bg-orange-500/20 border-l-4 border-orange-500' : ''
                                         }`}>
                                         <td className={`p-4 font-medium ${hasQuantity ? 'text-orange-300 font-bold' : 'text-white'}`}>
                                             {item.productName || '未命名商品'}
