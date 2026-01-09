@@ -61,7 +61,8 @@ export default function ReportPage({ user, apiUrl }) {
                     Number(item.stall || 0) + Number(item.cleaning || 0) + Number(item.electricity || 0) +
                     Number(item.gas || 0) + Number(item.parking || 0) + Number(item.goods || 0) +
                     Number(item.bags || 0) + Number(item.others || 0) + Number(item.vehicleMaintenance || 0) +
-                    Number(item.salary || 0);
+                    Number(item.salary || 0) + Number(item.linePay || 0) + Number(item.serviceFee || 0) +
+                    Number(item.reserve || 0);
                 item.rowTotal = rowTotal;
             });
 
@@ -302,6 +303,9 @@ export default function ReportPage({ user, apiUrl }) {
                                                 if (item.goods) cats.push(`貨款 $${item.goods}`);
                                                 if (item.bags) cats.push(`塑膠袋 $${item.bags}`);
                                                 if (item.others) cats.push(`其他 $${item.others}`);
+                                                if (item.linePay) cats.push(`Line Pay $${item.linePay}`);
+                                                if (item.serviceFee) cats.push(`服務費 $${item.serviceFee}`);
+                                                if (item.reserve) cats.push(`公積金 $${item.reserve}`);
                                                 if (item.vehicleMaintenance) cats.push(`車輛保養 $${item.vehicleMaintenance}`);
                                                 if (item.salary) cats.push(`薪資 $${item.salary}`);
 
