@@ -289,7 +289,8 @@ export default function ReportPage({ user, apiUrl }) {
                                                 <th className="p-3 font-medium w-32">對象/備註</th>
                                                 <th className="p-3 font-medium w-32">業務</th>
                                                 <th className="p-3 font-medium">支出細項</th>
-                                                <th className="p-3 font-medium text-right w-32">金額</th>
+                                                <th className="p-3 font-medium text-right w-28">總支出</th>
+                                                <th className="p-3 font-medium text-right w-28 text-emerald-400">結算金額</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-white/5 text-slate-300 bg-slate-900/30">
@@ -322,6 +323,9 @@ export default function ReportPage({ user, apiUrl }) {
                                                         <td className="p-3 text-xs text-slate-400">{cats.join(', ')}</td>
                                                         <td className="p-3 text-right font-mono text-rose-400">
                                                             ${item.rowTotal.toLocaleString()}
+                                                        </td>
+                                                        <td className="p-3 text-right font-mono font-bold text-emerald-400">
+                                                            ${(Number(item.finalTotal) || 0).toLocaleString()}
                                                         </td>
                                                     </tr>
                                                 );
