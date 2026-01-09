@@ -222,11 +222,11 @@ export default function SalesPage({ user, apiUrl }) {
     const isCredit = paymentType === 'CREDIT';
 
     // Final Total Calculation Logic
-    // IF CASH: (Total Cash - Reserve) + Expenses + LinePay - ServiceFee
+    // IF CASH: (Total Cash - Reserve) + Expenses + LinePay + ServiceFee
     // IF CREDIT: Just the Total Sales Amount (Product Subtotals)
     const finalTotal = isCredit
         ? totalSalesAmount
-        : (totalCashNet + totalExpensesPlusLinePay - Number(expenses.serviceFee));
+        : (totalCashNet + totalExpensesPlusLinePay + Number(expenses.serviceFee));
 
     const handleSubmit = async () => {
         if (!location.trim()) {

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>測試自動隱藏功能</title>
+    <style>
+        body {
+            font-family: 'Microsoft JhengHei', sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #eee;
+        }
+
+        .container {
+            background: #16213e;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #4ecca3;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: #4ecca3;
+            color: #16213e;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 10px 5px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #45b393;
+            transform: translateY(-2px);
+        }
+
+        button.danger {
+            background: #e74c3c;
+        }
+
+        button.danger:hover {
+            background: #c0392b;
+        }
+
+        .info {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+            border-left: 4px solid #4ecca3;
+        }
+
+        .result {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .warning {
+            background: #f39c12;
+            color: #16213e;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🧪 測試自動隱藏功能</h1>
+
+        <div class="info">
+            <strong>功能說明：</strong><br>
+            當產品庫存為 0 超過 2 天時，該產品會在盤點頁面自動隱藏。
+        </div>
+
+        <div class="warning">
+            ⚠️ 此測試會修改 localStorage 中的日期資料
+        </div>
+
+        <h3>測試步驟：</h3>
+
+        <button onclick="viewCurrentData()">1️⃣ 查看當前追蹤資料</button>
+        <button onclick="addTestData()">2️⃣ 新增測試資料（3天前）</button>
+        <button onclick="addTestData2Days()">3️⃣ 新增測試資料（2天前）</button>
+        <button onclick="addTestData1Day()">4️⃣ 新增測試資料（1天前）</button>
+        <button onclick="clearData()" class="danger">🗑️ 清除所有追蹤資料</button>
+
+        <div id="result" class="result"></div>
+
+        <div class="info" style="margin-top: 30px;">
+            <strong>驗證方式：</strong><br>
+            1. 點擊「新增測試資料」按鈕<br>
+            2. 重新整理盤點頁面<br>
+            3. 檢查測試產品是否被隱藏（3天前的應該隱藏，2天前和1天前的應該顯示）
+        </div>
+    </div>
+
+    <script>
+        function viewCurrentData() {
+            const data = localStorage.getItem('zeroStockDates');
+            const result = document.getElementById('result');
+
+            if (!data) {
+                result.textContent = '目前沒有追蹤資料';
+                return;
+            }
+
+            try {
+                const parsed = JSON.parse(data);
+                const today = new Date();
+
+                let output = '當前追蹤的產品：\n\n';
+
+                for (const [productId, dateStr] of Object.entries(parsed)) {
+                    const zeroDate = new Date(dateStr);
+                    const daysDiff = Math.floor((today - zeroDate) / (1000 * 60 * 60 * 24));
+                    const shouldHide = daysDiff > 2;
+
+                    output += `產品 ID: ${productId}\n`;
+                    output += `  庫存為0日期: ${dateStr}\n`;
+                    output += `  已經過天數: ${daysDiff} 天\n`;
+                    output += `  是否隱藏: ${shouldHide ? '✅ 是（超過2天）' : '❌ 否'}\n\n`;
+                }
+
+                result.textContent = output;
+            } catch (e) {
+                result.textContent = '解析資料失敗: ' + e.message;
+            }
+        }
+
+        function addTestData() {
+            const threeDaysAgo = new Date();
+            threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+            const dateStr = threeDaysAgo.toISOString().split('T')[0];
+
+            const data = localStorage.getItem('zeroStockDates');
+            const parsed = data ? JSON.parse(data) : {};
+
+            parsed['test-product-3days'] = dateStr;
+
+            localStorage.setItem('zeroStockDates', JSON.stringify(parsed));
+
+            document.getElementById('result').textContent =
+                `✅ 已新增測試資料\n\n` +
+                `產品 ID: test-product-3days\n` +
+                `庫存為0日期: ${dateStr}\n` +
+                `（3天前，應該會被隱藏）\n\n` +
+                `請重新整理盤點頁面查看效果`;
+        }
+
+        function addTestData2Days() {
+            const twoDaysAgo = new Date();
+            twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+            const dateStr = twoDaysAgo.toISOString().split('T')[0];
+
+            const data = localStorage.getItem('zeroStockDates');
+            const parsed = data ? JSON.parse(data) : {};
+
+            parsed['test-product-2days'] = dateStr;
+
+            localStorage.setItem('zeroStockDates', JSON.stringify(parsed));
+
+            document.getElementById('result').textContent =
+                `✅ 已新增測試資料\n\n` +
+                `產品 ID: test-product-2days\n` +
+                `庫存為0日期: ${dateStr}\n` +
+                `（2天前，不應該被隱藏）\n\n` +
+                `請重新整理盤點頁面查看效果`;
+        }
+
+        function addTestData1Day() {
+            const oneDayAgo = new Date();
+            oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+            const dateStr = oneDayAgo.toISOString().split('T')[0];
+
+            const data = localStorage.getItem('zeroStockDates');
+            const parsed = data ? JSON.parse(data) : {};
+
+            parsed['test-product-1day'] = dateStr;
+
+            localStorage.setItem('zeroStockDates', JSON.stringify(parsed));
+
+            document.getElementById('result').textContent =
+                `✅ 已新增測試資料\n\n` +
+                `產品 ID: test-product-1day\n` +
+                `庫存為0日期: ${dateStr}\n` +
+                `（1天前，不應該被隱藏）\n\n` +
+                `請重新整理盤點頁面查看效果`;
+        }
+
+        function clearData() {
+            if (confirm('確定要清除所有追蹤資料嗎？')) {
+                localStorage.removeItem('zeroStockDates');
+                document.getElementById('result').textContent = '✅ 已清除所有追蹤資料';
+            }
+        }
+
+        // 頁面載入時顯示當前資料
+        window.onload = viewCurrentData;
+    </script>
+</body>
+
+</html>
