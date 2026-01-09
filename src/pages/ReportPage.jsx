@@ -106,6 +106,7 @@ export default function ReportPage({ user, apiUrl }) {
     const totalQty = reportData?.reduce((acc, item) => acc + (Number(item.soldQty) || 0), 0) || 0;
     const totalExpenses = expenseData?.reduce((acc, item) => acc + (item.rowTotal || 0), 0) || 0;
     const totalFinalTotal = expenseData?.reduce((acc, item) => acc + (Number(item.displayFinalTotal) || 0), 0) || 0;
+    const totalReturnAmount = totalSales - totalExpenses + totalFinalTotal;
 
     // Group by Product for summary table
     const productSummary = reportData?.reduce((acc, item) => {
@@ -138,6 +139,10 @@ export default function ReportPage({ user, apiUrl }) {
                             <div className="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                                 <p className="text-xs text-slate-400 uppercase font-bold text-center">總銷售額</p>
                                 <p className="text-xl font-bold text-emerald-400 text-center">${totalSales.toLocaleString()}</p>
+                            </div>
+                            <div className="px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                                <p className="text-xs text-slate-400 uppercase font-bold text-center">應繳回金額</p>
+                                <p className="text-xl font-bold text-amber-400 text-center">${totalReturnAmount.toLocaleString()}</p>
                             </div>
                             <div className="px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/20">
                                 <p className="text-xs text-slate-400 uppercase font-bold text-center">總支出</p>
