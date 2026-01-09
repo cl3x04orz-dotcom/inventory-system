@@ -222,11 +222,12 @@ export default function SalesPage({ user, apiUrl }) {
     const isCredit = paymentType === 'CREDIT';
 
     // Final Total Calculation Logic
-    // IF CASH: (Total Cash - Reserve) + Expenses + LinePay + ServiceFee
+    // 扣除後總金額 = (總金額 - 預備金) + 支出 + Line Pay + 服務費 - 總繳回金額
+    // IF CASH: (Total Cash - Reserve) + Expenses + LinePay + ServiceFee - Total Sales Amount
     // IF CREDIT: Just the Total Sales Amount (Product Subtotals)
     const finalTotal = isCredit
         ? totalSalesAmount
-        : (totalCashNet + totalExpensesPlusLinePay + Number(expenses.serviceFee));
+        : (totalCashNet + totalExpensesPlusLinePay + Number(expenses.serviceFee) - totalSalesAmount);
 
     const handleSubmit = async () => {
         if (!location.trim()) {
