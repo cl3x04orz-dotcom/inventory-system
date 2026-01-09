@@ -95,11 +95,11 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
                     <table className="w-full text-left text-sm border-collapse">
                         <thead className="bg-slate-800/80 text-slate-400 text-xs uppercase sticky top-0 z-10 backdrop-blur-md">
                             <tr>
-                                <th className="p-4 border-b border-white/5">產品名稱</th>
-                                <th className="p-4 text-right border-b border-white/5">銷售收入</th>
-                                <th className="p-4 text-right border-b border-white/5">成本</th>
-                                <th className="p-4 text-right border-b border-white/5">毛利額</th>
-                                <th className="p-4 text-right border-b border-white/5">毛利率</th>
+                                <th className="p-4 border-b border-white/5 whitespace-nowrap">產品名稱</th>
+                                <th className="p-4 text-right border-b border-white/5 whitespace-nowrap">銷售收入</th>
+                                <th className="p-4 text-right border-b border-white/5 whitespace-nowrap">成本</th>
+                                <th className="p-4 text-right border-b border-white/5 whitespace-nowrap">毛利額</th>
+                                <th className="p-4 text-right border-b border-white/5 whitespace-nowrap">毛利率</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">

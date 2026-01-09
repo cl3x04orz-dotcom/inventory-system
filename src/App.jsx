@@ -11,6 +11,8 @@ import StocktakePage from './pages/StocktakePage';
 import StocktakeHistoryPage from './pages/StocktakeHistoryPage';
 import ReceivablePage from './pages/ReceivablePage';
 import PayablePage from './pages/PayablePage';
+import SalesRankingPage from './pages/SalesRankingPage';
+import CustomerRankingPage from './pages/CustomerRankingPage';
 import ProfitAnalysisPage from './pages/ProfitAnalysisPage';
 import TurnoverRatePage from './pages/TurnoverRatePage';
 import CostCalculationPage from './pages/CostCalculationPage';

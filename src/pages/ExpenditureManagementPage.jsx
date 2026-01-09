@@ -142,14 +142,14 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                             {[
-                                { key: 'stall', label: '攤位 (B)', next: 'cleaning' },
-                                { key: 'cleaning', label: '清潔 (C)', next: 'electricity', prev: 'note' },
-                                { key: 'electricity', label: '電費 (D)', next: 'gas', prev: 'stall' },
-                                { key: 'gas', label: '加油 (E)', next: 'parking', prev: 'cleaning' },
-                                { key: 'parking', label: '停車 (F)', next: 'goods', prev: 'electricity' },
-                                { key: 'goods', label: '貨款 (G)', next: 'bags', prev: 'gas' },
-                                { key: 'bags', label: '塑膠袋 (H)', next: 'others', prev: 'parking' },
-                                { key: 'others', label: '其他 (I)', next: 'linePay', prev: 'goods' },
+                                { key: 'stall', label: '攤位', next: 'cleaning' },
+                                { key: 'cleaning', label: '清潔', next: 'electricity', prev: 'stall' },
+                                { key: 'electricity', label: '電費', next: 'gas', prev: 'cleaning' },
+                                { key: 'gas', label: '加油', next: 'parking', prev: 'electricity' },
+                                { key: 'parking', label: '停車', next: 'goods', prev: 'gas' },
+                                { key: 'goods', label: '貨款', next: 'bags', prev: 'parking' },
+                                { key: 'bags', label: '塑膠袋', next: 'others', prev: 'goods' },
+                                { key: 'others', label: '其他', next: 'linePay', prev: 'bags' },
                             ].map((item) => (
                                 <div key={item.key} className="flex items-center justify-between gap-4 p-2 hover:bg-white/5 rounded-lg transition-colors">
                                     <label className="text-sm text-slate-300 font-medium whitespace-nowrap">{item.label}</label>
@@ -182,7 +182,7 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                         </div>
                         <div className="space-y-4">
                             <div>
-                                <label className="text-xs text-slate-500 block mb-1">Line Pay 收款 (J)</label>
+                                <label className="text-xs text-slate-500 block mb-1">Line Pay 收款</label>
                                 <div className="relative">
                                     <input
                                         id="input-expense-linePay"
@@ -196,7 +196,7 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                                 </div>
                             </div>
                             <div>
-                                <label className="text-xs text-slate-500 block mb-1">服務費扣除 (K)</label>
+                                <label className="text-xs text-slate-500 block mb-1">服務費扣除</label>
                                 <div className="relative">
                                     <input
                                         id="input-expense-serviceFee"
@@ -221,7 +221,7 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                         <div className="space-y-4">
                             <div className="flex items-center justify-between gap-2">
                                 <label className="text-xs text-slate-400 flex items-center gap-2">
-                                    <Truck size={14} /> 車輛保養 (P)
+                                    <Truck size={14} /> 車輛保養
                                 </label>
                                 <input
                                     id="input-expense-vehicleMaintenance"
@@ -234,7 +234,7 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                             </div>
                             <div className="flex items-center justify-between gap-2">
                                 <label className="text-xs text-slate-400 flex items-center gap-2">
-                                    <Users size={14} /> 薪資發放 (Q)
+                                    <Users size={14} /> 薪資發放
                                 </label>
                                 <input
                                     id="input-expense-salary"
@@ -247,7 +247,7 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                             </div>
                             <div className="flex items-center justify-between gap-2">
                                 <label className="text-xs text-slate-400 flex items-center gap-2">
-                                    <PiggyBank size={14} /> 公積金 (R)
+                                    <PiggyBank size={14} /> 公積金
                                 </label>
                                 <input
                                     id="input-expense-reserve"
