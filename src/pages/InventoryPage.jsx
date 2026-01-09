@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Package, Search, AlertCircle, RefreshCw, AlertTriangle, Trash2 } from 'lucide-react';
+import { Package, Search, AlertCircle, RefreshCw, AlertTriangle, Trash2, Clock } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import { CASE_MAP } from '../utils/constants';
 
@@ -169,11 +169,20 @@ export default function InventoryPage({ user, apiUrl }) {
                             items.map((item, idx) => {
                                 const safetyLevel = safetyStocks[item.productName] || 0;
                                 const totalQty = productTotals[item.productName] || 0;
-                                // Alert when total stock is LESS THAN OR EQUAL to safety level
                                 const isLowStock = safetyLevel > 0 && totalQty <= safetyLevel;
 
+                                // 效期判斷邏輯 (大約抓三天)
+                                const expiryDate = item.expiry ? new Date(item.expiry) : null;
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                const threeDaysLater = new Date(today);
+                                threeDaysLater.setDate(today.getDate() + 3);
+
+                                const isExpiringSoon = expiryDate && expiryDate >= today && expiryDate <= threeDaysLater;
+                                const isExpired = expiryDate && expiryDate < today;
+
                                 return (
-                                    <tr key={idx} className={`hover:bg-slate-800/40 transition-colors ${isLowStock ? 'bg-red-900/10' : ''}`}>
+                                    <tr key={idx} className={`hover:bg-slate-800/40 transition-colors ${isLowStock ? 'bg-red-900/10' : ''} ${isExpired ? 'bg-rose-950/20' : isExpiringSoon ? 'bg-amber-950/20' : ''}`}>
                                         <td className="p-4 font-medium text-white">
                                             <div className="flex items-center gap-2">
                                                 {isLowStock && <AlertTriangle size={16} className="text-red-400" />}
@@ -190,8 +199,22 @@ export default function InventoryPage({ user, apiUrl }) {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="p-4 text-slate-300 text-sm">
-                                            {formatDate(item.expiry)}
+                                        <td className="p-4 text-sm whitespace-nowrap">
+                                            <div className="flex flex-col gap-1">
+                                                <span className={isExpired ? 'text-rose-400 line-through' : isExpiringSoon ? 'text-amber-400 font-bold' : 'text-slate-300'}>
+                                                    {formatDate(item.expiry)}
+                                                </span>
+                                                {isExpiringSoon && (
+                                                    <span className="text-[10px] bg-amber-500/10 text-amber-500 border border-amber-500/30 px-1.5 py-0.5 rounded self-start flex items-center gap-1">
+                                                        <Clock size={10} /> 即將過期
+                                                    </span>
+                                                )}
+                                                {isExpired && (
+                                                    <span className="text-[10px] bg-rose-500/10 text-rose-500 border border-rose-500/30 px-1.5 py-0.5 rounded self-start flex items-center gap-1">
+                                                        <AlertTriangle size={10} /> 已過期
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="p-4 text-center">
                                             <input

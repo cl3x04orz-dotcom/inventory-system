@@ -14,6 +14,7 @@ export default function LoginPage({ onLogin, apiUrl }) {
         try {
             const action = isRegister ? 'register' : 'login';
             const result = await callGAS(apiUrl, action, { username, password });
+            console.log('Login API Result:', result); // DEBUG: Check what backend returns
 
             if (isRegister) {
                 alert('註冊成功！請等待管理員審核，或直接嘗試登入 (若是首位用戶)。');

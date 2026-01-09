@@ -1,0 +1,172 @@
+import React, { useState, useEffect } from 'react';
+import { PieChart, TrendingUp, TrendingDown, DollarSign, Calendar, RefreshCw, MinusCircle } from 'lucide-react';
+import { callGAS } from '../utils/api';
+import { getLocalDateString } from '../utils/constants';
+
+export default function IncomeStatementPage({ user, apiUrl }) {
+    const [loading, setLoading] = useState(false);
+    const [startDate, setStartDate] = useState(getLocalDateString().substring(0, 8) + '01'); // Default to first day of month
+    const [endDate, setEndDate] = useState(getLocalDateString());
+    const [data, setData] = useState({
+        revenue: 0,
+        cogs: 0,
+        grossProfit: 0,
+        expenses: {},
+        totalExpenses: 0,
+        netIncome: 0
+    });
+
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [salesData, expenseData] = await Promise.all([
+                callGAS(apiUrl, 'getProfitAnalysis', { startDate, endDate }, user.token),
+                callGAS(apiUrl, 'getExpenditures', { startDate, endDate }, user.token)
+            ]);
+
+            // Calculate Revenue & COGS
+            let revenue = 0;
+            let cogs = 0;
+            if (Array.isArray(salesData)) {
+                salesData.forEach(item => {
+                    revenue += Number(item.revenue || 0);
+                    cogs += Number(item.cost || 0);
+                });
+            }
+
+            // Calculate Expenses
+            let totalExpenses = 0;
+            const expenseCats = {
+                stall: 0, cleaning: 0, electricity: 0, gas: 0, parking: 0,
+                bags: 0, serviceFee: 0, others: 0, vehicleMaintenance: 0, salary: 0
+            };
+
+            if (Array.isArray(expenseData)) {
+                expenseData.forEach(item => {
+                    expenseCats.stall += Number(item.stall || 0);
+                    expenseCats.cleaning += Number(item.cleaning || 0);
+                    expenseCats.electricity += Number(item.electricity || 0);
+                    expenseCats.gas += Number(item.gas || 0);
+                    expenseCats.parking += Number(item.parking || 0);
+                    expenseCats.bags += Number(item.bags || 0);
+                    expenseCats.serviceFee += Number(item.serviceFee || 0);
+                    expenseCats.others += Number(item.others || 0);
+                    expenseCats.vehicleMaintenance += Number(item.vehicleMaintenance || 0);
+                    expenseCats.salary += Number(item.salary || 0);
+                });
+            }
+
+            Object.values(expenseCats).forEach(val => totalExpenses += val);
+
+            setData({
+                revenue,
+                cogs,
+                grossProfit: revenue - cogs,
+                expenses: expenseCats,
+                totalExpenses,
+                netIncome: (revenue - cogs) - totalExpenses
+            });
+
+        } catch (error) {
+            console.error('Failed to fetch income statement data:', error);
+            alert('載入失敗');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (user?.token) fetchData();
+    }, [user.token, apiUrl]);
+
+    const formatCurrency = (val) => `$${Math.round(val).toLocaleString()}`;
+    const getPercent = (val, total) => total === 0 ? '0%' : `${((val / total) * 100).toFixed(1)}%`;
+
+    return (
+        <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6 flex flex-col h-[calc(100vh-6rem)]">
+            <div className="flex justify-between items-center shrink-0">
+                <div>
+                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+                        <PieChart className="text-emerald-400" /> 損益表 (Income Statement)
+                    </h1>
+                    <p className="text-slate-400 text-sm mt-1">檢視指定期間的營收、成本、費用與淨利</p>
+                </div>
+                <button onClick={fetchData} className="btn-secondary p-2 rounded-xl">
+                    <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+                </button>
+            </div>
+
+            <div className="glass-panel p-4 shrink-0 flex items-center gap-4">
+                <Calendar size={18} className="text-slate-400" />
+                <input type="date" className="input-field flex-1" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                <span className="text-slate-500">至</span>
+                <input type="date" className="input-field flex-1" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                <button onClick={fetchData} className="btn-primary">查詢</button>
+            </div>
+
+            <div className="glass-panel p-0 overflow-hidden flex-1 flex flex-col">
+                <div className="overflow-y-auto flex-1 p-8">
+                    <div className="space-y-6 max-w-2xl mx-auto font-mono text-sm md:text-base">
+                        {/* Revenue Section */}
+                        <div className="space-y-2">
+                            <h3 className="text-emerald-400 font-bold text-lg border-b border-emerald-500/30 pb-2 mb-4">營業收入 (Revenue)</h3>
+                            <div className="flex justify-between items-center">
+                                <span className="text-slate-300">銷貨收入</span>
+                                <span className="text-white font-bold">{formatCurrency(data.revenue)}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-rose-400">
+                                <span className="flex items-center gap-2"><MinusCircle size={14} /> 銷貨成本</span>
+                                <span>- {formatCurrency(data.cogs)}</span>
+                            </div>
+                            <div className="flex justify-between items-center pt-2 border-t border-slate-700">
+                                <span className="text-emerald-300 font-bold">營業毛利 (Gross Profit)</span>
+                                <span className="text-emerald-300 font-bold">{formatCurrency(data.grossProfit)}</span>
+                            </div>
+                            <div className="text-right text-xs text-slate-500">
+                                毛利率: {getPercent(data.grossProfit, data.revenue)}
+                            </div>
+                        </div>
+
+                        {/* Expenses Section */}
+                        <div className="space-y-2 mt-8">
+                            <h3 className="text-orange-400 font-bold text-lg border-b border-orange-500/30 pb-2 mb-4">營業費用 (Operating Expenses)</h3>
+
+                            {Object.entries(data.expenses).map(([key, val]) => {
+                                const labels = {
+                                    stall: '攤位費', cleaning: '清潔費', electricity: '電費', gas: '加油費',
+                                    parking: '停車費', bags: '塑膠袋', serviceFee: '服務費', others: '其他支出',
+                                    vehicleMaintenance: '車輛保養', salary: '薪資支出'
+                                };
+                                if (val === 0) return null;
+                                return (
+                                    <div key={key} className="flex justify-between items-center text-slate-400 text-sm">
+                                        <span>{labels[key]}</span>
+                                        <span>{formatCurrency(val)}</span>
+                                    </div>
+                                );
+                            })}
+
+                            <div className="flex justify-between items-center pt-2 border-t border-slate-700 text-orange-300">
+                                <span className="font-bold">費用總計</span>
+                                <span className="font-bold">- {formatCurrency(data.totalExpenses)}</span>
+                            </div>
+                        </div>
+
+                        {/* Net Income Section */}
+                        <div className="mt-8 pt-4 border-t-2 border-slate-600">
+                            <div className="flex justify-between items-center text-xl">
+                                <span className="text-white font-bold">本期淨利 (Net Income)</span>
+                                <span className={`font-bold ${data.netIncome >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
+                                    {formatCurrency(data.netIncome)}
+                                </span>
+                            </div>
+                            <div className="text-right text-sm text-slate-500 mt-1">
+                                淨利率: {getPercent(data.netIncome, data.revenue)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}

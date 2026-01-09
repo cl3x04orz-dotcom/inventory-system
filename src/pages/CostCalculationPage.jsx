@@ -59,7 +59,7 @@ export default function CostCalculationPage({ user, apiUrl }) {
     });
 
     const totalOperationalCost = summary.stall + summary.cleaning + summary.electricity +
-        summary.gas + summary.parking + summary.bags + summary.serviceFee +
+        summary.gas + summary.parking + summary.bags +
         summary.others + summary.vehicleMaintenance + summary.salary;
 
     const expenseCategories = [
