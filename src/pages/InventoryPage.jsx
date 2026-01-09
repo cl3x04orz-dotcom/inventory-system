@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Package, Search, AlertCircle, RefreshCw, AlertTriangle, Trash2, Clock } from 'lucide-react';
 import { callGAS } from '../utils/api';
-import { CASE_MAP } from '../utils/constants';
+import { CASE_MAP, sortProducts } from '../utils/constants';
 
 export default function InventoryPage({ user, apiUrl }) {
     const [inventory, setInventory] = useState([]);
@@ -28,13 +28,10 @@ export default function InventoryPage({ user, apiUrl }) {
                 });
                 console.log('Filtered Inventory:', activeBatches);
 
-                activeBatches.sort((a, b) => {
-                    const nameA = String(a.productName || '').toLowerCase();
-                    const nameB = String(b.productName || '').toLowerCase();
-                    return nameA.localeCompare(nameB);
-                });
+                const sortedBatches = sortProducts(activeBatches, 'productName');
+                console.log('Sorted Inventory:', sortedBatches);
 
-                setInventory(activeBatches);
+                setInventory(sortedBatches);
             } else {
                 console.error('Inventory data is not an array:', data);
                 setInventory([]);
