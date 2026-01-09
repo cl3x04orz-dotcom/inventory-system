@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Save, Search, AlertTriangle, CheckSquare, RotateCcw, Package } from 'lucide-react';
+import { Save, Search, AlertTriangle, CheckSquare, RotateCcw, Package, AlertCircle } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import { sortProducts, getLocalDateString } from '../utils/constants';
 
@@ -19,15 +19,16 @@ export default function StocktakePage({ user, apiUrl }) {
                 const sorted = sortProducts(data, 'productName');
                 setInventory(sorted);
 
-                // Initialize stocktake data with empty values or pre-fill if needed
-                // Here we keep it empty to force manual entry, or we could copy quantity
+                // Initialize stocktake data only for STOCK items
                 const initialData = {};
                 sorted.forEach(item => {
-                    initialData[getRowKey(item)] = {
-                        physicalQty: '',
-                        reason: '',
-                        accountability: ''
-                    };
+                    if (item.type === 'STOCK') {
+                        initialData[getRowKey(item)] = {
+                            physicalQty: '',
+                            reason: '',
+                            accountability: ''
+                        };
+                    }
                 });
                 setStocktakeData(initialData);
             }
@@ -59,8 +60,9 @@ export default function StocktakePage({ user, apiUrl }) {
     };
 
     const getItemsToSubmit = () => {
-        // Only submit items where physicalQty has been entered (is not empty string)
+        // Only submit STOCK items where physicalQty has been entered
         return inventory.filter(item => {
+            if (item.type !== 'STOCK') return false;
             const entry = stocktakeData[getRowKey(item)];
             return entry && entry.physicalQty !== '';
         }).map(item => {
@@ -121,12 +123,123 @@ export default function StocktakePage({ user, apiUrl }) {
     const filteredInventory = inventory.filter(item => {
         if (!item) return false;
         const nameMatch = String(item.productName || '').toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesSearch = nameMatch;
-
-        if (!matchesSearch) return false;
-
-        return true;
+        return nameMatch;
     });
+
+    // Separate stock and original items
+    const stockItems = filteredInventory.filter(item => item.type === 'STOCK');
+    const originalItems = filteredInventory.filter(item => item.type !== 'STOCK');
+
+    const renderStocktakeTable = (items, title, Icon, colorClass, isStockType) => (
+        <div className="glass-panel p-6 flex flex-col">
+            <h3 className={`text-lg font-bold mb-4 flex items-center gap-2 ${colorClass}`}>
+                <Icon size={20} /> {title}
+                {!isStockType && <span className="text-xs text-slate-500 font-normal ml-2">（無需盤點）</span>}
+            </h3>
+            <div className="rounded-lg border border-slate-700/50 overflow-hidden">
+                <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-800 text-slate-400 text-xs uppercase">
+                        <tr>
+                            <th className="p-4">產品名稱</th>
+                            <th className="p-4 text-right">帳面庫存</th>
+                            {isStockType && (
+                                <>
+                                    <th className="p-4">實盤數量</th>
+                                    <th className="p-4 text-center">差異</th>
+                                    <th className="p-4">差異原因</th>
+                                    <th className="p-4">責任歸屬</th>
+                                </>
+                            )}
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-700/50">
+                        {loading ? (
+                            <tr><td colSpan={isStockType ? "6" : "2"} className="p-6 text-center text-slate-500">載入中...</td></tr>
+                        ) : items.length === 0 ? (
+                            <tr><td colSpan={isStockType ? "6" : "2"} className="p-6 text-center text-slate-500">無資料</td></tr>
+                        ) : (
+                            items.map((item, idx) => {
+                                if (!item) return null;
+                                const rowKey = getRowKey(item);
+                                const entry = stocktakeData[rowKey] || { physicalQty: '', reason: '', accountability: user.username || '' };
+                                const diff = calculateDiff(item.quantity, entry.physicalQty);
+
+                                return (
+                                    <tr key={rowKey} className={`hover:bg-slate-800/40 transition-colors ${isStockType && diff !== 0 && entry.physicalQty !== '' ? 'bg-amber-500/5' : ''}`}>
+                                        <td className="p-4 font-medium text-white">{item.productName || '未命名商品'}</td>
+                                        <td className="p-4 text-right font-mono text-slate-400">{item.quantity}</td>
+                                        {isStockType && (
+                                            <>
+                                                <td className="p-4">
+                                                    <input
+                                                        id={`qty-${rowKey}`}
+                                                        type="number"
+                                                        className={`input-field w-full text-right font-mono ${diff !== 0 && entry.physicalQty !== '' ? 'border-red-500/50 text-red-200' : ''}`}
+                                                        placeholder="0"
+                                                        value={entry.physicalQty}
+                                                        onChange={(e) => handleInputChange(rowKey, 'physicalQty', e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                e.preventDefault();
+                                                                document.getElementById(`reason-${rowKey}`)?.focus();
+                                                            }
+                                                        }}
+                                                        onWheel={(e) => e.target.blur()}
+                                                    />
+                                                </td>
+                                                <td className="p-4 text-center">
+                                                    <span className={`inline-flex items-center gap-1 font-mono font-bold ${entry.physicalQty === '' || diff === 0 ? 'text-green-500' : 'text-red-500 underline'}`}>
+                                                        {entry.physicalQty !== '' ? (diff > 0 ? `+${diff}` : diff) : 0}
+                                                        {entry.physicalQty !== '' && diff !== 0 && <AlertTriangle size={12} />}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4">
+                                                    <input
+                                                        id={`reason-${rowKey}`}
+                                                        type="text"
+                                                        className="input-field w-full text-xs"
+                                                        placeholder={diff !== 0 && entry.physicalQty !== '' ? "必填..." : "選填"}
+                                                        value={entry.reason}
+                                                        onChange={(e) => handleInputChange(rowKey, 'reason', e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                e.preventDefault();
+                                                                document.getElementById(`acc-${rowKey}`)?.focus();
+                                                            }
+                                                        }}
+                                                    />
+                                                </td>
+                                                <td className="p-4">
+                                                    <input
+                                                        id={`acc-${rowKey}`}
+                                                        type="text"
+                                                        className="input-field w-full text-xs"
+                                                        placeholder={diff !== 0 && entry.physicalQty !== '' ? "必填..." : "選填"}
+                                                        value={entry.accountability}
+                                                        onChange={(e) => handleInputChange(rowKey, 'accountability', e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                e.preventDefault();
+                                                                const nextItem = items[idx + 1];
+                                                                if (nextItem) {
+                                                                    const nextKey = getRowKey(nextItem);
+                                                                    document.getElementById(`qty-${nextKey}`)?.focus();
+                                                                }
+                                                            }
+                                                        }}
+                                                    />
+                                                </td>
+                                            </>
+                                        )}
+                                    </tr>
+                                );
+                            })
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
 
     return (
         <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6 flex flex-col h-[calc(100vh-6rem)]">
@@ -136,7 +249,7 @@ export default function StocktakePage({ user, apiUrl }) {
                     <h1 className="text-2xl font-bold text-white flex items-center gap-2">
                         <CheckSquare className="text-blue-400" /> 庫存盤點
                     </h1>
-                    <p className="text-slate-400 text-sm mt-1">輸入實盤數量，系統將自動調整庫存並記錄差異</p>
+                    <p className="text-slate-400 text-sm mt-1">現貨進貨需核對盤點，原貨退貨無需盤點</p>
                 </div>
 
                 <div className="flex gap-3">
@@ -171,113 +284,10 @@ export default function StocktakePage({ user, apiUrl }) {
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="glass-panel p-0 overflow-hidden flex-1 flex flex-col">
-                <div className="overflow-y-auto flex-1">
-                    <table className="w-full text-left text-sm relative">
-                        <thead className="bg-slate-800 text-slate-400 text-xs uppercase tracking-wider sticky top-0 z-10 shadow-sm">
-                            <tr>
-                                <th className="p-4 w-[20%]">產品資料</th>
-                                <th className="p-4 w-[10%] text-right">帳面庫存</th>
-                                <th className="p-4 w-[15%]">實盤數量</th>
-                                <th className="p-4 text-center w-[10%]">差異</th>
-                                <th className="p-4 w-[20%]">差異原因</th>
-                                <th className="p-4 w-[20%]">責任歸屬</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5">
-                            {loading ? (
-                                <tr><td colSpan="6" className="p-20 text-center text-slate-500">載入庫存資料中...</td></tr>
-                            ) : filteredInventory.length > 0 ? (
-                                filteredInventory.map((item, idx) => {
-                                    if (!item) return null;
-                                    const rowKey = getRowKey(item);
-                                    const entry = stocktakeData[rowKey] || { physicalQty: '', reason: '', accountability: user.username || '' };
-                                    const diff = calculateDiff(item.quantity, entry.physicalQty);
-
-                                    return (
-                                        <tr key={rowKey} className={`hover:bg-slate-800/30 transition-colors ${diff !== 0 && entry.physicalQty !== '' ? 'bg-amber-500/5' : ''}`}>
-                                            <td className="p-4">
-                                                <div className="font-bold text-white">{item.productName || '未命名商品'}</div>
-                                            </td>
-                                            <td className="p-4 text-right font-mono text-slate-400">
-                                                {item.quantity}
-                                            </td>
-                                            <td className="p-4">
-                                                <input
-                                                    id={`qty-${rowKey}`}
-                                                    type="number"
-                                                    className={`input-field w-full text-right font-mono ${diff !== 0 && entry.physicalQty !== '' ? 'border-red-500/50 text-red-200' : ''}`}
-                                                    placeholder="0"
-                                                    value={entry.physicalQty}
-                                                    onChange={(e) => handleInputChange(rowKey, 'physicalQty', e.target.value)}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.preventDefault();
-                                                            document.getElementById(`reason-${rowKey}`)?.focus();
-                                                        }
-                                                    }}
-                                                    onWheel={(e) => e.target.blur()}
-                                                />
-                                            </td>
-                                            <td className="p-4 text-center">
-                                                <span className={`inline-flex items-center gap-1 font-mono font-bold ${entry.physicalQty === '' || diff === 0 ? 'text-green-500' : 'text-red-500 underline'}`}>
-                                                    {entry.physicalQty !== '' ? (diff > 0 ? `+${diff}` : diff) : 0}
-                                                    {entry.physicalQty !== '' && diff !== 0 && <AlertTriangle size={12} />}
-                                                </span>
-                                            </td>
-                                            <td className="p-4">
-                                                <input
-                                                    id={`reason-${rowKey}`}
-                                                    type="text"
-                                                    className="input-field w-full text-xs"
-                                                    placeholder={diff !== 0 && entry.physicalQty !== '' ? "必填..." : "選填"}
-                                                    value={entry.reason}
-                                                    onChange={(e) => handleInputChange(rowKey, 'reason', e.target.value)}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.preventDefault();
-                                                            document.getElementById(`acc-${rowKey}`)?.focus();
-                                                        }
-                                                    }}
-                                                />
-                                            </td>
-                                            <td className="p-4">
-                                                <input
-                                                    id={`acc-${rowKey}`}
-                                                    type="text"
-                                                    className="input-field w-full text-xs"
-                                                    placeholder={diff !== 0 && entry.physicalQty !== '' ? "必填..." : "選填"}
-                                                    value={entry.accountability}
-                                                    onChange={(e) => handleInputChange(rowKey, 'accountability', e.target.value)}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.preventDefault();
-                                                            const nextItem = filteredInventory[idx + 1];
-                                                            if (nextItem) {
-                                                                const nextKey = getRowKey(nextItem);
-                                                                document.getElementById(`qty-${nextKey}`)?.focus();
-                                                            }
-                                                        }
-                                                    }}
-                                                />
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            ) : (
-                                <tr>
-                                    <td colSpan="6" className="p-20 text-center">
-                                        <div className="flex flex-col items-center gap-4">
-                                            <Package size={32} className="text-slate-600" />
-                                            <p className="text-slate-500">無符合條件的商品</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+            {/* Tables */}
+            <div className="flex-1 overflow-y-auto flex flex-col gap-6 pb-6">
+                {renderStocktakeTable(stockItems, "現貨進貨", Package, "text-blue-400", true)}
+                {renderStocktakeTable(originalItems, "原貨/退貨", AlertCircle, "text-orange-400", false)}
             </div>
         </div>
     );
