@@ -9,7 +9,20 @@ export default function StocktakePage({ user, apiUrl }) {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [zeroStockDates, setZeroStockDates] = useState({}); // Track when products hit zero stock
     const getRowKey = useCallback((item) => `${item.id}-${item.batchId || 'no-batch'}`, []);
+
+    // Load zero stock tracking from localStorage
+    useEffect(() => {
+        const saved = localStorage.getItem('zeroStockDates');
+        if (saved) {
+            try {
+                setZeroStockDates(JSON.parse(saved));
+            } catch (e) {
+                console.error('Failed to parse zeroStockDates:', e);
+            }
+        }
+    }, []);
 
     const fetchInventory = useCallback(async () => {
         setLoading(true);
@@ -17,6 +30,31 @@ export default function StocktakePage({ user, apiUrl }) {
             const data = await callGAS(apiUrl, 'getInventory', {}, user.token);
             if (Array.isArray(data)) {
                 const sorted = sortProducts(data, 'productName');
+
+                // Update zero stock tracking
+                const today = new Date().toISOString().split('T')[0];
+                const newZeroStockDates = { ...zeroStockDates };
+
+                sorted.forEach(item => {
+                    const qty = Number(item.quantity) || 0;
+                    const productKey = item.id;
+
+                    if (qty === 0) {
+                        // If not already tracked, start tracking
+                        if (!newZeroStockDates[productKey]) {
+                            newZeroStockDates[productKey] = today;
+                        }
+                    } else {
+                        // If stock is back, remove from tracking
+                        if (newZeroStockDates[productKey]) {
+                            delete newZeroStockDates[productKey];
+                        }
+                    }
+                });
+
+                setZeroStockDates(newZeroStockDates);
+                localStorage.setItem('zeroStockDates', JSON.stringify(newZeroStockDates));
+
                 setInventory(sorted);
 
                 // Initialize stocktake data only for STOCK items
@@ -38,7 +76,7 @@ export default function StocktakePage({ user, apiUrl }) {
         } finally {
             setLoading(false);
         }
-    }, [apiUrl, user.token]);
+    }, [apiUrl, user.token, zeroStockDates]);
 
     useEffect(() => {
         if (user?.token) fetchInventory();
@@ -120,8 +158,27 @@ export default function StocktakePage({ user, apiUrl }) {
         }
     };
 
+    // Check if product should be hidden (zero stock for more than 2 days)
+    const shouldHideProduct = (item) => {
+        const qty = Number(item.quantity) || 0;
+        if (qty > 0) return false;
+
+        const zeroDate = zeroStockDates[item.id];
+        if (!zeroDate) return false;
+
+        const today = new Date();
+        const zeroDateObj = new Date(zeroDate);
+        const daysDiff = Math.floor((today - zeroDateObj) / (1000 * 60 * 60 * 24));
+
+        return daysDiff > 2;
+    };
+
     const filteredInventory = inventory.filter(item => {
         if (!item) return false;
+
+        // Hide products with zero stock for more than 2 days
+        if (shouldHideProduct(item)) return false;
+
         const nameMatch = String(item.productName || '').toLowerCase().includes(searchTerm.toLowerCase());
         return nameMatch;
     });
@@ -164,10 +221,19 @@ export default function StocktakePage({ user, apiUrl }) {
                                 const entry = stocktakeData[rowKey] || { physicalQty: '', reason: '', accountability: user.username || '' };
                                 const diff = calculateDiff(item.quantity, entry.physicalQty);
 
+                                // Highlight original items with quantity > 0
+                                const hasQuantity = !isStockType && Number(item.quantity) > 0;
+
                                 return (
-                                    <tr key={rowKey} className={`hover:bg-slate-800/40 transition-colors ${isStockType && diff !== 0 && entry.physicalQty !== '' ? 'bg-amber-500/5' : ''}`}>
-                                        <td className="p-4 font-medium text-white">{item.productName || '未命名商品'}</td>
-                                        <td className="p-4 text-right font-mono text-slate-400">{item.quantity}</td>
+                                    <tr key={rowKey} className={`hover:bg-slate-800/40 transition-colors ${isStockType && diff !== 0 && entry.physicalQty !== '' ? 'bg-amber-500/5' :
+                                            hasQuantity ? 'bg-orange-500/20 border-l-4 border-orange-500' : ''
+                                        }`}>
+                                        <td className={`p-4 font-medium ${hasQuantity ? 'text-orange-300 font-bold' : 'text-white'}`}>
+                                            {item.productName || '未命名商品'}
+                                        </td>
+                                        <td className={`p-4 text-right font-mono ${hasQuantity ? 'text-orange-400 font-bold text-lg' : 'text-slate-400'}`}>
+                                            {item.quantity}
+                                        </td>
                                         {isStockType && (
                                             <>
                                                 <td className="p-4">
