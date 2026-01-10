@@ -24,11 +24,22 @@ export default function PermissionControlPage({ user, apiUrl }) {
             // Assumes backend has 'getUsers' handler
             const data = await callGAS(apiUrl, 'getUsers', {}, user.token);
             if (Array.isArray(data)) {
-                setUsers(data);
+                // Ensure permissions are parsed
+                const parsedData = data.map(u => {
+                    let perms = u.permissions;
+                    if (typeof perms === 'string') {
+                        try {
+                            perms = JSON.parse(perms);
+                        } catch (e) {
+                            console.error(`Failed to parse permissions for ${u.username}`, e);
+                            perms = [];
+                        }
+                    }
+                    return { ...u, permissions: Array.isArray(perms) ? perms : [] };
+                });
+                setUsers(parsedData);
             } else {
                 console.warn('Backend returned non-array for users or not implemented');
-                // Mock data for demo if backend fails or returns empty (optional, remove in prod)
-                // setUsers([{ username: 'admin', role: 'ADMIN' }, { username: 'staff', role: 'USER' }]);
             }
         } catch (error) {
             console.error('Failed to fetch users:', error);

@@ -136,13 +136,13 @@ export default function ReportPage({ user, apiUrl }) {
                     {/* Summary Stats (Integrated in Header) */}
                     {reportData && (
                         <div className="flex gap-4">
-                            <div className="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                                <p className="text-xs text-slate-400 uppercase font-bold text-center">總銷售額</p>
-                                <p className="text-xl font-bold text-emerald-400 text-center">${totalSales.toLocaleString()}</p>
-                            </div>
                             <div className="px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
                                 <p className="text-xs text-slate-400 uppercase font-bold text-center">應繳回金額</p>
                                 <p className="text-xl font-bold text-amber-400 text-center">${totalReturnAmount.toLocaleString()}</p>
+                            </div>
+                            <div className="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                                <p className="text-xs text-slate-400 uppercase font-bold text-center">總銷售額</p>
+                                <p className="text-xl font-bold text-emerald-400 text-center">${totalSales.toLocaleString()}</p>
                             </div>
                             <div className="px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/20">
                                 <p className="text-xs text-slate-400 uppercase font-bold text-center">總支出</p>
