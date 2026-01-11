@@ -19,10 +19,21 @@ export default function ReportPage({ user, apiUrl }) {
 
         try {
             const payload = { startDate, endDate }; // Basic payload for date range
-            const [salesRes, expenseRes] = await Promise.all([
-                callGAS(apiUrl, 'getSalesHistory', payload, user.token),
-                callGAS(apiUrl, 'getExpenditures', payload, user.token)
-            ]);
+
+            // RBAC Check: Only fetch expenditures if user has finance permission
+            const hasFinancePerm = user.role === 'BOSS' || (user.permissions && user.permissions.includes('finance'));
+
+            const promises = [
+                callGAS(apiUrl, 'getSalesHistory', payload, user.token)
+            ];
+
+            if (hasFinancePerm) {
+                promises.push(callGAS(apiUrl, 'getExpenditures', payload, user.token));
+            }
+
+            const results = await Promise.all(promises);
+            const salesRes = results[0];
+            const expenseRes = hasFinancePerm ? results[1] : [];
 
             // 1. Process Sales Data
             let filteredSales = Array.isArray(salesRes) ? salesRes : [];

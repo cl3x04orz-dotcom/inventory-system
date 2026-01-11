@@ -31,8 +31,10 @@ export default function SalesPage({ user, apiUrl }) {
 
             if (Array.isArray(data)) {
                 // Show ALL products (removed stock filter for debugging)
-                const sortedProducts = sortProducts(data, 'name');
-                console.log('Sales Page - Sorted Products:', sortedProducts);
+                // [User Request] Filter out only if BOTH stock and originalStock are 0
+                const content = data.filter(p => (Number(p.stock) || 0) > 0 || (Number(p.originalStock) || 0) > 0);
+                const sortedProducts = sortProducts(content, 'name');
+                console.log('Sales Page - Sorted Products (Stock or Original > 0):', sortedProducts);
 
                 setRows(sortedProducts.map(p => {
                     // Use custom selling price if available, otherwise fallback to system price

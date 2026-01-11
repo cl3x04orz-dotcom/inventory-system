@@ -9,12 +9,54 @@ export default function PermissionControlPage({ user, apiUrl }) {
     const [editingUser, setEditingUser] = useState(null); // The user currently being edited for permissions
 
     const AVAILABLE_PERMISSIONS = [
-        { key: 'sales', label: '銷售管理 (Sales)' },
-        { key: 'purchase', label: '進貨管理 (Purchase)' },
-        { key: 'inventory', label: '庫存管理 (Inventory)' },
-        { key: 'finance', label: '財務帳務 (Finance)' },
-        { key: 'analytics', label: '數據分析 (Analytics)' },
-        { key: 'system', label: '系統管理 (System)' }
+        {
+            group: '銷售管理',
+            items: [
+                { key: 'sales_entry', label: '商品銷售登錄' },
+                { key: 'sales_report', label: '銷售查詢報表' }
+            ]
+        },
+        {
+            group: '進貨管理',
+            items: [
+                { key: 'purchase_entry', label: '進貨資料登錄' },
+                { key: 'purchase_history', label: '進貨歷史紀錄' }
+            ]
+        },
+        {
+            group: '庫存管理',
+            items: [
+                { key: 'inventory_adjust', label: '庫存異動作業' },
+                { key: 'inventory_stocktake', label: '現場盤點作業' },
+                { key: 'inventory_valuation', label: '庫存估值報告' },
+                { key: 'inventory_history', label: '異動/盤點紀錄查詢' }
+            ]
+        },
+        {
+            group: '財務帳務',
+            items: [
+                { key: 'finance_expenditure', label: '外場支出作業' },
+                { key: 'finance_receivable', label: '應收帳款管理' },
+                { key: 'finance_payable', label: '應付帳款管理' },
+                { key: 'finance_income', label: '簡易損益表' },
+                { key: 'finance_cost', label: '成本計算分析' }
+            ]
+        },
+        {
+            group: '數據分析',
+            items: [
+                { key: 'analytics_sales', label: '商品銷售排行' },
+                { key: 'analytics_customer', label: '客戶銷售排行' },
+                { key: 'analytics_profit', label: '毛利分析報表' },
+                { key: 'analytics_turnover', label: '庫存周轉率' }
+            ]
+        },
+        {
+            group: '系統管理',
+            items: [
+                { key: 'system_config', label: '權限控管表' }
+            ]
+        }
     ];
 
     // ... existing code ...
@@ -108,6 +150,22 @@ export default function PermissionControlPage({ user, apiUrl }) {
             setEditingUser({ ...editingUser, permissions: currentPerms.filter(p => p !== key) });
         } else {
             setEditingUser({ ...editingUser, permissions: [...currentPerms, key] });
+        }
+    };
+
+    const toggleGroup = (groupItems) => {
+        if (!editingUser) return;
+        const currentPerms = editingUser.permissions || [];
+        const groupKeys = groupItems.map(item => item.key);
+        const allSelected = groupKeys.every(key => currentPerms.includes(key));
+
+        if (allSelected) {
+            // Deselect all in group
+            setEditingUser({ ...editingUser, permissions: currentPerms.filter(p => !groupKeys.includes(p)) });
+        } else {
+            // Select all in group
+            const otherPerms = currentPerms.filter(p => !groupKeys.includes(p));
+            setEditingUser({ ...editingUser, permissions: [...otherPerms, ...groupKeys] });
         }
     };
 
@@ -214,9 +272,35 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                                 <>
                                                     <button
                                                         onClick={() => {
+                                                            // [Migration Logic] Convert old permissions to new granular ones
+                                                            let currentPerms = Array.isArray(u.permissions) ? [...u.permissions] : [];
+                                                            const legacyMap = {
+                                                                'sales': ['sales_entry', 'sales_report'],
+                                                                'purchase': ['purchase_entry', 'purchase_history'],
+                                                                'inventory': ['inventory_adjust', 'inventory_stocktake', 'inventory_valuation', 'inventory_history'],
+                                                                'finance': ['finance_expenditure', 'finance_receivable', 'finance_payable', 'finance_income', 'finance_cost'],
+                                                                'analytics': ['analytics_sales', 'analytics_customer', 'analytics_profit', 'analytics_turnover'],
+                                                                'system': ['system_config']
+                                                            };
+
+                                                            let hasMigration = false;
+                                                            Object.keys(legacyMap).forEach(legacyKey => {
+                                                                if (currentPerms.includes(legacyKey)) {
+                                                                    hasMigration = true;
+                                                                    // Remove legacy key
+                                                                    currentPerms = currentPerms.filter(p => p !== legacyKey);
+                                                                    // Add all new granular keys (avoid duplicates)
+                                                                    legacyMap[legacyKey].forEach(newKey => {
+                                                                        if (!currentPerms.includes(newKey)) {
+                                                                            currentPerms.push(newKey);
+                                                                        }
+                                                                    });
+                                                                }
+                                                            });
+
                                                             setEditingUser({
                                                                 username: u.username,
-                                                                permissions: Array.isArray(u.permissions) ? u.permissions : []
+                                                                permissions: currentPerms
                                                             });
                                                         }}
                                                         className="p-2 text-slate-400 hover:text-blue-400 transition-colors"
@@ -260,26 +344,57 @@ export default function PermissionControlPage({ user, apiUrl }) {
                             <p className="text-slate-400 text-sm mt-1">勾選該使用者可存取的功能模組 (BOSS 擁有預設全權限)</p>
                         </div>
 
-                        <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto">
-                            {AVAILABLE_PERMISSIONS.map(perm => (
-                                <label key={perm.key} className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/30 hover:bg-slate-800 border border-slate-700/50 cursor-pointer transition-colors group">
-                                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${editingUser.permissions?.includes(perm.key)
-                                        ? 'bg-blue-500 border-blue-500 text-white'
-                                        : 'bg-slate-800 border-slate-600 group-hover:border-blue-500/50'
-                                        }`}>
-                                        {editingUser.permissions?.includes(perm.key) && <CheckSquare size={12} fill="currentColor" />}
+                        <div className="p-6 space-y-6 max-h-[65vh] overflow-y-auto custom-scrollbar">
+                            {AVAILABLE_PERMISSIONS.map(group => {
+                                const groupKeys = group.items.map(i => i.key);
+                                const isGroupAllSelected = groupKeys.every(k => editingUser.permissions?.includes(k));
+                                const isGroupSomeSelected = groupKeys.some(k => editingUser.permissions?.includes(k)) && !isGroupAllSelected;
+
+                                return (
+                                    <div key={group.group} className="space-y-3">
+                                        <div
+                                            className="flex items-center justify-between px-1 cursor-pointer group/title"
+                                            onClick={() => toggleGroup(group.items)}
+                                        >
+                                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 group-hover/title:text-blue-400 transition-colors">
+                                                {group.group}
+                                            </h4>
+                                            <span className="text-[10px] text-blue-500 font-bold opacity-0 group-hover/title:opacity-100 transition-opacity">
+                                                {isGroupAllSelected ? '取消全選' : '全選'}
+                                            </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 gap-2">
+                                            {group.items.map(perm => (
+                                                <label
+                                                    key={perm.key}
+                                                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group ${editingUser.permissions?.includes(perm.key)
+                                                        ? 'bg-blue-500/10 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.1)]'
+                                                        : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800 hover:border-slate-600'
+                                                        }`}
+                                                >
+                                                    <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${editingUser.permissions?.includes(perm.key)
+                                                        ? 'bg-blue-500 border-blue-500 text-white scale-110'
+                                                        : 'bg-slate-900 border-slate-600 group-hover:border-blue-500/50'
+                                                        }`}>
+                                                        {editingUser.permissions?.includes(perm.key) && <CheckSquare size={12} fill="currentColor" />}
+                                                    </div>
+                                                    <input
+                                                        type="checkbox"
+                                                        className="hidden"
+                                                        checked={editingUser.permissions?.includes(perm.key)}
+                                                        onChange={() => togglePermission(perm.key)}
+                                                    />
+                                                    <span className={`text-sm transition-colors ${editingUser.permissions?.includes(perm.key) ? 'text-white font-bold' : 'text-slate-400'
+                                                        }`}>
+                                                        {perm.label}
+                                                    </span>
+                                                </label>
+                                            ))}
+                                        </div>
                                     </div>
-                                    <input
-                                        type="checkbox"
-                                        className="hidden"
-                                        checked={editingUser.permissions?.includes(perm.key)}
-                                        onChange={() => togglePermission(perm.key)}
-                                    />
-                                    <span className={editingUser.permissions?.includes(perm.key) ? 'text-white font-bold' : 'text-slate-400'}>
-                                        {perm.label}
-                                    </span>
-                                </label>
-                            ))}
+                                );
+                            })}
                         </div>
 
                         <div className="p-6 border-t border-slate-800 flex justify-end gap-3 bg-slate-900/50">
