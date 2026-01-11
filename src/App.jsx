@@ -19,6 +19,7 @@ import CostCalculationPage from './pages/CostCalculationPage';
 import IncomeStatementPage from './pages/IncomeStatementPage';
 import ExpenditureManagementPage from './pages/ExpenditureManagementPage';
 import PermissionControlPage from './pages/PermissionControlPage';
+import PayrollPage from './pages/PayrollPage';
 import {
     LayoutDashboard, ShoppingCart, Archive, LogOut, PackagePlus,
     FileText, ClipboardList, DollarSign, CheckSquare, Wallet, ChevronDown,
@@ -149,6 +150,8 @@ export default function App() {
                 return perms.includes('finance_income') || perms.includes('finance');
             case 'costCalculation':
                 return perms.includes('finance_cost') || perms.includes('finance');
+            case 'payroll':
+                return perms.includes('finance_payroll') || perms.includes('finance');
             case 'salesRanking':
                 return perms.includes('analytics_sales') || perms.includes('analytics');
             case 'customerRanking':
@@ -280,6 +283,7 @@ export default function App() {
                             {checkPermission('incomeStatement') && <NavItem label="損益表" icon={PieChart} onClick={() => handlePageChange('incomeStatement')} active={page === 'incomeStatement'} />}
                             <div className="my-1 border-t border-slate-700/50" />
                             {checkPermission('costCalculation') && <NavItem label="成本計算分析" icon={DollarSign} onClick={() => handlePageChange('costCalculation')} active={page === 'costCalculation'} />}
+                            {checkPermission('payroll') && <NavItem label="薪資結算中心" icon={DollarSign} onClick={() => handlePageChange('payroll')} active={page === 'payroll'} />}
                         </NavDropdown>
                     )}
 
@@ -353,6 +357,7 @@ export default function App() {
                         {page === 'expenditureManagement' && <ExpenditureManagementPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'incomeStatement' && <IncomeStatementPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'permissionControl' && <PermissionControlPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'payroll' && <PayrollPage user={user} apiUrl={GAS_API_URL} />}
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full text-slate-500">

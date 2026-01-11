@@ -13,7 +13,8 @@ function doGet() {
  * Main API Router - 實作 RBAC 硬性校驗 (邏輯與功能保持不動，已修正細分權限)
  */
 function apiHandler(request) {
-    const { action, payload } = request;
+    let { action, payload } = request;
+    if (action) action = action.trim();
     
     // 檢查 Token (存在於 root 或 payload)
     const token = request.token || (payload && payload.token);
@@ -51,6 +52,7 @@ function apiHandler(request) {
         'getInventoryForStocktake': 'inventory_stocktake',
         'saveStocktake': 'inventory_stocktake',
         'getStocktakeHistory': 'inventory_history',
+        'getProducts': 'inventory_adjust', // 新增產品清單權限
         
         // Finance (財務管理)
         'getExpenditures': 'finance_expenditure',
@@ -60,6 +62,11 @@ function apiHandler(request) {
         'getPayables': 'finance_payable',
         'markPayableAsPaid': 'finance_payable',
         'getProfitAnalysis': 'analytics_profit', // 毛利分析歸類於數據分析
+
+        // Payroll (薪資管理) - 新增
+        'getPayrollData': 'finance_payroll',
+        'saveDailyRecord': 'finance_payroll',
+        'savePayrollSettings': 'finance_payroll',
         
         // Analytics (數據分析)
         'getSalesRanking': 'analytics_sales',
@@ -117,7 +124,7 @@ function apiHandler(request) {
             case 'updateUserStatus': return updateUserStatusService(payload);
 
             // Inventory & Purchase
-            case 'getProducts': return typeof getProductsService !== 'undefined' ? getProductsService() : {error: 'Service missing'}; 
+            case 'getProducts': return getProductsService(); 
             case 'getInventory': return typeof getInventoryService !== 'undefined' ? getInventoryService() : {error: 'Service missing'}; 
             case 'getPurchaseSuggestions': return typeof getPurchaseSuggestionsService !== 'undefined' ? getPurchaseSuggestionsService() : {error: 'Service missing'}; 
             case 'addPurchase': return typeof addPurchaseService !== 'undefined' ? addPurchaseService(payload, user) : {error: 'Service missing'}; 
@@ -139,6 +146,11 @@ function apiHandler(request) {
             case 'getProfitAnalysis': return typeof getProfitAnalysis !== 'undefined' ? getProfitAnalysis(payload) : {error: 'Service missing'};
             case 'getTurnoverRate': return typeof getTurnoverRate !== 'undefined' ? getTurnoverRate(payload) : {error: 'Service missing'};
             
+            // Payroll
+            case 'getPayrollData': return getPayrollDataService(payload);
+            case 'saveDailyRecord': return saveDailyRecordService(payload);
+            case 'savePayrollSettings': return savePayrollSettingsService(payload);
+
             // 支出管理
             case 'getExpenditures': return getExpendituresService(payload);
             case 'saveExpenditure': return saveExpenditureService(payload);
@@ -149,7 +161,7 @@ function apiHandler(request) {
             case 'getPayables': return typeof getPayablesService !== 'undefined' ? getPayablesService(payload) : {error: 'Service missing'};
             case 'markPayableAsPaid': return typeof markPayableAsPaidService !== 'undefined' ? markPayableAsPaidService(payload) : {error: 'Service missing'};
 
-            default: throw new Error('Unknown action: ' + action);
+            default: throw new Error('Unknown action: [' + action + '] (length: ' + (action ? action.length : 0) + ')');
         }
     } catch (error) {
         return { error: error.message };
@@ -208,7 +220,6 @@ function login(payload) {
                 try {
                     if (rowPerms && String(rowPerms).trim() !== "") {
                         var permStr = String(rowPerms).trim();
-                        // 確保 JSON 標準引號
                         permStr = permStr.replace(/[“”]/g, '"').replace(/[’‘]/g, "'");
                         if (permStr.startsWith('[') && permStr.endsWith(']')) {
                             permissions = JSON.parse(permStr);
@@ -488,3 +499,40 @@ function saveExpenditureService(payload) {
         throw new Error('保存支出資料失敗: ' + error.message);
     }
 }
+
+/**
+ * [Service] 獲取產品清單 (從 Products 或 Inventory 頁面)
+ */
+function getProductsService() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Products") || ss.getSheetByName("Inventory");
+    if (!sheet) return { error: "找不到 'Products' 或 'Inventory' 分頁" };
+  
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) return [];
+  
+    var headers = data[0];
+    var products = [];
+    
+    for (var i = 1; i < data.length; i++) {
+        var row = data[i];
+        if (!row[0] && !row[1]) continue; 
+        
+        var p = {};
+        headers.forEach((h, idx) => {
+            var header = String(h || '').trim();
+            if (header === 'ID' || header === '序號' || header === 'UUID') p.id = row[idx];
+            if (header === '產品名稱' || header === '名稱' || header === 'Name') p.name = row[idx];
+            if (header === '單價' || header === 'Price' || header === '售價') p.price = row[idx];
+            if (header === '庫存' || header === 'Stock') p.stock = row[idx];
+            if (header === '原始庫存' || header === 'OriginalStock') p.originalStock = row[idx];
+            if (header === '單位' || header === 'Unit') p.unit = row[idx];
+        });
+        
+        if (p.name && !p.id) p.id = p.name;
+        if (p.name) products.push(p);
+    }
+    return products;
+}
+
+
