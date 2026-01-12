@@ -48,29 +48,29 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
         <div className="max-w-[90rem] mx-auto p-4">
             <div className="glass-panel p-6">
                 {/* Header & Stats */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-6 border-b border-slate-700/50 pb-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-6 border-b border-slate-200 pb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                            <ClipboardList className="text-blue-400" /> 庫存異動
+                        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                            <ClipboardList className="text-blue-600" /> 庫存異動
                         </h1>
-                        <p className="text-slate-400 text-sm mt-1">查看庫存的手動調整記錄</p>
+                        <p className="text-slate-500 text-sm mt-1">查看庫存的手動調整記錄</p>
                     </div>
 
                     <div className="flex gap-4">
-                        <div className="px-5 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                            <p className="text-xs text-slate-400 uppercase font-bold text-center">總記錄數</p>
-                            <p className="text-xl font-bold text-blue-400 text-center">{filtered.length}</p>
+                        <div className="px-5 py-2 rounded-xl bg-blue-50 border border-blue-200">
+                            <p className="text-xs text-slate-500 uppercase font-bold text-center">總記錄數</p>
+                            <p className="text-xl font-bold text-blue-600 text-center">{filtered.length}</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Filter */}
-                <div className="mb-6 p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                <div className="mb-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
                     <div className="flex flex-col md:flex-row gap-4 items-end">
                         <div className="flex-1 space-y-1.5 w-full">
                             <label className="text-[10px] text-slate-500 font-bold uppercase px-1">商品名稱</label>
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                                 <input
                                     type="text"
                                     placeholder="搜尋商品名稱..."
@@ -86,7 +86,7 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                             <select
                                 value={type}
                                 onChange={(e) => setType(e.target.value)}
-                                className="input-field w-full text-sm appearance-none bg-slate-900"
+                                className="input-field w-full text-sm appearance-none bg-white font-medium"
                             >
                                 <option value="ALL">全部類型</option>
                                 <option value="SCRAP">報廢</option>
@@ -127,10 +127,10 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                 </div>
 
                 {/* Table */}
-                <div className="rounded-xl border border-slate-700/50 overflow-hidden">
+                <div className="rounded-xl border border-slate-200 overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-800/80 text-slate-400 text-xs uppercase tracking-wider sticky top-0 backdrop-blur-sm">
+                            <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider sticky top-0">
                                 <tr>
                                     <th className="p-4">日期</th>
                                     <th className="p-4">商品名稱</th>
@@ -140,7 +140,7 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                                     <th className="p-4">執行人</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-white/5 bg-slate-900/30">
+                            <tbody className="divide-y divide-slate-100 bg-white">
                                 {loading ? (
                                     <tr><td colSpan="6" className="p-20 text-center text-slate-500">載入中...</td></tr>
                                 ) : filtered.length > 0 ? (
@@ -153,32 +153,32 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                                         };
 
                                         return (
-                                            <tr key={idx} className="hover:bg-white/5 transition-colors">
+                                            <tr key={idx} className="hover:bg-slate-50 transition-colors">
                                                 <td className="p-4">
-                                                    <div className="flex flex-col gap-0.5 text-slate-300">
+                                                    <div className="flex flex-col gap-0.5 text-slate-500">
                                                         <div className="flex items-center gap-2">
-                                                            <Calendar size={14} className="text-slate-500" />
+                                                            <Calendar size={14} className="text-slate-400" />
                                                             <span>{record.date ? new Date(record.date).toLocaleDateString('zh-TW') : '-'}</span>
                                                         </div>
-                                                        <span className="text-xs text-slate-500 ml-6">
+                                                        <span className="text-xs text-slate-400 ml-6">
                                                             {record.date ? new Date(record.date).toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit' }) : ''}
                                                         </span>
                                                     </div>
                                                 </td>
-                                                <td className="p-4 font-medium text-white">{record.productName}</td>
+                                                <td className="p-4 font-medium text-slate-900">{record.productName}</td>
                                                 <td className="p-4">
-                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${record.type === 'SCRAP' ? 'bg-red-500/20 text-red-400' :
-                                                        record.type === 'RETURN' ? 'bg-blue-500/20 text-blue-400' :
-                                                            record.type === 'LOSS' ? 'bg-orange-500/20 text-orange-400' :
-                                                                'bg-slate-500/20 text-slate-400'
+                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${record.type === 'SCRAP' ? 'bg-rose-100 text-rose-700' :
+                                                        record.type === 'RETURN' ? 'bg-blue-100 text-blue-700' :
+                                                            record.type === 'LOSS' ? 'bg-amber-100 text-amber-700' :
+                                                                'bg-slate-100 text-slate-700'
                                                         }`}>
                                                         {typeLabels[record.type] || record.type}
                                                     </span>
                                                 </td>
-                                                <td className="p-4 text-right font-mono font-bold text-red-400">
+                                                <td className="p-4 text-right font-mono font-bold text-rose-600">
                                                     -{record.quantity}
                                                 </td>
-                                                <td className="p-4 text-slate-300 max-w-xs truncate" title={record.note}>
+                                                <td className="p-4 text-slate-600 max-w-xs truncate" title={record.note}>
                                                     {record.note || '-'}
                                                 </td>
                                                 <td className="p-4 text-slate-400">{record.operator || '-'}</td>

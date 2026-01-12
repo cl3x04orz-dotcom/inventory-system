@@ -142,13 +142,13 @@ export default function InventoryPage({ user, apiUrl }) {
     });
 
     const renderInventoryTable = (items, title, Icon, colorClass) => (
-        <div className="glass-panel p-6 flex flex-col">
+        <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col shadow-sm">
             <h3 className={`text-lg font-bold mb-4 flex items-center gap-2 ${colorClass}`}>
                 <Icon size={20} /> {title}
             </h3>
-            <div className="rounded-lg border border-slate-700/50 overflow-hidden">
+            <div className="rounded-lg border border-slate-200 overflow-hidden">
                 <table className="w-full text-left border-collapse">
-                    <thead className="bg-slate-800 text-slate-400 text-sm uppercase">
+                    <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
                         <tr>
                             <th className="p-4">產品名稱</th>
                             <th className="p-4 text-center">數量 / 箱數</th>
@@ -157,7 +157,7 @@ export default function InventoryPage({ user, apiUrl }) {
                             <th className="p-4 text-center">操作</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-700/50">
+                    <tbody className="divide-y divide-slate-100">
                         {loading ? (
                             <tr><td colSpan="5" className="p-6 text-center text-slate-500">載入中...</td></tr>
                         ) : items.length === 0 ? (
@@ -179,8 +179,8 @@ export default function InventoryPage({ user, apiUrl }) {
                                 const isExpired = expiryDate && expiryDate < today;
 
                                 return (
-                                    <tr key={idx} className={`hover:bg-slate-800/40 transition-colors ${isLowStock ? 'bg-red-900/10' : ''} ${isExpired ? 'bg-rose-950/20' : isExpiringSoon ? 'bg-amber-950/20' : ''}`}>
-                                        <td className="p-4 font-medium text-white">
+                                    <tr key={idx} className={`hover:bg-slate-50 transition-colors ${isLowStock ? 'bg-red-50' : ''} ${isExpired ? 'bg-rose-50' : isExpiringSoon ? 'bg-amber-50' : ''}`}>
+                                        <td className="p-4 font-medium text-slate-900">
                                             <div className="flex items-center gap-2">
                                                 {isLowStock && <AlertTriangle size={16} className="text-red-400" />}
                                                 {item.productName}
@@ -188,9 +188,9 @@ export default function InventoryPage({ user, apiUrl }) {
                                         </td>
                                         <td className="p-4 text-center">
                                             <div className="flex flex-col items-center">
-                                                <span className="font-mono text-emerald-400 font-bold text-lg">{item.quantity}</span>
+                                                <span className="font-mono text-emerald-600 font-bold text-lg">{item.quantity}</span>
                                                 {CASE_MAP[item.productName] && (
-                                                    <span className="text-blue-300 font-mono text-sm">
+                                                    <span className="text-blue-600 font-mono text-sm">
                                                         箱：{(item.quantity / CASE_MAP[item.productName]).toFixed(1)}
                                                     </span>
                                                 )}
@@ -198,16 +198,16 @@ export default function InventoryPage({ user, apiUrl }) {
                                         </td>
                                         <td className="p-4 text-sm whitespace-nowrap">
                                             <div className="flex flex-col gap-1">
-                                                <span className={isExpired ? 'text-rose-400 line-through' : isExpiringSoon ? 'text-amber-400 font-bold' : 'text-slate-300'}>
+                                                <span className={isExpired ? 'text-rose-600 line-through' : isExpiringSoon ? 'text-amber-600 font-bold' : 'text-slate-500'}>
                                                     {formatDate(item.expiry)}
                                                 </span>
                                                 {isExpiringSoon && (
-                                                    <span className="text-[10px] bg-amber-500/10 text-amber-500 border border-amber-500/30 px-1.5 py-0.5 rounded self-start flex items-center gap-1">
+                                                    <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded self-start flex items-center gap-1 font-bold">
                                                         <Clock size={10} /> 即將過期
                                                     </span>
                                                 )}
                                                 {isExpired && (
-                                                    <span className="text-[10px] bg-rose-500/10 text-rose-500 border border-rose-500/30 px-1.5 py-0.5 rounded self-start flex items-center gap-1">
+                                                    <span className="text-[10px] bg-rose-100 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded self-start flex items-center gap-1 font-bold">
                                                         <AlertTriangle size={10} /> 已過期
                                                     </span>
                                                 )}
@@ -216,7 +216,7 @@ export default function InventoryPage({ user, apiUrl }) {
                                         <td className="p-4 text-center">
                                             <input
                                                 type="number"
-                                                className="input-field w-20 text-center text-sm p-1"
+                                                className="input-field w-20 text-center text-sm p-1 bg-white"
                                                 value={tempSafetyInput[item.productName] !== undefined ? tempSafetyInput[item.productName] : (safetyStocks[item.productName] || '')}
                                                 onChange={(e) => handleSafetyInputChange(item.productName, e.target.value)}
                                                 onBlur={() => handleSafetyInputBlur(item.productName)}
@@ -243,9 +243,9 @@ export default function InventoryPage({ user, apiUrl }) {
 
     return (
         <div className="max-w-6xl mx-auto h-[calc(100vh-6rem)] flex flex-col p-4 gap-4">
-            <div className="flex justify-between items-center bg-slate-900/50 p-4 rounded-xl border border-slate-800 backdrop-blur-sm">
-                <h2 className="text-2xl font-bold flex items-center gap-2 text-white">
-                    <Package className="text-blue-400" /> 庫存檢視
+            <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <h2 className="text-2xl font-bold flex items-center gap-2 text-slate-800">
+                    <Package className="text-blue-600" /> 庫存檢視
                 </h2>
                 <div className="flex gap-4">
                     <div className="relative">
@@ -253,7 +253,7 @@ export default function InventoryPage({ user, apiUrl }) {
                         <input
                             type="text"
                             placeholder="搜尋產品..."
-                            className="input-field pl-10 w-64"
+                            className="input-field pl-10 w-64 bg-white"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -265,8 +265,8 @@ export default function InventoryPage({ user, apiUrl }) {
             </div>
 
             <div className="flex-1 overflow-y-auto flex flex-col gap-6 pb-6">
-                {renderInventoryTable(stockItems, "現貨進貨", Package, "text-blue-400")}
-                {renderInventoryTable(originalItems, "原貨/退貨", AlertCircle, "text-orange-400")}
+                {renderInventoryTable(stockItems, "現貨進貨", Package, "text-blue-600")}
+                {renderInventoryTable(originalItems, "原貨/退貨", AlertCircle, "text-orange-600")}
             </div>
 
             {showAdjustModal && (
@@ -275,12 +275,12 @@ export default function InventoryPage({ user, apiUrl }) {
                         <h3 className="text-xl font-bold mb-4">庫存異動</h3>
                         <div className="space-y-4">
                             <div>
-                                <label className="text-sm text-slate-400 block mb-1">產品資訊</label>
-                                <div className="flex justify-between items-center p-2 bg-slate-800/50 rounded-lg">
-                                    <div className="text-white font-bold">{selectedItem?.productName}</div>
+                                <label className="text-sm text-slate-500 block mb-1">產品資訊</label>
+                                <div className="flex justify-between items-center p-2 bg-slate-50 rounded-lg border border-slate-100">
+                                    <div className="text-slate-900 font-bold">{selectedItem?.productName}</div>
                                     <div className="flex items-center gap-2">
                                         <span className="text-xs text-slate-400">當前庫存:</span>
-                                        <span className="text-emerald-400 font-mono font-bold text-lg">{selectedItem?.quantity}</span>
+                                        <span className="text-emerald-600 font-mono font-bold text-lg">{selectedItem?.quantity}</span>
                                     </div>
                                 </div>
                             </div>

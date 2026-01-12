@@ -30,14 +30,14 @@ export default function LoginPage({ onLogin, apiUrl }) {
     };
 
     return (
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-            <div className="glass-panel p-8 w-full max-w-md">
+        <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-50">
+            <div className="bg-white border border-slate-200 p-8 w-full max-w-md rounded-2xl shadow-2xl">
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">
-                        INVENTORY OS
-                    </h1>
+                    <div className="flex justify-center mb-6">
+                        <img src="/logo.png" alt="Logo" className="h-20 w-auto object-contain" />
+                    </div>
                     <p className="text-slate-500">
-                        {isRegister ? '建立您的帳戶' : '登入系統'}
+                        {isRegister ? '建立您的帳戶' : '請登入系統以開始使用'}
                     </p>
                 </div>
 
@@ -49,7 +49,7 @@ export default function LoginPage({ onLogin, apiUrl }) {
                                 required
                                 type="text"
                                 placeholder="使用者名稱"
-                                className="input-field pl-10"
+                                className="input-field pl-10 bg-slate-50 border-slate-200 focus:bg-white transition-all"
                                 value={username}
                                 onChange={e => setUsername(e.target.value)}
                             />
@@ -62,7 +62,7 @@ export default function LoginPage({ onLogin, apiUrl }) {
                                 required
                                 type="password"
                                 placeholder="密碼"
-                                className="input-field pl-10"
+                                className="input-field pl-10 bg-slate-50 border-slate-200 focus:bg-white transition-all"
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}
                             />

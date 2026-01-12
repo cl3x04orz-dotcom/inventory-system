@@ -191,14 +191,14 @@ export default function StocktakePage({ user, apiUrl }) {
     const originalItems = filteredInventory.filter(item => item.type !== 'STOCK');
 
     const renderStocktakeTable = (items, title, Icon, colorClass, isStockType) => (
-        <div className="glass-panel p-6 flex flex-col">
+        <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col shadow-sm">
             <h3 className={`text-lg font-bold mb-4 flex items-center gap-2 ${colorClass}`}>
                 <Icon size={20} /> {title}
                 {!isStockType && <span className="text-xs text-slate-500 font-normal ml-2">（無需盤點）</span>}
             </h3>
-            <div className="rounded-lg border border-slate-700/50 overflow-hidden">
+            <div className="rounded-lg border border-slate-200 overflow-hidden">
                 <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-800 text-slate-400 text-xs uppercase">
+                    <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b border-slate-100">
                         <tr>
                             <th className="p-4">產品名稱</th>
                             <th className="p-4 text-right">帳面庫存</th>
@@ -212,7 +212,7 @@ export default function StocktakePage({ user, apiUrl }) {
                             )}
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-700/50">
+                    <tbody className="divide-y divide-slate-100">
                         {loading ? (
                             <tr><td colSpan={isStockType ? "6" : "2"} className="p-6 text-center text-slate-500">載入中...</td></tr>
                         ) : items.length === 0 ? (
@@ -228,13 +228,13 @@ export default function StocktakePage({ user, apiUrl }) {
                                 const hasQuantity = !isStockType && Number(item.quantity) > 0;
 
                                 return (
-                                    <tr key={rowKey} className={`hover:bg-slate-800/40 transition-colors ${isStockType && diff !== 0 && entry.physicalQty !== '' ? 'bg-amber-500/5' :
-                                        hasQuantity ? 'bg-orange-500/20 border-l-4 border-orange-500' : ''
+                                    <tr key={rowKey} className={`hover:bg-slate-50 transition-colors ${isStockType && diff !== 0 && entry.physicalQty !== '' ? 'bg-amber-50' :
+                                        hasQuantity ? 'bg-orange-50 border-l-4 border-orange-500' : ''
                                         }`}>
-                                        <td className={`p-4 font-medium ${hasQuantity ? 'text-orange-300 font-bold' : 'text-white'}`}>
+                                        <td className={`p-4 font-medium ${hasQuantity ? 'text-orange-700 font-bold' : 'text-slate-800'}`}>
                                             {item.productName || '未命名商品'}
                                         </td>
-                                        <td className={`p-4 text-right font-mono ${hasQuantity ? 'text-orange-400 font-bold text-lg' : 'text-slate-400'}`}>
+                                        <td className={`p-4 text-right font-mono ${hasQuantity ? 'text-orange-600 font-bold text-lg' : 'text-slate-500'}`}>
                                             {item.quantity}
                                         </td>
                                         {isStockType && (
@@ -243,7 +243,7 @@ export default function StocktakePage({ user, apiUrl }) {
                                                     <input
                                                         id={`qty-${rowKey}`}
                                                         type="number"
-                                                        className={`input-field w-full text-right font-mono ${diff !== 0 && entry.physicalQty !== '' ? 'border-red-500/50 text-red-200' : ''}`}
+                                                        className={`input-field w-full text-right font-mono bg-white ${diff !== 0 && entry.physicalQty !== '' ? 'border-red-300 text-red-700' : ''}`}
                                                         placeholder="0"
                                                         value={entry.physicalQty}
                                                         onChange={(e) => handleInputChange(rowKey, 'physicalQty', e.target.value)}
@@ -266,7 +266,7 @@ export default function StocktakePage({ user, apiUrl }) {
                                                     <input
                                                         id={`reason-${rowKey}`}
                                                         type="text"
-                                                        className="input-field w-full text-xs"
+                                                        className="input-field w-full text-xs bg-white"
                                                         placeholder={diff !== 0 && entry.physicalQty !== '' ? "必填..." : "選填"}
                                                         value={entry.reason}
                                                         onChange={(e) => handleInputChange(rowKey, 'reason', e.target.value)}
@@ -282,7 +282,7 @@ export default function StocktakePage({ user, apiUrl }) {
                                                     <input
                                                         id={`acc-${rowKey}`}
                                                         type="text"
-                                                        className="input-field w-full text-xs"
+                                                        className="input-field w-full text-xs bg-white"
                                                         placeholder={diff !== 0 && entry.physicalQty !== '' ? "必填..." : "選填"}
                                                         value={entry.accountability}
                                                         onChange={(e) => handleInputChange(rowKey, 'accountability', e.target.value)}
@@ -315,10 +315,10 @@ export default function StocktakePage({ user, apiUrl }) {
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
                 <div>
-                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                        <CheckSquare className="text-blue-400" /> 庫存盤點
+                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <CheckSquare className="text-blue-600" /> 庫存盤點
                     </h1>
-                    <p className="text-slate-400 text-sm mt-1">現貨進貨需核對盤點，原貨退貨無需盤點</p>
+                    <p className="text-slate-500 text-sm mt-1">現貨進貨需核對盤點，原貨退貨無需盤點</p>
                 </div>
 
                 <div className="flex gap-3">
@@ -340,13 +340,13 @@ export default function StocktakePage({ user, apiUrl }) {
             </div>
 
             {/* Controls */}
-            <div className="glass-panel p-4 shrink-0 flex flex-col md:flex-row gap-4 items-center">
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shrink-0 flex flex-col md:flex-row gap-4 items-center">
                 <div className="relative flex-1 w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input
                         type="text"
                         placeholder="搜尋產品名稱..."
-                        className="input-field pl-10 w-full"
+                        className="input-field pl-10 w-full bg-white"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -355,8 +355,8 @@ export default function StocktakePage({ user, apiUrl }) {
 
             {/* Tables */}
             <div className="flex-1 overflow-y-auto flex flex-col gap-6 pb-6">
-                {renderStocktakeTable(stockItems, "現貨進貨", Package, "text-blue-400", true)}
-                {renderStocktakeTable(originalItems, "原貨/退貨", AlertCircle, "text-orange-400", false)}
+                {renderStocktakeTable(stockItems, "現貨進貨", Package, "text-blue-600", true)}
+                {renderStocktakeTable(originalItems, "原貨/退貨", AlertCircle, "text-orange-600", false)}
             </div>
         </div>
     );

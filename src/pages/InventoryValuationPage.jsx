@@ -45,24 +45,24 @@ export default function InventoryValuationPage({ user, apiUrl }) {
         <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                        <DollarSign className="text-yellow-400" /> 庫存估值報告
+                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <DollarSign className="text-amber-600" /> 庫存估值報告
                     </h1>
-                    <p className="text-slate-400 text-sm mt-1">即時庫存價值分析與統計</p>
+                    <p className="text-slate-500 text-sm mt-1">即時庫存價值分析與統計</p>
                 </div>
 
                 {/* Stats Cards */}
                 <div className="flex gap-4">
-                    <div className="glass-panel px-5 py-3 border-yellow-500/20 bg-yellow-500/5">
-                        <p className="text-xs text-slate-400 uppercase font-bold">總庫存價值</p>
-                        <p className="text-2xl font-bold text-yellow-400 flex items-baseline gap-1">
+                    <div className="bg-amber-50 px-5 py-3 border border-amber-200 rounded-xl shadow-sm">
+                        <p className="text-xs text-slate-500 uppercase font-bold">總庫存價值</p>
+                        <p className="text-2xl font-bold text-amber-600 flex items-baseline gap-1">
                             <span className="text-sm opacity-50">$</span>
                             {totalValue.toLocaleString()}
                         </p>
                     </div>
-                    <div className="glass-panel px-5 py-3 border-blue-500/20 bg-blue-500/5">
-                        <p className="text-xs text-slate-400 uppercase font-bold">總庫存數量</p>
-                        <p className="text-2xl font-bold text-blue-400">
+                    <div className="bg-blue-50 px-5 py-3 border border-blue-200 rounded-xl shadow-sm">
+                        <p className="text-xs text-slate-500 uppercase font-bold">總庫存數量</p>
+                        <p className="text-2xl font-bold text-blue-600">
                             {totalItems.toLocaleString()}
                         </p>
                     </div>
@@ -70,13 +70,13 @@ export default function InventoryValuationPage({ user, apiUrl }) {
             </div>
 
             {/* Controls */}
-            <div className="glass-panel p-4 flex gap-4 items-center">
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex gap-4 items-center shadow-sm">
                 <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input
                         type="text"
                         placeholder="搜尋產品名稱..."
-                        className="input-field pl-10 w-full"
+                        className="input-field pl-10 w-full bg-white"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -91,10 +91,10 @@ export default function InventoryValuationPage({ user, apiUrl }) {
             </div>
 
             {/* Table */}
-            <div className="glass-panel p-0 overflow-hidden">
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-800/50 text-slate-400 text-xs uppercase tracking-wider sticky top-0">
+                        <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider sticky top-0 font-bold border-b border-slate-100">
                             <tr>
                                 <th className="p-4">產品名稱</th>
                                 <th className="p-4 text-right">庫存數量</th>
@@ -103,7 +103,7 @@ export default function InventoryValuationPage({ user, apiUrl }) {
                                 <th className="p-4 text-right">佔比</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5">
+                        <tbody className="divide-y divide-slate-100">
                             {loading ? (
                                 <tr><td colSpan="5" className="p-20 text-center text-slate-500">計算中...</td></tr>
                             ) : filteredData.length > 0 ? (
@@ -114,25 +114,25 @@ export default function InventoryValuationPage({ user, apiUrl }) {
                                     const percent = totalValue > 0 ? (value / totalValue * 100) : 0;
 
                                     return (
-                                        <tr key={idx} className="hover:bg-white/5 transition-colors">
-                                            <td className="p-4 font-medium text-white">
+                                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                            <td className="p-4 font-medium text-slate-800">
                                                 {item.name}
                                             </td>
-                                            <td className="p-4 text-right font-mono text-slate-300">
+                                            <td className="p-4 text-right font-mono text-slate-600">
                                                 {qty.toLocaleString()}
                                             </td>
-                                            <td className="p-4 text-right font-mono text-slate-400">
+                                            <td className="p-4 text-right font-mono text-slate-500">
                                                 ${unitCost.toFixed(2)}
                                             </td>
-                                            <td className="p-4 text-right font-mono font-bold text-yellow-400">
+                                            <td className="p-4 text-right font-mono font-bold text-amber-600">
                                                 ${value.toLocaleString()}
                                             </td>
                                             <td className="p-4 text-right w-24">
                                                 <div className="flex items-center gap-2 justify-end">
                                                     <span className="text-xs text-slate-500 w-8">{percent.toFixed(1)}%</span>
-                                                    <div className="w-12 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                                                    <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                                         <div
-                                                            className="h-full bg-yellow-500/50"
+                                                            className="h-full bg-amber-500"
                                                             style={{ width: `${Math.min(percent, 100)}%` }}
                                                         />
                                                     </div>

@@ -130,17 +130,17 @@ export default function PurchasePage({ user, apiUrl }) {
         <div className="max-w-[90rem] mx-auto p-4">
             <div className="glass-panel p-6">
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold flex items-center gap-2 text-white">
-                        <PlusCircle className="text-emerald-400" /> 批次進貨作業
+                    <h2 className="text-2xl font-bold flex items-center gap-2 text-slate-800">
+                        <PlusCircle className="text-emerald-600" /> 批次進貨作業
                     </h2>
 
                     {/* Payment Method Toggle */}
-                    <div className="flex bg-slate-800 p-1 rounded-lg border border-slate-600">
+                    <div className="flex bg-slate-50 p-1 rounded-lg border border-slate-200">
                         <button
                             onClick={() => setPaymentMethod('CASH')}
                             className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${paymentMethod === 'CASH'
-                                ? 'bg-emerald-500 text-white shadow-lg'
-                                : 'text-slate-400 hover:text-white'
+                                ? 'bg-emerald-500 text-white shadow-sm'
+                                : 'text-slate-400 hover:text-slate-600'
                                 }`}
                         >
                             現金進貨
@@ -148,8 +148,8 @@ export default function PurchasePage({ user, apiUrl }) {
                         <button
                             onClick={() => setPaymentMethod('CREDIT')}
                             className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${paymentMethod === 'CREDIT'
-                                ? 'bg-purple-500 text-white shadow-lg'
-                                : 'text-slate-400 hover:text-white'
+                                ? 'bg-purple-600 text-white shadow-sm'
+                                : 'text-slate-400 hover:text-slate-600'
                                 }`}
                         >
                             賒帳進貨
@@ -161,8 +161,8 @@ export default function PurchasePage({ user, apiUrl }) {
                     {/* Items Grid */}
                     <div className="space-y-3">
                         <div className="flex items-center justify-between px-2">
-                            <h3 className="text-sm font-semibold text-slate-400">📦 商品清單</h3>
-                            <span className="text-xs text-slate-600">共 {items.length} 項商品</span>
+                            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">📦 商品清單</h3>
+                            <span className="text-xs text-slate-400">共 {items.length} 項商品</span>
                         </div>
 
                         <datalist id="vendors-list">
@@ -173,10 +173,10 @@ export default function PurchasePage({ user, apiUrl }) {
                             const currentProductSuggestions = getProductSuggestions(item.vendor);
 
                             return (
-                                <div key={item.id} className="group relative p-4 bg-gradient-to-r from-slate-800/40 to-slate-800/20 rounded-xl border border-slate-700/50 hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-900/10 transition-all duration-200">
+                                <div key={item.id} className="group relative p-4 bg-slate-50 rounded-xl border border-slate-200 hover:border-emerald-500/30 hover:shadow-lg transition-all duration-200">
                                     {/* Number Badge */}
-                                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
-                                        <span className="text-[10px] font-bold text-emerald-400">{idx + 1}</span>
+                                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+                                        <span className="text-[10px] font-bold text-emerald-600">{idx + 1}</span>
                                     </div>
 
                                     {/* Custom Grid Layout: 14 columns total for better spacing */}
@@ -184,13 +184,13 @@ export default function PurchasePage({ user, apiUrl }) {
 
                                         {/* Vendor (3 cols) */}
                                         <div className="col-span-12 md:col-span-2">
-                                            <label className="text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1">
+                                            <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1 uppercase">
                                                 <span>🏢</span> 廠商
                                             </label>
                                             <input
                                                 id={`item-${idx}-vendor`}
                                                 list="vendors-list"
-                                                className="input-field w-full"
+                                                className="input-field w-full bg-white"
                                                 placeholder="廠商名稱"
                                                 value={item.vendor}
                                                 onChange={e => handleItemChange(item.id, 'vendor', e.target.value)}
@@ -201,13 +201,13 @@ export default function PurchasePage({ user, apiUrl }) {
 
                                         {/* Product (3 cols) */}
                                         <div className="col-span-12 md:col-span-3">
-                                            <label className="text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1">
+                                            <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1 uppercase">
                                                 <span>📦</span> 產品名稱
                                             </label>
                                             <input
                                                 id={`item-${idx}-product`}
                                                 list={`products-list-${idx}`}
-                                                className="input-field w-full"
+                                                className="input-field w-full bg-white"
                                                 placeholder="產品名稱"
                                                 value={item.productName}
                                                 onChange={e => handleItemChange(item.id, 'productName', e.target.value)}
@@ -220,13 +220,13 @@ export default function PurchasePage({ user, apiUrl }) {
 
                                         {/* Qty (2 cols) */}
                                         <div className="col-span-6 md:col-span-2">
-                                            <label className="text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1">
+                                            <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1 uppercase">
                                                 <span>🔢</span> 數量
                                             </label>
                                             <input
                                                 id={`item-${idx}-qty`}
                                                 type="number"
-                                                className="input-field w-full text-center"
+                                                className="input-field w-full text-center bg-white"
                                                 placeholder="0"
                                                 value={item.quantity}
                                                 onChange={e => handleItemChange(item.id, 'quantity', e.target.value)}
@@ -236,13 +236,13 @@ export default function PurchasePage({ user, apiUrl }) {
 
                                         {/* Price (2 cols) */}
                                         <div className="col-span-6 md:col-span-2">
-                                            <label className="text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1">
+                                            <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1 uppercase">
                                                 <span>💰</span> 單價
                                             </label>
                                             <input
                                                 id={`item-${idx}-price`}
                                                 type="number"
-                                                className="input-field w-full text-center"
+                                                className="input-field w-full text-center bg-white"
                                                 placeholder="0"
                                                 value={item.unitPrice}
                                                 onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)}
@@ -252,32 +252,32 @@ export default function PurchasePage({ user, apiUrl }) {
 
                                         {/* Expiry (2 cols + delete btn space) */}
                                         <div className="col-span-12 md:col-span-3 grid grid-cols-[1fr_auto_1fr_auto_1fr_auto] gap-1 relative">
-                                            <label className="absolute -top-6 left-0 text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1">
+                                            <label className="absolute -top-6 left-0 text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1 uppercase">
                                                 <span>📅</span> 有效期限
                                             </label>
 
                                             <input
                                                 id={`item-${idx}-year`}
-                                                className="input-field w-full text-center font-mono px-1"
+                                                className="input-field w-full text-center font-mono px-1 bg-white"
                                                 placeholder="YYYY"
                                                 value={item.expiryYear}
                                                 onChange={e => handleItemChange(item.id, 'expiryYear', e.target.value)}
                                                 onKeyDown={(e) => handleKeyDown(e, `item-${idx}-month`)}
                                             />
-                                            <span className="text-slate-600 self-center">/</span>
+                                            <span className="text-slate-400 self-center">/</span>
                                             <input
                                                 id={`item-${idx}-month`}
-                                                className="input-field w-full text-center font-mono px-1"
+                                                className="input-field w-full text-center font-mono px-1 bg-white"
                                                 placeholder="MM"
                                                 value={item.expiryMonth}
                                                 onChange={e => handleItemChange(item.id, 'expiryMonth', e.target.value)}
                                                 onKeyDown={(e) => handleKeyDown(e, `item-${idx}-day`)}
                                             />
-                                            <span className="text-slate-600 self-center">/</span>
+                                            <span className="text-slate-200 self-center">/</span>
                                             <input
                                                 id={`item-${idx}-day`}
                                                 type="number"
-                                                className="input-field w-full text-center font-mono px-1"
+                                                className="input-field w-full text-center font-mono px-1 bg-white"
                                                 placeholder="DD"
                                                 value={item.expiryDay}
                                                 onChange={e => handleItemChange(item.id, 'expiryDay', e.target.value)}
@@ -299,7 +299,7 @@ export default function PurchasePage({ user, apiUrl }) {
                                                 <button
                                                     type="button"
                                                     onClick={() => removeItem(item.id)}
-                                                    className="w-8 h-8 ml-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all flex items-center justify-center self-center"
+                                                    className="w-8 h-8 ml-2 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-all flex items-center justify-center self-center"
                                                     title="刪除此列"
                                                 >
                                                     ✕
@@ -312,7 +312,7 @@ export default function PurchasePage({ user, apiUrl }) {
                         })}
                     </div>
 
-                    <div className="flex gap-4 mt-8 pt-6 border-t border-slate-700/50">
+                    <div className="flex gap-4 mt-8 pt-6 border-t border-slate-100">
                         <button
                             type="button"
                             onClick={addItem}
@@ -323,7 +323,7 @@ export default function PurchasePage({ user, apiUrl }) {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="btn-primary flex-[2] py-4 text-lg font-bold shadow-xl shadow-emerald-900/30 hover:shadow-2xl hover:shadow-emerald-900/40 hover:scale-105 transition-all flex items-center justify-center gap-2"
+                            className="btn-primary flex-[2] py-4 text-lg font-bold shadow-lg shadow-emerald-100 hover:shadow-xl hover:shadow-emerald-200 hover:scale-105 transition-all flex items-center justify-center gap-2"
                         >
                             {loading ? (
                                 <>

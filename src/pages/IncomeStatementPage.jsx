@@ -86,41 +86,41 @@ export default function IncomeStatementPage({ user, apiUrl }) {
         <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6 flex flex-col h-[calc(100vh-6rem)]">
             <div className="flex justify-between items-center shrink-0">
                 <div>
-                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                        <PieChart className="text-emerald-400" /> 損益表 (Income Statement)
+                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <PieChart className="text-emerald-600" /> 損益表 (Income Statement)
                     </h1>
-                    <p className="text-slate-400 text-sm mt-1">檢視指定期間的營收、成本、費用與淨利</p>
+                    <p className="text-slate-500 text-sm mt-1">檢視指定期間的營收、成本、費用與淨利</p>
                 </div>
                 <button onClick={fetchData} className="btn-secondary p-2 rounded-xl">
                     <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
                 </button>
             </div>
 
-            <div className="glass-panel p-4 shrink-0 flex items-center gap-4">
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shrink-0 flex items-center gap-4 shadow-sm">
                 <Calendar size={18} className="text-slate-400" />
-                <input type="date" className="input-field flex-1" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                <span className="text-slate-500">至</span>
-                <input type="date" className="input-field flex-1" value={endDate} onChange={e => setEndDate(e.target.value)} />
-                <button onClick={fetchData} className="btn-primary">查詢</button>
+                <input type="date" className="input-field flex-1 bg-white" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                <span className="text-slate-500 font-bold">至</span>
+                <input type="date" className="input-field flex-1 bg-white" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                <button onClick={fetchData} className="btn-primary h-[42px] px-6">查詢</button>
             </div>
 
-            <div className="glass-panel p-0 overflow-hidden flex-1 flex flex-col">
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex-1 flex flex-col shadow-sm">
                 <div className="overflow-y-auto flex-1 p-8">
                     <div className="space-y-6 max-w-2xl mx-auto font-mono text-sm md:text-base">
                         {/* Revenue Section */}
                         <div className="space-y-2">
-                            <h3 className="text-emerald-400 font-bold text-lg border-b border-emerald-500/30 pb-2 mb-4">營業收入 (Revenue)</h3>
+                            <h3 className="text-emerald-700 font-bold text-lg border-b border-emerald-200 pb-2 mb-4">營業收入 (Revenue)</h3>
                             <div className="flex justify-between items-center">
-                                <span className="text-slate-300">銷貨收入</span>
-                                <span className="text-white font-bold">{formatCurrency(data.revenue)}</span>
+                                <span className="text-slate-600">銷貨收入</span>
+                                <span className="text-slate-900 font-bold">{formatCurrency(data.revenue)}</span>
                             </div>
-                            <div className="flex justify-between items-center text-rose-400">
+                            <div className="flex justify-between items-center text-rose-600">
                                 <span className="flex items-center gap-2"><MinusCircle size={14} /> 銷貨成本</span>
                                 <span>- {formatCurrency(data.cogs)}</span>
                             </div>
-                            <div className="flex justify-between items-center pt-2 border-t border-slate-700">
-                                <span className="text-emerald-300 font-bold">營業毛利 (Gross Profit)</span>
-                                <span className="text-emerald-300 font-bold">{formatCurrency(data.grossProfit)}</span>
+                            <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                                <span className="text-emerald-700 font-bold">營業毛利 (Gross Profit)</span>
+                                <span className="text-emerald-700 font-bold">{formatCurrency(data.grossProfit)}</span>
                             </div>
                             <div className="text-right text-xs text-slate-500">
                                 毛利率: {getPercent(data.grossProfit, data.revenue)}
@@ -129,7 +129,7 @@ export default function IncomeStatementPage({ user, apiUrl }) {
 
                         {/* Expenses Section */}
                         <div className="space-y-2 mt-8">
-                            <h3 className="text-orange-400 font-bold text-lg border-b border-orange-500/30 pb-2 mb-4">營業費用 (Operating Expenses)</h3>
+                            <h3 className="text-orange-700 font-bold text-lg border-b border-orange-200 pb-2 mb-4">營業費用 (Operating Expenses)</h3>
 
                             {Object.entries(data.expenses).map(([key, val]) => {
                                 const labels = {
@@ -146,17 +146,17 @@ export default function IncomeStatementPage({ user, apiUrl }) {
                                 );
                             })}
 
-                            <div className="flex justify-between items-center pt-2 border-t border-slate-700 text-orange-300">
+                            <div className="flex justify-between items-center pt-2 border-t border-slate-100 text-orange-700">
                                 <span className="font-bold">費用總計</span>
                                 <span className="font-bold">- {formatCurrency(data.totalExpenses)}</span>
                             </div>
                         </div>
 
                         {/* Net Income Section */}
-                        <div className="mt-8 pt-4 border-t-2 border-slate-600">
+                        <div className="mt-8 pt-4 border-t-2 border-slate-200">
                             <div className="flex justify-between items-center text-xl">
-                                <span className="text-white font-bold">本期淨利 (Net Income)</span>
-                                <span className={`font-bold ${data.netIncome >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
+                                <span className="text-slate-800 font-bold">本期淨利 (Net Income)</span>
+                                <span className={`font-bold ${data.netIncome >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
                                     {formatCurrency(data.netIncome)}
                                 </span>
                             </div>

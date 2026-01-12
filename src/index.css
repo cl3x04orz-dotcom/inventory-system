@@ -2,49 +2,49 @@
 
 @layer components {
     .glass-panel {
-        @apply bg-slate-900/80 backdrop-blur-md rounded-xl border border-slate-700/50 shadow-xl;
+        @apply bg-white/95 backdrop-blur-md rounded-xl border border-slate-200 shadow-xl;
     }
 
     .input-field {
-        @apply w-full bg-slate-950/50 border border-slate-700 rounded px-3 py-2 text-slate-200 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono;
+        @apply w-full bg-slate-50 border border-slate-200 rounded px-3 py-2 text-slate-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono;
     }
 
     .btn-primary {
-        @apply bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium py-2 px-4 rounded-lg shadow-lg shadow-blue-900/20 transition-all active:scale-95;
+        @apply bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium py-2 px-4 rounded-lg shadow-lg shadow-blue-200 transition-all active:scale-95;
     }
 
     .btn-secondary {
-        @apply bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-2 px-4 rounded-lg border border-slate-600 transition-all active:scale-95;
+        @apply bg-white hover:bg-slate-50 text-slate-600 font-medium py-2 px-4 rounded-lg border border-slate-200 transition-all active:scale-95;
     }
 }
 
 body {
-    @apply bg-slate-950 text-slate-200;
-    background-image: radial-gradient(circle at 50% 0%, #1e293b 0%, #020617 100%);
+    @apply bg-white text-slate-900;
+    background: #ffffff;
     min-height: 100vh;
 }
 
-/* Custom Scrollbar Styles for better usability */
+/* Custom Scrollbar Styles for light mode */
 ::-webkit-scrollbar {
-    width: 12px;
-    height: 12px;
+    width: 10px;
+    height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-    background: rgba(15, 23, 42, 0.3);
+    background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(71, 85, 105, 0.4);
-    border-radius: 6px;
-    border: 3px solid #0f172a;
+    background: #e2e8f0;
+    border-radius: 10px;
+    border: 2px solid white;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(100, 116, 139, 0.7);
+    background: #cbd5e1;
 }
 
 * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(71, 85, 105, 0.4) rgba(15, 23, 42, 0.3);
+    scrollbar-color: #e2e8f0 transparent;
 }

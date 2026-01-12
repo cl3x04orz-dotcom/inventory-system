@@ -173,10 +173,10 @@ export default function PermissionControlPage({ user, apiUrl }) {
         <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6 flex flex-col h-[calc(100vh-6rem)]">
             <div className="flex justify-between items-center shrink-0">
                 <div>
-                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                        <Shield className="text-rose-400" /> 權限控管表 (Permission Control)
+                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <Shield className="text-rose-600" /> 權限控管表 (Permission Control)
                     </h1>
-                    <p className="text-slate-400 text-sm mt-1">管理系統使用者與訪問權限</p>
+                    <p className="text-slate-500 text-sm mt-1">管理系統使用者與訪問權限</p>
                 </div>
                 <button onClick={fetchUsers} className="btn-secondary p-2 rounded-xl">
                     <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
@@ -185,8 +185,8 @@ export default function PermissionControlPage({ user, apiUrl }) {
 
             {/* Add User Panel */}
             <div className="glass-panel p-6 border-l-4 border-l-emerald-500 shrink-0">
-                <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                    <UserPlus size={20} className="text-emerald-400" /> 新增使用者
+                <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-slate-800">
+                    <UserPlus size={20} className="text-emerald-600" /> 新增使用者
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div className="space-y-1">
@@ -232,7 +232,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
             <div className="glass-panel p-0 overflow-hidden flex-1 flex flex-col">
                 <div className="overflow-y-auto flex-1">
                     <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-800 text-slate-400 text-xs uppercase sticky top-0 z-10">
+                        <thead className="bg-slate-50 text-slate-500 text-xs uppercase sticky top-0 z-10">
                             <tr>
                                 <th className="p-4">帳號 (Username)</th>
                                 <th className="p-4">角色 (Role)</th>
@@ -240,11 +240,11 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                 <th className="p-4 text-center">操作</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5">
+                        <tbody className="divide-y divide-slate-100 bg-white">
                             {users.length > 0 ? (
                                 users.map((u, idx) => (
-                                    <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
-                                        <td className="p-4 text-white font-bold">{u.username}</td>
+                                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                        <td className="p-4 text-slate-900 font-bold">{u.username}</td>
                                         <td className="p-4">
                                             <span className={`px-2 py-1 rounded text-xs font-bold border ${u.role === 'BOSS' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
                                                 u.role === 'ADMIN' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' :
@@ -257,8 +257,8 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                         </td>
                                         <td className="p-4 text-center">
                                             {u.status === 'ACTIVE' ? (
-                                                <span className="flex items-center justify-center gap-2 text-emerald-400 font-bold text-xs">
-                                                    <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></span> ACTIVE
+                                                <span className="flex items-center justify-center gap-2 text-emerald-600 font-bold text-xs">
+                                                    <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]"></span> ACTIVE
                                                 </span>
                                             ) : (
                                                 <span className="flex items-center justify-center gap-2 text-slate-500 font-bold text-xs">
@@ -335,13 +335,13 @@ export default function PermissionControlPage({ user, apiUrl }) {
 
             {/* Permission Editor Modal */}
             {editingUser && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
-                        <div className="p-6 border-b border-slate-800 bg-slate-800/50">
-                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                <Shield className="text-blue-400" /> 設定權限 ({editingUser.username})
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+                        <div className="p-6 border-b border-slate-100 bg-slate-50">
+                            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                <Shield className="text-blue-600" /> 設定權限 ({editingUser.username})
                             </h3>
-                            <p className="text-slate-400 text-sm mt-1">勾選該使用者可存取的功能模組 (BOSS 擁有預設全權限)</p>
+                            <p className="text-slate-500 text-sm mt-1">勾選該使用者可存取的功能模組 (BOSS 擁有預設全權限)</p>
                         </div>
 
                         <div className="p-6 space-y-6 max-h-[65vh] overflow-y-auto custom-scrollbar">
@@ -356,10 +356,10 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                             className="flex items-center justify-between px-1 cursor-pointer group/title"
                                             onClick={() => toggleGroup(group.items)}
                                         >
-                                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 group-hover/title:text-blue-400 transition-colors">
+                                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 group-hover/title:text-blue-600 transition-colors">
                                                 {group.group}
                                             </h4>
-                                            <span className="text-[10px] text-blue-500 font-bold opacity-0 group-hover/title:opacity-100 transition-opacity">
+                                            <span className="text-[10px] text-blue-600 font-bold opacity-0 group-hover/title:opacity-100 transition-opacity">
                                                 {isGroupAllSelected ? '取消全選' : '全選'}
                                             </span>
                                         </div>
@@ -369,13 +369,13 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                                 <label
                                                     key={perm.key}
                                                     className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group ${editingUser.permissions?.includes(perm.key)
-                                                        ? 'bg-blue-500/10 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.1)]'
-                                                        : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800 hover:border-slate-600'
+                                                        ? 'bg-blue-50 border-blue-200 shadow-sm'
+                                                        : 'bg-slate-50 border-slate-100 hover:bg-slate-100 hover:border-slate-200'
                                                         }`}
                                                 >
                                                     <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${editingUser.permissions?.includes(perm.key)
-                                                        ? 'bg-blue-500 border-blue-500 text-white scale-110'
-                                                        : 'bg-slate-900 border-slate-600 group-hover:border-blue-500/50'
+                                                        ? 'bg-blue-600 border-blue-600 text-white scale-110'
+                                                        : 'bg-white border-slate-200 group-hover:border-blue-300'
                                                         }`}>
                                                         {editingUser.permissions?.includes(perm.key) && <CheckSquare size={12} fill="currentColor" />}
                                                     </div>
@@ -385,7 +385,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                                         checked={editingUser.permissions?.includes(perm.key)}
                                                         onChange={() => togglePermission(perm.key)}
                                                     />
-                                                    <span className={`text-sm transition-colors ${editingUser.permissions?.includes(perm.key) ? 'text-white font-bold' : 'text-slate-400'
+                                                    <span className={`text-sm transition-colors ${editingUser.permissions?.includes(perm.key) ? 'text-slate-900 font-bold' : 'text-slate-500'
                                                         }`}>
                                                         {perm.label}
                                                     </span>
@@ -397,10 +397,10 @@ export default function PermissionControlPage({ user, apiUrl }) {
                             })}
                         </div>
 
-                        <div className="p-6 border-t border-slate-800 flex justify-end gap-3 bg-slate-900/50">
+                        <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
                             <button
                                 onClick={() => setEditingUser(null)}
-                                className="px-4 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                                className="px-4 py-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-black/5 transition-colors"
                             >
                                 取消
                             </button>

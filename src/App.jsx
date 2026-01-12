@@ -40,8 +40,8 @@ const NavDropdown = ({ label, icon: Icon, active, children, id, openDropdown, se
                     setOpenDropdown(isOpen ? null : id);
                 }}
                 className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all duration-200 ${active
-                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-[0_0_15px_rgba(37,99,235,0.1)]'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                    ? 'bg-blue-50 text-blue-600 border border-blue-200 shadow-sm'
+                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
                     }`}
             >
                 <Icon size={18} />
@@ -51,7 +51,7 @@ const NavDropdown = ({ label, icon: Icon, active, children, id, openDropdown, se
 
             {isOpen && (
                 <div
-                    className="absolute top-full left-0 mt-2 w-48 bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-xl shadow-2xl py-2 z-[100] animate-in fade-in slide-in-from-top-2 duration-200"
+                    className="absolute top-full left-0 mt-2 w-48 bg-white/95 backdrop-blur-xl border border-slate-200 rounded-xl shadow-2xl py-2 z-[100] animate-in fade-in slide-in-from-top-2 duration-200"
                     onClick={(e) => e.stopPropagation()}
                 >
                     <div className="flex flex-col gap-1 px-1">
@@ -67,8 +67,8 @@ const NavItem = ({ label, onClick, active, icon: Icon }) => (
     <button
         onClick={onClick}
         className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2 ${active
-            ? 'text-blue-400 bg-blue-600/10 font-bold'
-            : 'text-slate-400 hover:text-white hover:bg-white/5'
+            ? 'text-blue-600 bg-blue-50 font-bold'
+            : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
             }`}
     >
         {Icon && <Icon size={14} />}
@@ -197,10 +197,10 @@ export default function App() {
     return (
         <div className="min-h-screen flex flex-col">
             {/* Navbar */}
-            <header className="h-16 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md flex justify-between items-center px-6 sticky top-0 z-[60]">
+            <header className="h-16 border-b border-slate-200 bg-white/80 backdrop-blur-md flex justify-between items-center px-6 sticky top-0 z-[60]">
                 {/* ... Navbar content ... */}
-                <div className="font-bold text-xl tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
-                    INVENTORY <span className="font-light text-slate-400 uppercase tracking-widest text-xs">System</span>
+                <div className="flex items-center gap-2">
+                    <img src="/logo.png" alt="Logo" className="h-10 w-auto object-contain" />
                 </div>
 
                 <nav className="flex gap-1">
@@ -247,7 +247,7 @@ export default function App() {
                             {checkPermission('inventory') && <NavItem label="庫存檢視" icon={Archive} onClick={() => handlePageChange('inventory')} active={page === 'inventory'} />}
                             {checkPermission('stocktake') && <NavItem label="庫存盤點" icon={CheckSquare} onClick={() => handlePageChange('stocktake')} active={page === 'stocktake'} />}
                             {checkPermission('valuation') && <NavItem label="庫存估值" icon={DollarSign} onClick={() => handlePageChange('valuation')} active={page === 'valuation'} />}
-                            <div className="my-1 border-t border-slate-700/50" />
+                            <div className="my-1 border-t border-slate-100" />
                             {checkPermission('adjustHistory') && <NavItem label="異動查詢" icon={FileText} onClick={() => handlePageChange('adjustHistory')} active={page === 'adjustHistory'} />}
                             {checkPermission('stocktakeHistory') && <NavItem label="盤點歷史" icon={ClipboardList} onClick={() => handlePageChange('stocktakeHistory')} active={page === 'stocktakeHistory'} />}
                         </NavDropdown>
@@ -281,7 +281,7 @@ export default function App() {
                             {checkPermission('receivable') && <NavItem label="應收帳款" icon={Wallet} onClick={() => handlePageChange('receivable')} active={page === 'receivable'} />}
                             {checkPermission('payable') && <NavItem label="應付帳款" icon={Wallet} onClick={() => handlePageChange('payable')} active={page === 'payable'} />}
                             {checkPermission('incomeStatement') && <NavItem label="損益表" icon={PieChart} onClick={() => handlePageChange('incomeStatement')} active={page === 'incomeStatement'} />}
-                            <div className="my-1 border-t border-slate-700/50" />
+                            <div className="my-1 border-t border-slate-100" />
                             {checkPermission('costCalculation') && <NavItem label="成本計算分析" icon={DollarSign} onClick={() => handlePageChange('costCalculation')} active={page === 'costCalculation'} />}
                             {checkPermission('payroll') && <NavItem label="薪資結算中心" icon={DollarSign} onClick={() => handlePageChange('payroll')} active={page === 'payroll'} />}
                         </NavDropdown>
@@ -321,12 +321,12 @@ export default function App() {
 
                 <div className="flex items-center gap-4">
                     <div className="hidden md:flex flex-col items-end">
-                        <span className="text-xs font-bold text-blue-400 leading-none">{user.username}</span>
-                        <span className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">{user.role}</span>
+                        <span className="text-xs font-bold text-blue-600 leading-none">{user.username}</span>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold tracking-tighter">{user.role}</span>
                     </div>
                     <button
                         onClick={handleLogout}
-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-all border border-transparent hover:border-red-400/20"
+                        className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all border border-transparent hover:border-red-100"
                         title="登出系統"
                     >
                         <LogOut size={20} />
@@ -360,13 +360,13 @@ export default function App() {
                         {page === 'payroll' && <PayrollPage user={user} apiUrl={GAS_API_URL} />}
                     </>
                 ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-slate-500">
-                        <Shield size={64} className="mb-4 text-slate-700" />
-                        <h2 className="text-xl font-bold text-slate-200">權限不足</h2>
+                    <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                        <Shield size={64} className="mb-4 text-slate-200" />
+                        <h2 className="text-xl font-bold text-slate-800">權限不足</h2>
                         <p className="mt-2">您所在的帳號角色尚未獲得此頁面的訪問授權。</p>
                         <button
                             onClick={() => setPage('sales')}
-                            className="mt-6 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-blue-400 rounded-lg transition-colors border border-slate-700"
+                            className="mt-6 px-4 py-2 bg-white hover:bg-slate-50 text-blue-600 rounded-lg transition-colors border border-slate-200 shadow-sm"
                         >
                             返回首頁
                         </button>

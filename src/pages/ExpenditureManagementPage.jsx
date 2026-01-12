@@ -91,18 +91,18 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                        <div className="p-2 bg-rose-500/20 rounded-lg">
-                            <DollarSign className="text-rose-400" size={24} />
+                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <div className="p-2 bg-rose-100 rounded-lg">
+                            <DollarSign className="text-rose-600" size={24} />
                         </div>
                         支出管理
                     </h1>
-                    <p className="text-slate-400 text-sm mt-1">整理與紀錄經營成本，並同步至雲端試算表</p>
+                    <p className="text-slate-500 text-sm mt-1">整理與紀錄經營成本，並同步至雲端試算表</p>
                 </div>
 
-                <div className="glass-panel px-6 py-3 border-rose-500/20 bg-rose-500/5">
+                <div className="bg-rose-50 px-6 py-3 border border-rose-200 rounded-xl shadow-sm">
                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">今日計算總額 (結算)</p>
-                    <p className="text-2xl font-black text-rose-400">${finalTotal.toLocaleString()}</p>
+                    <p className="text-2xl font-black text-rose-600">${finalTotal.toLocaleString()}</p>
                 </div>
             </div>
 
@@ -111,7 +111,7 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                 <div className="lg:col-span-2 space-y-6">
                     {/* Basic Info */}
                     <div className="glass-panel p-6">
-                        <div className="flex items-center gap-2 mb-4 text-blue-400 font-bold">
+                        <div className="flex items-center gap-2 mb-4 text-blue-600 font-bold">
                             <Clipboard size={18} />
                             <span>基本資訊</span>
                         </div>
@@ -120,7 +120,7 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                             <input
                                 id="input-note"
                                 type="text"
-                                className="input-field w-full text-lg py-3"
+                                className="input-field w-full text-lg py-3 bg-white"
                                 placeholder="例如：1/7 台北攤位支出..."
                                 value={note}
                                 onChange={(e) => setNote(e.target.value)}
@@ -136,7 +136,7 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
 
                     {/* Operational Expenses */}
                     <div className="glass-panel p-6">
-                        <div className="flex items-center gap-2 mb-6 text-emerald-400 font-bold">
+                        <div className="flex items-center gap-2 mb-6 text-emerald-600 font-bold">
                             <Settings size={18} />
                             <span>基礎營運支出</span>
                         </div>
@@ -151,12 +151,12 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                                 { key: 'bags', label: '塑膠袋', next: 'others', prev: 'goods' },
                                 { key: 'others', label: '其他', next: 'linePay', prev: 'bags' },
                             ].map((item) => (
-                                <div key={item.key} className="flex items-center justify-between gap-4 p-2 hover:bg-white/5 rounded-lg transition-colors">
-                                    <label className="text-sm text-slate-300 font-medium whitespace-nowrap">{item.label}</label>
+                                <div key={item.key} className="flex items-center justify-between gap-4 p-2 hover:bg-slate-50 rounded-lg transition-colors border-b border-slate-100 last:border-0">
+                                    <label className="text-sm text-slate-600 font-medium whitespace-nowrap">{item.label}</label>
                                     <input
                                         id={`input-expense-${item.key}`}
                                         type="number"
-                                        className="input-field text-right w-32 border-transparent bg-slate-800/50 focus:border-emerald-500/50"
+                                        className="input-field text-right w-32 bg-white"
                                         value={expenses[item.key] || ''}
                                         onChange={(e) => setExpenses({ ...expenses, [item.key]: Number(e.target.value) })}
                                         onKeyDown={(e) => handleKeyDown(
@@ -175,8 +175,8 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                 {/* Right Column: Special Items & Submit */}
                 <div className="space-y-6">
                     {/* Money & Services */}
-                    <div className="glass-panel p-6 border-amber-500/10">
-                        <div className="flex items-center gap-2 mb-6 text-amber-400 font-bold">
+                    <div className="glass-panel p-6 border-amber-200">
+                        <div className="flex items-center gap-2 mb-6 text-amber-600 font-bold">
                             <CreditCard size={18} />
                             <span>金流與服務費</span>
                         </div>
@@ -187,12 +187,12 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                                     <input
                                         id="input-expense-linePay"
                                         type="number"
-                                        className="input-field w-full pl-8 border-green-800/50 text-green-400 bg-green-500/5"
+                                        className="input-field w-full pl-8 border-emerald-200 text-emerald-700 bg-emerald-50"
                                         value={expenses.linePay || ''}
                                         onChange={(e) => setExpenses({ ...expenses, linePay: Number(e.target.value) })}
                                         onKeyDown={(e) => handleKeyDown(e, 'input-expense-linePay', 'input-expense-serviceFee', 'input-expense-others')}
                                     />
-                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-green-600">+</div>
+                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 font-bold">+</div>
                                 </div>
                             </div>
                             <div>
@@ -201,58 +201,58 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                                     <input
                                         id="input-expense-serviceFee"
                                         type="number"
-                                        className="input-field w-full pl-8 border-rose-800/50 text-rose-400 bg-rose-500/5"
+                                        className="input-field w-full pl-8 border-rose-200 text-rose-700 bg-rose-50"
                                         value={expenses.serviceFee || ''}
                                         onChange={(e) => setExpenses({ ...expenses, serviceFee: Number(e.target.value) })}
                                         onKeyDown={(e) => handleKeyDown(e, 'input-expense-serviceFee', 'input-expense-vehicleMaintenance', 'input-expense-linePay')}
                                     />
-                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-rose-600">-</div>
+                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-rose-600 font-bold">-</div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     {/* Maintenance & Salary */}
-                    <div className="glass-panel p-6 border-indigo-500/10">
-                        <div className="flex items-center gap-2 mb-6 text-indigo-400 font-bold">
+                    <div className="glass-panel p-6 border-indigo-200">
+                        <div className="flex items-center gap-2 mb-6 text-indigo-600 font-bold">
                             <Truck size={18} />
                             <span>車輛與人事</span>
                         </div>
                         <div className="space-y-4">
                             <div className="flex items-center justify-between gap-2">
-                                <label className="text-xs text-slate-400 flex items-center gap-2">
+                                <label className="text-xs text-slate-500 flex items-center gap-2 font-bold">
                                     <Truck size={14} /> 車輛保養
                                 </label>
                                 <input
                                     id="input-expense-vehicleMaintenance"
                                     type="number"
-                                    className="input-field w-28 text-right bg-slate-800/50"
+                                    className="input-field w-28 text-right bg-white"
                                     value={expenses.vehicleMaintenance || ''}
                                     onChange={(e) => setExpenses({ ...expenses, vehicleMaintenance: Number(e.target.value) })}
                                     onKeyDown={(e) => handleKeyDown(e, 'input-expense-vehicleMaintenance', 'input-expense-salary', 'input-expense-serviceFee')}
                                 />
                             </div>
                             <div className="flex items-center justify-between gap-2">
-                                <label className="text-xs text-slate-400 flex items-center gap-2">
+                                <label className="text-xs text-slate-500 flex items-center gap-2 font-bold">
                                     <Users size={14} /> 薪資發放
                                 </label>
                                 <input
                                     id="input-expense-salary"
                                     type="number"
-                                    className="input-field w-28 text-right bg-slate-800/50"
+                                    className="input-field w-28 text-right bg-white"
                                     value={expenses.salary || ''}
                                     onChange={(e) => setExpenses({ ...expenses, salary: Number(e.target.value) })}
                                     onKeyDown={(e) => handleKeyDown(e, 'input-expense-salary', 'input-expense-reserve', 'input-expense-vehicleMaintenance')}
                                 />
                             </div>
                             <div className="flex items-center justify-between gap-2">
-                                <label className="text-xs text-slate-400 flex items-center gap-2">
+                                <label className="text-xs text-slate-500 flex items-center gap-2 font-bold">
                                     <PiggyBank size={14} /> 公積金
                                 </label>
                                 <input
                                     id="input-expense-reserve"
                                     type="number"
-                                    className="input-field w-28 text-right bg-slate-800/50"
+                                    className="input-field w-28 text-right bg-white"
                                     value={expenses.reserve || ''}
                                     onChange={(e) => setExpenses({ ...expenses, reserve: Number(e.target.value) })}
                                     onKeyDown={(e) => handleKeyDown(e, 'input-expense-reserve', null, 'input-expense-salary')}
@@ -264,7 +264,7 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                     {/* Final Action */}
                     <button
                         onClick={handleSubmit}
-                        className="btn-primary w-full py-4 text-lg font-black shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] transition-all flex justify-center items-center gap-3 active:scale-95"
+                        className="btn-primary w-full py-4 text-lg font-black shadow-lg shadow-blue-100 hover:shadow-xl hover:shadow-blue-200 transition-all flex justify-center items-center gap-3 active:scale-95"
                     >
                         <Save size={22} /> 保存今日支出
                     </button>

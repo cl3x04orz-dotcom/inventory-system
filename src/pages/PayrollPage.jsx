@@ -190,24 +190,24 @@ export default function PayrollPage({ user, apiUrl }) {
 
             {/* Summary Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <SummaryCard title="底薪" amount={data?.config?.baseSalary} color="text-slate-200" />
-                <SummaryCard title="全勤獎金" amount={summary.attendanceBonus} color="text-yellow-400" />
-                <SummaryCard title="業績獎金" amount={summary.bonus} subtext={`業績: $${(summary.sales || 0).toLocaleString()}`} color="text-green-400" />
-                <SummaryCard title="月休/請假" amount={summary.leaveDays} isCurrency={false} suffix=" 天" subtext={`(標準: ${data?.config?.monthlyOffDays || 8}天)`} color="text-blue-300" />
+                <SummaryCard title="底薪" amount={data?.config?.baseSalary} color="text-slate-800" />
+                <SummaryCard title="全勤獎金" amount={summary.attendanceBonus} color="text-yellow-600" />
+                <SummaryCard title="業績獎金" amount={summary.bonus} subtext={`業績: $${(summary.sales || 0).toLocaleString()}`} color="text-green-600" />
+                <SummaryCard title="月休/請假" amount={summary.leaveDays} isCurrency={false} suffix=" 天" subtext={`(標準: ${data?.config?.monthlyOffDays || 8}天)`} color="text-blue-600" />
 
-                <SummaryCard title="勞健保(扣)" amount={summary.insurance} isDeduction color="text-red-400" />
-                <SummaryCard title="虧損/盤損(扣)" amount={Math.abs(summary.loss || 0)} isDeduction color="text-red-400" />
+                <SummaryCard title="勞健保(扣)" amount={summary.insurance} isDeduction color="text-red-600" />
+                <SummaryCard title="虧損/盤損(扣)" amount={Math.abs(summary.loss || 0)} isDeduction color="text-red-600" />
 
-                <div className="col-span-2 lg:col-span-2 glass-panel p-4 flex justify-between items-center border border-emerald-500/30 bg-emerald-900/10">
-                    <span className="text-lg text-emerald-200 font-bold">實領薪資</span>
-                    <span className="text-4xl font-bold text-emerald-400">${(summary.finalSalary || 0).toLocaleString()}</span>
+                <div className="col-span-2 lg:col-span-2 glass-panel p-4 flex justify-between items-center border border-emerald-200 bg-emerald-50">
+                    <span className="text-lg text-emerald-900 font-bold">實領薪資</span>
+                    <span className="text-4xl font-bold text-emerald-600">${(summary.finalSalary || 0).toLocaleString()}</span>
                 </div>
             </div>
 
             {/* Calendar Table */}
             <div className="glass-panel overflow-hidden">
                 <table className="w-full text-left border-collapse">
-                    <thead className="bg-slate-900/50 text-slate-400 text-sm">
+                    <thead className="bg-slate-50 text-slate-500 text-sm">
                         <tr>
                             <th className="p-4 w-32">日期</th>
                             <th className="p-4 w-24 text-center">星期</th>
@@ -217,7 +217,7 @@ export default function PayrollPage({ user, apiUrl }) {
                             <th className="p-4 text-center">操作</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800">
+                    <tbody className="divide-y divide-slate-100">
                         {days.map((dayItem) => {
                             const dateStr = dayItem.date;
                             const sales = data?.dailyData?.[dateStr] || 0;
@@ -228,7 +228,7 @@ export default function PayrollPage({ user, apiUrl }) {
                             // If Sales == 0, check record.isLeave.
                             // If isLeave => "休假". Else => "上班" (Default).
                             let status = '上班';
-                            let statusColor = 'text-slate-400';
+                            let statusColor = 'text-slate-500';
 
                             if (hasSales) {
                                 status = '出勤 (有業績)';
@@ -245,18 +245,18 @@ export default function PayrollPage({ user, apiUrl }) {
                             const isWeekend = dayItem.weekday === '六' || dayItem.weekday === '日';
 
                             return (
-                                <tr key={dateStr} className={`hover:bg-slate-800/30 transition-colors ${isWeekend ? 'bg-slate-900/20' : ''}`}>
-                                    <td className="p-4 font-mono text-slate-300">{dateStr}</td>
-                                    <td className={`p-4 text-center ${dayItem.weekday === '日' ? 'text-red-400' : 'text-slate-400'}`}>
+                                <tr key={dateStr} className={`hover:bg-slate-50 transition-colors ${isWeekend ? 'bg-slate-50/50' : ''}`}>
+                                    <td className="p-4 font-mono text-slate-600">{dateStr}</td>
+                                    <td className={`p-4 text-center ${dayItem.weekday === '日' ? 'text-red-600' : 'text-slate-500'}`}>
                                         {dayItem.weekday}
                                     </td>
-                                    <td className="p-4 text-right font-mono text-emerald-300">
+                                    <td className="p-4 text-right font-mono text-emerald-600">
                                         {Math.abs(sales) > 0.01 ? `$${sales.toLocaleString()}` : '-'}
                                     </td>
                                     <td className="p-4 text-center">
                                         <span className={`text-sm ${statusColor}`}>{status}</span>
                                     </td>
-                                    <td className="p-4 text-right font-mono text-red-400">
+                                    <td className="p-4 text-right font-mono text-red-600">
                                         {Math.abs(record.loss || 0) > 0.01 ? `-$${Math.abs(record.loss).toLocaleString()}` : ''}
                                         {record.note && <span className="block text-xs text-slate-500">{record.note}</span>}
                                     </td>
@@ -287,13 +287,13 @@ export default function PayrollPage({ user, apiUrl }) {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm text-slate-400 mb-2">類型</label>
-                                <div className="flex bg-slate-800 rounded p-1">
+                                <div className="flex bg-slate-50 rounded p-1 border border-slate-200">
                                     <button
-                                        className={`flex-1 py-2 rounded text-sm ${editType === 'LEAVE' ? 'bg-yellow-600 text-white' : 'text-slate-400'}`}
+                                        className={`flex-1 py-2 rounded text-sm ${editType === 'LEAVE' ? 'bg-yellow-600 text-white' : 'text-slate-500'}`}
                                         onClick={() => setEditType('LEAVE')}
                                     >休假</button>
                                     <button
-                                        className={`flex-1 py-2 rounded text-sm ${editType === 'LOSS' ? 'bg-red-600 text-white' : 'text-slate-400'}`}
+                                        className={`flex-1 py-2 rounded text-sm ${editType === 'LOSS' ? 'bg-red-600 text-white' : 'text-slate-500'}`}
                                         onClick={() => setEditType('LOSS')}
                                     >盤損/扣款</button>
                                 </div>
@@ -377,7 +377,7 @@ export default function PayrollPage({ user, apiUrl }) {
                                     onChange={e => setSettingsForm({ ...settingsForm, bonusTiers: e.target.value })}
                                     placeholder='[{"threshold": 50000, "bonus": 1000}]'
                                 />
-                                <p className="text-xs text-slate-500 mt-1">{"格式: `[{\"threshold\": 目標金額, \"bonus\": 獎金 }]`"}</p>
+                                <p className="text-xs text-slate-400 mt-1">{"格式: `[{\"threshold\": 目標金額, \"bonus\": 獎金 }]`"}</p>
                             </div>
                         </div>
 
@@ -394,8 +394,8 @@ export default function PayrollPage({ user, apiUrl }) {
 
 function SummaryCard({ title, amount, subtext, color, isDeduction, isCurrency = true, suffix = '' }) {
     return (
-        <div className="glass-panel p-4 flex flex-col justify-between h-28 relative overflow-hidden group hover:border-blue-500/30 transition-all">
-            <span className="text-slate-400 text-sm font-medium z-10">{title}</span>
+        <div className="glass-panel p-4 flex flex-col justify-between h-28 relative overflow-hidden group hover:border-blue-500 transition-all">
+            <span className="text-slate-500 text-sm font-medium z-10">{title}</span>
             <div className="z-10">
                 <span className={`text-2xl font-bold tracking-tight ${color}`}>
                     {isDeduction && '-'}{isCurrency && '$'}{(amount || 0).toLocaleString()}{suffix}
