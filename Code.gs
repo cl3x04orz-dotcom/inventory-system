@@ -124,11 +124,11 @@ function apiHandler(request) {
             case 'updateUserStatus': return updateUserStatusService(payload);
 
             // Inventory & Purchase
-            case 'getProducts': return getProductsService(); 
-            case 'getInventory': return typeof getInventoryService !== 'undefined' ? getInventoryService() : {error: 'Service missing'}; 
-            case 'getPurchaseSuggestions': return typeof getPurchaseSuggestionsService !== 'undefined' ? getPurchaseSuggestionsService() : {error: 'Service missing'}; 
-            case 'addPurchase': return typeof addPurchaseService !== 'undefined' ? addPurchaseService(payload, user) : {error: 'Service missing'}; 
-            case 'getPurchaseHistory': return typeof getPurchaseHistory !== 'undefined' ? getPurchaseHistory(payload) : {error: 'Service missing'};
+            case 'getProducts': return typeof getProductsService !== 'undefined' ? getProductsService() : {error: '後端服務缺失: getProductsService'}; 
+            case 'getInventory': return typeof getInventoryService !== 'undefined' ? getInventoryService() : {error: '後端服務缺失: getInventoryService'}; 
+            case 'getPurchaseSuggestions': return typeof getPurchaseSuggestionsService !== 'undefined' ? getPurchaseSuggestionsService() : {error: '後端服務缺失: getPurchaseSuggestionsService'}; 
+            case 'addPurchase': return typeof addPurchaseService !== 'undefined' ? addPurchaseService(payload, user) : {error: '後端服務缺失: addPurchaseService (進貨功能)'}; 
+            case 'getPurchaseHistory': return typeof getPurchaseHistory !== 'undefined' ? getPurchaseHistory(payload) : {error: '後端服務缺失: getPurchaseHistory'};
 
             // 估值與盤點
             case 'getInventoryWithSafety': return typeof getInventoryWithSafety !== 'undefined' ? getInventoryWithSafety() : {error: 'Service missing'};
