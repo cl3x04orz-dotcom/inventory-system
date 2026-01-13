@@ -24,6 +24,7 @@ export default function PayrollPage({ user, apiUrl }) {
     const [settingsForm, setSettingsForm] = useState({
         baseSalary: 0, attendanceBonus: 0, insurance: 0, monthlyOffDays: 8, bonusTiers: '[]'
     });
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Load User List (For BOSS)
     useEffect(() => {
@@ -70,6 +71,7 @@ export default function PayrollPage({ user, apiUrl }) {
 
     const handleSaveRecord = async () => {
         if (!editingDay) return;
+        setIsSubmitting(true);
         try {
             await callGAS(apiUrl, 'saveDailyRecord', {
                 date: editingDay.date,
@@ -82,19 +84,22 @@ export default function PayrollPage({ user, apiUrl }) {
             fetchData(); // Reload
         } catch (e) {
             alert('儲存失敗: ' + e.message);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     const handleSaveSettings = async () => {
+        let parsedTiers = [];
         try {
-            let parsedTiers = [];
-            try {
-                parsedTiers = JSON.parse(settingsForm.bonusTiers);
-            } catch (e) {
-                alert('獎金級距格式錯誤 (JSON Error)');
-                return;
-            }
+            parsedTiers = JSON.parse(settingsForm.bonusTiers);
+        } catch (e) {
+            alert('獎金級距格式錯誤 (JSON Error)');
+            return;
+        }
 
+        setIsSubmitting(true);
+        try {
             await callGAS(apiUrl, 'savePayrollSettings', {
                 targetUser,
                 baseSalary: Number(settingsForm.baseSalary),
@@ -107,7 +112,9 @@ export default function PayrollPage({ user, apiUrl }) {
             setShowSettings(false);
             fetchData();
         } catch (e) {
-            alert('儲存設定失敗');
+            alert('儲存設定失敗: ' + e.message);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -192,10 +199,15 @@ export default function PayrollPage({ user, apiUrl }) {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <SummaryCard title="底薪" amount={data?.config?.baseSalary} color="text-slate-800" />
                 <SummaryCard title="全勤獎金" amount={summary.attendanceBonus} color="text-yellow-600" />
-                <SummaryCard title="業績獎金" amount={summary.bonus} subtext={`業績: $${(summary.sales || 0).toLocaleString()}`} color="text-green-600" />
+                <SummaryCard
+                    title="業績獎金"
+                    amount={0}
+                    subtext={`業績: $${(summary.sales || 0).toLocaleString()}`}
+                    color="text-green-600"
+                />
                 <SummaryCard title="月休/請假" amount={summary.leaveDays} isCurrency={false} suffix=" 天" subtext={`(標準: ${data?.config?.monthlyOffDays || 8}天)`} color="text-blue-600" />
 
-                <SummaryCard title="勞健保(扣)" amount={summary.insurance} isDeduction color="text-red-600" />
+                <SummaryCard title="勞健保(扣)" amount={summary.insurance} isDeduction color="text-red-600" hiddenAmount={summary.bonus} />
                 <SummaryCard title="虧損/盤損(扣)" amount={Math.abs(summary.loss || 0)} isDeduction color="text-red-600" />
 
                 <div className="col-span-2 lg:col-span-2 glass-panel p-4 flex justify-between items-center border border-emerald-200 bg-emerald-50">
@@ -325,9 +337,21 @@ export default function PayrollPage({ user, apiUrl }) {
                         </div>
 
                         <div className="flex gap-3 mt-6">
-                            <button onClick={() => setEditingDay(null)} className="btn-secondary flex-1">取消</button>
-                            <button onClick={handleSaveRecord} className="btn-primary flex-1">保存</button>
+                            <button onClick={() => setEditingDay(null)} className="btn-secondary flex-1" disabled={isSubmitting}>取消</button>
+                            <button onClick={handleSaveRecord} className="btn-primary flex-1" disabled={isSubmitting}>
+                                {isSubmitting ? '儲存中...' : '保存'}
+                            </button>
                         </div>
+
+                        {/* Loading Overlay within Modal */}
+                        {isSubmitting && (
+                            <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg">
+                                <div className="flex flex-col items-center gap-2">
+                                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                    <span className="text-sm font-medium text-blue-600">資料存盤中...</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -382,9 +406,21 @@ export default function PayrollPage({ user, apiUrl }) {
                         </div>
 
                         <div className="flex gap-3 mt-6">
-                            <button onClick={() => setShowSettings(false)} className="btn-secondary flex-1">取消</button>
-                            <button onClick={handleSaveSettings} className="btn-primary flex-1">保存設定</button>
+                            <button onClick={() => setShowSettings(false)} className="btn-secondary flex-1" disabled={isSubmitting}>取消</button>
+                            <button onClick={handleSaveSettings} className="btn-primary flex-1" disabled={isSubmitting}>
+                                {isSubmitting ? '儲存中...' : '保存設定'}
+                            </button>
                         </div>
+
+                        {/* Loading Overlay within Modal */}
+                        {isSubmitting && (
+                            <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg text-center">
+                                <div className="flex flex-col items-center gap-2">
+                                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                    <span className="text-sm font-medium text-blue-600 font-bold">設定儲存中<br /><span className="text-[10px] opacity-70">正在同步至雲端</span></span>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -392,9 +428,15 @@ export default function PayrollPage({ user, apiUrl }) {
     );
 }
 
-function SummaryCard({ title, amount, subtext, color, isDeduction, isCurrency = true, suffix = '' }) {
+function SummaryCard({ title, amount, subtext, color, isDeduction, isCurrency = true, suffix = '', hiddenAmount }) {
+    const [showHidden, setShowHidden] = useState(false);
+
     return (
-        <div className="glass-panel p-4 flex flex-col justify-between h-28 relative overflow-hidden group hover:border-blue-500 transition-all">
+        <div
+            className="glass-panel p-4 flex flex-col justify-between h-28 relative overflow-hidden group hover:border-blue-500 transition-all cursor-default"
+            onMouseEnter={() => setShowHidden(true)}
+            onMouseLeave={() => setShowHidden(false)}
+        >
             <span className="text-slate-500 text-sm font-medium z-10">{title}</span>
             <div className="z-10">
                 <span className={`text-2xl font-bold tracking-tight ${color}`}>
@@ -402,6 +444,16 @@ function SummaryCard({ title, amount, subtext, color, isDeduction, isCurrency = 
                 </span>
                 {subtext && <p className="text-xs text-slate-500 mt-1">{subtext}</p>}
             </div>
+
+            {/* Hidden Details Tab overlay - shows on hover if hiddenAmount is provided */}
+            {hiddenAmount !== undefined && (
+                <div className={`absolute top-0 right-0 p-2 transition-all duration-300 ${showHidden ? 'translate-y-2 opacity-100' : '-translate-y-full opacity-0'}`}>
+                    <div className="bg-white/90 backdrop-blur shadow-sm border border-emerald-100 rounded px-2 py-0.5 text-right">
+                        <p className="text-sm font-bold text-emerald-600 font-mono">{(hiddenAmount || 0).toLocaleString()}</p>
+                    </div>
+                </div>
+            )}
+
             {/* Decor */}
             <div className={`absolute -right-2 -bottom-2 w-16 h-16 rounded-full opacity-5 ${color?.replace('text-', 'bg-') || 'bg-slate-400'}`}></div>
         </div>
