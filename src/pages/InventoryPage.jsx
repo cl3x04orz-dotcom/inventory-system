@@ -14,6 +14,7 @@ export default function InventoryPage({ user, apiUrl }) {
     const [adjustmentNote, setAdjustmentNote] = useState('');
     const [safetyStocks, setSafetyStocks] = useState({});
     const [tempSafetyInput, setTempSafetyInput] = useState({});
+    const [customCaseSizes, setCustomCaseSizes] = useState({}); // Hand-tuned case sizes
     const [isAdjusting, setIsAdjusting] = useState(false);
 
     const fetchInventory = useCallback(async () => {
@@ -50,8 +51,11 @@ export default function InventoryPage({ user, apiUrl }) {
         const init = async () => {
             if (user?.token) {
                 await fetchInventory();
-                const saved = localStorage.getItem('safetyStocks');
-                if (saved) setSafetyStocks(JSON.parse(saved));
+                const savedSafety = localStorage.getItem('safetyStocks');
+                if (savedSafety) setSafetyStocks(JSON.parse(savedSafety));
+
+                const savedCaseSizes = localStorage.getItem('customCaseSizes');
+                if (savedCaseSizes) setCustomCaseSizes(JSON.parse(savedCaseSizes));
             }
         };
         init();
@@ -118,6 +122,12 @@ export default function InventoryPage({ user, apiUrl }) {
         }
     };
 
+    const updateCustomCaseSize = (productName, size) => {
+        const newSizes = { ...customCaseSizes, [productName]: Number(size) || 0 };
+        setCustomCaseSizes(newSizes);
+        localStorage.setItem('customCaseSizes', JSON.stringify(newSizes));
+    };
+
     const focusAndSelect = (id) => {
         const el = document.getElementById(id);
         if (el) {
@@ -127,18 +137,35 @@ export default function InventoryPage({ user, apiUrl }) {
         }
     };
 
-    const handleSafetyKeyDown = (e, idx, items) => {
-        if (e.key === 'Enter' || e.key === 'ArrowDown') {
+    const handleSafetyKeyDown = (e, idx, field, items) => {
+        const item = items[idx];
+        if (e.key === 'Enter' || e.key === 'ArrowRight') {
+            e.preventDefault();
+            if (field === 'case') {
+                focusAndSelect(`safety-input-${item.productName}-${item.batchId}`);
+            } else if (idx < items.length - 1) {
+                const next = items[idx + 1];
+                focusAndSelect(`case-input-${next.productName}-${next.batchId}`);
+            }
+        } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            if (field === 'safety') {
+                focusAndSelect(`case-input-${item.productName}-${item.batchId}`);
+            } else if (idx > 0) {
+                const prev = items[idx - 1];
+                focusAndSelect(`safety-input-${prev.productName}-${prev.batchId}`);
+            }
+        } else if (e.key === 'ArrowDown') {
             e.preventDefault();
             if (idx < items.length - 1) {
-                const nextItem = items[idx + 1];
-                focusAndSelect(`safety-input-${nextItem.productName}-${nextItem.batchId}`);
+                const next = items[idx + 1];
+                focusAndSelect(`${field}-input-${next.productName}-${next.batchId}`);
             }
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             if (idx > 0) {
-                const prevItem = items[idx - 1];
-                focusAndSelect(`safety-input-${prevItem.productName}-${prevItem.batchId}`);
+                const prev = items[idx - 1];
+                focusAndSelect(`${field}-input-${prev.productName}-${prev.batchId}`);
             }
         }
     };
@@ -182,18 +209,22 @@ export default function InventoryPage({ user, apiUrl }) {
                             <th className="p-4">產品名稱</th>
                             <th className="p-4 text-center">數量 / 箱數</th>
                             <th className="p-4">效期</th>
+                            <th className="p-4 text-center">每箱規格</th>
                             <th className="p-4 text-center">安全庫存</th>
                             <th className="p-4 text-center">操作</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {loading ? (
-                            <tr><td colSpan="5" className="p-6 text-center text-slate-500">載入中...</td></tr>
+                            <tr><td colSpan="6" className="p-6 text-center text-slate-500">載入中...</td></tr>
                         ) : items.length === 0 ? (
-                            <tr><td colSpan="5" className="p-6 text-center text-slate-500">無資料</td></tr>
+                            <tr><td colSpan="6" className="p-6 text-center text-slate-500">無資料</td></tr>
                         ) : (
                             items.map((item, idx) => {
                                 const safetyLevel = safetyStocks[item.productName] || 0;
+                                const customCaseSize = customCaseSizes[item.productName];
+                                const currentCaseSize = customCaseSize !== undefined && customCaseSize !== 0 ? customCaseSize : (CASE_MAP[item.productName] || 0);
+
                                 const totalQty = productTotals[item.productName] || 0;
                                 const isLowStock = safetyLevel > 0 && totalQty <= safetyLevel;
 
@@ -218,9 +249,9 @@ export default function InventoryPage({ user, apiUrl }) {
                                         <td className="p-4 text-center">
                                             <div className="flex flex-col items-center">
                                                 <span className="font-mono text-emerald-600 font-bold text-lg">{item.quantity}</span>
-                                                {CASE_MAP[item.productName] && (
+                                                {currentCaseSize > 0 && (
                                                     <span className="text-blue-600 font-mono text-sm">
-                                                        箱：{(item.quantity / CASE_MAP[item.productName]).toFixed(1)}
+                                                        箱：{(item.quantity / currentCaseSize).toFixed(1)}
                                                     </span>
                                                 )}
                                             </div>
@@ -244,14 +275,25 @@ export default function InventoryPage({ user, apiUrl }) {
                                         </td>
                                         <td className="p-4 text-center">
                                             <input
+                                                id={`case-input-${item.productName}-${item.batchId}`}
+                                                type="number"
+                                                className="input-field w-16 text-center text-xs p-1 bg-white border-blue-200"
+                                                value={customCaseSize !== undefined ? customCaseSize : (CASE_MAP[item.productName] || '')}
+                                                onChange={(e) => updateCustomCaseSize(item.productName, e.target.value)}
+                                                onKeyDown={(e) => handleSafetyKeyDown(e, idx, 'case', items)}
+                                                placeholder="箱規"
+                                            />
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <input
                                                 id={`safety-input-${item.productName}-${item.batchId}`}
                                                 type="number"
-                                                className="input-field w-20 text-center text-sm p-1 bg-white"
+                                                className="input-field w-16 text-center text-xs p-1 bg-white border-amber-200"
                                                 value={tempSafetyInput[item.productName] !== undefined ? tempSafetyInput[item.productName] : (safetyStocks[item.productName] || '')}
                                                 onChange={(e) => handleSafetyInputChange(item.productName, e.target.value)}
                                                 onBlur={() => handleSafetyInputBlur(item.productName)}
-                                                onKeyDown={(e) => handleSafetyKeyDown(e, idx, items)}
-                                                placeholder="0"
+                                                onKeyDown={(e) => handleSafetyKeyDown(e, idx, 'safety', items)}
+                                                placeholder="低標"
                                             />
                                         </td>
                                         <td className="p-4 text-center">
