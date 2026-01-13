@@ -14,6 +14,7 @@ export default function SalesPage({ user, apiUrl }) {
     });
     const [location, setLocation] = useState(''); // This will be used as "Sales Target"
     const [paymentType, setPaymentType] = useState('CASH');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Handle Payment Type Effects
     useEffect(() => {
@@ -116,9 +117,15 @@ export default function SalesPage({ user, apiUrl }) {
     };
 
     // Navigation Helpers
-    // Mapping sidebar Inputs for easier navigation logic
-    // Sidebar structure: Cash (1000..1), Reserve, Expenses (stall..others), LinePay, ServiceFee
-    // We will assign them IDs and maybe a logical sequence list if needed, but direct ID jumping is easier.
+    const focusAndSelect = (id) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.focus();
+            el.select?.();
+            // Ensure the element is scrolled into view smoothly
+            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    };
 
     const handleKeyDown = (e, idx, field) => {
         const validKeys = ['Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
@@ -141,15 +148,15 @@ export default function SalesPage({ user, apiUrl }) {
             if (currentFieldIdx < enterSequence.length - 1 && currentFieldIdx !== -1) {
                 // Next field in same row (picked -> original -> returns)
                 const nextField = enterSequence[currentFieldIdx + 1];
-                document.getElementById(`input-${idx}-${nextField}`)?.select();
+                focusAndSelect(`input-${idx}-${nextField}`);
             } else {
                 // If it's returns (or price/other unexpected), move to next row
                 if (idx < rows.length - 1) {
                     // Go to next row picked
-                    document.getElementById(`input-${idx + 1}-picked`)?.select();
+                    focusAndSelect(`input-${idx + 1}-picked`);
                 } else {
                     // Last row -> Jump to Sidebar (1000 cash or first available)
-                    document.getElementById('input-cash-1000')?.select();
+                    focusAndSelect('input-cash-1000');
                 }
             }
             return;
@@ -182,8 +189,7 @@ export default function SalesPage({ user, apiUrl }) {
         }
 
         if (targetId) {
-            const el = document.getElementById(targetId);
-            if (el) el.select();
+            focusAndSelect(targetId);
         }
     };
 
@@ -194,19 +200,19 @@ export default function SalesPage({ user, apiUrl }) {
 
         if (e.key === 'Enter' || e.key === 'ArrowDown') {
             e.preventDefault();
-            if (nextId) document.getElementById(nextId)?.select();
+            if (nextId) focusAndSelect(nextId);
         } else if (e.key === 'ArrowUp') {
-            if (prevId) document.getElementById(prevId)?.select();
+            if (prevId) focusAndSelect(prevId);
             else {
                 // Top of sidebar -> Back to Table (Last row, last col)
                 if (rows.length > 0) {
-                    document.getElementById(`input-${rows.length - 1}-price`)?.select();
+                    focusAndSelect(`input-${rows.length - 1}-price`);
                 }
             }
         } else if (e.key === 'ArrowLeft') {
             // Back to Table (Last row, last col)
             if (rows.length > 0) {
-                document.getElementById(`input-${rows.length - 1}-price`)?.select();
+                focusAndSelect(`input-${rows.length - 1}-price`);
             }
         }
     };
@@ -257,17 +263,26 @@ export default function SalesPage({ user, apiUrl }) {
             expenseData: { ...expenses, finalTotal }
         };
 
+        setIsSubmitting(true);
         try {
             await callGAS(apiUrl, 'saveSales', payload, user.token);
             alert('保存成功！資料已寫入 Google Sheet。');
             window.location.reload();
         } catch (e) {
             alert('保存失敗: ' + e.message);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     return (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {isSubmitting && (
+                <div className="loading-overlay">
+                    <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-lg font-bold text-slate-800">資料存盤中，請稍後...</p>
+                </div>
+            )}
             {/* Product Table */}
             <div className="xl:col-span-2 glass-panel p-6 overflow-hidden flex flex-col h-[calc(100vh-10rem)]">
                 <div className="flex justify-between items-center mb-4">

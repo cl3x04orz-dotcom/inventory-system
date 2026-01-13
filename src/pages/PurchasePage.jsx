@@ -59,17 +59,46 @@ export default function PurchasePage({ user, apiUrl }) {
         }
     };
 
-    const handleKeyDown = (e, nextId) => {
-        if (e.key === 'Enter') {
+    const focusAndSelect = (id) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.focus();
+            el.select?.();
+            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    };
+
+    const handleKeyDown = (e, idx, field) => {
+        const fields = ['vendor', 'product', 'qty', 'price', 'year', 'month', 'day'];
+        const fieldIdx = fields.indexOf(field);
+
+        if (e.key === 'Enter' || e.key === 'ArrowRight') {
             e.preventDefault();
-            if (nextId === 'NEW_ROW') {
+            if (fieldIdx < fields.length - 1) {
+                focusAndSelect(`item-${idx}-${fields[fieldIdx + 1]}`);
+            } else if (idx < items.length - 1) {
+                focusAndSelect(`item-${idx + 1}-vendor`);
+            } else if (e.key === 'Enter') {
                 addItem();
-            } else {
-                const el = document.getElementById(nextId);
-                if (el) {
-                    el.focus();
-                    el.select();
-                }
+                // We need a short delay to wait for React to render the new row
+                setTimeout(() => focusAndSelect(`item-${idx + 1}-vendor`), 50);
+            }
+        } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            if (fieldIdx > 0) {
+                focusAndSelect(`item-${idx}-${fields[fieldIdx - 1]}`);
+            } else if (idx > 0) {
+                focusAndSelect(`item-${idx - 1}-day`);
+            }
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (idx < items.length - 1) {
+                focusAndSelect(`item-${idx + 1}-${field}`);
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (idx > 0) {
+                focusAndSelect(`item-${idx - 1}-${field}`);
             }
         }
     };
@@ -128,10 +157,16 @@ export default function PurchasePage({ user, apiUrl }) {
 
     return (
         <div className="max-w-[90rem] mx-auto p-4">
+            {loading && (
+                <div className="loading-overlay">
+                    <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-lg font-bold text-slate-800">資料存盤中，請稍後...</p>
+                </div>
+            )}
             <div className="glass-panel p-6">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold flex items-center gap-2 text-slate-800">
-                        <PlusCircle className="text-emerald-600" /> 批次進貨作業
+                        進貨作業
                     </h2>
 
                     {/* Payment Method Toggle */}
@@ -161,7 +196,7 @@ export default function PurchasePage({ user, apiUrl }) {
                     {/* Items Grid */}
                     <div className="space-y-3">
                         <div className="flex items-center justify-between px-2">
-                            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">📦 商品清單</h3>
+                            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">商品清單</h3>
                             <span className="text-xs text-slate-400">共 {items.length} 項商品</span>
                         </div>
 
@@ -185,7 +220,7 @@ export default function PurchasePage({ user, apiUrl }) {
                                         {/* Vendor (3 cols) */}
                                         <div className="col-span-12 md:col-span-2">
                                             <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1 uppercase">
-                                                <span>🏢</span> 廠商
+                                                廠商
                                             </label>
                                             <input
                                                 id={`item-${idx}-vendor`}
@@ -194,7 +229,7 @@ export default function PurchasePage({ user, apiUrl }) {
                                                 placeholder="廠商名稱"
                                                 value={item.vendor}
                                                 onChange={e => handleItemChange(item.id, 'vendor', e.target.value)}
-                                                onKeyDown={(e) => handleKeyDown(e, `item-${idx}-product`)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'vendor')}
                                                 autoFocus={idx === items.length - 1} // Auto focus on new row vendor
                                             />
                                         </div>
@@ -202,7 +237,7 @@ export default function PurchasePage({ user, apiUrl }) {
                                         {/* Product (3 cols) */}
                                         <div className="col-span-12 md:col-span-3">
                                             <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1 uppercase">
-                                                <span>📦</span> 產品名稱
+                                                產品名稱
                                             </label>
                                             <input
                                                 id={`item-${idx}-product`}
@@ -211,7 +246,7 @@ export default function PurchasePage({ user, apiUrl }) {
                                                 placeholder="產品名稱"
                                                 value={item.productName}
                                                 onChange={e => handleItemChange(item.id, 'productName', e.target.value)}
-                                                onKeyDown={(e) => handleKeyDown(e, `item-${idx}-qty`)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'product')}
                                             />
                                             <datalist id={`products-list-${idx}`}>
                                                 {currentProductSuggestions.map((n, i) => <option key={i} value={n} />)}
@@ -221,7 +256,7 @@ export default function PurchasePage({ user, apiUrl }) {
                                         {/* Qty (2 cols) */}
                                         <div className="col-span-6 md:col-span-2">
                                             <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1 uppercase">
-                                                <span>🔢</span> 數量
+                                                數量
                                             </label>
                                             <input
                                                 id={`item-${idx}-qty`}
@@ -230,14 +265,14 @@ export default function PurchasePage({ user, apiUrl }) {
                                                 placeholder="0"
                                                 value={item.quantity}
                                                 onChange={e => handleItemChange(item.id, 'quantity', e.target.value)}
-                                                onKeyDown={(e) => handleKeyDown(e, `item-${idx}-price`)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'qty')}
                                             />
                                         </div>
 
                                         {/* Price (2 cols) */}
                                         <div className="col-span-6 md:col-span-2">
                                             <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1 uppercase">
-                                                <span>💰</span> 單價
+                                                單價
                                             </label>
                                             <input
                                                 id={`item-${idx}-price`}
@@ -246,14 +281,14 @@ export default function PurchasePage({ user, apiUrl }) {
                                                 placeholder="0"
                                                 value={item.unitPrice}
                                                 onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)}
-                                                onKeyDown={(e) => handleKeyDown(e, `item-${idx}-year`)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'price')}
                                             />
                                         </div>
 
                                         {/* Expiry (2 cols + delete btn space) */}
                                         <div className="col-span-12 md:col-span-3 grid grid-cols-[1fr_auto_1fr_auto_1fr_auto] gap-1 relative">
                                             <label className="absolute -top-6 left-0 text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1 uppercase">
-                                                <span>📅</span> 有效期限
+                                                有效期限
                                             </label>
 
                                             <input
@@ -262,7 +297,7 @@ export default function PurchasePage({ user, apiUrl }) {
                                                 placeholder="YYYY"
                                                 value={item.expiryYear}
                                                 onChange={e => handleItemChange(item.id, 'expiryYear', e.target.value)}
-                                                onKeyDown={(e) => handleKeyDown(e, `item-${idx}-month`)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'year')}
                                             />
                                             <span className="text-slate-400 self-center">/</span>
                                             <input
@@ -271,7 +306,7 @@ export default function PurchasePage({ user, apiUrl }) {
                                                 placeholder="MM"
                                                 value={item.expiryMonth}
                                                 onChange={e => handleItemChange(item.id, 'expiryMonth', e.target.value)}
-                                                onKeyDown={(e) => handleKeyDown(e, `item-${idx}-day`)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'month')}
                                             />
                                             <span className="text-slate-200 self-center">/</span>
                                             <input
@@ -281,17 +316,7 @@ export default function PurchasePage({ user, apiUrl }) {
                                                 placeholder="DD"
                                                 value={item.expiryDay}
                                                 onChange={e => handleItemChange(item.id, 'expiryDay', e.target.value)}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                        e.preventDefault();
-                                                        if (idx === items.length - 1) {
-                                                            addItem();
-                                                        } else {
-                                                            const nextEl = document.getElementById(`item-${idx + 1}-vendor`);
-                                                            if (nextEl) nextEl.focus();
-                                                        }
-                                                    }
-                                                }}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'day')}
                                             />
 
                                             {/* Delete Button (inline) */}

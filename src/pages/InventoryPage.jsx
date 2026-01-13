@@ -14,6 +14,7 @@ export default function InventoryPage({ user, apiUrl }) {
     const [adjustmentNote, setAdjustmentNote] = useState('');
     const [safetyStocks, setSafetyStocks] = useState({});
     const [tempSafetyInput, setTempSafetyInput] = useState({});
+    const [isAdjusting, setIsAdjusting] = useState(false);
 
     const fetchInventory = useCallback(async () => {
         setLoading(true);
@@ -81,6 +82,7 @@ export default function InventoryPage({ user, apiUrl }) {
             return;
         }
 
+        setIsAdjusting(true);
         try {
             await callGAS(apiUrl, 'adjustInventory', {
                 batchId: selectedItem.batchId,
@@ -94,6 +96,8 @@ export default function InventoryPage({ user, apiUrl }) {
             fetchInventory();
         } catch (error) {
             alert('異動失敗: ' + error.message);
+        } finally {
+            setIsAdjusting(false);
         }
     };
 
@@ -111,6 +115,31 @@ export default function InventoryPage({ user, apiUrl }) {
         const value = tempSafetyInput[productName];
         if (value !== undefined) {
             updateSafetyStock(productName, value);
+        }
+    };
+
+    const focusAndSelect = (id) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.focus();
+            el.select?.();
+            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    };
+
+    const handleSafetyKeyDown = (e, idx, items) => {
+        if (e.key === 'Enter' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (idx < items.length - 1) {
+                const nextItem = items[idx + 1];
+                focusAndSelect(`safety-input-${nextItem.productName}-${nextItem.batchId}`);
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (idx > 0) {
+                const prevItem = items[idx - 1];
+                focusAndSelect(`safety-input-${prevItem.productName}-${prevItem.batchId}`);
+            }
         }
     };
 
@@ -215,11 +244,13 @@ export default function InventoryPage({ user, apiUrl }) {
                                         </td>
                                         <td className="p-4 text-center">
                                             <input
+                                                id={`safety-input-${item.productName}-${item.batchId}`}
                                                 type="number"
                                                 className="input-field w-20 text-center text-sm p-1 bg-white"
                                                 value={tempSafetyInput[item.productName] !== undefined ? tempSafetyInput[item.productName] : (safetyStocks[item.productName] || '')}
                                                 onChange={(e) => handleSafetyInputChange(item.productName, e.target.value)}
                                                 onBlur={() => handleSafetyInputBlur(item.productName)}
+                                                onKeyDown={(e) => handleSafetyKeyDown(e, idx, items)}
                                                 placeholder="0"
                                             />
                                         </td>
@@ -271,6 +302,12 @@ export default function InventoryPage({ user, apiUrl }) {
 
             {showAdjustModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    {isAdjusting && (
+                        <div className="loading-overlay">
+                            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                            <p className="text-lg font-bold text-slate-800">異動處理中，請稍後...</p>
+                        </div>
+                    )}
                     <div className="glass-panel p-6 w-96 max-w-[90vw]">
                         <h3 className="text-xl font-bold mb-4">庫存異動</h3>
                         <div className="space-y-4">
@@ -306,7 +343,7 @@ export default function InventoryPage({ user, apiUrl }) {
                                     value={adjustmentQty}
                                     onChange={(e) => setAdjustmentQty(e.target.value)}
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
+                                        if (e.key === 'Enter' || e.key === 'ArrowDown') {
                                             e.preventDefault();
                                             document.getElementById('adjustment-note-input')?.focus();
                                         }
@@ -324,9 +361,12 @@ export default function InventoryPage({ user, apiUrl }) {
                                     value={adjustmentNote}
                                     onChange={(e) => setAdjustmentNote(e.target.value)}
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && e.ctrlKey) {
+                                        if (e.key === 'Enter') {
                                             e.preventDefault();
                                             submitAdjustment();
+                                        } else if (e.key === 'ArrowUp') {
+                                            e.preventDefault();
+                                            document.getElementById('adjustment-qty-input')?.focus();
                                         }
                                     }}
                                     placeholder="輸入備註原因（必填）..."

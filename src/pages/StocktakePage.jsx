@@ -9,20 +9,8 @@ export default function StocktakePage({ user, apiUrl }) {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [zeroStockDates, setZeroStockDates] = useState({}); // Track when products hit zero stock
+    const [showZeroStock, setShowZeroStock] = useState(false); // Manual toggle for zero stock items
     const getRowKey = useCallback((item) => `${item.id}-${item.batchId || 'no-batch'}`, []);
-
-    // Load zero stock tracking from localStorage
-    useEffect(() => {
-        const saved = localStorage.getItem('zeroStockDates');
-        if (saved) {
-            try {
-                setZeroStockDates(JSON.parse(saved));
-            } catch (e) {
-                console.error('Failed to parse zeroStockDates:', e);
-            }
-        }
-    }, []);
 
     const fetchInventory = useCallback(async () => {
         setLoading(true);
@@ -30,34 +18,6 @@ export default function StocktakePage({ user, apiUrl }) {
             const data = await callGAS(apiUrl, 'getInventory', {}, user.token);
             if (Array.isArray(data)) {
                 const sorted = sortProducts(data, 'productName');
-
-                // Update zero stock tracking using functional update
-                const today = new Date().toISOString().split('T')[0];
-
-                setZeroStockDates(prevDates => {
-                    const newZeroStockDates = { ...prevDates };
-
-                    sorted.forEach(item => {
-                        const qty = Number(item.quantity) || 0;
-                        const productKey = item.id;
-
-                        if (qty === 0) {
-                            // If not already tracked, start tracking
-                            if (!newZeroStockDates[productKey]) {
-                                newZeroStockDates[productKey] = today;
-                            }
-                        } else {
-                            // If stock is back, remove from tracking
-                            if (newZeroStockDates[productKey]) {
-                                delete newZeroStockDates[productKey];
-                            }
-                        }
-                    });
-
-                    localStorage.setItem('zeroStockDates', JSON.stringify(newZeroStockDates));
-                    return newZeroStockDates;
-                });
-
                 setInventory(sorted);
 
                 // Initialize stocktake data only for STOCK items
@@ -93,6 +53,56 @@ export default function StocktakePage({ user, apiUrl }) {
                 [field]: value
             }
         }));
+    };
+
+    const focusAndSelect = (id) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.focus();
+            el.select?.();
+            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    };
+
+    const handleKeyDown = (e, rowIdx, field, items) => {
+        const currentItem = items[rowIdx];
+        const rowKey = getRowKey(currentItem);
+        const entry = stocktakeData[rowKey] || {};
+        const diff = calculateDiff(currentItem.quantity, entry.physicalQty);
+        const hasDiff = entry.physicalQty !== '' && diff !== 0;
+
+        const fields = ['qty', 'reason', 'acc'];
+        const fieldIdx = fields.indexOf(field);
+
+        if (e.key === 'ArrowRight' || (e.key === 'Enter' && !e.shiftKey)) {
+            e.preventDefault();
+            // Move to next field in same row, or next row's first field
+            if (field === 'qty' && !hasDiff) {
+                // Skip reason/acc if no diff
+                if (rowIdx < items.length - 1) {
+                    focusAndSelect(`qty-${getRowKey(items[rowIdx + 1])}`);
+                }
+            } else if (fieldIdx < fields.length - 1) {
+                focusAndSelect(`${fields[fieldIdx + 1]}-${rowKey}`);
+            } else if (rowIdx < items.length - 1) {
+                focusAndSelect(`qty-${getRowKey(items[rowIdx + 1])}`);
+            }
+        } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            if (fieldIdx > 0) {
+                focusAndSelect(`${fields[fieldIdx - 1]}-${rowKey}`);
+            }
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (rowIdx < items.length - 1) {
+                focusAndSelect(`${field}-${getRowKey(items[rowIdx + 1])}`);
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (rowIdx > 0) {
+                focusAndSelect(`${field}-${getRowKey(items[rowIdx - 1])}`);
+            }
+        }
     };
 
     const calculateDiff = (bookQty, physicalQty) => {
@@ -161,26 +171,11 @@ export default function StocktakePage({ user, apiUrl }) {
         }
     };
 
-    // Check if product should be hidden (zero stock for more than 2 days)
-    const shouldHideProduct = (item) => {
-        const qty = Number(item.quantity) || 0;
-        if (qty > 0) return false;
-
-        const zeroDate = zeroStockDates[item.id];
-        if (!zeroDate) return false;
-
-        const today = new Date();
-        const zeroDateObj = new Date(zeroDate);
-        const daysDiff = Math.floor((today - zeroDateObj) / (1000 * 60 * 60 * 24));
-
-        return daysDiff > 2;
-    };
-
     const filteredInventory = inventory.filter(item => {
         if (!item) return false;
 
-        // Hide products with zero stock for more than 2 days
-        if (shouldHideProduct(item)) return false;
+        // Manual toggle to show/hide zero stock
+        if (!showZeroStock && (Number(item.quantity) || 0) === 0) return false;
 
         const nameMatch = String(item.productName || '').toLowerCase().includes(searchTerm.toLowerCase());
         return nameMatch;
@@ -247,12 +242,7 @@ export default function StocktakePage({ user, apiUrl }) {
                                                         placeholder="0"
                                                         value={entry.physicalQty}
                                                         onChange={(e) => handleInputChange(rowKey, 'physicalQty', e.target.value)}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') {
-                                                                e.preventDefault();
-                                                                document.getElementById(`reason-${rowKey}`)?.focus();
-                                                            }
-                                                        }}
+                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'qty', items)}
                                                         onWheel={(e) => e.target.blur()}
                                                     />
                                                 </td>
@@ -266,36 +256,24 @@ export default function StocktakePage({ user, apiUrl }) {
                                                     <input
                                                         id={`reason-${rowKey}`}
                                                         type="text"
-                                                        className="input-field w-full text-xs bg-white"
-                                                        placeholder={diff !== 0 && entry.physicalQty !== '' ? "必填..." : "選填"}
+                                                        disabled={entry.physicalQty === '' || diff === 0}
+                                                        className={`input-field w-full text-xs transition-all ${entry.physicalQty !== '' && diff !== 0 ? 'bg-white' : 'bg-slate-100 cursor-not-allowed opacity-50'}`}
+                                                        placeholder={diff !== 0 && entry.physicalQty !== '' ? "原因..." : "-"}
                                                         value={entry.reason}
                                                         onChange={(e) => handleInputChange(rowKey, 'reason', e.target.value)}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') {
-                                                                e.preventDefault();
-                                                                document.getElementById(`acc-${rowKey}`)?.focus();
-                                                            }
-                                                        }}
+                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'reason', items)}
                                                     />
                                                 </td>
                                                 <td className="p-4">
                                                     <input
                                                         id={`acc-${rowKey}`}
                                                         type="text"
-                                                        className="input-field w-full text-xs bg-white"
-                                                        placeholder={diff !== 0 && entry.physicalQty !== '' ? "必填..." : "選填"}
+                                                        disabled={entry.physicalQty === '' || diff === 0}
+                                                        className={`input-field w-full text-xs transition-all ${entry.physicalQty !== '' && diff !== 0 ? 'bg-white' : 'bg-slate-100 cursor-not-allowed opacity-50'}`}
+                                                        placeholder={diff !== 0 && entry.physicalQty !== '' ? "責任人..." : "-"}
                                                         value={entry.accountability}
                                                         onChange={(e) => handleInputChange(rowKey, 'accountability', e.target.value)}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') {
-                                                                e.preventDefault();
-                                                                const nextItem = items[idx + 1];
-                                                                if (nextItem) {
-                                                                    const nextKey = getRowKey(nextItem);
-                                                                    document.getElementById(`qty-${nextKey}`)?.focus();
-                                                                }
-                                                            }
-                                                        }}
+                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'acc', items)}
                                                     />
                                                 </td>
                                             </>
@@ -311,7 +289,13 @@ export default function StocktakePage({ user, apiUrl }) {
     );
 
     return (
-        <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6 flex flex-col h-[calc(100vh-6rem)]">
+        <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6 flex flex-col h-[calc(100vh-6rem)] relative">
+            {submitting && (
+                <div className="loading-overlay">
+                    <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-lg font-bold text-slate-800">盤點存盤中，請稍後...</p>
+                </div>
+            )}
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
                 <div>
@@ -350,6 +334,18 @@ export default function StocktakePage({ user, apiUrl }) {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
+                </div>
+
+                <div className="flex items-center gap-3 bg-white p-2 px-4 rounded-xl border border-slate-200 shadow-sm shrink-0">
+                    <label className="text-sm font-bold text-slate-600 flex items-center gap-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            checked={showZeroStock}
+                            onChange={(e) => setShowZeroStock(e.target.checked)}
+                        />
+                        顯示庫存為 0 的品項
+                    </label>
                 </div>
             </div>
 

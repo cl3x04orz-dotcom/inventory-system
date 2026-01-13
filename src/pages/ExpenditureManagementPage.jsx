@@ -3,6 +3,7 @@ import { Save, DollarSign, Truck, Users, CreditCard, Clipboard, PiggyBank, Setti
 import { callGAS } from '../utils/api';
 
 export default function ExpenditureManagementPage({ user, apiUrl }) {
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [expenses, setExpenses] = useState({
         stall: 0,           // B 攤位
         cleaning: 0,        // C 清潔
@@ -50,6 +51,7 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
             finalTotal: finalTotal
         };
 
+        setIsSubmitting(true);
         try {
             await callGAS(apiUrl, 'saveExpenditure', payload, user.token);
             alert('保存成功！支出資料已寫入 Expenditures 試算表。');
@@ -61,20 +63,56 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
             setNote('');
         } catch (e) {
             alert('保存失敗: ' + e.message);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
-    const handleKeyDown = (e, currentId, nextId, prevId) => {
-        const validKeys = ['Enter', 'ArrowUp', 'ArrowDown'];
-        if (!validKeys.includes(e.key)) return;
-        if (e.key.startsWith('Arrow')) e.preventDefault();
+    const focusAndSelect = (id) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.focus();
+            el.select?.();
+            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    };
 
-        if (e.key === 'Enter' || e.key === 'ArrowDown') {
+    const handleKeyDown = (e, field) => {
+        const fields = [
+            'note', 'stall', 'cleaning', 'electricity', 'gas', 'parking', 'goods', 'bags', 'others',
+            'linePay', 'serviceFee', 'vehicleMaintenance', 'salary', 'reserve'
+        ];
+        const fieldIdx = fields.indexOf(field);
+
+        if (e.key === 'Enter' || e.key === 'ArrowRight') {
             e.preventDefault();
-            if (nextId) document.getElementById(nextId)?.focus();
+            if (fieldIdx < fields.length - 1) {
+                focusAndSelect(`input-expense-${fields[fieldIdx + 1]}`);
+            } else if (e.key === 'Enter') {
+                handleSubmit();
+            }
+        } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            if (fieldIdx > 0) {
+                focusAndSelect(`input-expense-${fields[fieldIdx - 1]}`);
+            }
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            // grid Layout based movements (rough logic for 2-column Operatonal Expenses)
+            if (['stall', 'cleaning', 'electricity', 'gas', 'parking', 'goods'].includes(field)) {
+                const nextMap = { stall: 'electricity', cleaning: 'gas', electricity: 'parking', gas: 'goods', parking: 'bags', goods: 'others' };
+                focusAndSelect(`input-expense-${nextMap[field]}`);
+            } else if (fieldIdx < fields.length - 1) {
+                focusAndSelect(`input-expense-${fields[fieldIdx + 1]}`);
+            }
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            if (prevId) document.getElementById(prevId)?.focus();
+            if (['electricity', 'gas', 'parking', 'goods', 'bags', 'others'].includes(field)) {
+                const prevMap = { electricity: 'stall', gas: 'cleaning', parking: 'electricity', goods: 'gas', bags: 'parking', others: 'goods' };
+                focusAndSelect(`input-expense-${prevMap[field]}`);
+            } else if (fieldIdx > 0) {
+                focusAndSelect(`input-expense-${fields[fieldIdx - 1]}`);
+            }
         }
     };
 
@@ -87,7 +125,13 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
     const finalTotal = totalExpenses + Number(expenses.linePay);
 
     return (
-        <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-in fade-in duration-500">
+        <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-in fade-in duration-500 relative">
+            {isSubmitting && (
+                <div className="loading-overlay">
+                    <div className="w-12 h-12 border-4 border-rose-600 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-lg font-bold text-slate-800">資料存盤中，請稍後...</p>
+                </div>
+            )}
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
@@ -118,18 +162,13 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                         <div>
                             <label className="text-xs text-slate-500 font-bold block mb-2">備註 / 說明 *</label>
                             <input
-                                id="input-note"
+                                id="input-expense-note"
                                 type="text"
                                 className="input-field w-full text-lg py-3 bg-white"
                                 placeholder="例如：1/7 台北攤位支出..."
                                 value={note}
                                 onChange={(e) => setNote(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        document.getElementById('input-expense-stall')?.focus();
-                                    }
-                                }}
+                                onKeyDown={(e) => handleKeyDown(e, 'note')}
                             />
                         </div>
                     </div>
@@ -159,12 +198,8 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                                         className="input-field text-right w-32 bg-white"
                                         value={expenses[item.key] || ''}
                                         onChange={(e) => setExpenses({ ...expenses, [item.key]: Number(e.target.value) })}
-                                        onKeyDown={(e) => handleKeyDown(
-                                            e,
-                                            `input-expense-${item.key}`,
-                                            item.next ? `input-expense-${item.next === 'linePay' ? 'linePay' : item.next}` : null,
-                                            item.prev === 'note' ? 'input-note' : `input-expense-${item.prev}`
-                                        )}
+                                        onKeyDown={(e) => handleKeyDown(e, item.key)}
+                                        onWheel={(e) => e.target.blur()}
                                     />
                                 </div>
                             ))}
@@ -190,7 +225,8 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                                         className="input-field w-full pl-8 border-emerald-200 text-emerald-700 bg-emerald-50"
                                         value={expenses.linePay || ''}
                                         onChange={(e) => setExpenses({ ...expenses, linePay: Number(e.target.value) })}
-                                        onKeyDown={(e) => handleKeyDown(e, 'input-expense-linePay', 'input-expense-serviceFee', 'input-expense-others')}
+                                        onKeyDown={(e) => handleKeyDown(e, 'linePay')}
+                                        onWheel={(e) => e.target.blur()}
                                     />
                                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 font-bold">+</div>
                                 </div>
@@ -204,7 +240,8 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                                         className="input-field w-full pl-8 border-rose-200 text-rose-700 bg-rose-50"
                                         value={expenses.serviceFee || ''}
                                         onChange={(e) => setExpenses({ ...expenses, serviceFee: Number(e.target.value) })}
-                                        onKeyDown={(e) => handleKeyDown(e, 'input-expense-serviceFee', 'input-expense-vehicleMaintenance', 'input-expense-linePay')}
+                                        onKeyDown={(e) => handleKeyDown(e, 'serviceFee')}
+                                        onWheel={(e) => e.target.blur()}
                                     />
                                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-rose-600 font-bold">-</div>
                                 </div>
@@ -229,7 +266,8 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                                     className="input-field w-28 text-right bg-white"
                                     value={expenses.vehicleMaintenance || ''}
                                     onChange={(e) => setExpenses({ ...expenses, vehicleMaintenance: Number(e.target.value) })}
-                                    onKeyDown={(e) => handleKeyDown(e, 'input-expense-vehicleMaintenance', 'input-expense-salary', 'input-expense-serviceFee')}
+                                    onKeyDown={(e) => handleKeyDown(e, 'vehicleMaintenance')}
+                                    onWheel={(e) => e.target.blur()}
                                 />
                             </div>
                             <div className="flex items-center justify-between gap-2">
@@ -242,7 +280,8 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                                     className="input-field w-28 text-right bg-white"
                                     value={expenses.salary || ''}
                                     onChange={(e) => setExpenses({ ...expenses, salary: Number(e.target.value) })}
-                                    onKeyDown={(e) => handleKeyDown(e, 'input-expense-salary', 'input-expense-reserve', 'input-expense-vehicleMaintenance')}
+                                    onKeyDown={(e) => handleKeyDown(e, 'salary')}
+                                    onWheel={(e) => e.target.blur()}
                                 />
                             </div>
                             <div className="flex items-center justify-between gap-2">
@@ -255,7 +294,8 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                                     className="input-field w-28 text-right bg-white"
                                     value={expenses.reserve || ''}
                                     onChange={(e) => setExpenses({ ...expenses, reserve: Number(e.target.value) })}
-                                    onKeyDown={(e) => handleKeyDown(e, 'input-expense-reserve', null, 'input-expense-salary')}
+                                    onKeyDown={(e) => handleKeyDown(e, 'reserve')}
+                                    onWheel={(e) => e.target.blur()}
                                 />
                             </div>
                         </div>

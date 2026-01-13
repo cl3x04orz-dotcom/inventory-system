@@ -61,7 +61,13 @@ export default function InventoryAdjustmentPage({ user, apiUrl }) {
     };
 
     return (
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 relative">
+            {saving && (
+                <div className="loading-overlay">
+                    <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-lg font-bold text-slate-800">調整存盤中，請稍後...</p>
+                </div>
+            )}
             {/* Left: Product List */}
             <div className="space-y-4 flex flex-col h-[calc(100vh-10rem)]">
                 <div className="flex justify-between items-center">
