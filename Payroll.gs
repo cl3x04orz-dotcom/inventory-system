@@ -289,7 +289,7 @@ function getPayrollDataService(payload, user) {
         sickLeaveDeduction: sickLeaveDeduction,
         insurance: config.insurance,
         loss: finalLoss,
-        finalSalary: config.baseSalary + 0 + (hasAttendanceBonus ? config.attendanceBonus : 0) + leaveCompensation - config.insurance - finalLoss - sickLeaveDeduction
+        finalSalary: config.baseSalary + 0 + (hasAttendanceBonus ? config.attendanceBonus : 0) + leaveCompensation - config.insurance - bonus - sickLeaveDeduction
     };
 
     // [新增] 生日月份提醒檢查 (強化版：同時支援日期格式與字串格式，並統一帳號比對)
