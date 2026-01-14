@@ -248,8 +248,8 @@ function getPayrollDataService(payload, user) {
 
     // 5. 總結
     const finalLoss = manualLoss + salesShortage;
-    // 全勤獎金邏輯：只要有「一般休假」就沒有全勤；特休與病假不扣全勤
-    const hasAttendanceBonus = (generalLeaveDays === 0);
+    // 全勤獎金邏輯：一般休假天數在月休標準內（含）即可領取；特休與病假不影響全勤
+    const hasAttendanceBonus = (generalLeaveDays <= config.monthlyOffDays);
     const summary = {
         sales: totalSales,
         bonus: bonus,
