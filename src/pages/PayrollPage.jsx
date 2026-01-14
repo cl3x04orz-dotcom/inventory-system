@@ -261,6 +261,21 @@ export default function PayrollPage({ user, apiUrl }) {
     const days = getDaysInMonth(year, month);
     const summary = data?.summary || {};
 
+    // Helper: Count actual attendance days
+    let attendanceDaysCount = 0;
+    // Use days array which has { date: 'YYYY-MM-DD' }
+    if (data?.dailyRecords) {
+        attendanceDaysCount = days.filter(d => {
+            const dateKey = d.date;
+            const rec = data.dailyRecords[dateKey];
+            if (!rec) return true; // Default is work/attended
+            return !rec.isLeave && !rec.isSickLeave && !rec.isSpecialLeave;
+        }).length;
+    } else {
+        // Fallback
+        attendanceDaysCount = days.length - (summary.generalLeaveDays || 0) - (summary.specialLeaveDays || 0) - (summary.sickLeaveDays || 0);
+    }
+
 
     const formatBirthday = (val) => {
         if (!val) return '';
@@ -412,7 +427,17 @@ export default function PayrollPage({ user, apiUrl }) {
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4 px-2">
-                <SummaryCard title="全勤獎金" amount={summary.attendanceBonus} color="text-yellow-600" />
+                <SummaryCard
+                    title="全勤獎金"
+                    amount={summary.attendanceBonus}
+                    color="text-yellow-600"
+                    hoverContent={
+                        <>
+                            <p className="text-xs text-slate-400 font-medium">出勤天</p>
+                            <p className="text-sm font-bold text-emerald-600 font-mono">{attendanceDaysCount} 天</p>
+                        </>
+                    }
+                />
                 <SummaryCard title="一般休假" amount={summary.generalLeaveDays} isCurrency={false} suffix=" 天" color="text-slate-500" />
                 <SummaryCard title="特休紀錄" amount={summary.specialLeaveDays} isCurrency={false} suffix=" 天" color="text-emerald-500" />
                 <SummaryCard title="病假紀錄" amount={summary.sickLeaveDays} isCurrency={false} suffix=" 天" color="text-amber-500" />
@@ -757,7 +782,7 @@ export default function PayrollPage({ user, apiUrl }) {
     );
 }
 
-function SummaryCard({ title, amount, subtext, color, isDeduction, isCurrency = true, suffix = '', hiddenAmount, hiddenTitle = '總額參考' }) {
+function SummaryCard({ title, amount, subtext, color, isDeduction, isCurrency = true, suffix = '', hiddenAmount, hiddenTitle = '總額參考', hoverContent }) {
     const [showHidden, setShowHidden] = useState(false);
 
     return (
@@ -776,14 +801,18 @@ function SummaryCard({ title, amount, subtext, color, isDeduction, isCurrency = 
                 {subtext && <p className="text-xs text-slate-500 mt-1">{subtext}</p>}
             </div>
 
-            {/* Hidden Details Tab overlay - shows on hover if hiddenAmount is provided */}
-            {hiddenAmount !== undefined && (
+            {/* Hidden Details Tab overlay - shows on hover if hiddenAmount OR hoverContent is provided */}
+            {(hiddenAmount !== undefined || hoverContent) && (
                 <div className={`absolute top-0 right-0 p-2 transition-all duration-300 ${showHidden ? 'translate-y-2 opacity-100' : '-translate-y-full opacity-0'}`}>
                     <div className="bg-white/90 backdrop-blur shadow-sm border border-emerald-100 rounded px-2 py-0.5 text-right">
-                        {hiddenTitle && <p className="text-xs text-slate-400 font-medium">{hiddenTitle}</p>}
-                        <p className="text-sm font-bold text-emerald-600 font-mono">
-                            {isCurrency && '$'}{(hiddenAmount || 0).toLocaleString()}
-                        </p>
+                        {hoverContent ? hoverContent : (
+                            <>
+                                {hiddenTitle && <p className="text-xs text-slate-400 font-medium">{hiddenTitle}</p>}
+                                <p className="text-sm font-bold text-emerald-600 font-mono">
+                                    {isCurrency && '$'}{(hiddenAmount || 0).toLocaleString()}
+                                </p>
+                            </>
+                        )}
                     </div>
                 </div>
             )}
