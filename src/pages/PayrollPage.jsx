@@ -448,10 +448,10 @@ export default function PayrollPage({ user, apiUrl }) {
                     amount={summary.attendanceBonus}
                     color="text-yellow-600"
                     hoverContent={
-                        <>
-                            <p className="text-xs text-slate-400 font-medium">出勤天</p>
+                        <div className="flex flex-col items-end">
+                            <p className="text-[10px] text-slate-400 font-medium leading-none mb-1">出勤天</p>
                             <p className="text-sm font-bold text-emerald-600 font-mono">{attendanceDaysCount} 天</p>
-                        </>
+                        </div>
                     }
                 />
                 <SummaryCard
@@ -461,16 +461,18 @@ export default function PayrollPage({ user, apiUrl }) {
                     suffix=" 天"
                     color="text-slate-500"
                     hoverContent={
-                        <>
-                            <p className="text-xs text-slate-400 font-medium">月休天數標準</p>
-                            <p className="text-sm font-bold text-emerald-600 font-mono mb-2">{data?.config?.monthlyOffDays || 0} 天</p>
-                            <div className="border-t border-emerald-100 pt-1">
-                                <p className="text-xs text-slate-400 font-medium whitespace-nowrap">補：</p>
+                        <div className="flex flex-col items-end gap-1">
+                            <div>
+                                <p className="text-[10px] text-slate-400 font-medium leading-none mb-1">月休天數標準</p>
+                                <p className="text-sm font-bold text-emerald-600 font-mono">{data?.config?.monthlyOffDays || 0} 天</p>
+                            </div>
+                            <div className="w-full border-t border-emerald-100 pt-1 mt-0.5">
+                                <p className="text-[10px] text-slate-400 font-medium leading-none mb-1">補：</p>
                                 <p className={`text-sm font-bold font-mono ${(summary.leaveCompensation || 0) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
                                     {(summary.leaveCompensation || 0) >= 0 ? '+' : '-'}${Math.abs(summary.leaveCompensation || 0).toLocaleString()}
                                 </p>
                             </div>
-                        </>
+                        </div>
                     }
                 />
                 <SummaryCard title="特休紀錄" amount={specialLeaveDaysCount} isCurrency={false} suffix=" 天" color="text-emerald-500" />
