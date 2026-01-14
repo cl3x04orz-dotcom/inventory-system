@@ -271,6 +271,9 @@ function getPayrollDataService(payload, user) {
     const finalLoss = manualLoss + salesShortage;
     // 全勤獎金邏輯：一般休假天數在月休標準內（含）即可領取；特休與病假不影響全勤
     const hasAttendanceBonus = (generalLeaveDays <= config.monthlyOffDays);
+    // 出勤補貼：少休補錢，多休扣錢 (標準天數 - 實際休假天數) × 1000
+    const leaveCompensation = (config.monthlyOffDays - generalLeaveDays) * 1000;
+    
     const summary = {
         sales: totalSales,
         bonus: bonus,
@@ -278,9 +281,10 @@ function getPayrollDataService(payload, user) {
         specialLeaveDays: specialLeaveDays,
         sickLeaveDays: sickLeaveDays,
         attendanceBonus: hasAttendanceBonus ? config.attendanceBonus : 0,
+        leaveCompensation: leaveCompensation,
         insurance: config.insurance,
         loss: finalLoss,
-        finalSalary: config.baseSalary + 0 + (hasAttendanceBonus ? config.attendanceBonus : 0) - config.insurance - finalLoss
+        finalSalary: config.baseSalary + 0 + (hasAttendanceBonus ? config.attendanceBonus : 0) + leaveCompensation - config.insurance - finalLoss
     };
 
     // [新增] 生日月份提醒檢查 (強化版：同時支援日期格式與字串格式，並統一帳號比對)

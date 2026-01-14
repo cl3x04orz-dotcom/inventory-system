@@ -463,7 +463,13 @@ export default function PayrollPage({ user, apiUrl }) {
                     hoverContent={
                         <>
                             <p className="text-xs text-slate-400 font-medium">月休天數標準</p>
-                            <p className="text-sm font-bold text-emerald-600 font-mono">{data?.config?.monthlyOffDays || 0} 天</p>
+                            <p className="text-sm font-bold text-emerald-600 font-mono mb-2">{data?.config?.monthlyOffDays || 0} 天</p>
+                            <div className="border-t border-emerald-100 pt-1">
+                                <p className="text-xs text-slate-400 font-medium whitespace-nowrap">補：</p>
+                                <p className={`text-sm font-bold font-mono ${(summary.leaveCompensation || 0) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                                    {(summary.leaveCompensation || 0) >= 0 ? '+' : '-'}${Math.abs(summary.leaveCompensation || 0).toLocaleString()}
+                                </p>
+                            </div>
                         </>
                     }
                 />
