@@ -208,8 +208,11 @@ function getPayrollDataService(payload, user) {
             totalSpecialLeaveUsed++;
         }
 
-        // Current month stats
-        if (d.getFullYear() === year && (d.getMonth() + 1) === month) {
+        // Current month stats - Use Utilities.formatDate to ensure timezone consistency
+        const recordYear = Number(Utilities.formatDate(d, ssTimezone, "yyyy"));
+        const recordMonth = Number(Utilities.formatDate(d, ssTimezone, "M"));
+        
+        if (recordYear === year && recordMonth === month) {
             if (!dailyRecords[dateKey]) dailyRecords[dateKey] = {};
             
             // Reset flags to ensure no double counting status
@@ -274,6 +277,7 @@ function getPayrollDataService(payload, user) {
     // 出勤補貼：少休補錢，多休扣錢 (標準天數 - 實際休假天數) × 1000
     const leaveCompensation = (config.monthlyOffDays - generalLeaveDays) * 1000;
     
+    const sickLeaveDeduction = (sickLeaveDays * 500);
     const summary = {
         sales: totalSales,
         bonus: bonus,
@@ -282,9 +286,10 @@ function getPayrollDataService(payload, user) {
         sickLeaveDays: sickLeaveDays,
         attendanceBonus: hasAttendanceBonus ? config.attendanceBonus : 0,
         leaveCompensation: leaveCompensation,
+        sickLeaveDeduction: sickLeaveDeduction,
         insurance: config.insurance,
         loss: finalLoss,
-        finalSalary: config.baseSalary + 0 + (hasAttendanceBonus ? config.attendanceBonus : 0) + leaveCompensation - config.insurance - finalLoss
+        finalSalary: config.baseSalary + 0 + (hasAttendanceBonus ? config.attendanceBonus : 0) + leaveCompensation - config.insurance - finalLoss - sickLeaveDeduction
     };
 
     // [新增] 生日月份提醒檢查 (強化版：同時支援日期格式與字串格式，並統一帳號比對)

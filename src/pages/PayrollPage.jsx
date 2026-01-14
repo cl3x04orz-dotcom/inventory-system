@@ -476,7 +476,19 @@ export default function PayrollPage({ user, apiUrl }) {
                     }
                 />
                 <SummaryCard title="特休紀錄" amount={specialLeaveDaysCount} isCurrency={false} suffix=" 天" color="text-emerald-500" />
-                <SummaryCard title="病假紀錄" amount={sickLeaveDaysCount} isCurrency={false} suffix=" 天" color="text-amber-500" />
+                <SummaryCard
+                    title="病假紀錄"
+                    amount={sickLeaveDaysCount}
+                    isCurrency={false}
+                    suffix=" 天"
+                    color="text-amber-500"
+                    hoverContent={
+                        <div className="flex flex-col items-end">
+                            <p className="text-[10px] text-slate-400 font-medium leading-none mb-1">扣款：</p>
+                            <p className="text-sm font-bold text-red-600 font-mono">-${(sickLeaveDaysCount * 500).toLocaleString()}</p>
+                        </div>
+                    }
+                />
             </div>
 
             <div className="px-2 mt-4">
