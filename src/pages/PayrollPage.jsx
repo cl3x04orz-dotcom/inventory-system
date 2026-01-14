@@ -261,20 +261,36 @@ export default function PayrollPage({ user, apiUrl }) {
     const days = getDaysInMonth(year, month);
     const summary = data?.summary || {};
 
-    // Helper: Count actual attendance days
+    // Helper: Count days based on actual displayed status
     let attendanceDaysCount = 0;
-    // Use days array which has { date: 'YYYY-MM-DD' }
-    if (data?.dailyRecords) {
-        attendanceDaysCount = days.filter(d => {
-            const dateKey = d.date;
-            const rec = data.dailyRecords[dateKey];
-            if (!rec) return true; // Default is work/attended
-            return !rec.isLeave && !rec.isSickLeave && !rec.isSpecialLeave;
-        }).length;
-    } else {
-        // Fallback
-        attendanceDaysCount = days.length - (summary.generalLeaveDays || 0) - (summary.specialLeaveDays || 0) - (summary.sickLeaveDays || 0);
-    }
+    let generalLeaveDaysCount = 0;
+    let specialLeaveDaysCount = 0;
+    let sickLeaveDaysCount = 0;
+
+    days.forEach(d => {
+        const dateKey = d.date;
+        const sales = data?.dailyData?.[dateKey] || 0;
+        const record = data?.dailyRecords?.[dateKey] || {};
+        const hasSales = sales > 0;
+
+        // Match the exact logic used in the table display
+        if (hasSales) {
+            // 出勤 (有業績)
+            attendanceDaysCount++;
+        } else if (record.isLeave) {
+            // 休假
+            generalLeaveDaysCount++;
+        } else if (record.isSpecialLeave) {
+            // 特休
+            specialLeaveDaysCount++;
+        } else if (record.isSickLeave) {
+            // 病假
+            sickLeaveDaysCount++;
+        } else {
+            // Default is 休假 (as per new logic)
+            generalLeaveDaysCount++;
+        }
+    });
 
 
     const formatBirthday = (val) => {
@@ -440,7 +456,7 @@ export default function PayrollPage({ user, apiUrl }) {
                 />
                 <SummaryCard
                     title="一般休假"
-                    amount={summary.generalLeaveDays}
+                    amount={generalLeaveDaysCount}
                     isCurrency={false}
                     suffix=" 天"
                     color="text-slate-500"
@@ -451,8 +467,8 @@ export default function PayrollPage({ user, apiUrl }) {
                         </>
                     }
                 />
-                <SummaryCard title="特休紀錄" amount={summary.specialLeaveDays} isCurrency={false} suffix=" 天" color="text-emerald-500" />
-                <SummaryCard title="病假紀錄" amount={summary.sickLeaveDays} isCurrency={false} suffix=" 天" color="text-amber-500" />
+                <SummaryCard title="特休紀錄" amount={specialLeaveDaysCount} isCurrency={false} suffix=" 天" color="text-emerald-500" />
+                <SummaryCard title="病假紀錄" amount={sickLeaveDaysCount} isCurrency={false} suffix=" 天" color="text-amber-500" />
             </div>
 
             <div className="px-2 mt-4">
