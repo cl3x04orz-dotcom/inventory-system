@@ -438,7 +438,19 @@ export default function PayrollPage({ user, apiUrl }) {
                         </>
                     }
                 />
-                <SummaryCard title="一般休假" amount={summary.generalLeaveDays} isCurrency={false} suffix=" 天" color="text-slate-500" />
+                <SummaryCard
+                    title="一般休假"
+                    amount={summary.generalLeaveDays}
+                    isCurrency={false}
+                    suffix=" 天"
+                    color="text-slate-500"
+                    hoverContent={
+                        <>
+                            <p className="text-xs text-slate-400 font-medium">月休天數標準</p>
+                            <p className="text-sm font-bold text-emerald-600 font-mono">{data?.config?.monthlyOffDays || 0} 天</p>
+                        </>
+                    }
+                />
                 <SummaryCard title="特休紀錄" amount={summary.specialLeaveDays} isCurrency={false} suffix=" 天" color="text-emerald-500" />
                 <SummaryCard title="病假紀錄" amount={summary.sickLeaveDays} isCurrency={false} suffix=" 天" color="text-amber-500" />
             </div>
