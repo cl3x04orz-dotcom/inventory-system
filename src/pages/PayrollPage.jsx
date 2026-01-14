@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { callGAS } from '../utils/api';
-import { Calendar, DollarSign, User, Save, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+// Using specific icons only when needed
+import { Calendar, User, CheckCircle, DollarSign } from 'lucide-react';
 
 export default function PayrollPage({ user, apiUrl }) {
     // State for filters
@@ -26,6 +27,17 @@ export default function PayrollPage({ user, apiUrl }) {
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // State for Basic Profile Modal
+    const [showProfile, setShowProfile] = useState(false);
+    const [profileData, setProfileData] = useState({
+        profile: { joinedDate: '', birthday: '', identityId: '', contact: '', note: '' },
+        seniorityText: '',
+        estimatedLeaveDays: 0
+    });
+    const [profileForm, setProfileForm] = useState({
+        joinedDate: '', birthday: '', identityId: '', contact: '', note: ''
+    });
+
     // Input Refs for Navigation
     const settingRefs = {
         baseSalary: useRef(null),
@@ -40,21 +52,20 @@ export default function PayrollPage({ user, apiUrl }) {
         editNote: useRef(null)
     };
 
-    // Load User List (For BOSS)
+    // Load User List (Only for BOSS)
     useEffect(() => {
-        if (user.role === 'BOSS' || user.permissions?.includes('finance_payroll')) {
+        const isAdmin = user.role === 'BOSS';
+        if (isAdmin) {
             callGAS(apiUrl, 'getUsers', {}, user.token)
                 .then(users => setUserList(users))
                 .catch(err => console.error(err));
         }
-    }, [user]);
+    }, [user.role, user.token, apiUrl]);
 
     // Fetch Payroll Data
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            // Note: Replace apiUrl with props if available, or assume passed from App
-            // For now using placeholder or the known method
             const result = await callGAS(apiUrl, 'getPayrollData', {
                 year, month, targetUser
             }, user.token);
@@ -79,9 +90,22 @@ export default function PayrollPage({ user, apiUrl }) {
         }
     }, [year, month, targetUser, user.token]);
 
+    const fetchProfile = useCallback(async () => {
+        try {
+            const result = await callGAS(apiUrl, 'getEmployeeProfile', { targetUser }, user.token);
+            if (result && !result.error) {
+                setProfileData(result);
+                setProfileForm(result.profile);
+            }
+        } catch (e) {
+            console.error('Fetch Profile Error:', e);
+        }
+    }, [targetUser, user.token, apiUrl]);
+
     useEffect(() => {
         fetchData();
-    }, [fetchData]);
+        fetchProfile();
+    }, [fetchData, fetchProfile]);
 
     const handleSaveRecord = async () => {
         if (!editingDay) return;
@@ -91,13 +115,29 @@ export default function PayrollPage({ user, apiUrl }) {
                 date: editingDay.date,
                 username: targetUser,
                 type: editType,
-                value: editType === 'LEAVE' ? 1 : Number(editValue), // Leave=1 day?
+                value: (editType === 'WORK' || editType === 'LEAVE' || editType === 'SPECIAL_LEAVE' || editType === 'SICK_LEAVE') ? 1 : Number(editValue),
                 note: editNote
             }, user.token);
             setEditingDay(null);
             fetchData(); // Reload
         } catch (e) {
             alert('儲存失敗: ' + e.message);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleSaveProfile = async () => {
+        setIsSubmitting(true);
+        try {
+            await callGAS(apiUrl, 'saveEmployeeProfile', {
+                username: targetUser,
+                ...profileForm
+            }, user.token);
+            setShowProfile(false);
+            fetchProfile();
+        } catch (e) {
+            alert('儲存基本資料失敗: ' + e.message);
         } finally {
             setIsSubmitting(false);
         }
@@ -177,11 +217,26 @@ export default function PayrollPage({ user, apiUrl }) {
     const handleDayEditKeyDown = (e, currentField) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            if (currentField === 'editValue') {
+            if (currentField === 'editType') {
+                if (editType === 'LOSS') {
+                    dayEditRefs.editValue.current?.focus();
+                } else {
+                    dayEditRefs.editNote.current?.focus();
+                }
+            } else if (currentField === 'editValue') {
                 dayEditRefs.editNote.current?.focus();
             } else if (currentField === 'editNote') {
                 handleSaveRecord();
             }
+        }
+
+        if (currentField === 'editType' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+            e.preventDefault();
+            const types = ['WORK', 'LEAVE', 'SPECIAL_LEAVE', 'SICK_LEAVE', 'LOSS'];
+            let idx = types.indexOf(editType);
+            if (e.key === 'ArrowLeft') idx = (idx - 1 + types.length) % types.length;
+            if (e.key === 'ArrowRight') idx = (idx + 1) % types.length;
+            setEditType(types[idx]);
         }
     };
 
@@ -190,8 +245,7 @@ export default function PayrollPage({ user, apiUrl }) {
         const days = new Date(y, m, 0).getDate();
         return Array.from({ length: days }, (_, i) => {
             const d = new Date(y, m - 1, i + 1);
-            const dateStr = d.toISOString().split('T')[0]; // yyyy-mm-dd (UTC... better use local formatting)
-            // Local formatting for consistency with backend
+            // Local formatting for consistency with backend (simple approach)
             const offset = d.getTimezoneOffset() * 60000;
             const localDate = new Date(d.getTime() - offset);
             const localDateStr = localDate.toISOString().split('T')[0];
@@ -206,6 +260,42 @@ export default function PayrollPage({ user, apiUrl }) {
 
     const days = getDaysInMonth(year, month);
     const summary = data?.summary || {};
+
+
+    const formatBirthday = (val) => {
+        if (!val) return '';
+        try {
+            // 1. If it's already a Date object
+            if (val instanceof Date) {
+                return `${val.getMonth() + 1}月${val.getDate()}日`;
+            }
+
+            // 2. Convert to string and try to match simple digits first involved in separators
+            // Matches: 2026/01/20, 1/20, 01-20, etc.
+            const str = String(val);
+
+            // If it looks like a standard timestamp "2026-01-20..." or has year
+            // Try Standard Date parsing
+            const d = new Date(str);
+            if (!isNaN(d.getTime())) {
+                return `${d.getMonth() + 1}月${d.getDate()}日`;
+            }
+
+            // 3. Fallback: regex to find month/day patterns if standard parse fails
+            // Look for any pattern like M/D or MM-DD
+            const match = str.match(/(\d{1,2})[/-](\d{1,2})/);
+            if (match) {
+                // Warning: simple regex might be ambiguous for Year/Month, assuming Month/Day order or Month/Day pattern
+                return `${match[1]}月${match[2]}日`;
+            }
+
+            // 4. Last resort: Replace common separators with Chinese char
+            return str.replace(/[/.-]/g, '月') + '日';
+        } catch (e) {
+            console.error('Format err', e);
+            return String(val);
+        }
+    };
 
     return (
         <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto pb-24">
@@ -235,7 +325,8 @@ export default function PayrollPage({ user, apiUrl }) {
                         {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}月</option>)}
                     </select>
 
-                    {(user.role === 'BOSS' || user.permissions?.includes('finance_payroll')) && (
+                    {/* Only BOSS can switch user */}
+                    {user.role === 'BOSS' && (
                         <select
                             value={targetUser}
                             onChange={e => setTargetUser(e.target.value)}
@@ -248,13 +339,25 @@ export default function PayrollPage({ user, apiUrl }) {
                         </select>
                     )}
 
-                    <button
-                        onClick={() => setShowSettings(true)}
-                        className="btn-secondary flex items-center gap-2"
-                        disabled={user.role !== 'BOSS'}
-                    >
-                        <User size={16} /> 薪資設定
-                    </button>
+                    {/* Only BOSS update settings */}
+                    {user.role === 'BOSS' && (
+                        <button
+                            onClick={() => setShowSettings(true)}
+                            className="btn-secondary flex items-center gap-2"
+                        >
+                            <User size={16} /> 薪資設定
+                        </button>
+                    )}
+
+                    {/* Only BOSS update profile */}
+                    {user.role === 'BOSS' && (
+                        <button
+                            onClick={() => setShowProfile(true)}
+                            className="btn-secondary flex items-center gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                        >
+                            <Calendar size={16} /> 基本資料
+                        </button>
+                    )}
 
                     <button onClick={fetchData} className="btn-primary">
                         重新計算
@@ -262,24 +365,63 @@ export default function PayrollPage({ user, apiUrl }) {
                 </div>
             </div>
 
+            {/* Seniority & Profile Mini Info */}
+            <div className="flex flex-wrap gap-4 px-2">
+                <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-sm font-medium border border-blue-100">
+                    <Calendar size={14} /> 到職日: {profileData.profile.joinedDate || '未設定'}
+                </div>
+                <div className="flex items-center gap-2 bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-full text-sm font-medium border border-indigo-100">
+                    <User size={14} /> 年資: {profileData.seniorityText}
+                </div>
+                <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-full text-sm font-medium border border-emerald-100">
+                    <CheckCircle size={14} /> 特休狀況: 預估總額 {profileData.estimatedLeaveDays} 天 / 已請 {data?.totalSpecialLeaveUsed || 0} 天 / 剩餘 {(profileData.estimatedLeaveDays - (data?.totalSpecialLeaveUsed || 0))} 天
+                </div>
+            </div>
+
+            {/* Birthday Reminder - Only for BOSS */}
+            {user.role === 'BOSS' && data?.isBirthdayMonth && (
+                <div className="px-2">
+                    <div className="bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-100 rounded-xl p-4 flex items-center gap-4 animate-bounce-subtle">
+                        <div className="bg-white p-2 rounded-full shadow-sm text-2xl">🎂</div>
+                        <div>
+                            <h4 className="text-rose-700 font-bold">本月適逢該員工生日 {profileData.profile.birthday ? `(${formatBirthday(profileData.profile.birthday)})` : ''}！</h4>
+                            <p className="text-rose-600/80 text-sm">結算薪資時，別忘了發放生日禮金或準備小驚喜喔！</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-2">
                 <SummaryCard title="底薪" amount={data?.config?.baseSalary} color="text-slate-800" />
-                <SummaryCard title="全勤獎金" amount={summary.attendanceBonus} color="text-yellow-600" />
                 <SummaryCard
                     title="業績獎金"
                     amount={0}
-                    subtext={`業績: $${(summary.sales || 0).toLocaleString()}`}
-                    color="text-green-600"
+                    subtext={`業績總額: $${(summary.sales || 0).toLocaleString()}`}
+                    color="text-indigo-600"
                 />
-                <SummaryCard title="月休/請假" amount={summary.leaveDays} isCurrency={false} suffix=" 天" subtext={`(標準: ${data?.config?.monthlyOffDays || 8}天)`} color="text-blue-600" />
+                <SummaryCard
+                    title="勞健保 (扣除)"
+                    amount={summary.insurance}
+                    isDeduction
+                    hiddenAmount={summary.bonus}
+                    hiddenTitle=""
+                    color="text-red-600"
+                />
+                <SummaryCard title="實領薪資" amount={summary.finalSalary} color="text-blue-600" subtext="含獎金/扣除保險與扣款" />
+            </div>
 
-                <SummaryCard title="勞健保(扣)" amount={summary.insurance} isDeduction color="text-red-600" hiddenAmount={summary.bonus} />
-                <SummaryCard title="虧損/盤損(扣)" amount={Math.abs(summary.loss || 0)} isDeduction color="text-red-600" />
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4 px-2">
+                <SummaryCard title="全勤獎金" amount={summary.attendanceBonus} color="text-yellow-600" />
+                <SummaryCard title="一般休假" amount={summary.generalLeaveDays} isCurrency={false} suffix=" 天" color="text-slate-500" />
+                <SummaryCard title="特休紀錄" amount={summary.specialLeaveDays} isCurrency={false} suffix=" 天" color="text-emerald-500" />
+                <SummaryCard title="病假紀錄" amount={summary.sickLeaveDays} isCurrency={false} suffix=" 天" color="text-amber-500" />
+            </div>
 
-                <div className="col-span-2 lg:col-span-2 glass-panel p-4 flex justify-between items-center border border-emerald-200 bg-emerald-50">
-                    <span className="text-lg text-emerald-900 font-bold">實領薪資</span>
-                    <span className="text-4xl font-bold text-emerald-600">${(summary.finalSalary || 0).toLocaleString()}</span>
+            <div className="px-2 mt-4">
+                <div className="bg-white p-3 rounded-lg border border-red-100 flex justify-between items-center shadow-sm">
+                    <span className="text-sm text-red-600 font-bold">盤損/扣款合計</span>
+                    <span className="text-lg font-bold text-red-600">-${(summary.loss || 0).toLocaleString()}</span>
                 </div>
             </div>
 
@@ -303,9 +445,6 @@ export default function PayrollPage({ user, apiUrl }) {
                             const record = data?.dailyRecords?.[dateStr] || {};
                             const hasSales = sales > 0;
 
-                            // Logic: Sales > 0 => Present. 
-                            // If Sales == 0, check record.isLeave.
-                            // If isLeave => "休假". Else => "上班" (Default).
                             let status = '上班';
                             let statusColor = 'text-slate-500';
 
@@ -314,13 +453,18 @@ export default function PayrollPage({ user, apiUrl }) {
                                 statusColor = 'text-green-400 font-bold';
                             } else if (record.isLeave) {
                                 status = '休假';
-                                statusColor = 'text-yellow-500 bg-yellow-500/10 px-2 rounded';
+                                statusColor = 'text-yellow-500 bg-yellow-500/10 px-2 rounded font-medium';
+                            } else if (record.isSpecialLeave) {
+                                status = '特休';
+                                statusColor = 'text-emerald-500 bg-emerald-500/10 px-2 rounded font-medium';
+                            } else if (record.isSickLeave) {
+                                status = '病假';
+                                statusColor = 'text-amber-500 bg-amber-500/10 px-2 rounded font-medium';
                             } else {
                                 status = '上班 (無業績)';
                                 statusColor = 'text-slate-500';
                             }
 
-                            // Check for Sunday highlighting
                             const isWeekend = dayItem.weekday === '六' || dayItem.weekday === '日';
 
                             return (
@@ -340,15 +484,17 @@ export default function PayrollPage({ user, apiUrl }) {
                                         {record.note && <span className="block text-xs text-slate-500">{record.note}</span>}
                                     </td>
                                     <td className="p-4 text-center">
-                                        <button
-                                            onClick={() => {
-                                                setEditingDay(dayItem);
-                                                setEditType('LEAVE'); // Default
-                                            }}
-                                            className="text-xs btn-ghost text-blue-400 hover:text-blue-300"
-                                        >
-                                            編輯
-                                        </button>
+                                        {user.role === 'BOSS' && (
+                                            <button
+                                                onClick={() => {
+                                                    setEditingDay(dayItem);
+                                                    setEditType('LEAVE'); // Default
+                                                }}
+                                                className="text-xs btn-ghost text-blue-400 hover:text-blue-300"
+                                            >
+                                                編輯
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             );
@@ -358,158 +504,260 @@ export default function PayrollPage({ user, apiUrl }) {
             </div>
 
             {/* Edit Modal (Day) */}
-            {editingDay && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="glass-panel w-full max-w-md p-6 animate-fadeIn">
-                        <h3 className="text-xl font-bold mb-4">{editingDay.date} ({editingDay.weekday}) 設定</h3>
+            {
+                editingDay && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="glass-panel w-full max-w-md p-6 animate-fadeIn">
+                            <h3 className="text-xl font-bold mb-4">{editingDay.date} ({editingDay.weekday}) 設定</h3>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm text-slate-400 mb-2">類型</label>
-                                <div className="flex bg-slate-50 rounded p-1 border border-slate-200">
-                                    <button
-                                        className={`flex-1 py-2 rounded text-sm ${editType === 'LEAVE' ? 'bg-yellow-600 text-white' : 'text-slate-500'}`}
-                                        onClick={() => setEditType('LEAVE')}
-                                    >休假</button>
-                                    <button
-                                        className={`flex-1 py-2 rounded text-sm ${editType === 'LOSS' ? 'bg-red-600 text-white' : 'text-slate-500'}`}
-                                        onClick={() => setEditType('LOSS')}
-                                    >盤損/扣款</button>
-                                </div>
-                            </div>
-
-                            {editType === 'LOSS' && (
+                            <div className="space-y-4">
                                 <div>
-                                    <label className="block text-sm text-slate-400 mb-1">金額 (負數為扣款)</label>
+                                    <label className="block text-sm text-slate-400 mb-2">類型 (左右鍵切換)</label>
+                                    <div
+                                        className="flex bg-slate-50 rounded p-1 border border-slate-200 outline-none focus-within:ring-2 focus-within:ring-blue-500/20"
+                                        tabIndex="0"
+                                        onKeyDown={e => handleDayEditKeyDown(e, 'editType')}
+                                    >
+                                        {[
+                                            { id: 'WORK', label: '上班', color: 'bg-blue-600' },
+                                            { id: 'LEAVE', label: '休假', color: 'bg-yellow-600' },
+                                            { id: 'SPECIAL_LEAVE', label: '特休', color: 'bg-emerald-600' },
+                                            { id: 'SICK_LEAVE', label: '病假', color: 'bg-amber-600' },
+                                            { id: 'LOSS', label: '盤損/扣款', color: 'bg-red-600' }
+                                        ].map(t => (
+                                            <button
+                                                key={t.id}
+                                                className={`flex-1 py-2 rounded text-xs transition-all ${editType === t.id ? `${t.color} text-white shadow-sm` : 'text-slate-500 hover:bg-slate-100'}`}
+                                                onClick={() => setEditType(t.id)}
+                                            >{t.label}</button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {editType === 'LOSS' && (
+                                    <div>
+                                        <label className="block text-sm text-slate-400 mb-1">金額 (負數為扣款)</label>
+                                        <input
+                                            type="number"
+                                            className="input-field w-full"
+                                            placeholder="-100"
+                                            ref={dayEditRefs.editValue}
+                                            value={editValue}
+                                            onChange={e => setEditValue(e.target.value)}
+                                            onKeyDown={e => handleDayEditKeyDown(e, 'editValue')}
+                                        />
+                                    </div>
+                                )}
+
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-1">備註</label>
                                     <input
-                                        type="number"
+                                        type="text"
                                         className="input-field w-full"
-                                        placeholder="-100"
-                                        ref={dayEditRefs.editValue}
-                                        value={editValue}
-                                        onChange={e => setEditValue(e.target.value)}
-                                        onKeyDown={e => handleDayEditKeyDown(e, 'editValue')}
+                                        placeholder="原因說明..."
+                                        ref={dayEditRefs.editNote}
+                                        value={editNote}
+                                        onChange={e => setEditNote(e.target.value)}
+                                        onKeyDown={e => handleDayEditKeyDown(e, 'editNote')}
                                     />
                                 </div>
-                            )}
-
-                            <div>
-                                <label className="block text-sm text-slate-400 mb-1">備註</label>
-                                <input
-                                    type="text"
-                                    className="input-field w-full"
-                                    placeholder="原因說明..."
-                                    ref={dayEditRefs.editNote}
-                                    value={editNote}
-                                    onChange={e => setEditNote(e.target.value)}
-                                    onKeyDown={e => handleDayEditKeyDown(e, 'editNote')}
-                                />
                             </div>
-                        </div>
 
-                        <div className="flex gap-3 mt-6">
-                            <button onClick={() => setEditingDay(null)} className="btn-secondary flex-1" disabled={isSubmitting}>取消</button>
-                            <button onClick={handleSaveRecord} className="btn-primary flex-1" disabled={isSubmitting}>
-                                {isSubmitting ? '儲存中...' : '保存'}
-                            </button>
-                        </div>
+                            <div className="flex gap-3 mt-6">
+                                <button onClick={() => setEditingDay(null)} className="btn-secondary flex-1" disabled={isSubmitting}>取消</button>
+                                <button onClick={handleSaveRecord} className="btn-primary flex-1" disabled={isSubmitting}>
+                                    {isSubmitting ? '儲存中...' : '保存'}
+                                </button>
+                            </div>
 
-                        {/* Loading Overlay within Modal */}
-                        {isSubmitting && (
-                            <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg">
-                                <div className="flex flex-col items-center gap-2">
-                                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                                    <span className="text-sm font-medium text-blue-600">資料存盤中...</span>
+                            {/* Loading Overlay within Modal */}
+                            {isSubmitting && (
+                                <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg">
+                                    <div className="flex flex-col items-center gap-2">
+                                        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                        <span className="text-sm font-medium text-blue-600">資料存盤中...</span>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Settings Modal (Config) */}
-            {showSettings && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="glass-panel w-full max-w-lg p-6 animate-fadeIn max-h-[90vh] overflow-y-auto">
-                        <h3 className="text-xl font-bold mb-4">薪資參數設定 - {targetUser}</h3>
+            {
+                showSettings && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="glass-panel w-full max-w-lg p-6 animate-fadeIn max-h-[90vh] overflow-y-auto">
+                            <h3 className="text-xl font-bold mb-4">薪資參數設定 - {targetUser}</h3>
 
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="label">底薪</label>
-                                    <input type="number" className="input-field w-full"
-                                        ref={settingRefs.baseSalary}
-                                        value={settingsForm.baseSalary}
-                                        onChange={e => setSettingsForm({ ...settingsForm, baseSalary: e.target.value })}
-                                        onKeyDown={e => handleSettingKeyDown(e, 'baseSalary')} />
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="label">底薪</label>
+                                        <input type="number" className="input-field w-full"
+                                            ref={settingRefs.baseSalary}
+                                            value={settingsForm.baseSalary}
+                                            onChange={e => setSettingsForm({ ...settingsForm, baseSalary: e.target.value })}
+                                            onKeyDown={e => handleSettingKeyDown(e, 'baseSalary')} />
+                                    </div>
+                                    <div>
+                                        <label className="label">全勤獎金</label>
+                                        <input type="number" className="input-field w-full"
+                                            ref={settingRefs.attendanceBonus}
+                                            value={settingsForm.attendanceBonus}
+                                            onChange={e => setSettingsForm({ ...settingsForm, attendanceBonus: e.target.value })}
+                                            onKeyDown={e => handleSettingKeyDown(e, 'attendanceBonus')} />
+                                    </div>
                                 </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="label">月休天數標準</label>
+                                        <input type="number" className="input-field w-full"
+                                            ref={settingRefs.monthlyOffDays}
+                                            value={settingsForm.monthlyOffDays}
+                                            onChange={e => setSettingsForm({ ...settingsForm, monthlyOffDays: e.target.value })}
+                                            onKeyDown={e => handleSettingKeyDown(e, 'monthlyOffDays')} />
+                                    </div>
+                                    <div>
+                                        <label className="label">勞健保 (扣除額)</label>
+                                        <input type="number" className="input-field w-full"
+                                            ref={settingRefs.insurance}
+                                            value={settingsForm.insurance}
+                                            onChange={e => setSettingsForm({ ...settingsForm, insurance: e.target.value })}
+                                            onKeyDown={e => handleSettingKeyDown(e, 'insurance')} />
+                                    </div>
+                                </div>
+
                                 <div>
-                                    <label className="label">全勤獎金</label>
-                                    <input type="number" className="input-field w-full"
-                                        ref={settingRefs.attendanceBonus}
-                                        value={settingsForm.attendanceBonus}
-                                        onChange={e => setSettingsForm({ ...settingsForm, attendanceBonus: e.target.value })}
-                                        onKeyDown={e => handleSettingKeyDown(e, 'attendanceBonus')} />
+                                    <label className="label">業績獎金級距 (JSON)</label>
+                                    <textarea
+                                        className="input-field w-full font-mono text-xs h-32"
+                                        ref={settingRefs.bonusTiers}
+                                        value={settingsForm.bonusTiers}
+                                        onChange={e => setSettingsForm({ ...settingsForm, bonusTiers: e.target.value })}
+                                        onKeyDown={e => handleSettingKeyDown(e, 'bonusTiers')}
+                                        placeholder='[{"threshold": 50000, "bonus": 1000}]'
+                                    />
+                                    <p className="text-xs text-slate-400 mt-1">{"格式: `[{\"threshold\": 目標金額, \"bonus\": 獎金 }]` (按 Enter 儲存)"}</p>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="label">月休天數標準</label>
-                                    <input type="number" className="input-field w-full"
-                                        ref={settingRefs.monthlyOffDays}
-                                        value={settingsForm.monthlyOffDays}
-                                        onChange={e => setSettingsForm({ ...settingsForm, monthlyOffDays: e.target.value })}
-                                        onKeyDown={e => handleSettingKeyDown(e, 'monthlyOffDays')} />
-                                </div>
-                                <div>
-                                    <label className="label">勞健保 (扣除額)</label>
-                                    <input type="number" className="input-field w-full"
-                                        ref={settingRefs.insurance}
-                                        value={settingsForm.insurance}
-                                        onChange={e => setSettingsForm({ ...settingsForm, insurance: e.target.value })}
-                                        onKeyDown={e => handleSettingKeyDown(e, 'insurance')} />
-                                </div>
+                            <div className="flex gap-3 mt-6">
+                                <button onClick={() => setShowSettings(false)} className="btn-secondary flex-1" disabled={isSubmitting}>取消</button>
+                                <button onClick={handleSaveSettings} className="btn-primary flex-1" disabled={isSubmitting}>
+                                    {isSubmitting ? '儲存中...' : '保存設定'}
+                                </button>
                             </div>
 
-                            <div>
-                                <label className="label">業績獎金級距 (JSON)</label>
-                                <textarea
-                                    className="input-field w-full font-mono text-xs h-32"
-                                    ref={settingRefs.bonusTiers}
-                                    value={settingsForm.bonusTiers}
-                                    onChange={e => setSettingsForm({ ...settingsForm, bonusTiers: e.target.value })}
-                                    onKeyDown={e => handleSettingKeyDown(e, 'bonusTiers')}
-                                    placeholder='[{"threshold": 50000, "bonus": 1000}]'
-                                />
-                                <p className="text-xs text-slate-400 mt-1">{"格式: `[{\"threshold\": 目標金額, \"bonus\": 獎金 }]` (按 Enter 儲存)"}</p>
-                            </div>
+                            {/* Loading Overlay within Modal */}
+                            {isSubmitting && (
+                                <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg text-center">
+                                    <div className="flex flex-col items-center gap-2">
+                                        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                        <span className="text-sm font-medium text-blue-600 font-bold">設定儲存中<br /><span className="text-[10px] opacity-70">正在同步至雲端</span></span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-
-                        <div className="flex gap-3 mt-6">
-                            <button onClick={() => setShowSettings(false)} className="btn-secondary flex-1" disabled={isSubmitting}>取消</button>
-                            <button onClick={handleSaveSettings} className="btn-primary flex-1" disabled={isSubmitting}>
-                                {isSubmitting ? '儲存中...' : '保存設定'}
-                            </button>
-                        </div>
-
-                        {/* Loading Overlay within Modal */}
-                        {isSubmitting && (
-                            <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg text-center">
-                                <div className="flex flex-col items-center gap-2">
-                                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                                    <span className="text-sm font-medium text-blue-600 font-bold">設定儲存中<br /><span className="text-[10px] opacity-70">正在同步至雲端</span></span>
-                                </div>
-                            </div>
-                        )}
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+
+            {/* Employee Profile Modal */}
+            {
+                showProfile && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="glass-panel w-full max-w-lg p-6 animate-fadeIn">
+                            <div className="flex justify-between items-start mb-6">
+                                <div>
+                                    <h3 className="text-xl font-bold">員工基本資料 - {targetUser}</h3>
+                                    <p className="text-sm text-slate-400 mt-1">設定到職日以自動計算年資假</p>
+                                </div>
+                                <div className="text-right">
+                                    <span className="block text-xs text-slate-400 uppercase font-bold tracking-wider">目前年資</span>
+                                    <span className="text-lg font-bold text-blue-600">{profileData.seniorityText}</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="label">到職日期</label>
+                                        <input
+                                            type="date"
+                                            className="input-field w-full"
+                                            value={profileForm.joinedDate}
+                                            onChange={e => setProfileForm({ ...profileForm, joinedDate: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="label">生日紀錄 (月/日)</label>
+                                        <input
+                                            type="text"
+                                            placeholder="05/20"
+                                            className="input-field w-full"
+                                            value={profileForm.birthday}
+                                            onChange={e => setProfileForm({ ...profileForm, birthday: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="label">身分證/卡號</label>
+                                        <input
+                                            type="text"
+                                            className="input-field w-full"
+                                            placeholder="A123456789"
+                                            value={profileForm.identityId}
+                                            onChange={e => setProfileForm({ ...profileForm, identityId: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="label">聯絡電話</label>
+                                        <input
+                                            type="text"
+                                            className="input-field w-full"
+                                            placeholder="0912-345-678"
+                                            value={profileForm.contact}
+                                            onChange={e => setProfileForm({ ...profileForm, contact: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="label">備註事項</label>
+                                    <textarea
+                                        className="input-field w-full h-24"
+                                        placeholder="其他個人備註..."
+                                        value={profileForm.note}
+                                        onChange={e => setProfileForm({ ...profileForm, note: e.target.value })}
+                                    />
+                                </div>
+
+                                <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-3 flex justify-between items-center">
+                                    <span className="text-sm text-emerald-800 font-medium">勞基法預估特休額度</span>
+                                    <span className="text-xl font-bold text-emerald-600 font-mono">{profileData.estimatedLeaveDays} 天</span>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 mt-8">
+                                <button onClick={() => setShowProfile(false)} className="btn-secondary flex-1" disabled={isSubmitting}>取消</button>
+                                <button onClick={handleSaveProfile} className="btn-primary flex-1" disabled={isSubmitting}>
+                                    {isSubmitting ? '儲存中...' : '儲存資料'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 }
 
-function SummaryCard({ title, amount, subtext, color, isDeduction, isCurrency = true, suffix = '', hiddenAmount }) {
+function SummaryCard({ title, amount, subtext, color, isDeduction, isCurrency = true, suffix = '', hiddenAmount, hiddenTitle = '總額參考' }) {
     const [showHidden, setShowHidden] = useState(false);
 
     return (
@@ -518,7 +766,9 @@ function SummaryCard({ title, amount, subtext, color, isDeduction, isCurrency = 
             onMouseEnter={() => setShowHidden(true)}
             onMouseLeave={() => setShowHidden(false)}
         >
-            <span className="text-slate-500 text-sm font-medium z-10">{title}</span>
+            <div className="flex justify-between items-start z-10">
+                <span className="text-slate-500 text-sm font-medium">{title}</span>
+            </div>
             <div className="z-10">
                 <span className={`text-2xl font-bold tracking-tight ${color}`}>
                     {isDeduction && '-'}{isCurrency && '$'}{(amount || 0).toLocaleString()}{suffix}
@@ -530,7 +780,10 @@ function SummaryCard({ title, amount, subtext, color, isDeduction, isCurrency = 
             {hiddenAmount !== undefined && (
                 <div className={`absolute top-0 right-0 p-2 transition-all duration-300 ${showHidden ? 'translate-y-2 opacity-100' : '-translate-y-full opacity-0'}`}>
                     <div className="bg-white/90 backdrop-blur shadow-sm border border-emerald-100 rounded px-2 py-0.5 text-right">
-                        <p className="text-sm font-bold text-emerald-600 font-mono">{(hiddenAmount || 0).toLocaleString()}</p>
+                        {hiddenTitle && <p className="text-xs text-slate-400 font-medium">{hiddenTitle}</p>}
+                        <p className="text-sm font-bold text-emerald-600 font-mono">
+                            {isCurrency && '$'}{(hiddenAmount || 0).toLocaleString()}
+                        </p>
                     </div>
                 </div>
             )}

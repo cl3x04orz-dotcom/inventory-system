@@ -39,7 +39,8 @@ export default function PermissionControlPage({ user, apiUrl }) {
                 { key: 'finance_receivable', label: '應收帳款管理' },
                 { key: 'finance_payable', label: '應付帳款管理' },
                 { key: 'finance_income', label: '簡易損益表' },
-                { key: 'finance_cost', label: '成本計算分析' }
+                { key: 'finance_cost', label: '成本計算分析' },
+                { key: 'finance_payroll', label: '薪資結算中心' }
             ]
         },
         {

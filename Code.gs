@@ -67,6 +67,8 @@ function apiHandler(request) {
         'getPayrollData': 'finance_payroll',
         'saveDailyRecord': 'finance_payroll',
         'savePayrollSettings': 'finance_payroll',
+        'getEmployeeProfile': 'finance_payroll',
+        'saveEmployeeProfile': 'finance_payroll',
         
         // Analytics (數據分析)
         'getSalesRanking': 'analytics_sales',
@@ -147,9 +149,11 @@ function apiHandler(request) {
             case 'getTurnoverRate': return typeof getTurnoverRate !== 'undefined' ? getTurnoverRate(payload) : {error: 'Service missing'};
             
             // Payroll
-            case 'getPayrollData': return getPayrollDataService(payload);
-            case 'saveDailyRecord': return saveDailyRecordService(payload);
-            case 'savePayrollSettings': return savePayrollSettingsService(payload);
+            case 'getPayrollData': return getPayrollDataService(payload, user);
+            case 'saveDailyRecord': return saveDailyRecordService(payload, user);
+            case 'savePayrollSettings': return savePayrollSettingsService(payload, user);
+            case 'getEmployeeProfile': return getEmployeeProfileService(payload, user);
+            case 'saveEmployeeProfile': return saveEmployeeProfileService(payload, user);
 
             // 支出管理
             case 'getExpenditures': return getExpendituresService(payload);

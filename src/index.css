@@ -1,5 +1,25 @@
 @import "tailwindcss";
 
+@layer utilities {
+    .animate-bounce-subtle {
+        animation: bounce-subtle 3s infinite;
+    }
+}
+
+@keyframes bounce-subtle {
+
+    0%,
+    100% {
+        transform: translateY(-5%);
+        animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+    }
+
+    50% {
+        transform: translateY(0);
+        animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+    }
+}
+
 @layer components {
     .glass-panel {
         @apply bg-white/95 backdrop-blur-md rounded-xl border border-slate-200 shadow-xl;
