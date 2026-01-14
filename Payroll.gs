@@ -271,9 +271,12 @@ function getPayrollDataService(payload, user) {
     }
 
     // 5. 總結
-    // [修正] 盤損與扣款合計：扣除業績獎金
-    const finalLoss = bonus; 
+    const finalLoss = manualLoss + salesShortage;
     
+    // [修正] 業績獎金 = 級距獎金 - 盤損/扣款合計
+    // 這樣前端「業績獎金」欄位會顯示淨值 (例如 500 - 365160 = -364660)
+    bonus = bonus - finalLoss;
+
     // 全勤獎金邏輯：一般休假天數在月休標準內（含）即可領取；特休與病假不影響全勤
     const hasAttendanceBonus = (generalLeaveDays <= config.monthlyOffDays);
     // 出勤補貼：少休補錢，多休扣錢 (標準天數 - 實際休假天數) × 1000
@@ -291,7 +294,8 @@ function getPayrollDataService(payload, user) {
         sickLeaveDeduction: sickLeaveDeduction,
         insurance: config.insurance,
         loss: finalLoss,
-        finalSalary: config.baseSalary + 0 + (hasAttendanceBonus ? config.attendanceBonus : 0) + leaveCompensation - config.insurance - finalLoss - sickLeaveDeduction
+        // finalSalary: 不包含業績獎金 (也不扣除盤損)，只計算底薪與出勤相關
+        finalSalary: config.baseSalary + (hasAttendanceBonus ? config.attendanceBonus : 0) + leaveCompensation - config.insurance - sickLeaveDeduction
     };
 
     // [新增] 生日月份提醒檢查 (強化版：同時支援日期格式與字串格式，並統一帳號比對)

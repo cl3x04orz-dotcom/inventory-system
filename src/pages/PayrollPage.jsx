@@ -435,9 +435,12 @@ export default function PayrollPage({ user, apiUrl }) {
                     title="勞健保 (扣除)"
                     amount={summary.insurance}
                     isDeduction
-                    hiddenAmount={summary.bonus}
-                    hiddenTitle=""
                     color="text-red-600"
+                    hoverContent={
+                        <div className="flex flex-col items-end">
+                            <p className="text-sm font-bold text-emerald-600 font-mono">${(summary.bonus || 0).toLocaleString()}</p>
+                        </div>
+                    }
                 />
                 <SummaryCard title="實領薪資" amount={summary.finalSalary} color="text-blue-600" subtext="含獎金/扣除保險與扣款" />
             </div>
