@@ -236,6 +236,27 @@ function getPayrollDataService(payload, user) {
         }
     }
 
+    // Count default leave days: days with no sales and no explicit leave record
+    // This matches the frontend logic where default status is "休假"
+    const daysInMonth = new Date(year, month, 0).getDate();
+    for (let day = 1; day <= daysInMonth; day++) {
+        const d = new Date(year, month - 1, day);
+        const offset = d.getTimezoneOffset() * 60000;
+        const localDate = new Date(d.getTime() - offset);
+        const dateKey = localDate.toISOString().split('T')[0];
+        
+        const hasSales = (dailyData[dateKey] || 0) > 0;
+        const hasRecord = dailyRecords[dateKey];
+        const hasExplicitLeave = hasRecord && (hasRecord.isLeave || hasRecord.isSpecialLeave || hasRecord.isSickLeave);
+        
+        // If no sales and no explicit leave record, count as general leave (default state)
+        if (!hasSales && !hasExplicitLeave) {
+            if (!dailyRecords[dateKey]) dailyRecords[dateKey] = {};
+            dailyRecords[dateKey].isLeave = true;
+            generalLeaveDays++;
+        }
+    }
+
     // 4. 計算獎金
     let bonus = 0;
     const sortedTiers = (config.bonusTiers || []).sort((a, b) => b.threshold - a.threshold);
