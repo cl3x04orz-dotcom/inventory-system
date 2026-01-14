@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { callGAS } from '../utils/api';
 import { Calendar, DollarSign, User, Save, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 
@@ -25,6 +25,20 @@ export default function PayrollPage({ user, apiUrl }) {
         baseSalary: 0, attendanceBonus: 0, insurance: 0, monthlyOffDays: 8, bonusTiers: '[]'
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Input Refs for Navigation
+    const settingRefs = {
+        baseSalary: useRef(null),
+        attendanceBonus: useRef(null),
+        monthlyOffDays: useRef(null),
+        insurance: useRef(null),
+        bonusTiers: useRef(null)
+    };
+
+    const dayEditRefs = {
+        editValue: useRef(null),
+        editNote: useRef(null)
+    };
 
     // Load User List (For BOSS)
     useEffect(() => {
@@ -115,6 +129,59 @@ export default function PayrollPage({ user, apiUrl }) {
             alert('儲存設定失敗: ' + e.message);
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleSettingKeyDown = (e, currentField) => {
+        const sequence = ['baseSalary', 'attendanceBonus', 'monthlyOffDays', 'insurance', 'bonusTiers'];
+        const currentIndex = sequence.indexOf(currentField);
+        const isTextarea = currentField === 'bonusTiers';
+
+        // Prevent number increment/decrement with arrows only on numeric inputs
+        if (!isTextarea && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+            e.preventDefault();
+        }
+
+        if (e.key === 'Enter') {
+            // Textarea allows Enter for new line unless it's a specific "submit" trigger
+            if (currentField === 'bonusTiers' && !e.ctrlKey) {
+                // Just let it be for textarea default behavior
+                return;
+            }
+
+            e.preventDefault();
+            const nextField = sequence[currentIndex + 1];
+            if (nextField && settingRefs[nextField].current) {
+                settingRefs[nextField].current.focus();
+                settingRefs[nextField].current.select?.();
+            }
+            return;
+        }
+
+        const navMap = {
+            baseSalary: { ArrowRight: 'attendanceBonus', ArrowDown: 'monthlyOffDays' },
+            attendanceBonus: { ArrowLeft: 'baseSalary', ArrowDown: 'insurance' },
+            monthlyOffDays: { ArrowRight: 'insurance', ArrowUp: 'baseSalary', ArrowDown: 'bonusTiers' },
+            insurance: { ArrowLeft: 'monthlyOffDays', ArrowUp: 'attendanceBonus', ArrowDown: 'bonusTiers' },
+            bonusTiers: {} // Keep empty to allow internal line movement
+        };
+
+        const targetField = navMap[currentField]?.[e.key];
+        if (targetField && settingRefs[targetField].current) {
+            e.preventDefault();
+            settingRefs[targetField].current.focus();
+            settingRefs[targetField].current.select?.();
+        }
+    };
+
+    const handleDayEditKeyDown = (e, currentField) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (currentField === 'editValue') {
+                dayEditRefs.editNote.current?.focus();
+            } else if (currentField === 'editNote') {
+                handleSaveRecord();
+            }
         }
     };
 
@@ -318,8 +385,10 @@ export default function PayrollPage({ user, apiUrl }) {
                                         type="number"
                                         className="input-field w-full"
                                         placeholder="-100"
+                                        ref={dayEditRefs.editValue}
                                         value={editValue}
                                         onChange={e => setEditValue(e.target.value)}
+                                        onKeyDown={e => handleDayEditKeyDown(e, 'editValue')}
                                     />
                                 </div>
                             )}
@@ -330,8 +399,10 @@ export default function PayrollPage({ user, apiUrl }) {
                                     type="text"
                                     className="input-field w-full"
                                     placeholder="原因說明..."
+                                    ref={dayEditRefs.editNote}
                                     value={editNote}
                                     onChange={e => setEditNote(e.target.value)}
+                                    onKeyDown={e => handleDayEditKeyDown(e, 'editNote')}
                                 />
                             </div>
                         </div>
@@ -367,14 +438,18 @@ export default function PayrollPage({ user, apiUrl }) {
                                 <div>
                                     <label className="label">底薪</label>
                                     <input type="number" className="input-field w-full"
+                                        ref={settingRefs.baseSalary}
                                         value={settingsForm.baseSalary}
-                                        onChange={e => setSettingsForm({ ...settingsForm, baseSalary: e.target.value })} />
+                                        onChange={e => setSettingsForm({ ...settingsForm, baseSalary: e.target.value })}
+                                        onKeyDown={e => handleSettingKeyDown(e, 'baseSalary')} />
                                 </div>
                                 <div>
                                     <label className="label">全勤獎金</label>
                                     <input type="number" className="input-field w-full"
+                                        ref={settingRefs.attendanceBonus}
                                         value={settingsForm.attendanceBonus}
-                                        onChange={e => setSettingsForm({ ...settingsForm, attendanceBonus: e.target.value })} />
+                                        onChange={e => setSettingsForm({ ...settingsForm, attendanceBonus: e.target.value })}
+                                        onKeyDown={e => handleSettingKeyDown(e, 'attendanceBonus')} />
                                 </div>
                             </div>
 
@@ -382,14 +457,18 @@ export default function PayrollPage({ user, apiUrl }) {
                                 <div>
                                     <label className="label">月休天數標準</label>
                                     <input type="number" className="input-field w-full"
+                                        ref={settingRefs.monthlyOffDays}
                                         value={settingsForm.monthlyOffDays}
-                                        onChange={e => setSettingsForm({ ...settingsForm, monthlyOffDays: e.target.value })} />
+                                        onChange={e => setSettingsForm({ ...settingsForm, monthlyOffDays: e.target.value })}
+                                        onKeyDown={e => handleSettingKeyDown(e, 'monthlyOffDays')} />
                                 </div>
                                 <div>
                                     <label className="label">勞健保 (扣除額)</label>
                                     <input type="number" className="input-field w-full"
+                                        ref={settingRefs.insurance}
                                         value={settingsForm.insurance}
-                                        onChange={e => setSettingsForm({ ...settingsForm, insurance: e.target.value })} />
+                                        onChange={e => setSettingsForm({ ...settingsForm, insurance: e.target.value })}
+                                        onKeyDown={e => handleSettingKeyDown(e, 'insurance')} />
                                 </div>
                             </div>
 
@@ -397,11 +476,13 @@ export default function PayrollPage({ user, apiUrl }) {
                                 <label className="label">業績獎金級距 (JSON)</label>
                                 <textarea
                                     className="input-field w-full font-mono text-xs h-32"
+                                    ref={settingRefs.bonusTiers}
                                     value={settingsForm.bonusTiers}
                                     onChange={e => setSettingsForm({ ...settingsForm, bonusTiers: e.target.value })}
+                                    onKeyDown={e => handleSettingKeyDown(e, 'bonusTiers')}
                                     placeholder='[{"threshold": 50000, "bonus": 1000}]'
                                 />
-                                <p className="text-xs text-slate-400 mt-1">{"格式: `[{\"threshold\": 目標金額, \"bonus\": 獎金 }]`"}</p>
+                                <p className="text-xs text-slate-400 mt-1">{"格式: `[{\"threshold\": 目標金額, \"bonus\": 獎金 }]` (按 Enter 儲存)"}</p>
                             </div>
                         </div>
 
