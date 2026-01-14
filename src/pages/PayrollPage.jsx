@@ -482,8 +482,8 @@ export default function PayrollPage({ user, apiUrl }) {
                             const record = data?.dailyRecords?.[dateStr] || {};
                             const hasSales = sales > 0;
 
-                            let status = '上班';
-                            let statusColor = 'text-slate-500';
+                            let status = '休假';
+                            let statusColor = 'text-yellow-500 bg-yellow-500/10 px-2 rounded font-medium';
 
                             if (hasSales) {
                                 status = '出勤 (有業績)';
@@ -497,9 +497,6 @@ export default function PayrollPage({ user, apiUrl }) {
                             } else if (record.isSickLeave) {
                                 status = '病假';
                                 statusColor = 'text-amber-500 bg-amber-500/10 px-2 rounded font-medium';
-                            } else {
-                                status = '上班 (無業績)';
-                                statusColor = 'text-slate-500';
                             }
 
                             const isWeekend = dayItem.weekday === '六' || dayItem.weekday === '日';
