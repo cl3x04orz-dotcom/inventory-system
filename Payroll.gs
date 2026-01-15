@@ -577,30 +577,9 @@ function savePayrollToExpenditureService(payload, user) {
 
     const currentTimestamp = new Date();
     
-    // 檢查是否已有該月份的薪資記錄 (精準比對業務與月份)
-    for (let i = 1; i < data.length; i++) {
-        const row = data[i];
-        const rowTime = row[idxTime]; 
-        const rowDate = idxDate !== -1 ? row[idxDate] : null;
-        const rowRep = idxRep !== -1 ? String(row[idxRep] || '').trim() : '';
-        
-        // 優先檢查日期欄位，其次檢查時間戳記
-        const checkDate = (rowDate instanceof Date) ? rowDate : (rowTime instanceof Date ? rowTime : null);
-        
-        if (checkDate) {
-            const rowYear = checkDate.getFullYear();
-            const rowMonth = checkDate.getMonth() + 1;
-            
-            if (rowYear === year && rowMonth === month && rowRep === targetUser) {
-                // 找到記錄，更新薪資欄位
-                expSheet.getRange(i + 1, idxSalary + 1).setValue(finalSalary);
-                return { success: true, message: '已更新 ' + year + '/' + month + ' 薪資記錄' };
-            }
-        }
-    }
-    
-    // 沒有找到現有記錄，新增一筆 (根據表頭長度建立空白列)
-    const newRow = new Array(headers.length).fill(0);
+    // [修改] 無論是否已有資料，一律新增一筆
+    // 建立新的一列 (根據表頭長度建立空白列)
+    const newRow = new Array(headers.length).fill('');
     
     // 填入已知欄位
     if (idxId !== -1) newRow[idxId] = ''; // 銷售編號固定空白
@@ -611,12 +590,12 @@ function savePayrollToExpenditureService(payload, user) {
     if (idxTotal !== -1) newRow[idxTotal] = 0; // 本筆總支出金額固定為 0
     if (idxDate !== -1) newRow[idxDate] = currentTimestamp;
     
-    // 如果有備註欄位，可以補上
+    // 備註欄位
     const idxNote = findIndex(['備註', 'Note']);
     if (idxNote !== -1) newRow[idxNote] = year + '年' + month + '月薪資結算';
 
     expSheet.appendRow(newRow);
     
-    return { success: true, message: '薪資記錄已存檔至 Expenditures' };
+    return { success: true, message: '薪資記錄已新增至 Expenditures' };
 }
 
