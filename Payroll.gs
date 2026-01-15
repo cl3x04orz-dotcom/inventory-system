@@ -577,25 +577,56 @@ function savePayrollToExpenditureService(payload, user) {
 
     const currentTimestamp = new Date();
     
-    // [修改] 無論是否已有資料，一律新增一筆
-    // 建立新的一列 (根據表頭長度建立空白列)
-    const newRow = new Array(headers.length).fill('');
+    // 定義覆蓋的關鍵字 (根據使用者需求: YYYY年MM月薪資結算)
+    const targetNote = year + '年' + month + '月薪資結算';
     
-    // 填入已知欄位
-    if (idxId !== -1) newRow[idxId] = ''; // 銷售編號固定空白
-    if (idxTime !== -1) newRow[idxTime] = currentTimestamp;
-    if (idxCust !== -1) newRow[idxCust] = targetUser;
-    if (idxRep !== -1) newRow[idxRep] = targetUser;
-    if (idxSalary !== -1) newRow[idxSalary] = finalSalary;
-    if (idxTotal !== -1) newRow[idxTotal] = 0; // 本筆總支出金額固定為 0
-    if (idxDate !== -1) newRow[idxDate] = currentTimestamp;
-    
-    // 備註欄位
+    // 備註欄位索引
     const idxNote = findIndex(['備註', 'Note']);
-    if (idxNote !== -1) newRow[idxNote] = year + '年' + month + '月薪資結算';
-
-    expSheet.appendRow(newRow);
     
-    return { success: true, message: '薪資記錄已新增至 Expenditures' };
+    // [修改] 搜尋是否已有該月份的薪資紀錄 (比對 備註 + 人員)
+    // 這樣可以確保同一個月同一個人只會有一筆結算紀錄，避免重複
+    let foundRowIndex = -1;
+    
+    if (idxNote !== -1 && idxRep !== -1) {
+        for (let i = 1; i < data.length; i++) {
+            const row = data[i];
+            const rowNote = String(row[idxNote] || '').trim();
+            const rowRep = String(row[idxRep] || '').trim();
+            
+            // 嚴格比對備註文字與人員名稱
+            if (rowNote === targetNote && rowRep === targetUser) {
+                foundRowIndex = i + 1; // 轉為 1-based index (Spreadsheet row)
+                break;
+            }
+        }
+    }
+
+    if (foundRowIndex > 0) {
+        // [覆蓋模式] 更新現有資料
+        // 更新時間、薪資金額 (其餘欄位如日期若需更新也可在此加入，目前僅更新核心資訊)
+        if (idxTime !== -1) expSheet.getRange(foundRowIndex, idxTime + 1).setValue(currentTimestamp);
+        if (idxSalary !== -1) expSheet.getRange(foundRowIndex, idxSalary + 1).setValue(finalSalary);
+        
+        return { success: true, message: '已更新 ' + year + '/' + month + ' 薪資記錄 (覆蓋舊檔)' };
+    } else {
+        // [新增模式] 建立新的一列
+        const newRow = new Array(headers.length).fill('');
+        
+        // 填入已知欄位
+        if (idxId !== -1) newRow[idxId] = ''; // 銷售編號固定空白
+        if (idxTime !== -1) newRow[idxTime] = currentTimestamp;
+        if (idxCust !== -1) newRow[idxCust] = targetUser;
+        if (idxRep !== -1) newRow[idxRep] = targetUser;
+        if (idxSalary !== -1) newRow[idxSalary] = finalSalary;
+        if (idxTotal !== -1) newRow[idxTotal] = 0; // 本筆總支出金額固定為 0
+        if (idxDate !== -1) newRow[idxDate] = currentTimestamp;
+        
+        // 寫入關鍵備註，供下次覆蓋比對使用
+        if (idxNote !== -1) newRow[idxNote] = targetNote;
+    
+        expSheet.appendRow(newRow);
+        
+        return { success: true, message: '薪資記錄已新增至 Expenditures' };
+    }
 }
 

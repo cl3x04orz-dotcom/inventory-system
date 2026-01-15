@@ -38,6 +38,37 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
         fetchHistory();
     }, [fetchHistory]);
 
+    // [Fix] 自動校正日期：當視窗回到焦點時，若日期仍停留在「昨天」且為單日查詢模式，自動更新為「今天」
+    // 解決使用者過夜未關閉分頁，導致日期顯示舊資料的問題
+    useEffect(() => {
+        const checkAndFixDate = () => {
+            if (document.hidden) return; // 只有在頁面可見時才執行
+
+            const today = getLocalDateString();
+            if (startDate === endDate && startDate !== today) {
+                // 計算「昨天」的日期字串
+                const d = new Date();
+                d.setDate(d.getDate() - 1);
+                const yesterday = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+                // 只有當日期剛好是「昨天」時才自動更新 (避免誤改使用者特意查詢的歷史日期)
+                if (startDate === yesterday) {
+                    console.log('Detected stale date (yesterday), auto-updating to today:', today);
+                    setStartDate(today);
+                    setEndDate(today);
+                }
+            }
+        };
+
+        window.addEventListener('focus', checkAndFixDate);
+        document.addEventListener('visibilitychange', checkAndFixDate);
+
+        return () => {
+            window.removeEventListener('focus', checkAndFixDate);
+            document.removeEventListener('visibilitychange', checkAndFixDate);
+        };
+    }, [startDate, endDate]);
+
     const filtered = records.filter(r =>
         String(r.productName || '').toLowerCase().includes(searchTerm.toLowerCase())
     );

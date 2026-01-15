@@ -75,6 +75,8 @@ export default function ReportPage({ user, apiUrl }) {
                     Number(item.salary || 0) + Number(item.linePay || 0) + Number(item.serviceFee || 0) +
                     Number(item.reserve || 0);
                 item.rowTotal = rowTotal;
+                // [Fix] 標記薪資金額 (匯款)，不計入「應繳回金額」的現金支出扣除
+                item.salaryAmount = Number(item.salary || 0);
 
                 // 模糊匹配結算金額欄位 (Expenditures L 欄)
                 const finalTotalKey = Object.keys(item).find(k => {
@@ -115,7 +117,8 @@ export default function ReportPage({ user, apiUrl }) {
     // Calculate summaries
     const totalSales = reportData?.reduce((acc, item) => acc + (Number(item.totalAmount) || 0), 0) || 0;
     const totalQty = reportData?.reduce((acc, item) => acc + (Number(item.soldQty) || 0), 0) || 0;
-    const totalExpenses = expenseData?.reduce((acc, item) => acc + (item.rowTotal || 0), 0) || 0;
+    // [Fix] 總支出扣除薪資 (因為薪資是匯款，不從現金帳扣除)
+    const totalExpenses = expenseData?.reduce((acc, item) => acc + (item.rowTotal || 0) - (item.salaryAmount || 0), 0) || 0;
     const totalFinalTotal = expenseData?.reduce((acc, item) => acc + (Number(item.displayFinalTotal) || 0), 0) || 0;
     const totalReturnAmount = totalSales - totalExpenses + totalFinalTotal;
 

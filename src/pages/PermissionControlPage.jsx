@@ -5,6 +5,8 @@ import { callGAS } from '../utils/api';
 export default function PermissionControlPage({ user, apiUrl }) {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [processing, setProcessing] = useState(false);
+    const [processMessage, setProcessMessage] = useState('');
     const [newUser, setNewUser] = useState({ username: '', password: '', role: 'VIEWER' });
     const [editingUser, setEditingUser] = useState(null); // The user currently being edited for permissions
 
@@ -60,14 +62,46 @@ export default function PermissionControlPage({ user, apiUrl }) {
         }
     ];
 
-    // ... existing code ...
+    const handleAddUser = async () => {
+        if (!newUser.username || !newUser.password) {
+            alert('請輸入帳號與密碼');
+            return;
+        }
+        setProcessing(true);
+        setProcessMessage('資料存檔中 請稍候...');
+        try {
+            await callGAS(apiUrl, 'addUser', newUser, user.token);
+            // alert('新增成功');
+            setNewUser({ username: '', password: '', role: 'VIEWER' });
+            await fetchUsers();
+            alert('新增成功');
+        } catch (error) {
+            alert('新增失敗: ' + error.message);
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const handleDeleteUser = async (targetUsername) => {
+        if (!window.confirm(`確定要刪除使用者 ${targetUsername}?`)) return;
+        setProcessing(true);
+        setProcessMessage('資料刪除中 請稍候...');
+        try {
+            await callGAS(apiUrl, 'deleteUser', { username: targetUsername }, user.token);
+            await fetchUsers();
+            alert('刪除成功');
+        } catch (error) {
+            alert('刪除失敗: ' + error.message);
+        } finally {
+            setProcessing(false);
+        }
+    };
+
     const fetchUsers = async () => {
         setLoading(true);
         try {
-            // Assumes backend has 'getUsers' handler
             const data = await callGAS(apiUrl, 'getUsers', {}, user.token);
             if (Array.isArray(data)) {
-                // Ensure permissions are parsed
                 const parsedData = data.map(u => {
                     let perms = u.permissions;
                     if (typeof perms === 'string') {
@@ -82,11 +116,11 @@ export default function PermissionControlPage({ user, apiUrl }) {
                 });
                 setUsers(parsedData);
             } else {
-                console.warn('Backend returned non-array for users or not implemented');
+                console.warn('Backend returned non-array for users');
             }
         } catch (error) {
             console.error('Failed to fetch users:', error);
-            alert('無法載入使用者列表 (請確認後端是否支援 getUsers)');
+            alert('無法載入使用者列表');
         } finally {
             setLoading(false);
         }
@@ -96,51 +130,25 @@ export default function PermissionControlPage({ user, apiUrl }) {
         if (user?.token) fetchUsers();
     }, [user.token, apiUrl]);
 
-    const handleAddUser = async () => {
-        if (!newUser.username || !newUser.password) {
-            alert('請輸入帳號與密碼');
-            return;
-        }
-        try {
-            await callGAS(apiUrl, 'addUser', newUser, user.token);
-            alert('新增成功');
-            setNewUser({ username: '', password: '', role: 'VIEWER' });
-            fetchUsers();
-        } catch (error) {
-            alert('新增失敗: ' + error.message);
-        }
-    };
-
-    const handleDeleteUser = async (targetUsername) => {
-        if (!window.confirm(`確定要刪除使用者 ${targetUsername}?`)) return;
-        try {
-            await callGAS(apiUrl, 'deleteUser', { username: targetUsername }, user.token);
-            alert('刪除成功');
-            fetchUsers();
-        } catch (error) {
-            alert('刪除失敗: ' + error.message);
-        }
-    };
-
     const handleSavePermissions = async () => {
         if (!editingUser) return;
-        setLoading(true);
+        setProcessing(true);
+        setProcessMessage('權限更新中 請稍候...');
         try {
-            // Send updated permissions to backend
-            // Payload: { username: '...', permissions: ['sales', 'inventory'] }
             await callGAS(apiUrl, 'updateUserPermissions', {
                 username: editingUser.username,
                 permissions: editingUser.permissions
             }, user.token);
 
-            alert('權限權限更新成功');
+            // alert('權限更新成功');
             setEditingUser(null);
-            fetchUsers();
+            await fetchUsers();
+            alert('權限更新成功');
         } catch (error) {
             console.error(error);
             alert('更新失敗: ' + error.message);
         } finally {
-            setLoading(false);
+            setProcessing(false);
         }
     };
 
@@ -172,6 +180,16 @@ export default function PermissionControlPage({ user, apiUrl }) {
 
     return (
         <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6 flex flex-col h-[calc(100vh-6rem)]">
+            {/* Global Processing Overlay */}
+            {processing && (
+                <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-[60] flex items-center justify-center animate-in fade-in duration-200">
+                    <div className="bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center gap-4 min-w-[200px]">
+                        <RefreshCw className="animate-spin text-blue-600" size={32} />
+                        <span className="text-slate-700 font-bold text-base">{processMessage}</span>
+                    </div>
+                </div>
+            )}
+
             <div className="flex justify-between items-center shrink-0">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -189,33 +207,60 @@ export default function PermissionControlPage({ user, apiUrl }) {
                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-slate-800">
                     <UserPlus size={20} className="text-emerald-600" /> 新增使用者
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end relative">
                     <div className="space-y-1">
                         <label className="text-xs text-slate-500 uppercase font-bold px-1">帳號 (Username)</label>
                         <input
+                            id="input-new-username"
                             type="text"
                             className="input-field w-full"
                             value={newUser.username}
                             onChange={e => setNewUser({ ...newUser, username: e.target.value })}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === 'ArrowRight') {
+                                    e.preventDefault();
+                                    document.getElementById('input-new-password')?.focus();
+                                }
+                            }}
                             placeholder="輸入帳號"
                         />
                     </div>
                     <div className="space-y-1">
                         <label className="text-xs text-slate-500 uppercase font-bold px-1">密碼 (Password)</label>
                         <input
+                            id="input-new-password"
                             type="password"
                             className="input-field w-full"
                             value={newUser.password}
                             onChange={e => setNewUser({ ...newUser, password: e.target.value })}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === 'ArrowRight') {
+                                    e.preventDefault();
+                                    document.getElementById('input-new-role')?.focus();
+                                } else if (e.key === 'ArrowLeft') {
+                                    e.preventDefault();
+                                    document.getElementById('input-new-username')?.focus();
+                                }
+                            }}
                             placeholder="輸入密碼"
                         />
                     </div>
                     <div className="space-y-1">
                         <label className="text-xs text-slate-500 uppercase font-bold px-1">權限角色 (Role)</label>
                         <select
+                            id="input-new-role"
                             className="input-field w-full"
                             value={newUser.role}
                             onChange={e => setNewUser({ ...newUser, role: e.target.value })}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === 'ArrowRight') {
+                                    e.preventDefault();
+                                    document.getElementById('btn-add-user')?.focus();
+                                } else if (e.key === 'ArrowLeft') {
+                                    e.preventDefault();
+                                    document.getElementById('input-new-password')?.focus();
+                                }
+                            }}
                         >
                             <option value="BOSS">老闆 (BOSS)</option>
                             <option value="ADMIN">管理員 (ADMIN)</option>
@@ -223,7 +268,18 @@ export default function PermissionControlPage({ user, apiUrl }) {
                             <option value="VIEWER">檢視者 (VIEWER)</option>
                         </select>
                     </div>
-                    <button onClick={handleAddUser} className="btn-primary flex justify-center items-center gap-2">
+                    <button
+                        id="btn-add-user"
+                        onClick={handleAddUser}
+                        onKeyDown={(e) => {
+                            if (e.key === 'ArrowLeft') {
+                                e.preventDefault();
+                                document.getElementById('input-new-role')?.focus();
+                            }
+                        }}
+                        className="btn-primary flex justify-center items-center gap-2"
+                        disabled={loading}
+                    >
                         <Save size={18} /> 新增
                     </button>
                 </div>
@@ -366,32 +422,72 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                         </div>
 
                                         <div className="grid grid-cols-1 gap-2">
-                                            {group.items.map(perm => (
-                                                <label
-                                                    key={perm.key}
-                                                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group ${editingUser.permissions?.includes(perm.key)
-                                                        ? 'bg-blue-50 border-blue-200 shadow-sm'
-                                                        : 'bg-slate-50 border-slate-100 hover:bg-slate-100 hover:border-slate-200'
-                                                        }`}
-                                                >
-                                                    <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${editingUser.permissions?.includes(perm.key)
-                                                        ? 'bg-blue-600 border-blue-600 text-white scale-110'
-                                                        : 'bg-white border-slate-200 group-hover:border-blue-300'
-                                                        }`}>
-                                                        {editingUser.permissions?.includes(perm.key) && <CheckSquare size={12} fill="currentColor" />}
-                                                    </div>
-                                                    <input
-                                                        type="checkbox"
-                                                        className="hidden"
-                                                        checked={editingUser.permissions?.includes(perm.key)}
-                                                        onChange={() => togglePermission(perm.key)}
-                                                    />
-                                                    <span className={`text-sm transition-colors ${editingUser.permissions?.includes(perm.key) ? 'text-slate-900 font-bold' : 'text-slate-500'
-                                                        }`}>
-                                                        {perm.label}
-                                                    </span>
-                                                </label>
-                                            ))}
+                                            {group.items.map((perm, pIdx) => {
+                                                const uniqueId = `perm-item-${perm.key}`;
+
+                                                const handleKeyDown = (e) => {
+                                                    const validKeys = ['Enter', ' ', 'ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft'];
+                                                    if (!validKeys.includes(e.key)) return;
+                                                    e.preventDefault();
+
+                                                    // Flatten all permission keys to find next/prev
+                                                    const allKeys = [];
+                                                    AVAILABLE_PERMISSIONS.forEach(g => {
+                                                        g.items.forEach(i => allKeys.push(i.key));
+                                                    });
+
+                                                    const currentIndex = allKeys.indexOf(perm.key);
+
+                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                        togglePermission(perm.key);
+                                                        // Move to next after toggle
+                                                        if (currentIndex < allKeys.length - 1) {
+                                                            const nextKey = allKeys[currentIndex + 1];
+                                                            document.getElementById(`perm-item-${nextKey}`)?.focus();
+                                                        }
+                                                    } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                                                        if (currentIndex < allKeys.length - 1) {
+                                                            const nextKey = allKeys[currentIndex + 1];
+                                                            document.getElementById(`perm-item-${nextKey}`)?.focus();
+                                                        }
+                                                    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                                                        if (currentIndex > 0) {
+                                                            const prevKey = allKeys[currentIndex - 1];
+                                                            document.getElementById(`perm-item-${prevKey}`)?.focus();
+                                                        }
+                                                    }
+                                                };
+
+                                                return (
+                                                    <label
+                                                        key={perm.key}
+                                                        id={uniqueId}
+                                                        tabIndex="0"
+                                                        onKeyDown={handleKeyDown}
+                                                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group outline-none ring-offset-2 focus:ring-2 focus:ring-blue-400 ${editingUser.permissions?.includes(perm.key)
+                                                            ? 'bg-blue-50 border-blue-200 shadow-sm'
+                                                            : 'bg-slate-50 border-slate-100 hover:bg-slate-100 hover:border-slate-200'
+                                                            }`}
+                                                    >
+                                                        <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${editingUser.permissions?.includes(perm.key)
+                                                            ? 'bg-blue-600 border-blue-600 text-white scale-110'
+                                                            : 'bg-white border-slate-200 group-hover:border-blue-300'
+                                                            }`}>
+                                                            {editingUser.permissions?.includes(perm.key) && <CheckSquare size={12} fill="currentColor" />}
+                                                        </div>
+                                                        <input
+                                                            type="checkbox"
+                                                            className="hidden"
+                                                            checked={editingUser.permissions?.includes(perm.key)}
+                                                            onChange={() => togglePermission(perm.key)}
+                                                        />
+                                                        <span className={`text-sm transition-colors ${editingUser.permissions?.includes(perm.key) ? 'text-slate-900 font-bold' : 'text-slate-500'
+                                                            }`}>
+                                                            {perm.label}
+                                                        </span>
+                                                    </label>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 );
