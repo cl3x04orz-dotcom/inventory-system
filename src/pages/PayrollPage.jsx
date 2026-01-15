@@ -98,9 +98,37 @@ export default function PayrollPage({ user, apiUrl }) {
                 setProfileForm(result.profile);
             }
         } catch (e) {
-            console.error('Fetch Profile Error:', e);
+            console.error(e);
         }
     }, [targetUser, user.token, apiUrl]);
+
+    // Save Payroll to Expenditures
+    const handleSavePayroll = async () => {
+        if (!data || !data.summary) {
+            alert('請先計算薪資資料');
+            return;
+        }
+
+        const confirmMsg = `確定要將 ${targetUser} 的薪資存檔至支出表嗎？\n\n實領薪資: $${(data.summary.finalSalary || 0).toLocaleString()}\n月份: ${year}年${month}月`;
+        if (!confirm(confirmMsg)) return;
+
+        setIsSubmitting(true);
+        try {
+            await callGAS(apiUrl, 'savePayrollToExpenditure', {
+                targetUser,
+                year,
+                month,
+                finalSalary: data.summary.finalSalary
+            }, user.token);
+
+            alert('薪資存檔成功！');
+        } catch (error) {
+            console.error('Save payroll failed:', error);
+            alert('存檔失敗: ' + error.message);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     useEffect(() => {
         fetchData();
@@ -382,12 +410,21 @@ export default function PayrollPage({ user, apiUrl }) {
 
                     {/* Only BOSS update profile */}
                     {user.role === 'BOSS' && (
-                        <button
-                            onClick={() => setShowProfile(true)}
-                            className="btn-secondary flex items-center gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                        >
-                            <Calendar size={16} /> 基本資料
-                        </button>
+                        <>
+                            <button
+                                onClick={() => setShowProfile(true)}
+                                className="btn-secondary flex items-center gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                            >
+                                <Calendar size={16} /> 基本資料
+                            </button>
+                            <button
+                                onClick={handleSavePayroll}
+                                disabled={isSubmitting || !data}
+                                className="btn-secondary flex items-center gap-2 border-blue-200 text-blue-700 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <DollarSign size={16} /> {isSubmitting ? '存檔中...' : '薪資存檔'}
+                            </button>
+                        </>
                     )}
 
                     <button onClick={fetchData} className="btn-primary">

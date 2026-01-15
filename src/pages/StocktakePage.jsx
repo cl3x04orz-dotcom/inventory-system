@@ -133,10 +133,30 @@ export default function StocktakePage({ user, apiUrl }) {
     };
 
     const handleSubmit = async () => {
-        const items = getItemsToSubmit();
-        if (items.length === 0) {
-            alert('請至少輸入一項商品的實盤數量');
+        // [New Validation] Ensure ALL STOCK items (with quantity > 0) have a physical quantity entered
+        const incompleteItems = inventory.filter(item => {
+            if (item.type !== 'STOCK') return false;
+
+            // Skip zero-stock items (usually hidden, no need to count)
+            if (Number(item.quantity) === 0) return false;
+
+            const rowKey = getRowKey(item);
+            const entry = stocktakeData[rowKey];
+            return !entry || entry.physicalQty === '' || entry.physicalQty === undefined;
+        });
+
+        if (incompleteItems.length > 0) {
+            alert(`尚有 ${incompleteItems.length} 筆現貨商品未輸入盤點數量！\n請完成所有實盤數量後再提交。`);
+            // Focus on the first incomplete item
+            const firstKey = getRowKey(incompleteItems[0]);
+            focusAndSelect(`qty-${firstKey}`);
             return;
+        }
+
+        const items = getItemsToSubmit();
+        // (Since we validated all items have input, items.length should be > 0 if there are items)
+        if (items.length === 0 && inventory.some(i => i.type === 'STOCK')) {
+            // This case mimics "No items" but we just checked incomplete.
         }
 
         // Validate reason and accountability for discrepancies

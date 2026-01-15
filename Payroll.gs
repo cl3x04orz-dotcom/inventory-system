@@ -527,3 +527,96 @@ function initPayrollSheet_(name, headers) {
     }
     return sheet;
 }
+
+/**
+ * [Service] 將薪資存檔至 Expenditures (薪資發放欄位)
+ */
+function savePayrollToExpenditureService(payload, user) {
+    // 權限檢查：只有 BOSS 可以存檔薪資
+    if (user.role !== 'BOSS') {
+        throw new Error('權限不足：只有管理員可以存檔薪資');
+    }
+
+    const { targetUser, year, month, finalSalary } = payload;
+    
+    if (!targetUser || !year || !month || finalSalary === undefined) {
+        throw new Error('缺少必要參數');
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const expSheet = ss.getSheetByName('Expenditures');
+    
+    if (!expSheet) {
+        throw new Error('找不到 Expenditures 分頁');
+    }
+
+    // 建立日期 (該月份的第一天)
+    const recordDate = new Date(year, month - 1, 1);
+    
+    // 取得現有資料
+    const data = expSheet.getDataRange().getValues();
+    const headers = data[0].map(h => String(h || '').trim());
+    
+    // 動態找尋欄位索引
+    const findIndex = (keywords) => {
+        return headers.findIndex(h => keywords.some(k => h.includes(k)));
+    };
+    
+    const idxTime = findIndex(['時間', '戳記']);
+    const idxRep = findIndex(['業務', '人員', 'Operator']);
+    const idxSalary = findIndex(['薪資']);
+    const idxTotal = findIndex(['總額', '結算', 'Total']);
+    const idxCust = findIndex(['對象', '客戶', 'Customer']);
+    const idxId = findIndex(['編號', 'ID']);
+    const idxDate = headers.lastIndexOf('日期'); // 通常最後一欄是純日期
+
+    // 檢查基本欄位是否存在
+    if (idxSalary === -1) {
+        throw new Error('Expenditures 表中找不到「薪資發放」欄位，請確認表頭設定');
+    }
+
+    const currentTimestamp = new Date();
+    
+    // 檢查是否已有該月份的薪資記錄 (精準比對業務與月份)
+    for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        const rowTime = row[idxTime]; 
+        const rowDate = idxDate !== -1 ? row[idxDate] : null;
+        const rowRep = idxRep !== -1 ? String(row[idxRep] || '').trim() : '';
+        
+        // 優先檢查日期欄位，其次檢查時間戳記
+        const checkDate = (rowDate instanceof Date) ? rowDate : (rowTime instanceof Date ? rowTime : null);
+        
+        if (checkDate) {
+            const rowYear = checkDate.getFullYear();
+            const rowMonth = checkDate.getMonth() + 1;
+            
+            if (rowYear === year && rowMonth === month && rowRep === targetUser) {
+                // 找到記錄，更新薪資欄位
+                expSheet.getRange(i + 1, idxSalary + 1).setValue(finalSalary);
+                return { success: true, message: '已更新 ' + year + '/' + month + ' 薪資記錄' };
+            }
+        }
+    }
+    
+    // 沒有找到現有記錄，新增一筆 (根據表頭長度建立空白列)
+    const newRow = new Array(headers.length).fill(0);
+    
+    // 填入已知欄位
+    if (idxId !== -1) newRow[idxId] = ''; // 銷售編號固定空白
+    if (idxTime !== -1) newRow[idxTime] = currentTimestamp;
+    if (idxCust !== -1) newRow[idxCust] = targetUser;
+    if (idxRep !== -1) newRow[idxRep] = targetUser;
+    if (idxSalary !== -1) newRow[idxSalary] = finalSalary;
+    if (idxTotal !== -1) newRow[idxTotal] = 0; // 本筆總支出金額固定為 0
+    if (idxDate !== -1) newRow[idxDate] = currentTimestamp;
+    
+    // 如果有備註欄位，可以補上
+    const idxNote = findIndex(['備註', 'Note']);
+    if (idxNote !== -1) newRow[idxNote] = year + '年' + month + '月薪資結算';
+
+    expSheet.appendRow(newRow);
+    
+    return { success: true, message: '薪資記錄已存檔至 Expenditures' };
+}
+

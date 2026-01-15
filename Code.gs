@@ -154,6 +154,7 @@ function apiHandler(request) {
             case 'savePayrollSettings': return savePayrollSettingsService(payload, user);
             case 'getEmployeeProfile': return getEmployeeProfileService(payload, user);
             case 'saveEmployeeProfile': return saveEmployeeProfileService(payload, user);
+            case 'savePayrollToExpenditure': return savePayrollToExpenditureService(payload, user);
 
             // 支出管理
             case 'getExpenditures': return getExpendituresService(payload);
