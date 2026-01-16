@@ -52,17 +52,17 @@ export default function InventoryValuationPage({ user, apiUrl }) {
                 </div>
 
                 {/* Stats Cards */}
-                <div className="flex gap-4">
-                    <div className="bg-amber-50 px-5 py-3 border border-amber-200 rounded-xl shadow-sm">
+                <div className="flex w-full md:w-auto gap-3">
+                    <div className="flex-1 bg-amber-50 px-3 py-3 border border-amber-200 rounded-xl shadow-sm text-center">
                         <p className="text-xs text-slate-500 uppercase font-bold">總庫存價值</p>
-                        <p className="text-2xl font-bold text-amber-600 flex items-baseline gap-1">
+                        <p className="text-xl md:text-2xl font-bold text-amber-600 flex justify-center items-baseline gap-1">
                             <span className="text-sm opacity-50">$</span>
                             {totalValue.toLocaleString()}
                         </p>
                     </div>
-                    <div className="bg-blue-50 px-5 py-3 border border-blue-200 rounded-xl shadow-sm">
+                    <div className="flex-1 bg-blue-50 px-3 py-3 border border-blue-200 rounded-xl shadow-sm text-center">
                         <p className="text-xs text-slate-500 uppercase font-bold">總庫存數量</p>
-                        <p className="text-2xl font-bold text-blue-600">
+                        <p className="text-xl md:text-2xl font-bold text-blue-600">
                             {totalItems.toLocaleString()}
                         </p>
                     </div>
@@ -90,8 +90,8 @@ export default function InventoryValuationPage({ user, apiUrl }) {
                 </button>
             </div>
 
-            {/* Table */}
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+            {/* Desktop Table View */}
+            <div className="hidden md:block bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
                         <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider sticky top-0 font-bold border-b border-slate-100">
@@ -154,6 +154,60 @@ export default function InventoryValuationPage({ user, apiUrl }) {
                         </tbody>
                     </table>
                 </div>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4">
+                {loading ? (
+                    <div className="text-center py-8 text-slate-500">載入中...</div>
+                ) : filteredData.length > 0 ? (
+                    filteredData.map((item, idx) => {
+                        const qty = Number(item.totalQty) || 0;
+                        const value = Number(item.totalValue) || 0;
+                        const unitCost = qty > 0 ? (value / qty) : 0;
+                        const percent = totalValue > 0 ? (value / totalValue * 100) : 0;
+
+                        return (
+                            <div key={idx} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col gap-3">
+                                <div className="flex justify-between items-start border-b border-slate-100 pb-2">
+                                    <h3 className="font-bold text-slate-800 text-lg">{item.name}</h3>
+                                    <div className="text-right">
+                                        <div className="text-xs text-slate-400">總價值</div>
+                                        <div className="font-bold text-amber-600 text-lg font-mono">${value.toLocaleString()}</div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                                    <div className="bg-slate-50 p-2 rounded-lg">
+                                        <div className="text-xs text-slate-400 mb-1">庫存量</div>
+                                        <div className="font-mono font-bold text-slate-700">{qty.toLocaleString()}</div>
+                                    </div>
+                                    <div className="bg-slate-50 p-2 rounded-lg">
+                                        <div className="text-xs text-slate-400 mb-1">單位成本</div>
+                                        <div className="font-mono text-slate-600">${unitCost.toFixed(0)}</div>
+                                    </div>
+                                    <div className="bg-slate-50 p-2 rounded-lg">
+                                        <div className="text-xs text-slate-400 mb-1">價值佔比</div>
+                                        <div className="font-mono text-slate-600">{percent.toFixed(1)}%</div>
+                                    </div>
+                                </div>
+
+                                {/* Percentage Bar */}
+                                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
+                                    <div
+                                        className="h-full bg-amber-500 transition-all duration-500"
+                                        style={{ width: `${Math.min(percent, 100)}%` }}
+                                    />
+                                </div>
+                            </div>
+                        );
+                    })
+                ) : (
+                    <div className="text-center py-8 text-slate-500 bg-white rounded-xl border border-slate-200">
+                        <TrendingUp size={24} className="mx-auto mb-2 text-slate-400" />
+                        <p>無估值資料</p>
+                    </div>
+                )}
             </div>
         </div>
     );
