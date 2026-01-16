@@ -178,8 +178,61 @@ export default function ReportPage({ user, apiUrl }) {
                     )}
                 </div>
 
-                {/* Filters */}
-                <form onSubmit={handleSearch} className="mb-6 p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
+                {/* Filters - Mobile View (Horizontal, No Border, mimics SalesPage) */}
+                <form onSubmit={handleSearch} className="md:hidden mb-6 space-y-3">
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">開始日期:</label>
+                        <input
+                            type="date"
+                            required
+                            className="input-field flex-1 py-1.5 px-3"
+                            value={startDate}
+                            onChange={e => setStartDate(e.target.value)}
+                        />
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">結束日期:</label>
+                        <input
+                            type="date"
+                            required
+                            className="input-field flex-1 py-1.5 px-3"
+                            value={endDate}
+                            onChange={e => setEndDate(e.target.value)}
+                        />
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">銷售對象:</label>
+                        <input
+                            type="text"
+                            placeholder="輸入銷售對象..."
+                            className="input-field flex-1 py-1.5 px-3"
+                            value={location}
+                            onChange={e => setLocation(e.target.value)}
+                        />
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">業務員:</label>
+                        <div className="flex flex-1 gap-2">
+                            <input
+                                type="text"
+                                placeholder="姓名..."
+                                className="input-field flex-1 py-1.5 px-3"
+                                value={salesRep}
+                                onChange={e => setSalesRep(e.target.value)}
+                            />
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="btn-primary px-4 py-1.5 flex items-center justify-center rounded-lg shadow-sm active:scale-95 transition-transform"
+                            >
+                                <Search size={18} />
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                {/* Filters - Desktop View (Original Grid) */}
+                <form onSubmit={handleSearch} className="hidden md:block mb-6 p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="grid grid-cols-2 gap-4 md:contents">
                             <div className="space-y-1">
