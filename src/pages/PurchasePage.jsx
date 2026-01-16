@@ -208,14 +208,124 @@ export default function PurchasePage({ user, apiUrl }) {
                             const currentProductSuggestions = getProductSuggestions(item.vendor);
 
                             return (
-                                <div key={item.id} className="group relative p-4 bg-slate-50 rounded-xl border border-slate-200 hover:border-emerald-500/30 hover:shadow-lg transition-all duration-200">
+                                <div key={item.id} className="group relative p-0 md:p-4 bg-transparent md:bg-slate-50 rounded-none md:rounded-xl border-b md:border border-slate-100 md:border-slate-200 hover:md:border-emerald-500/30 hover:md:shadow-lg transition-all duration-200 mb-6 md:mb-0">
                                     {/* Number Badge */}
-                                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-                                        <span className="text-[10px] font-bold text-emerald-600">{idx + 1}</span>
+                                    <div className="md:absolute md:-left-2 md:top-1/2 md:-translate-y-1/2 mb-2 md:mb-0 flex items-center gap-2 md:block">
+                                        <div className="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+                                            <span className="text-[10px] font-bold text-emerald-600">{idx + 1}</span>
+                                        </div>
+                                        <span className="md:hidden text-sm font-bold text-slate-700">商品資料</span>
                                     </div>
 
-                                    {/* Custom Grid Layout: 14 columns total for better spacing */}
-                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                                    {/* MOBILE VIEW (Horizontal Layout) */}
+                                    <div className="md:hidden space-y-3 pb-4">
+                                        {/* Vendor */}
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">廠商:</label>
+                                            <input
+                                                id={`item-m-${idx}-vendor`}
+                                                list="vendors-list"
+                                                className="input-field flex-1 py-1.5 px-3"
+                                                placeholder="廠商名稱"
+                                                value={item.vendor}
+                                                onChange={e => handleItemChange(item.id, 'vendor', e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'vendor')}
+                                            />
+                                        </div>
+
+                                        {/* Product */}
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">產品名稱:</label>
+                                            <input
+                                                id={`item-m-${idx}-product`}
+                                                list={`products-list-${idx}`}
+                                                className="input-field flex-1 py-1.5 px-3"
+                                                placeholder="產品名稱"
+                                                value={item.productName}
+                                                onChange={e => handleItemChange(item.id, 'productName', e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'product')}
+                                            />
+                                            <datalist id={`products-list-${idx}`}>
+                                                {currentProductSuggestions.map((n, i) => <option key={i} value={n} />)}
+                                            </datalist>
+                                        </div>
+
+                                        {/* Qty */}
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">數量:</label>
+                                            <input
+                                                id={`item-m-${idx}-qty`}
+                                                type="number"
+                                                className="input-field flex-1 py-1.5 px-3"
+                                                placeholder="0"
+                                                value={item.quantity}
+                                                onChange={e => handleItemChange(item.id, 'quantity', e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'qty')}
+                                            />
+                                        </div>
+
+                                        {/* Price */}
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">單價:</label>
+                                            <input
+                                                id={`item-m-${idx}-price`}
+                                                type="number"
+                                                className="input-field flex-1 py-1.5 px-3"
+                                                placeholder="0"
+                                                value={item.unitPrice}
+                                                onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'price')}
+                                            />
+                                        </div>
+
+                                        {/* Expiry */}
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">有效期限:</label>
+                                            <div className="flex flex-1 gap-1 items-center">
+                                                <input
+                                                    id={`item-m-${idx}-year`}
+                                                    className="input-field flex-[2] py-1.5 px-1 text-center"
+                                                    placeholder="YYYY"
+                                                    value={item.expiryYear}
+                                                    onChange={e => handleItemChange(item.id, 'expiryYear', e.target.value)}
+                                                    onKeyDown={(e) => handleKeyDown(e, idx, 'year')}
+                                                />
+                                                <span className="text-slate-300">/</span>
+                                                <input
+                                                    id={`item-m-${idx}-month`}
+                                                    className="input-field flex-1 py-1.5 px-1 text-center"
+                                                    placeholder="MM"
+                                                    value={item.expiryMonth}
+                                                    onChange={e => handleItemChange(item.id, 'expiryMonth', e.target.value)}
+                                                    onKeyDown={(e) => handleKeyDown(e, idx, 'month')}
+                                                />
+                                                <span className="text-slate-300">/</span>
+                                                <input
+                                                    id={`item-m-${idx}-day`}
+                                                    type="number"
+                                                    className="input-field flex-1 py-1.5 px-1 text-center"
+                                                    placeholder="DD"
+                                                    value={item.expiryDay}
+                                                    onChange={e => handleItemChange(item.id, 'expiryDay', e.target.value)}
+                                                    onKeyDown={(e) => handleKeyDown(e, idx, 'day')}
+                                                />
+
+                                                {/* Delete Button Mobile */}
+                                                {items.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeItem(item.id)}
+                                                        className="w-8 h-8 ml-1 rounded-lg bg-red-50 text-red-500 flex items-center justify-center border border-red-100"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* DESKTOP VIEW (Original Grid Layout) */}
+                                    <div className="hidden md:grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
 
                                         {/* Vendor (3 cols) */}
                                         <div className="col-span-12 md:col-span-2">
@@ -248,9 +358,7 @@ export default function PurchasePage({ user, apiUrl }) {
                                                 onChange={e => handleItemChange(item.id, 'productName', e.target.value)}
                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'product')}
                                             />
-                                            <datalist id={`products-list-${idx}`}>
-                                                {currentProductSuggestions.map((n, i) => <option key={i} value={n} />)}
-                                            </datalist>
+                                            {/* (datalist is reused from mobile block or just define again? datalist id is shared so it's fine) */}
                                         </div>
 
                                         {/* Qty (2 cols) */}
