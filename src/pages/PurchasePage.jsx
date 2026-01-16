@@ -286,6 +286,7 @@ export default function PurchasePage({ user, apiUrl }) {
                                             <div className="flex flex-1 gap-1 items-center">
                                                 <input
                                                     id={`item-m-${idx}-year`}
+                                                    type="number"
                                                     className="input-field flex-[2] py-1.5 px-1 text-center"
                                                     placeholder="YYYY"
                                                     value={item.expiryYear}
@@ -295,6 +296,7 @@ export default function PurchasePage({ user, apiUrl }) {
                                                 <span className="text-slate-300">/</span>
                                                 <input
                                                     id={`item-m-${idx}-month`}
+                                                    type="number"
                                                     className="input-field flex-1 py-1.5 px-1 text-center"
                                                     placeholder="MM"
                                                     value={item.expiryMonth}
