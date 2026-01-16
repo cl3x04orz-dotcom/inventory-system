@@ -69,36 +69,38 @@ export default function PurchasePage({ user, apiUrl }) {
     };
 
     const handleKeyDown = (e, idx, field) => {
+        const isMobile = e.target.id.includes('-m-');
+        const prefix = isMobile ? 'item-m-' : 'item-';
         const fields = ['vendor', 'product', 'qty', 'price', 'year', 'month', 'day'];
         const fieldIdx = fields.indexOf(field);
 
         if (e.key === 'Enter' || e.key === 'ArrowRight') {
             e.preventDefault();
             if (fieldIdx < fields.length - 1) {
-                focusAndSelect(`item-${idx}-${fields[fieldIdx + 1]}`);
+                focusAndSelect(`${prefix}${idx}-${fields[fieldIdx + 1]}`);
             } else if (idx < items.length - 1) {
-                focusAndSelect(`item-${idx + 1}-vendor`);
+                focusAndSelect(`${prefix}${idx + 1}-vendor`);
             } else if (e.key === 'Enter') {
                 addItem();
                 // We need a short delay to wait for React to render the new row
-                setTimeout(() => focusAndSelect(`item-${idx + 1}-vendor`), 50);
+                setTimeout(() => focusAndSelect(`${prefix}${idx + 1}-vendor`), 50);
             }
         } else if (e.key === 'ArrowLeft') {
             e.preventDefault();
             if (fieldIdx > 0) {
-                focusAndSelect(`item-${idx}-${fields[fieldIdx - 1]}`);
+                focusAndSelect(`${prefix}${idx}-${fields[fieldIdx - 1]}`);
             } else if (idx > 0) {
-                focusAndSelect(`item-${idx - 1}-day`);
+                focusAndSelect(`${prefix}${idx - 1}-day`);
             }
         } else if (e.key === 'ArrowDown') {
             e.preventDefault();
             if (idx < items.length - 1) {
-                focusAndSelect(`item-${idx + 1}-${field}`);
+                focusAndSelect(`${prefix}${idx + 1}-${field}`);
             }
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             if (idx > 0) {
-                focusAndSelect(`item-${idx - 1}-${field}`);
+                focusAndSelect(`${prefix}${idx - 1}-${field}`);
             }
         }
     };
