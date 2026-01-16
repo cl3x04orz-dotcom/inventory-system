@@ -149,63 +149,65 @@ export default function ReportPage({ user, apiUrl }) {
 
                     {/* Summary Stats (Integrated in Header) */}
                     {reportData && (
-                        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                            <div className="px-4 py-2 rounded-xl bg-amber-50 border border-amber-200 shadow-sm">
-                                <p className="text-xs text-slate-500 uppercase font-bold text-center">應繳回金額</p>
-                                <p className="text-xl font-bold text-amber-700 text-center">${totalReturnAmount.toLocaleString()}</p>
+                        <div className="grid grid-cols-3 md:grid-cols-6 gap-2 md:gap-3 w-full md:w-auto">
+                            <div className="px-2 md:px-4 py-2 rounded-xl bg-amber-50 border border-amber-200 shadow-sm">
+                                <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold text-center">應繳回</p>
+                                <p className="text-sm md:text-xl font-bold text-amber-700 text-center">${totalReturnAmount.toLocaleString()}</p>
                             </div>
-                            <div className="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-200 shadow-sm">
-                                <p className="text-xs text-slate-500 uppercase font-bold text-center">總銷售額</p>
-                                <p className="text-xl font-bold text-emerald-700 text-center">${totalSales.toLocaleString()}</p>
+                            <div className="px-2 md:px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-200 shadow-sm">
+                                <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold text-center">總銷售</p>
+                                <p className="text-sm md:text-xl font-bold text-emerald-700 text-center">${totalSales.toLocaleString()}</p>
                             </div>
-                            <div className="px-4 py-2 rounded-xl bg-rose-50 border border-rose-200 shadow-sm">
-                                <p className="text-xs text-slate-500 uppercase font-bold text-center">總支出</p>
-                                <p className="text-xl font-bold text-rose-700 text-center">${totalExpenses.toLocaleString()}</p>
+                            <div className="px-2 md:px-4 py-2 rounded-xl bg-rose-50 border border-rose-200 shadow-sm">
+                                <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold text-center">總支出</p>
+                                <p className="text-sm md:text-xl font-bold text-rose-700 text-center">${totalExpenses.toLocaleString()}</p>
                             </div>
-                            <div className="px-4 py-2 rounded-xl bg-cyan-50 border border-cyan-200 shadow-sm">
-                                <p className="text-xs text-slate-500 uppercase font-bold text-center">結算金額</p>
-                                <p className="text-xl font-bold text-cyan-700 text-center">${totalFinalTotal.toLocaleString()}</p>
+                            <div className="px-2 md:px-4 py-2 rounded-xl bg-cyan-50 border border-cyan-200 shadow-sm">
+                                <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold text-center">結算</p>
+                                <p className="text-sm md:text-xl font-bold text-cyan-700 text-center">${totalFinalTotal.toLocaleString()}</p>
                             </div>
-                            <div className="px-4 py-2 rounded-xl bg-blue-50 border border-blue-200 shadow-sm">
-                                <p className="text-xs text-slate-500 uppercase font-bold text-center">總數量</p>
-                                <p className="text-xl font-bold text-blue-700 text-center">{totalQty.toLocaleString()}</p>
+                            <div className="px-2 md:px-4 py-2 rounded-xl bg-blue-50 border border-blue-200 shadow-sm">
+                                <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold text-center">總數量</p>
+                                <p className="text-sm md:text-xl font-bold text-blue-700 text-center">{totalQty.toLocaleString()}</p>
                             </div>
-                            <div className="px-4 py-2 rounded-xl bg-purple-50 border border-purple-200 shadow-sm">
-                                <p className="text-xs text-slate-500 uppercase font-bold text-center">總筆數</p>
-                                <p className="text-xl font-bold text-purple-700 text-center">{reportData.length}</p>
+                            <div className="px-2 md:px-4 py-2 rounded-xl bg-purple-50 border border-purple-200 shadow-sm">
+                                <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold text-center">總筆數</p>
+                                <p className="text-sm md:text-xl font-bold text-purple-700 text-center">{reportData.length}</p>
                             </div>
                         </div>
                     )}
                 </div>
 
                 {/* Filters */}
-                <form onSubmit={handleSearch} className="mb-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase px-1">開始日期</label>
-                            <input
-                                type="date"
-                                required
-                                className="input-field w-full"
-                                value={startDate}
-                                onChange={e => setStartDate(e.target.value)}
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase px-1">結束日期</label>
-                            <input
-                                type="date"
-                                required
-                                className="input-field w-full"
-                                value={endDate}
-                                onChange={e => setEndDate(e.target.value)}
-                            />
+                <form onSubmit={handleSearch} className="mb-6 p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 gap-4 md:contents">
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase px-1">開始日期</label>
+                                <input
+                                    type="date"
+                                    required
+                                    className="input-field w-full"
+                                    value={startDate}
+                                    onChange={e => setStartDate(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase px-1">結束日期</label>
+                                <input
+                                    type="date"
+                                    required
+                                    className="input-field w-full"
+                                    value={endDate}
+                                    onChange={e => setEndDate(e.target.value)}
+                                />
+                            </div>
                         </div>
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase px-1">銷售對象</label>
                             <input
                                 type="text"
-                                placeholder="輸入關鍵字..."
+                                placeholder="關鍵字..."
                                 className="input-field w-full"
                                 value={location}
                                 onChange={e => setLocation(e.target.value)}
@@ -223,9 +225,9 @@ export default function ReportPage({ user, apiUrl }) {
                                 />
                             </div>
                             <button
-                                onClick={handleSearch}
+                                type="submit"
                                 disabled={loading}
-                                className="btn-primary py-2 px-6 flex items-center gap-2 self-end h-[42px]"
+                                className="btn-primary py-2 px-6 flex items-center justify-center gap-2 self-end h-[42px] min-w-[100px]"
                             >
                                 {loading ? '...' : <Search size={18} />} 查詢
                             </button>
@@ -290,48 +292,71 @@ export default function ReportPage({ user, apiUrl }) {
 
                             <div className="overflow-auto flex-1">
                                 {viewMode === 'SALES' ? (
-                                    <table className="w-full text-left text-sm">
-                                        <thead className="bg-slate-50 text-slate-500 sticky top-0 z-10">
-                                            <tr>
-                                                <th className="p-3 font-medium w-48">日期</th>
-                                                <th className="p-3 font-medium w-32">銷售對象</th>
-                                                <th className="p-3 font-medium w-32">業務</th>
-                                                <th className="p-3 font-medium">商品</th>
-                                                <th className="p-3 font-medium text-right w-24">數量</th>
-                                                <th className="p-3 font-medium text-right w-32">金額</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100 text-slate-600 bg-white">
+                                    <>
+                                        {/* Mobile Card View (SALES) */}
+                                        <div className="md:hidden divide-y divide-slate-100">
                                             {reportData.map((item, idx) => (
-                                                <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="p-3 text-slate-500">
-                                                        {new Date(item.date).toLocaleString('zh-TW', {
-                                                            year: 'numeric', month: '2-digit', day: '2-digit',
-                                                            hour: '2-digit', minute: '2-digit', hour12: false
-                                                        })}
-                                                    </td>
-                                                    <td className="p-3">{item.location}</td>
-                                                    <td className="p-3">{item.salesRep}</td>
-                                                    <td className="p-3 text-slate-900">{item.productName}</td>
-                                                    <td className="p-3 text-right">{item.soldQty}</td>
-                                                    <td className="p-3 text-right">${item.totalAmount}</td>
-                                                </tr>
+                                                <div key={idx} className="p-4 space-y-3 bg-white hover:bg-slate-50 transition-colors">
+                                                    <div className="flex justify-between items-start">
+                                                        <div className="text-xs font-mono text-slate-400">
+                                                            {new Date(item.date).toLocaleString('zh-TW', {
+                                                                year: 'numeric', month: '2-digit', day: '2-digit',
+                                                                hour: '2-digit', minute: '2-digit', hour12: false
+                                                            })}
+                                                        </div>
+                                                        <div className="text-emerald-600 font-bold font-mono text-lg">${item.totalAmount}</div>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-2 text-sm">
+                                                        <div className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md">
+                                                            <MapPin size={12} /> <span className="font-medium">{item.location}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1 bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                                                            <User size={12} /> <span>{item.salesRep}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex justify-between items-center pt-1 border-t border-slate-50">
+                                                        <div className="font-bold text-slate-800">{item.productName}</div>
+                                                        <div className="text-slate-500">數量: <span className="font-bold text-slate-900">{item.soldQty}</span></div>
+                                                    </div>
+                                                </div>
                                             ))}
-                                        </tbody>
-                                    </table>
+                                        </div>
+
+                                        {/* Desktop Table View (SALES) */}
+                                        <table className="hidden md:table w-full text-left text-sm">
+                                            <thead className="bg-slate-50 text-slate-500 sticky top-0 z-10">
+                                                <tr>
+                                                    <th className="p-3 font-medium w-48">日期</th>
+                                                    <th className="p-3 font-medium w-32">銷售對象</th>
+                                                    <th className="p-3 font-medium w-32">業務</th>
+                                                    <th className="p-3 font-medium">商品</th>
+                                                    <th className="p-3 font-medium text-right w-24">數量</th>
+                                                    <th className="p-3 font-medium text-right w-32">金額</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 text-slate-600 bg-white">
+                                                {reportData.map((item, idx) => (
+                                                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                                        <td className="p-3 text-slate-500">
+                                                            {new Date(item.date).toLocaleString('zh-TW', {
+                                                                year: 'numeric', month: '2-digit', day: '2-digit',
+                                                                hour: '2-digit', minute: '2-digit', hour12: false
+                                                            })}
+                                                        </td>
+                                                        <td className="p-3">{item.location}</td>
+                                                        <td className="p-3">{item.salesRep}</td>
+                                                        <td className="p-3 text-slate-900">{item.productName}</td>
+                                                        <td className="p-3 text-right">{item.soldQty}</td>
+                                                        <td className="p-3 text-right">${item.totalAmount}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </>
                                 ) : (
-                                    <table className="w-full text-left text-sm">
-                                        <thead className="bg-slate-50 text-slate-500 sticky top-0 z-10">
-                                            <tr>
-                                                <th className="p-3 font-medium w-48">日期</th>
-                                                <th className="p-3 font-medium w-32">對象/備註</th>
-                                                <th className="p-3 font-medium w-32">業務</th>
-                                                <th className="p-3 font-medium">支出細項</th>
-                                                <th className="p-3 font-medium text-right w-28">總支出</th>
-                                                <th className="p-3 font-medium text-right w-28 text-emerald-600">結算金額</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100 text-slate-600 bg-white">
+                                    <>
+                                        {/* Mobile Card View (EXPENSES) */}
+                                        <div className="md:hidden divide-y divide-slate-100">
                                             {expenseData.map((item, idx) => {
                                                 const cats = [];
                                                 if (item.stall) cats.push(`攤位 $${item.stall}`);
@@ -349,27 +374,92 @@ export default function ReportPage({ user, apiUrl }) {
                                                 if (item.salary) cats.push(`薪資 $${item.salary}`);
 
                                                 return (
-                                                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                                        <td className="p-3 text-slate-500">
-                                                            {new Date(item.date).toLocaleString('zh-TW', {
-                                                                year: 'numeric', month: '2-digit', day: '2-digit',
-                                                                hour: '2-digit', minute: '2-digit', hour12: false
-                                                            })}
-                                                        </td>
-                                                        <td className="p-3 font-bold text-slate-900">{item.customer || item.note || '-'}</td>
-                                                        <td className="p-3">{item.salesRep}</td>
-                                                        <td className="p-3 text-xs text-slate-400">{cats.join(', ')}</td>
-                                                        <td className="p-3 text-right font-mono text-rose-600">
-                                                            ${(item.rowTotal || 0).toLocaleString()}
-                                                        </td>
-                                                        <td className="p-3 text-right font-mono font-bold text-emerald-600">
-                                                            ${(Number(item.displayFinalTotal) || 0).toLocaleString()}
-                                                        </td>
-                                                    </tr>
+                                                    <div key={idx} className="p-4 space-y-3 bg-white hover:bg-slate-50 transition-colors">
+                                                        <div className="flex justify-between items-start">
+                                                            <div className="text-xs font-mono text-slate-400">
+                                                                {new Date(item.date).toLocaleString('zh-TW', {
+                                                                    year: 'numeric', month: '2-digit', day: '2-digit',
+                                                                    hour: '2-digit', minute: '2-digit', hour12: false
+                                                                })}
+                                                            </div>
+                                                            <div className="flex flex-col items-end">
+                                                                <div className="text-emerald-600 font-bold font-mono text-lg">${Number(item.displayFinalTotal).toLocaleString()}</div>
+                                                                <div className="text-[10px] text-slate-400 font-mono">支出: ${Number(item.rowTotal).toLocaleString()}</div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2 text-sm">
+                                                            <div className="flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md">
+                                                                <MapPin size={12} /> <span className="font-medium">{item.customer || item.note || '-'}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-1 bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                                                                <User size={12} /> <span>{item.salesRep}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="pt-2 border-t border-slate-50">
+                                                            <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">支出細項</p>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {cats.map((c, i) => (
+                                                                    <span key={i} className="text-[10px] bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded border border-slate-100">{c}</span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 );
                                             })}
-                                        </tbody>
-                                    </table>
+                                        </div>
+
+                                        {/* Desktop Table View (EXPENSES) */}
+                                        <table className="hidden md:table w-full text-left text-sm">
+                                            <thead className="bg-slate-50 text-slate-500 sticky top-0 z-10">
+                                                <tr>
+                                                    <th className="p-3 font-medium w-48">日期</th>
+                                                    <th className="p-3 font-medium w-32">對象/備註</th>
+                                                    <th className="p-3 font-medium w-32">業務</th>
+                                                    <th className="p-3 font-medium">支出細項</th>
+                                                    <th className="p-3 font-medium text-right w-28">總支出</th>
+                                                    <th className="p-3 font-medium text-right w-28 text-emerald-600">結算金額</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 text-slate-600 bg-white">
+                                                {expenseData.map((item, idx) => {
+                                                    const cats = [];
+                                                    if (item.stall) cats.push(`攤位 $${item.stall}`);
+                                                    if (item.cleaning) cats.push(`清潔 $${item.cleaning}`);
+                                                    if (item.electricity) cats.push(`電費 $${item.electricity}`);
+                                                    if (item.gas) cats.push(`加油 $${item.gas}`);
+                                                    if (item.parking) cats.push(`停車 $${item.parking}`);
+                                                    if (item.goods) cats.push(`貨款 $${item.goods}`);
+                                                    if (item.bags) cats.push(`塑膠袋 $${item.bags}`);
+                                                    if (item.others) cats.push(`其他 $${item.others}`);
+                                                    if (item.linePay) cats.push(`Line Pay $${item.linePay}`);
+                                                    if (item.serviceFee) cats.push(`服務費 $${item.serviceFee}`);
+                                                    if (item.reserve) cats.push(`公積金 $${item.reserve}`);
+                                                    if (item.vehicleMaintenance) cats.push(`車輛保養 $${item.vehicleMaintenance}`);
+                                                    if (item.salary) cats.push(`薪資 $${item.salary}`);
+
+                                                    return (
+                                                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                                            <td className="p-3 text-slate-500">
+                                                                {new Date(item.date).toLocaleString('zh-TW', {
+                                                                    year: 'numeric', month: '2-digit', day: '2-digit',
+                                                                    hour: '2-digit', minute: '2-digit', hour12: false
+                                                                })}
+                                                            </td>
+                                                            <td className="p-3 font-bold text-slate-900">{item.customer || item.note || '-'}</td>
+                                                            <td className="p-3">{item.salesRep}</td>
+                                                            <td className="p-3 text-xs text-slate-400">{cats.join(', ')}</td>
+                                                            <td className="p-3 text-right font-mono text-rose-600">
+                                                                ${(item.rowTotal || 0).toLocaleString()}
+                                                            </td>
+                                                            <td className="p-3 text-right font-mono font-bold text-emerald-600">
+                                                                ${(Number(item.displayFinalTotal) || 0).toLocaleString()}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </>
                                 )}
                             </div>
                         </div>
