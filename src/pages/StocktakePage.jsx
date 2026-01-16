@@ -64,7 +64,7 @@ export default function StocktakePage({ user, apiUrl }) {
         }
     };
 
-    const handleKeyDown = (e, rowIdx, field, items) => {
+    const handleKeyDown = (e, rowIdx, field, items, isMobile = false) => {
         const currentItem = items[rowIdx];
         const rowKey = getRowKey(currentItem);
         const entry = stocktakeData[rowKey] || {};
@@ -73,6 +73,7 @@ export default function StocktakePage({ user, apiUrl }) {
 
         const fields = ['qty', 'reason', 'acc'];
         const fieldIdx = fields.indexOf(field);
+        const prefix = isMobile ? 'm-' : '';
 
         if (e.key === 'ArrowRight' || (e.key === 'Enter' && !e.shiftKey)) {
             e.preventDefault();
@@ -80,27 +81,27 @@ export default function StocktakePage({ user, apiUrl }) {
             if (field === 'qty' && !hasDiff) {
                 // Skip reason/acc if no diff
                 if (rowIdx < items.length - 1) {
-                    focusAndSelect(`qty-${getRowKey(items[rowIdx + 1])}`);
+                    focusAndSelect(`${prefix}qty-${getRowKey(items[rowIdx + 1])}`);
                 }
             } else if (fieldIdx < fields.length - 1) {
-                focusAndSelect(`${fields[fieldIdx + 1]}-${rowKey}`);
+                focusAndSelect(`${prefix}${fields[fieldIdx + 1]}-${rowKey}`);
             } else if (rowIdx < items.length - 1) {
-                focusAndSelect(`qty-${getRowKey(items[rowIdx + 1])}`);
+                focusAndSelect(`${prefix}qty-${getRowKey(items[rowIdx + 1])}`);
             }
         } else if (e.key === 'ArrowLeft') {
             e.preventDefault();
             if (fieldIdx > 0) {
-                focusAndSelect(`${fields[fieldIdx - 1]}-${rowKey}`);
+                focusAndSelect(`${prefix}${fields[fieldIdx - 1]}-${rowKey}`);
             }
         } else if (e.key === 'ArrowDown') {
             e.preventDefault();
             if (rowIdx < items.length - 1) {
-                focusAndSelect(`${field}-${getRowKey(items[rowIdx + 1])}`);
+                focusAndSelect(`${prefix}${field}-${getRowKey(items[rowIdx + 1])}`);
             }
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             if (rowIdx > 0) {
-                focusAndSelect(`${field}-${getRowKey(items[rowIdx - 1])}`);
+                focusAndSelect(`${prefix}${field}-${getRowKey(items[rowIdx - 1])}`);
             }
         }
     };
@@ -206,7 +207,7 @@ export default function StocktakePage({ user, apiUrl }) {
     const originalItems = filteredInventory.filter(item => item.type !== 'STOCK');
 
     const renderStocktakeTable = (items, title, Icon, colorClass, isStockType) => (
-        <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col shadow-sm">
+        <div className="hidden md:flex bg-white rounded-xl border border-slate-200 p-6 flex-col shadow-sm">
             <h3 className={`text-lg font-bold mb-4 flex items-center gap-2 ${colorClass}`}>
                 <Icon size={20} /> {title}
                 {!isStockType && <span className="text-xs text-slate-500 font-normal ml-2">（無需盤點）</span>}
@@ -308,6 +309,106 @@ export default function StocktakePage({ user, apiUrl }) {
         </div>
     );
 
+    const renderStocktakeCards = (items, title, Icon, colorClass, isStockType) => (
+        <div className="md:hidden flex flex-col gap-4">
+            <h3 className={`text-lg font-bold flex items-center gap-2 ${colorClass} px-1`}>
+                <Icon size={20} /> {title}
+                {!isStockType && <span className="text-xs text-slate-500 font-normal ml-2">（無需盤點）</span>}
+            </h3>
+            <div className="space-y-4">
+                {loading ? (
+                    <div className="text-center py-8 text-slate-500">載入中...</div>
+                ) : items.length === 0 ? (
+                    <div className="text-center py-8 text-slate-500 bg-white rounded-xl border border-slate-200">無資料</div>
+                ) : (
+                    items.map((item, idx) => {
+                        if (!item) return null;
+                        const rowKey = getRowKey(item);
+                        const entry = stocktakeData[rowKey] || { physicalQty: '', reason: '', accountability: user.username || '' };
+                        const diff = calculateDiff(item.quantity, entry.physicalQty);
+                        const hasDiff = entry.physicalQty !== '' && diff !== 0;
+
+                        // Highlight original items with quantity > 0
+                        const hasQuantity = !isStockType && Number(item.quantity) > 0;
+
+                        return (
+                            <div key={rowKey} className={`bg-white rounded-xl p-4 border shadow-sm space-y-3 ${isStockType && hasDiff ? 'border-amber-200 bg-amber-50' :
+                                    hasQuantity ? 'border-orange-200 bg-orange-50' : 'border-slate-200'
+                                }`}>
+                                {/* Header: Product Name & System Stock */}
+                                <div className="flex justify-between items-start border-b border-slate-100 pb-2">
+                                    <span className={`font-bold text-lg ${hasQuantity ? 'text-orange-700' : 'text-slate-800'}`}>
+                                        {item.productName || '未命名商品'}
+                                    </span>
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-xs text-slate-400">帳面庫存</span>
+                                        <span className={`font-mono text-lg font-bold ${hasQuantity ? 'text-orange-600' : 'text-slate-600'}`}>
+                                            {item.quantity}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {isStockType && (
+                                    <>
+                                        {/* Physical Qty Input */}
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-sm font-bold text-slate-600 min-w-[70px]">實盤數量:</label>
+                                            <input
+                                                id={`m-qty-${rowKey}`}
+                                                type="number"
+                                                className={`input-field flex-1 text-right font-mono py-2 ${hasDiff ? 'border-red-300 text-red-700 bg-white' : ''}`}
+                                                placeholder="輸入數量"
+                                                value={entry.physicalQty}
+                                                onChange={(e) => handleInputChange(rowKey, 'physicalQty', e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'qty', items, true)}
+                                            />
+                                            {/* Diff Indicator */}
+                                            <div className="w-12 text-right">
+                                                <span className={`font-mono font-bold ${entry.physicalQty === '' || !hasDiff ? 'text-slate-300' : 'text-red-500'}`}>
+                                                    {entry.physicalQty !== '' ? (diff > 0 ? `+${diff}` : diff) : '-'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Reason & Accountability (Only show if Diff exists) */}
+                                        {hasDiff && (
+                                            <div className="bg-white/50 p-3 rounded-lg border border-amber-100 space-y-3">
+                                                <div className="flex flex-col gap-1">
+                                                    <label className="text-xs font-bold text-slate-500">差異原因</label>
+                                                    <input
+                                                        id={`m-reason-${rowKey}`}
+                                                        type="text"
+                                                        className="input-field w-full text-sm"
+                                                        placeholder="請說明差異原因..."
+                                                        value={entry.reason}
+                                                        onChange={(e) => handleInputChange(rowKey, 'reason', e.target.value)}
+                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'reason', items, true)}
+                                                    />
+                                                </div>
+                                                <div className="flex flex-col gap-1">
+                                                    <label className="text-xs font-bold text-slate-500">責任歸屬</label>
+                                                    <input
+                                                        id={`m-acc-${rowKey}`}
+                                                        type="text"
+                                                        className="input-field w-full text-sm"
+                                                        placeholder="責任人姓名"
+                                                        value={entry.accountability}
+                                                        onChange={(e) => handleInputChange(rowKey, 'accountability', e.target.value)}
+                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'acc', items, true)}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        );
+                    })
+                )}
+            </div>
+        </div>
+    );
+
     return (
         <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6 flex flex-col h-[calc(100vh-6rem)] relative">
             {submitting && (
@@ -316,63 +417,115 @@ export default function StocktakePage({ user, apiUrl }) {
                     <p className="text-lg font-bold text-slate-800">盤點存盤中，請稍後...</p>
                 </div>
             )}
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <CheckSquare className="text-blue-600" /> 庫存盤點
-                    </h1>
-                    <p className="text-slate-500 text-sm mt-1">現貨進貨需核對盤點，原貨退貨無需盤點</p>
+            {/* Desktop Header & Controls (Hidden on Mobile) */}
+            <div className="hidden md:flex flex-col gap-6 shrink-0">
+                <div className="flex justify-between items-center gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                            <CheckSquare className="text-blue-600" /> 庫存盤點
+                        </h1>
+                        <p className="text-slate-500 text-sm mt-1">現貨進貨需核對盤點，原貨退貨無需盤點</p>
+                    </div>
+
+                    <div className="flex gap-3">
+                        <button
+                            onClick={fetchInventory}
+                            className="btn-secondary h-[42px] px-4"
+                            title="重新載入庫存"
+                        >
+                            <RotateCcw size={18} />
+                        </button>
+                        <button
+                            onClick={handleSubmit}
+                            disabled={submitting}
+                            className="btn-primary h-[42px] px-6 flex items-center gap-2"
+                        >
+                            {submitting ? '提交中...' : <><Save size={18} /> 提交盤點結果</>}
+                        </button>
+                    </div>
                 </div>
 
-                <div className="flex gap-3">
-                    <button
-                        onClick={fetchInventory}
-                        className="btn-secondary h-[42px] px-4"
-                        title="重新載入庫存"
-                    >
-                        <RotateCcw size={18} />
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={submitting}
-                        className="btn-primary h-[42px] px-6 flex items-center gap-2"
-                    >
-                        {submitting ? '提交中...' : <><Save size={18} /> 提交盤點結果</>}
-                    </button>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex gap-4 items-center">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder="搜尋產品名稱..."
+                            className="input-field pl-10 w-full bg-white"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-3 bg-white p-2 px-4 rounded-xl border border-slate-200 shadow-sm shrink-0">
+                        <label className="text-sm font-bold text-slate-600 flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                checked={showZeroStock}
+                                onChange={(e) => setShowZeroStock(e.target.checked)}
+                            />
+                            顯示庫存為 0 的品項
+                        </label>
+                    </div>
                 </div>
             </div>
 
-            {/* Controls */}
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shrink-0 flex flex-col md:flex-row gap-4 items-center">
-                <div className="relative flex-1 w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input
-                        type="text"
-                        placeholder="搜尋產品名稱..."
-                        className="input-field pl-10 w-full bg-white"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+            {/* Mobile Header & Controls (Visible only on Mobile) */}
+            <div className="md:hidden flex flex-col gap-3 shrink-0">
+                <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <CheckSquare className="text-blue-600" /> 庫存盤點
+                </h1>
+
+                {/* Row 1: Search + Refresh */}
+                <div className="flex gap-2">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder="搜尋產品..."
+                            className="input-field pl-10 w-full bg-white"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <button
+                        onClick={fetchInventory}
+                        className="btn-secondary px-3 flex items-center justify-center shrink-0"
+                        title="重新整理"
+                    >
+                        <RotateCcw size={20} />
+                    </button>
                 </div>
 
-                <div className="flex items-center gap-3 bg-white p-2 px-4 rounded-xl border border-slate-200 shadow-sm shrink-0">
-                    <label className="text-sm font-bold text-slate-600 flex items-center gap-2 cursor-pointer">
+                {/* Row 2: Show Zero Stock + Submit */}
+                <div className="flex gap-2">
+                    <div className="flex-1 flex items-center justify-center gap-2 bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-sm">
                         <input
                             type="checkbox"
                             className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                             checked={showZeroStock}
                             onChange={(e) => setShowZeroStock(e.target.checked)}
                         />
-                        顯示庫存為 0 的品項
-                    </label>
+                        <span className="text-xs font-bold text-slate-600">顯示 0 庫存</span>
+                    </div>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={submitting}
+                        className="btn-primary flex-1 py-2 flex items-center justify-center gap-2 text-sm"
+                    >
+                        {submitting ? '...' : <><Save size={16} /> 提交盤點</>}
+                    </button>
                 </div>
             </div>
 
             {/* Tables */}
-            <div className="flex-1 overflow-y-auto flex flex-col gap-6 pb-6">
+            <div className="flex-1 overflow-y-auto flex flex-col gap-6 pb-6 w-full">
                 {renderStocktakeTable(stockItems, "現貨進貨", Package, "text-blue-600", true)}
+                {renderStocktakeCards(stockItems, "現貨進貨", Package, "text-blue-600", true)}
+
                 {renderStocktakeTable(originalItems, "原貨/退貨", AlertCircle, "text-orange-600", false)}
+                {renderStocktakeCards(originalItems, "原貨/退貨", AlertCircle, "text-orange-600", false)}
             </div>
         </div>
     );
