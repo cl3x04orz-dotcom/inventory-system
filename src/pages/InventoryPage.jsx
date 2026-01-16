@@ -137,35 +137,36 @@ export default function InventoryPage({ user, apiUrl }) {
         }
     };
 
-    const handleSafetyKeyDown = (e, idx, field, items) => {
+    const handleSafetyKeyDown = (e, idx, field, items, isMobile = false) => {
         const item = items[idx];
+        const prefix = isMobile ? 'm-' : '';
         if (e.key === 'Enter' || e.key === 'ArrowRight') {
             e.preventDefault();
             if (field === 'case') {
-                focusAndSelect(`safety-input-${item.productName}-${item.batchId}`);
+                focusAndSelect(`${prefix}safety-input-${item.productName}-${item.batchId}`);
             } else if (idx < items.length - 1) {
                 const next = items[idx + 1];
-                focusAndSelect(`case-input-${next.productName}-${next.batchId}`);
+                focusAndSelect(`${prefix}case-input-${next.productName}-${next.batchId}`);
             }
         } else if (e.key === 'ArrowLeft') {
             e.preventDefault();
             if (field === 'safety') {
-                focusAndSelect(`case-input-${item.productName}-${item.batchId}`);
+                focusAndSelect(`${prefix}case-input-${item.productName}-${item.batchId}`);
             } else if (idx > 0) {
                 const prev = items[idx - 1];
-                focusAndSelect(`safety-input-${prev.productName}-${prev.batchId}`);
+                focusAndSelect(`${prefix}safety-input-${prev.productName}-${prev.batchId}`);
             }
         } else if (e.key === 'ArrowDown') {
             e.preventDefault();
             if (idx < items.length - 1) {
                 const next = items[idx + 1];
-                focusAndSelect(`${field}-input-${next.productName}-${next.batchId}`);
+                focusAndSelect(`${prefix}${field}-input-${next.productName}-${next.batchId}`);
             }
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             if (idx > 0) {
                 const prev = items[idx - 1];
-                focusAndSelect(`${field}-input-${prev.productName}-${prev.batchId}`);
+                focusAndSelect(`${prefix}${field}-input-${prev.productName}-${prev.batchId}`);
             }
         }
     };
@@ -198,7 +199,7 @@ export default function InventoryPage({ user, apiUrl }) {
     });
 
     const renderInventoryTable = (items, title, Icon, colorClass) => (
-        <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col shadow-sm">
+        <div className="hidden md:flex bg-white rounded-xl border border-slate-200 p-6 flex-col shadow-sm">
             <h3 className={`text-lg font-bold mb-4 flex items-center gap-2 ${colorClass}`}>
                 <Icon size={20} /> {title}
             </h3>
@@ -314,24 +315,133 @@ export default function InventoryPage({ user, apiUrl }) {
         </div>
     );
 
+    const renderInventoryCards = (items, title, Icon, colorClass) => (
+        <div className="md:hidden flex flex-col gap-4">
+            <h3 className={`text-lg font-bold flex items-center gap-2 ${colorClass} px-1`}>
+                <Icon size={20} /> {title}
+            </h3>
+            <div className="space-y-4">
+                {loading ? (
+                    <div className="text-center py-8 text-slate-500">載入中...</div>
+                ) : items.length === 0 ? (
+                    <div className="text-center py-8 text-slate-500 bg-white rounded-xl border border-slate-200">無資料</div>
+                ) : (
+                    items.map((item, idx) => {
+                        const safetyLevel = safetyStocks[item.productName] || 0;
+                        const customCaseSize = customCaseSizes[item.productName];
+                        const currentCaseSize = customCaseSize !== undefined && customCaseSize !== 0 ? customCaseSize : (CASE_MAP[item.productName] || 0);
+
+                        const totalQty = productTotals[item.productName] || 0;
+                        const isLowStock = safetyLevel > 0 && totalQty <= safetyLevel;
+
+                        const expiryDate = item.expiry ? new Date(item.expiry) : null;
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const threeDaysLater = new Date(today);
+                        threeDaysLater.setDate(today.getDate() + 3);
+
+                        const isExpiringSoon = expiryDate && expiryDate >= today && expiryDate <= threeDaysLater;
+                        const isExpired = expiryDate && expiryDate < today;
+
+                        return (
+                            <div key={idx} className={`bg-white rounded-xl p-4 border shadow-sm ${isLowStock ? 'border-red-200 bg-red-50' : 'border-slate-200'}`}>
+                                {/* Header: Product Name & Stock */}
+                                <div className="flex justify-between items-start mb-3 border-b border-slate-100 pb-2">
+                                    <div className="flex items-center gap-2">
+                                        {isLowStock && <AlertTriangle size={18} className="text-red-500" />}
+                                        <span className="font-bold text-slate-800 text-lg">{item.productName}</span>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-2xl font-bold text-emerald-600 font-mono">{item.quantity}</div>
+                                        {currentCaseSize > 0 && (
+                                            <div className="text-xs text-blue-600 font-mono">
+                                                箱：{(item.quantity / currentCaseSize).toFixed(1)}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Details Grid */}
+                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                    <div className="bg-slate-50 p-2 rounded-lg">
+                                        <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">效期</span>
+                                        <div className="flex flex-col">
+                                            <span className={`text-sm font-medium ${isExpired ? 'text-rose-600 line-through' : isExpiringSoon ? 'text-amber-600 font-bold' : 'text-slate-600'}`}>
+                                                {formatDate(item.expiry)}
+                                            </span>
+                                            {isExpiringSoon && (
+                                                <span className="text-[10px] text-amber-600 flex items-center gap-1 mt-0.5">
+                                                    <Clock size={10} /> 即將過期
+                                                </span>
+                                            )}
+                                            {isExpired && (
+                                                <span className="text-[10px] text-rose-600 flex items-center gap-1 mt-0.5">
+                                                    <AlertTriangle size={10} /> 已過期
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="bg-slate-50 p-2 rounded-lg flex flex-col justify-between">
+                                        <div className="flex items-center justify-between gap-1 mb-1">
+                                            <span className="text-[10px] text-slate-400 uppercase font-bold">箱規</span>
+                                            <input
+                                                id={`m-case-input-${item.productName}-${item.batchId}`}
+                                                type="number"
+                                                className="w-12 text-center text-xs p-0.5 rounded border border-blue-200 bg-white"
+                                                value={customCaseSize !== undefined ? customCaseSize : (CASE_MAP[item.productName] || '')}
+                                                onChange={(e) => updateCustomCaseSize(item.productName, e.target.value)}
+                                                onKeyDown={(e) => handleSafetyKeyDown(e, idx, 'case', items, true)}
+                                            />
+                                        </div>
+                                        <div className="flex items-center justify-between gap-1">
+                                            <span className="text-[10px] text-slate-400 uppercase font-bold">低標</span>
+                                            <input
+                                                id={`m-safety-input-${item.productName}-${item.batchId}`}
+                                                type="number"
+                                                className="w-12 text-center text-xs p-0.5 rounded border border-amber-200 bg-white"
+                                                value={tempSafetyInput[item.productName] !== undefined ? tempSafetyInput[item.productName] : (safetyStocks[item.productName] || '')}
+                                                onChange={(e) => handleSafetyInputChange(item.productName, e.target.value)}
+                                                onBlur={() => handleSafetyInputBlur(item.productName)}
+                                                onKeyDown={(e) => handleSafetyKeyDown(e, idx, 'safety', items, true)}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Footer: Action */}
+                                <button
+                                    onClick={() => handleAdjustment(item)}
+                                    className="w-full btn-secondary py-2 flex items-center justify-center gap-2 text-sm"
+                                >
+                                    <Trash2 size={16} /> 庫存異動
+                                </button>
+                            </div>
+                        );
+                    })
+                )}
+            </div>
+        </div>
+    );
+
     return (
         <div className="max-w-6xl mx-auto h-[calc(100vh-6rem)] flex flex-col p-4 gap-4">
-            <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                <h2 className="text-2xl font-bold flex items-center gap-2 text-slate-800">
+            {/* Search Bar - Responsive */}
+            <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm gap-4">
+                <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2 text-slate-800">
                     <Package className="text-blue-600" /> 庫存檢視
                 </h2>
-                <div className="flex gap-4">
-                    <div className="relative">
+                <div className="flex gap-2 w-full md:w-auto">
+                    <div className="relative flex-1 md:flex-none">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input
                             type="text"
                             placeholder="搜尋產品..."
-                            className="input-field pl-10 w-64 bg-white"
+                            className="input-field pl-10 w-full md:w-64 bg-white"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <button onClick={fetchInventory} className="btn-secondary p-2" title="重新整理">
+                    <button onClick={fetchInventory} className="btn-secondary p-2 whitespace-nowrap" title="重新整理">
                         <RefreshCw size={20} />
                     </button>
                 </div>
@@ -339,7 +449,10 @@ export default function InventoryPage({ user, apiUrl }) {
 
             <div className="flex-1 overflow-y-auto flex flex-col gap-6 pb-6">
                 {renderInventoryTable(stockItems, "現貨進貨", Package, "text-blue-600")}
+                {renderInventoryCards(stockItems, "現貨進貨", Package, "text-blue-600")}
+
                 {renderInventoryTable(originalItems, "原貨/退貨", AlertCircle, "text-orange-600")}
+                {renderInventoryCards(originalItems, "原貨/退貨", AlertCircle, "text-orange-600")}
             </div>
 
             {showAdjustModal && (
