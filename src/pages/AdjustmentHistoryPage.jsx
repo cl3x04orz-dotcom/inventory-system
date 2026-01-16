@@ -48,16 +48,16 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
         <div className="max-w-[90rem] mx-auto p-4">
             <div className="glass-panel p-6">
                 {/* Header & Stats */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-6 border-b border-slate-200 pb-6">
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                <div className="flex flex-row justify-between items-start md:items-center mb-6 gap-3 md:gap-6 border-b border-slate-200 pb-6">
+                    <div className="flex-1">
+                        <h1 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2">
                             <ClipboardList className="text-blue-600" /> 庫存異動
                         </h1>
-                        <p className="text-slate-500 text-sm mt-1">查看庫存的手動調整記錄</p>
+                        <p className="text-slate-500 text-xs md:text-sm mt-1">查看庫存的手動調整記錄</p>
                     </div>
 
-                    <div className="flex gap-4 w-full md:w-auto">
-                        <div className="flex-1 md:flex-none px-5 py-2 rounded-xl bg-blue-50 border border-blue-200 flex md:block items-center justify-center gap-2">
+                    <div className="flex gap-4 shrink-0">
+                        <div className="px-3 md:px-5 py-2 rounded-xl bg-blue-50 border border-blue-200 flex md:block items-center justify-center gap-2">
                             <p className="text-xs text-slate-500 uppercase font-bold text-center">總記錄數</p>
                             <p className="text-xl font-bold text-blue-600 text-center">{filtered.length}</p>
                         </div>
@@ -103,7 +103,7 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                             <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
                             <input
                                 type="date"
-                                className="input-field w-full text-sm"
+                                className="input-field w-full text-sm min-w-0"
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
                             />
@@ -114,7 +114,7 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                             <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
                             <input
                                 type="date"
-                                className="input-field w-full text-sm"
+                                className="input-field w-full text-sm min-w-0"
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
                             />
