@@ -273,7 +273,7 @@ export default function App() {
 
                     {/* Mobile Dropdown Panel */}
                     {mobileMenuOpen && (
-                        <div className="absolute top-full left-0 mt-3 w-[85vw] max-w-sm bg-white/95 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-2xl overflow-y-auto max-h-[80vh] animate-in fade-in slide-in-from-top-4 duration-200 z-[100]">
+                        <div className="fixed top-16 left-0 right-0 mx-auto mt-2 w-[90%] max-w-md bg-white/95 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-2xl overflow-y-auto max-h-[80vh] animate-in fade-in slide-in-from-top-4 duration-200 z-[100]">
                             <div className="p-2 flex flex-col">
                                 {/* 銷售管理 Group */}
                                 {(user.role === 'BOSS' || checkPermission('sales') || checkPermission('report')) && (

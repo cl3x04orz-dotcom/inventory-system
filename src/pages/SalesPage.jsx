@@ -285,14 +285,14 @@ export default function SalesPage({ user, apiUrl }) {
             )}
             {/* Product Table */}
             <div className="xl:col-span-2 glass-panel p-6 overflow-hidden flex flex-col h-auto min-h-[60vh] xl:h-[calc(100vh-10rem)]">
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
                     <h2 className="text-xl font-bold flex items-center gap-2 text-slate-800">
                         <RefreshCw size={20} className="text-blue-600" /> 商品銷售登錄
                     </h2>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full md:w-auto">
                         {/* Toggle on Left */}
-                        <div className="flex bg-slate-50 rounded-lg p-1 border border-slate-200">
+                        <div className="flex bg-slate-50 rounded-lg p-1 border border-slate-200 self-start md:self-auto">
                             <button
                                 onClick={() => setPaymentType('CASH')}
                                 className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${paymentType === 'CASH'
@@ -313,12 +313,12 @@ export default function SalesPage({ user, apiUrl }) {
                             </button>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <label className="text-sm text-slate-500 font-bold">銷售對象:</label>
+                        <div className="flex items-center gap-2 w-full md:w-auto">
+                            <label className="text-sm text-slate-500 font-bold whitespace-nowrap">銷售對象:</label>
                             <input
                                 id="input-location"
                                 type="text"
-                                className="input-field py-1 px-3 w-32 md:w-48"
+                                className="input-field py-1 px-3 w-full md:w-48"
                                 placeholder="輸入銷售對象..."
                                 value={location}
                                 onChange={(e) => setLocation(e.target.value)}
@@ -327,7 +327,81 @@ export default function SalesPage({ user, apiUrl }) {
                     </div>
                 </div>
                 <div className="flex-1 overflow-auto">
-                    <table className="w-full text-left border-collapse">
+                    {/* Mobile Card View (Visible on < md) */}
+                    <div className="md:hidden space-y-4">
+                        {rows.map((row, idx) => (
+                            <div key={row.id} className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                {/* Header: Name & Stock */}
+                                <div className="flex justify-between items-start mb-3">
+                                    <div className="font-bold text-slate-800 text-lg">{row.name}</div>
+                                    <div className="text-xs font-mono bg-white px-2 py-1 rounded border border-slate-200">
+                                        <span className="text-slate-400 mr-1">庫存</span>
+                                        <span className="text-blue-600 font-bold">{row.stock}</span>
+                                        <span className="text-slate-300 mx-1">/</span>
+                                        <span className="text-orange-600 font-bold">{row.originalStock || 0}</span>
+                                    </div>
+                                </div>
+
+                                {/* Inputs Grid */}
+                                <div className="grid grid-cols-4 gap-2 mb-3">
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] text-slate-500 text-center font-bold">領貨</label>
+                                        <input
+                                            id={`input-m-${idx}-picked`}
+                                            type="number"
+                                            className="input-field text-center p-2 text-base font-bold"
+                                            value={row.picked || ''}
+                                            onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] text-slate-500 text-center font-bold">原貨</label>
+                                        <input
+                                            id={`input-m-${idx}-original`}
+                                            type="number"
+                                            className="input-field text-center p-2 text-base font-bold"
+                                            value={row.original || ''}
+                                            onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] text-slate-500 text-center font-bold">退貨</label>
+                                        <input
+                                            id={`input-m-${idx}-returns`}
+                                            type="number"
+                                            className="input-field text-center p-2 text-base font-bold text-red-600"
+                                            value={row.returns || ''}
+                                            onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] text-slate-500 text-center font-bold">單價</label>
+                                        <input
+                                            id={`input-m-${idx}-price`}
+                                            type="number"
+                                            className="input-field text-center p-2 text-base font-bold"
+                                            value={row.price}
+                                            onChange={(e) => handleRowChange(row.id, 'price', e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Summary Footer */}
+                                <div className="flex justify-between items-center pt-2 border-t border-slate-200">
+                                    <div className="text-xs text-slate-500">
+                                        售出: <span className="font-bold text-blue-600 text-sm ml-1">{row.sold}</span>
+                                    </div>
+                                    <div className="text-sm font-bold text-emerald-600 font-mono">
+                                        <span className="text-xs text-slate-400 font-normal mr-1">小計</span>
+                                        ${row.subtotal?.toLocaleString()}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Desktop Table View (Hidden on < md) */}
+                    <table className="hidden md:table w-full text-left border-collapse">
                         <thead className="sticky top-0 bg-white z-10 text-slate-500 text-xs uppercase font-bold border-b border-slate-100">
                             <tr>
                                 <th className="p-3">品項</th>
