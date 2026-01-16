@@ -67,21 +67,6 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                 {/* Filter */}
                 <div className="mb-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
                     <div className="flex flex-col md:flex-row gap-4 items-end">
-                        {/* Mobile Order: 4. Product Name */}
-                        <div className="flex-1 space-y-1.5 w-full order-4 md:order-none">
-                            <label className="text-[10px] text-slate-500 font-bold uppercase px-1">商品名稱</label>
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                <input
-                                    type="text"
-                                    placeholder="搜尋商品名稱..."
-                                    className="input-field pl-10 w-full"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
                         {/* Mobile Order: 3. Type */}
                         <div className="w-full md:w-32 space-y-1.5 order-3 md:order-none">
                             <label className="text-[10px] text-slate-500 font-bold uppercase px-1">類型</label>
@@ -98,23 +83,38 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                             </select>
                         </div>
 
+                        {/* Mobile Order: 4. Product Name */}
+                        <div className="flex-1 space-y-1.5 w-full order-4 md:order-none">
+                            <label className="text-[10px] text-slate-500 font-bold uppercase px-1">商品名稱</label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="搜尋商品名稱..."
+                                    className="input-field pl-10 w-full"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
                         {/* Mobile Order: 1. Start Date */}
-                        <div className="w-full md:w-36 space-y-1.5 order-1 md:order-none">
+                        <div className="w-1/2 md:w-36 space-y-1.5 order-1 md:order-none">
                             <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
                             <input
                                 type="date"
-                                className="input-field w-full text-sm min-w-0"
+                                className="input-field w-full text-sm"
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
                             />
                         </div>
 
                         {/* Mobile Order: 2. End Date */}
-                        <div className="w-full md:w-36 space-y-1.5 order-2 md:order-none">
+                        <div className="w-1/2 md:w-36 space-y-1.5 order-2 md:order-none">
                             <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
                             <input
                                 type="date"
-                                className="input-field w-full text-sm min-w-0"
+                                className="input-field w-full text-sm"
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
                             />
