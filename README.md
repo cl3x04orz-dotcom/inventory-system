@@ -1,16 +1,46 @@
-# React + Vite
+# Inventory System (庫存管理系統)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+一個基於 React (Vite) 前端與 Google Apps Script (GAS) 後端的庫存管理系統。
 
-Currently, two official plugins are available:
+## 技術棧
+- 前端：React 19 (Vite)
+- 後端：Google Apps Script
+- 資料庫：Google Sheets (Google 試算表)
+- UI 庫：Lucide React, Tailwind CSS
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 環境變數設定
 
-## React Compiler
+本專案使用 Vite 開發，環境變數需以 `VITE_` 開頭。請參考 `.env.example` 建立 `.env` 檔案。
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```env
+VITE_GAS_API_URL=你的_GAS_API_網址
+```
 
-## Expanding the ESLint configuration
+## 本機開發
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+1. 複製儲存庫
+2. 執行 `npm install`
+3. 建立 `.env` 並填入 `VITE_GAS_API_URL`
+4. 執行 `npm run dev`
+
+## 自動化部署 (GitHub Actions)
+
+本專案已設定 GitHub Actions 自動部署至 GitHub Pages。
+
+### 1. 設定 GitHub Secrets
+為了安全起見，API 網址不應直接寫在工作流檔案中。請在 GitHub 儲存庫設定：
+1. 進入 GitHub Repository -> **Settings** -> **Secrets and variables** -> **Actions**。
+2. 點擊 **New repository secret**。
+3. Name: `VITE_GAS_API_URL`
+4. Value: (貼上您的 Google Apps Script 部署網址，例如：`https://script.google.com/macros/s/.../exec`)
+
+### 2. 觸發部署
+每當您推送到 `main` 分支時，GitHub Actions 會自動執行：
+- 安裝依賴
+- 帶入 `VITE_GAS_API_URL` 進行 Build
+- 將生成的 `dist` 目錄部署到 `gh-pages` 分支
+
+### 3. 開啟 GitHub Pages (首次設定)
+1. 進入 **Settings** -> **Pages**。
+2. Build and deployment -> Source 選擇 **Deploy from a branch**。
+3. Branch 選擇 `gh-pages` 且目錄為 `/(root)`。

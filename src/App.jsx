@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 
 // Google Apps Script (GAS) API Endpoint
-const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbzIoBBRytN2Qja-AUSILlXwdAnbwnU6nfil9403HYHXJH_KrvDy3lC9rQ_U8dlP9AIt/exec';
+const GAS_API_URL = import.meta.env.VITE_GAS_API_URL;
 
 const NavDropdown = ({ label, icon: Icon, active, children, id, openDropdown, setOpenDropdown }) => {
     const isOpen = openDropdown === id;
