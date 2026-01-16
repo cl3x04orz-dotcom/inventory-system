@@ -50,10 +50,10 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                 {/* Header & Stats */}
                 {/* Header & Stats */}
                 <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-200">
-                    <div className="flex items-center gap-3 overflow-hidden">
+                    <div className="flex items-center gap-3 overflow-hidden flex-1">
                         <ClipboardList className="text-blue-600 shrink-0" size={24} />
-                        <h1 className="text-xl md:text-2xl font-bold text-slate-800 truncate">庫存異動</h1>
-                        <div className="bg-blue-50 px-2 py-0.5 rounded border border-blue-100 shrink-0 flex items-center">
+                        <h1 className="text-2xl md:text-3xl font-bold text-slate-800 truncate">庫存異動</h1>
+                        <div className="bg-blue-50 px-2 py-0.5 rounded border border-blue-100 shrink-0 flex items-center ml-auto mr-2">
                             <span className="text-[10px] md:text-xs text-slate-500 font-bold uppercase mr-1">總記錄數</span>
                             <span className="text-sm md:text-xl font-bold text-blue-600">{filtered.length}</span>
                         </div>
@@ -72,22 +72,22 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                 {/* Filter */}
                 <div className="mb-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
                     <div className="flex flex-col md:flex-row gap-4">
-                        {/* Mobile: Date Range in separate rows */}
+                        {/* Mobile: Date Range in separate rows, horizontal alignment */}
                         <div className="w-full md:hidden flex flex-col gap-3">
-                            <div className="space-y-1">
-                                <label className="text-xs text-slate-500 font-bold uppercase px-1">開始日期</label>
+                            <div className="flex items-center justify-between gap-2">
+                                <label className="text-sm text-slate-500 font-bold uppercase whitespace-nowrap">開始日期</label>
                                 <input
                                     type="date"
-                                    className="input-field w-full text-sm px-2 py-2"
+                                    className="input-field flex-1 text-sm px-2 py-2 min-w-0 bg-white"
                                     value={startDate}
                                     onChange={(e) => setStartDate(e.target.value)}
                                 />
                             </div>
-                            <div className="space-y-1">
-                                <label className="text-xs text-slate-500 font-bold uppercase px-1">結束日期</label>
+                            <div className="flex items-center justify-between gap-2">
+                                <label className="text-sm text-slate-500 font-bold uppercase whitespace-nowrap">結束日期</label>
                                 <input
                                     type="date"
-                                    className="input-field w-full text-sm px-2 py-2"
+                                    className="input-field flex-1 text-sm px-2 py-2 min-w-0 bg-white"
                                     value={endDate}
                                     onChange={(e) => setEndDate(e.target.value)}
                                 />
