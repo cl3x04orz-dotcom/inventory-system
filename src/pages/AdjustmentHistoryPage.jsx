@@ -98,8 +98,30 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                             </div>
                         </div>
 
-                        {/* Mobile Order: 1. Start Date */}
-                        <div className="w-1/2 md:w-36 space-y-1.5 order-1 md:order-none">
+                        {/* Mobile: Date Range in Grid */}
+                        <div className="w-full md:hidden grid grid-cols-2 gap-2 order-1">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
+                                <input
+                                    type="date"
+                                    className="input-field w-full text-xs px-2 py-2"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
+                                <input
+                                    type="date"
+                                    className="input-field w-full text-xs px-2 py-2"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Desktop: Separate Date Inputs */}
+                        <div className="hidden md:block w-36 space-y-1.5">
                             <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
                             <input
                                 type="date"
@@ -109,8 +131,7 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                             />
                         </div>
 
-                        {/* Mobile Order: 2. End Date */}
-                        <div className="w-1/2 md:w-36 space-y-1.5 order-2 md:order-none">
+                        <div className="hidden md:block w-36 space-y-1.5">
                             <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
                             <input
                                 type="date"
@@ -123,7 +144,7 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                         <button
                             onClick={fetchHistory}
                             disabled={loading}
-                            className="btn-secondary h-[42px] flex items-center justify-center gap-2 whitespace-nowrap px-6 order-5 md:order-none"
+                            className="btn-secondary h-[42px] flex items-center justify-center gap-2 whitespace-nowrap px-6 order-last md:order-none"
                         >
                             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} /> 刷新
                         </button>
