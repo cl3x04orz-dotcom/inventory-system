@@ -48,32 +48,74 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
         <div className="max-w-[90rem] mx-auto p-4">
             <div className="glass-panel p-6">
                 {/* Header & Stats */}
-                <div className="flex flex-row justify-between items-start md:items-center mb-6 gap-3 md:gap-6 border-b border-slate-200 pb-6">
-                    <div className="flex-1">
-                        <h1 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2">
-                            <ClipboardList className="text-blue-600" /> 庫存異動
-                        </h1>
-                        <p className="text-slate-500 text-xs md:text-sm mt-1">查看庫存的手動調整記錄</p>
-                    </div>
-
-                    <div className="flex gap-4 shrink-0">
-                        <div className="px-3 md:px-5 py-2 rounded-xl bg-blue-50 border border-blue-200 flex md:block items-center justify-center gap-2">
-                            <p className="text-xs text-slate-500 uppercase font-bold text-center">總記錄數</p>
-                            <p className="text-xl font-bold text-blue-600 text-center">{filtered.length}</p>
+                {/* Header & Stats */}
+                <div className="flex items-center justify-between mb-6 gap-3 border-b border-slate-200 pb-4">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <ClipboardList className="text-blue-600 shrink-0" size={20} />
+                        <h1 className="text-lg md:text-2xl font-bold text-slate-800 truncate">庫存異動</h1>
+                        <div className="bg-blue-50 px-2 py-0.5 rounded border border-blue-100 shrink-0">
+                            <span className="text-[10px] md:text-xs text-slate-500 font-bold uppercase mr-1 hidden md:inline">總記錄數</span>
+                            <span className="text-xs md:text-xl font-bold text-blue-600">{filtered.length}</span>
                         </div>
                     </div>
+
+                    <button
+                        onClick={fetchHistory}
+                        disabled={loading}
+                        className="btn-secondary h-8 md:h-[42px] px-3 md:px-6 flex items-center justify-center gap-2 whitespace-nowrap text-xs md:text-sm shrink-0"
+                    >
+                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                        <span className="hidden md:inline">刷新</span>
+                    </button>
                 </div>
 
                 {/* Filter */}
                 <div className="mb-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="flex flex-col md:flex-row gap-4 items-end">
-                        {/* Mobile Order: 3. Type */}
-                        <div className="w-full md:w-32 space-y-1.5 order-3 md:order-none">
+                    <div className="flex flex-col md:flex-row gap-4">
+                        {/* Mobile: Date Range in Grid (Row 1) */}
+                        <div className="w-full md:hidden grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                                <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
+                                <input
+                                    type="date"
+                                    className="input-field w-full text-xs px-2 py-1.5 h-9"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
+                                <input
+                                    type="date"
+                                    className="input-field w-full text-xs px-2 py-1.5 h-9"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Row 2 on Mobile: Product Name (now swap with Type) */}
+                        <div className="flex-1 space-y-1.5 w-full md:order-none">
+                            <label className="text-[10px] text-slate-500 font-bold uppercase px-1">商品名稱</label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                <input
+                                    type="text"
+                                    placeholder="搜尋商品名稱..."
+                                    className="input-field pl-9 w-full text-sm h-9 md:h-10"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Row 3 on Mobile: Type */}
+                        <div className="w-full md:w-32 space-y-1.5 md:order-none">
                             <label className="text-[10px] text-slate-500 font-bold uppercase px-1">類型</label>
                             <select
                                 value={type}
                                 onChange={(e) => setType(e.target.value)}
-                                className="input-field w-full text-sm appearance-none bg-white font-medium"
+                                className="input-field w-full text-sm appearance-none bg-white font-medium h-9 md:h-10"
                             >
                                 <option value="ALL">全部類型</option>
                                 <option value="SCRAP">報廢</option>
@@ -83,49 +125,12 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                             </select>
                         </div>
 
-                        {/* Mobile Order: 4. Product Name */}
-                        <div className="flex-1 space-y-1.5 w-full order-4 md:order-none">
-                            <label className="text-[10px] text-slate-500 font-bold uppercase px-1">商品名稱</label>
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                <input
-                                    type="text"
-                                    placeholder="搜尋商品名稱..."
-                                    className="input-field pl-10 w-full"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Mobile: Date Range in Grid */}
-                        <div className="w-full md:hidden grid grid-cols-2 gap-2 order-1">
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
-                                <input
-                                    type="date"
-                                    className="input-field w-full text-xs px-2 py-2"
-                                    value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
-                                <input
-                                    type="date"
-                                    className="input-field w-full text-xs px-2 py-2"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Desktop: Separate Date Inputs */}
+                        {/* Desktop: Separate Date Inputs (Hidden on Mobile) */}
                         <div className="hidden md:block w-36 space-y-1.5">
                             <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
                             <input
                                 type="date"
-                                className="input-field w-full text-sm"
+                                className="input-field w-full text-sm h-10"
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
                             />
@@ -135,16 +140,17 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                             <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
                             <input
                                 type="date"
-                                className="input-field w-full text-sm"
+                                className="input-field w-full text-sm h-10"
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
                             />
                         </div>
 
+                        {/* Desktop Only Refresh (Mobile uses Header Refresh) */}
                         <button
                             onClick={fetchHistory}
                             disabled={loading}
-                            className="btn-secondary h-[42px] flex items-center justify-center gap-2 whitespace-nowrap px-6 order-last md:order-none"
+                            className="hidden md:flex btn-secondary h-10 items-center justify-center gap-2 whitespace-nowrap px-6"
                         >
                             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} /> 刷新
                         </button>
