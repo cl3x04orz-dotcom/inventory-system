@@ -276,7 +276,7 @@ export default function SalesPage({ user, apiUrl }) {
     };
 
     return (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 h-full overflow-y-auto xl:overflow-hidden">
             {isSubmitting && (
                 <div className="loading-overlay">
                     <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
@@ -284,7 +284,7 @@ export default function SalesPage({ user, apiUrl }) {
                 </div>
             )}
             {/* Product Table */}
-            <div className="xl:col-span-2 glass-panel p-6 overflow-hidden flex flex-col h-[calc(100vh-10rem)]">
+            <div className="xl:col-span-2 glass-panel p-6 overflow-hidden flex flex-col h-auto min-h-[60vh] xl:h-[calc(100vh-10rem)]">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold flex items-center gap-2 text-slate-800">
                         <RefreshCw size={20} className="text-blue-600" /> 商品銷售登錄
@@ -394,9 +394,9 @@ export default function SalesPage({ user, apiUrl }) {
             </div>
 
             {/* Right Side: Cash, Expenses & Final Result (Unified Column) */}
-            <div className="flex flex-col h-[calc(100vh-10rem)] gap-6">
+            <div className="flex flex-col h-auto xl:h-[calc(100vh-10rem)] gap-6">
                 {/* Scrollable Content: Cash & Expenses */}
-                <div className={`flex-1 overflow-y-auto pr-2 space-y-6 transition-opacity ${isCredit ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
+                <div className={`flex-1 xl:overflow-y-auto pr-0 xl:pr-2 space-y-6 transition-opacity ${isCredit ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
 
                     {/* Overlay for locking if strictly needed, but pointer-events-none does the trick interactively */}
 
