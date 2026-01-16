@@ -198,6 +198,23 @@ export default function App() {
         localStorage.removeItem('inventory_user');
     };
 
+    if (!GAS_API_URL || GAS_API_URL.includes('YOUR_SCRIPT_ID')) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-red-50 text-red-900">
+                <Shield size={64} className="mb-4 text-red-500" />
+                <h1 className="text-2xl font-bold mb-2">環境變數未設定</h1>
+                <p className="text-center max-w-md mb-6">
+                    偵測到 `VITE_GAS_API_URL` 缺失或尚未設定。請在 GitHub Secrets 中設定該變數，並重新執行 Actions 部署。
+                </p>
+                <div className="bg-white p-4 rounded-lg border border-red-200 font-mono text-xs w-full max-w-lg">
+                    <p className="font-bold mb-2">偵錯資訊：</p>
+                    <p>GAS_API_URL: {String(GAS_API_URL)}</p>
+                    <p>Base URL: {import.meta.env.BASE_URL}</p>
+                </div>
+            </div>
+        );
+    }
+
     if (!user) {
         return <LoginPage onLogin={handleLogin} apiUrl={GAS_API_URL} />;
     }
