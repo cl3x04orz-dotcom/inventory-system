@@ -127,7 +127,7 @@ export default function SalesPage({ user, apiUrl }) {
         }
     };
 
-    const handleKeyDown = (e, idx, field) => {
+    const handleKeyDown = (e, idx, field, prefix = 'input-') => {
         const validKeys = ['Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
         if (!validKeys.includes(e.key)) return;
 
@@ -140,57 +140,41 @@ export default function SalesPage({ user, apiUrl }) {
         // Enter Logic
         if (e.key === 'Enter') {
             e.preventDefault();
-            // SKIP Price for Enter key navigation
-            // Sequence for Enter: picked -> original -> returns -> Next Row picked
+            // User requested sequence: picked -> original -> returns -> Next Row picked
             const enterSequence = ['picked', 'original', 'returns'];
             const currentFieldIdx = enterSequence.indexOf(field);
 
             if (currentFieldIdx < enterSequence.length - 1 && currentFieldIdx !== -1) {
-                // Next field in same row (picked -> original -> returns)
+                // Next field in same row
                 const nextField = enterSequence[currentFieldIdx + 1];
-                focusAndSelect(`input-${idx}-${nextField}`);
+                focusAndSelect(`${prefix}${idx}-${nextField}`);
             } else {
                 // If it's returns (or price/other unexpected), move to next row
                 if (idx < rows.length - 1) {
-                    // Go to next row picked
-                    focusAndSelect(`input-${idx + 1}-picked`);
+                    focusAndSelect(`${prefix}${idx + 1}-picked`);
                 } else {
-                    // Last row -> Jump to Sidebar (1000 cash or first available)
+                    // Last row -> Jump to Sidebar (1000 cash)
                     focusAndSelect('input-cash-1000');
                 }
             }
             return;
         }
 
-        // Arrow Logic
+        // Arrow Logic (Mainly for desktop table, keeps functionality)
         let targetId = null;
-
         if (e.key === 'ArrowUp') {
-            if (idx > 0) targetId = `input-${idx - 1}-${field}`;
+            if (idx > 0) targetId = `${prefix}${idx - 1}-${field}`;
         } else if (e.key === 'ArrowDown') {
-            if (idx < rows.length - 1) {
-                targetId = `input-${idx + 1}-${field}`;
-            } else {
-                // From last row down -> go to sidebar top
-                targetId = 'input-cash-1000';
-            }
+            if (idx < rows.length - 1) targetId = `${prefix}${idx + 1}-${field}`;
+            else targetId = 'input-cash-1000';
         } else if (e.key === 'ArrowLeft') {
-            if (colIdx > 0) {
-                targetId = `input-${idx}-${sequence[colIdx - 1]}`;
-            }
+            if (colIdx > 0) targetId = `${prefix}${idx}-${sequence[colIdx - 1]}`;
         } else if (e.key === 'ArrowRight') {
-            if (colIdx < sequence.length - 1) {
-                targetId = `input-${idx}-${sequence[colIdx + 1]}`;
-            } else {
-                // From rightmost column -> Jump to Sidebar
-                // Try to map row index to sidebar item roughly if possible, or just top
-                targetId = 'input-cash-1000';
-            }
+            if (colIdx < sequence.length - 1) targetId = `${prefix}${idx}-${sequence[colIdx + 1]}`;
+            else targetId = 'input-cash-1000';
         }
 
-        if (targetId) {
-            focusAndSelect(targetId);
-        }
+        if (targetId) focusAndSelect(targetId);
     };
 
     const handleSidebarKeyDown = (e, currentId, nextId, prevId) => {
@@ -322,6 +306,13 @@ export default function SalesPage({ user, apiUrl }) {
                                 placeholder="輸入銷售對象..."
                                 value={location}
                                 onChange={(e) => setLocation(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        // Jump to first product (checks both mobile and desktop IDs)
+                                        focusAndSelect('input-m-0-picked') || focusAndSelect('input-0-picked');
+                                    }
+                                }}
                             />
                         </div>
                     </div>
@@ -352,6 +343,7 @@ export default function SalesPage({ user, apiUrl }) {
                                             className="input-field text-center p-2 text-base font-bold"
                                             value={row.picked || ''}
                                             onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
+                                            onKeyDown={(e) => handleKeyDown(e, idx, 'picked', 'input-m-')}
                                         />
                                     </div>
                                     <div className="flex flex-col gap-1">
@@ -362,6 +354,7 @@ export default function SalesPage({ user, apiUrl }) {
                                             className="input-field text-center p-2 text-base font-bold"
                                             value={row.original || ''}
                                             onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
+                                            onKeyDown={(e) => handleKeyDown(e, idx, 'original', 'input-m-')}
                                         />
                                     </div>
                                     <div className="flex flex-col gap-1">
@@ -372,6 +365,7 @@ export default function SalesPage({ user, apiUrl }) {
                                             className="input-field text-center p-2 text-base font-bold text-red-600"
                                             value={row.returns || ''}
                                             onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
+                                            onKeyDown={(e) => handleKeyDown(e, idx, 'returns', 'input-m-')}
                                         />
                                     </div>
                                     <div className="flex flex-col gap-1">
@@ -382,6 +376,7 @@ export default function SalesPage({ user, apiUrl }) {
                                             className="input-field text-center p-2 text-base font-bold"
                                             value={row.price}
                                             onChange={(e) => handleRowChange(row.id, 'price', e.target.value)}
+                                            onKeyDown={(e) => handleKeyDown(e, idx, 'price', 'input-m-')}
                                         />
                                     </div>
                                 </div>
@@ -581,7 +576,7 @@ export default function SalesPage({ user, apiUrl }) {
                                     value={expenses.serviceFee || ''}
                                     onChange={(e) => setExpenses({ ...expenses, serviceFee: Number(e.target.value) })}
                                     disabled={isCredit}
-                                    onKeyDown={(e) => handleSidebarKeyDown(e, 'input-expense-serviceFee', null, 'input-expense-linePay')}
+                                    onKeyDown={(e) => handleSidebarKeyDown(e, 'input-expense-serviceFee', 'btn-save-data', 'input-expense-linePay')}
                                 />
                             </div>
                         </div>
@@ -595,7 +590,7 @@ export default function SalesPage({ user, apiUrl }) {
                     <div className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-indigo-700">
                         ${(isCredit ? totalSalesAmount : finalTotal).toLocaleString()}
                     </div>
-                    <button onClick={handleSubmit} className="btn-primary w-full mt-6 flex justify-center items-center gap-2 py-4 text-lg">
+                    <button id="btn-save-data" onClick={handleSubmit} className="btn-primary w-full mt-6 flex justify-center items-center gap-2 py-4 text-lg">
                         <Save size={20} /> 保存今日資料
                     </button>
                 </div>
