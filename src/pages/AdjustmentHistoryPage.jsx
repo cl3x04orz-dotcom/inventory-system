@@ -49,22 +49,22 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
             <div className="glass-panel p-6">
                 {/* Header & Stats */}
                 {/* Header & Stats */}
-                <div className="flex items-center justify-between mb-6 gap-3 border-b border-slate-200 pb-4">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <ClipboardList className="text-blue-600 shrink-0" size={20} />
-                        <h1 className="text-lg md:text-2xl font-bold text-slate-800 truncate">庫存異動</h1>
-                        <div className="bg-blue-50 px-2 py-0.5 rounded border border-blue-100 shrink-0">
-                            <span className="text-[10px] md:text-xs text-slate-500 font-bold uppercase mr-1 hidden md:inline">總記錄數</span>
-                            <span className="text-xs md:text-xl font-bold text-blue-600">{filtered.length}</span>
+                <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-200">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                        <ClipboardList className="text-blue-600 shrink-0" size={24} />
+                        <h1 className="text-xl md:text-2xl font-bold text-slate-800 truncate">庫存異動</h1>
+                        <div className="bg-blue-50 px-2 py-0.5 rounded border border-blue-100 shrink-0 flex items-center">
+                            <span className="text-[10px] md:text-xs text-slate-500 font-bold uppercase mr-1">總記錄數</span>
+                            <span className="text-sm md:text-xl font-bold text-blue-600">{filtered.length}</span>
                         </div>
                     </div>
 
                     <button
                         onClick={fetchHistory}
                         disabled={loading}
-                        className="btn-secondary h-8 md:h-[42px] px-3 md:px-6 flex items-center justify-center gap-2 whitespace-nowrap text-xs md:text-sm shrink-0"
+                        className="btn-secondary h-9 md:h-[42px] px-3 md:px-6 flex items-center justify-center gap-2 whitespace-nowrap text-sm shrink-0"
                     >
-                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
                         <span className="hidden md:inline">刷新</span>
                     </button>
                 </div>
@@ -72,22 +72,22 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                 {/* Filter */}
                 <div className="mb-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
                     <div className="flex flex-col md:flex-row gap-4">
-                        {/* Mobile: Date Range in Grid (Row 1) */}
-                        <div className="w-full md:hidden grid grid-cols-2 gap-2">
+                        {/* Mobile: Date Range in separate rows */}
+                        <div className="w-full md:hidden flex flex-col gap-3">
                             <div className="space-y-1">
-                                <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
+                                <label className="text-xs text-slate-500 font-bold uppercase px-1">開始日期</label>
                                 <input
                                     type="date"
-                                    className="input-field w-full text-xs px-2 py-1.5 h-9"
+                                    className="input-field w-full text-sm px-2 py-2"
                                     value={startDate}
                                     onChange={(e) => setStartDate(e.target.value)}
                                 />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
+                                <label className="text-xs text-slate-500 font-bold uppercase px-1">結束日期</label>
                                 <input
                                     type="date"
-                                    className="input-field w-full text-xs px-2 py-1.5 h-9"
+                                    className="input-field w-full text-sm px-2 py-2"
                                     value={endDate}
                                     onChange={(e) => setEndDate(e.target.value)}
                                 />
