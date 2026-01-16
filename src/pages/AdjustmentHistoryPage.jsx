@@ -49,13 +49,16 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
             <div className="glass-panel p-6">
                 {/* Header & Stats */}
                 {/* Header & Stats */}
-                <div className="flex items-center justify-between mb-6 gap-3 border-b border-slate-200 pb-4">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-6 border-b border-slate-200 pb-4">
+                    <div className="flex items-center gap-2">
                         <ClipboardList className="text-blue-600 shrink-0" size={20} />
-                        <h1 className="text-lg md:text-2xl font-bold text-slate-800 truncate">庫存異動</h1>
-                        <div className="bg-blue-50 px-2 py-0.5 rounded border border-blue-100 shrink-0">
-                            <span className="text-[10px] md:text-xs text-slate-500 font-bold uppercase mr-1 hidden md:inline">總記錄數</span>
-                            <span className="text-xs md:text-xl font-bold text-blue-600">{filtered.length}</span>
+                        <h1 className="text-lg md:text-2xl font-bold text-slate-800 truncate">
+                            庫存異動
+                            <span className="ml-2 text-sm text-slate-500 font-normal md:hidden">({filtered.length})</span>
+                        </h1>
+                        <div className="hidden md:flex bg-blue-50 px-2 py-0.5 rounded border border-blue-100 shrink-0 ml-2">
+                            <span className="text-xs text-slate-500 font-bold uppercase mr-1">總記錄數</span>
+                            <span className="text-xl font-bold text-blue-600">{filtered.length}</span>
                         </div>
                     </div>
 
@@ -65,7 +68,7 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                         className="btn-secondary h-8 md:h-[42px] px-3 md:px-6 flex items-center justify-center gap-2 whitespace-nowrap text-xs md:text-sm shrink-0"
                     >
                         <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                        <span className="hidden md:inline">刷新</span>
+                        <span className="md:inline">刷新</span>
                     </button>
                 </div>
 
@@ -74,20 +77,20 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                     <div className="flex flex-col md:flex-row gap-4">
                         {/* Mobile: Date Range in Grid (Row 1) */}
                         <div className="w-full md:hidden grid grid-cols-2 gap-2">
-                            <div className="space-y-1">
-                                <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
+                            <div className="flex items-center gap-2">
+                                <label className="text-[10px] text-slate-500 font-bold uppercase whitespace-nowrap">開始</label>
                                 <input
                                     type="date"
-                                    className="input-field w-full text-xs px-2 py-1.5 h-9"
+                                    className="input-field w-full text-xs px-1 py-1.5 h-9"
                                     value={startDate}
                                     onChange={(e) => setStartDate(e.target.value)}
                                 />
                             </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
+                            <div className="flex items-center gap-2">
+                                <label className="text-[10px] text-slate-500 font-bold uppercase whitespace-nowrap">結束</label>
                                 <input
                                     type="date"
-                                    className="input-field w-full text-xs px-2 py-1.5 h-9"
+                                    className="input-field w-full text-xs px-1 py-1.5 h-9"
                                     value={endDate}
                                     onChange={(e) => setEndDate(e.target.value)}
                                 />
