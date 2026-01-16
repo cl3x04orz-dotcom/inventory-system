@@ -70,8 +70,62 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                     </div>
                 </div>
 
-                {/* Filters */}
-                <div className="mb-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                {/* Filters - Mobile View (Horizontal, No Border, mimics SalesPage/ReportPage) */}
+                <div className="md:hidden mb-6 space-y-3">
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">產品名稱:</label>
+                        <div className="relative flex-1">
+                            <input
+                                type="text"
+                                placeholder="搜尋產品..."
+                                className="input-field w-full py-1.5 px-3"
+                                value={productSearch}
+                                onChange={(e) => setProductSearch(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">廠商名稱:</label>
+                        <div className="relative flex-1">
+                            <input
+                                type="text"
+                                placeholder="搜尋廠商..."
+                                className="input-field w-full py-1.5 px-3"
+                                value={vendorSearch}
+                                onChange={(e) => setVendorSearch(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">開始日期:</label>
+                        <input
+                            type="date"
+                            className="input-field flex-1 py-1.5 px-3"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                        />
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">結束日期:</label>
+                        <input
+                            type="date"
+                            className="input-field flex-1 py-1.5 px-3"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                        />
+                    </div>
+                    <button
+                        onClick={fetchHistory}
+                        disabled={loading}
+                        className="btn-secondary w-full py-2 flex items-center justify-center gap-2 mt-2"
+                    >
+                        {loading ? <div className="animate-spin w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full"></div> : <RefreshCw size={18} />}
+                        查詢記錄
+                    </button>
+                </div>
+
+                {/* Filters - Desktop View (Original Grid) */}
+                <div className="hidden md:block mb-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
                     <div className="flex flex-col md:flex-row gap-4 items-end">
                         <div className="flex-1 space-y-1.5 w-full">
                             <label className="text-[10px] text-slate-500 font-bold uppercase px-1">產品名稱</label>
