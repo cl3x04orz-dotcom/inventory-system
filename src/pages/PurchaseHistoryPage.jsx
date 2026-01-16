@@ -50,20 +50,22 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
         <div className="max-w-[90rem] mx-auto p-4">
             <div className="glass-panel p-6">
                 {/* Header & Stats */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-6">
+                {/* Header & Stats */}
+                <div className="flex flex-row justify-between items-center mb-6 gap-2 md:gap-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                            <Truck className="text-blue-600" /> 進貨查詢
+                        <h1 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2">
+                            <Truck className="text-blue-600 w-6 h-6 md:w-auto md:h-auto" />
+                            <span className="whitespace-nowrap">進貨查詢</span>
                         </h1>
-                        <p className="text-slate-500 text-sm mt-1">查看完整的採購與入庫記錄</p>
+                        <p className="text-slate-500 text-xs md:text-sm mt-1 hidden md:block">查看完整的採購與入庫記錄</p>
                     </div>
-                    <div className="px-5 py-3 rounded-xl border border-emerald-200 bg-emerald-50 flex items-center gap-3">
-                        <div className="p-2 rounded-full bg-emerald-100 text-emerald-700">
-                            <DollarSign size={20} />
+                    <div className="px-3 md:px-5 py-2 md:py-3 rounded-xl border border-emerald-200 bg-emerald-50 flex items-center gap-2 md:gap-3">
+                        <div className="p-1.5 md:p-2 rounded-full bg-emerald-100 text-emerald-700">
+                            <DollarSign size={16} className="md:w-5 md:h-5" />
                         </div>
                         <div>
-                            <p className="text-xs text-slate-500 uppercase font-bold">總進貨金額</p>
-                            <p className="text-xl font-bold text-emerald-700">
+                            <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold whitespace-nowrap">總進貨金額</p>
+                            <p className="text-base md:text-xl font-bold text-emerald-700">
                                 ${totalAmount.toLocaleString()}
                             </p>
                         </div>
@@ -71,31 +73,8 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                 </div>
 
                 {/* Filters - Mobile View (Horizontal, No Border, mimics SalesPage/ReportPage) */}
+                {/* Filters - Mobile View (Horizontal, No Border) */}
                 <div className="md:hidden mb-6 space-y-3">
-                    <div className="flex items-center gap-3">
-                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">產品名稱:</label>
-                        <div className="relative flex-1">
-                            <input
-                                type="text"
-                                placeholder="搜尋產品..."
-                                className="input-field w-full py-1.5 px-3"
-                                value={productSearch}
-                                onChange={(e) => setProductSearch(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">廠商名稱:</label>
-                        <div className="relative flex-1">
-                            <input
-                                type="text"
-                                placeholder="搜尋廠商..."
-                                className="input-field w-full py-1.5 px-3"
-                                value={vendorSearch}
-                                onChange={(e) => setVendorSearch(e.target.value)}
-                            />
-                        </div>
-                    </div>
                     <div className="flex items-center gap-3">
                         <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">開始日期:</label>
                         <input
@@ -113,6 +92,30 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                             value={endDate}
                             onChange={(e) => setEndDate(e.target.value)}
                         />
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">廠商名稱:</label>
+                        <div className="relative flex-1">
+                            <input
+                                type="text"
+                                placeholder="搜尋廠商..."
+                                className="input-field w-full py-1.5 px-3"
+                                value={vendorSearch}
+                                onChange={(e) => setVendorSearch(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">產品名稱:</label>
+                        <div className="relative flex-1">
+                            <input
+                                type="text"
+                                placeholder="搜尋產品..."
+                                className="input-field w-full py-1.5 px-3"
+                                value={productSearch}
+                                onChange={(e) => setProductSearch(e.target.value)}
+                            />
+                        </div>
                     </div>
                     <button
                         onClick={fetchHistory}
@@ -185,8 +188,73 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                     </div>
                 </div>
 
-                {/* Table */}
-                <div className="rounded-xl border border-slate-200 overflow-hidden">
+                {/* Mobile Card View (Vertical Layout) */}
+                <div className="md:hidden space-y-4">
+                    {loading ? (
+                        <div className="text-center py-10 text-slate-500">載入中...</div>
+                    ) : filtered.length > 0 ? (
+                        filtered.map((record, idx) => (
+                            <div key={idx} className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3">
+                                {/* Header: Date & Total Price */}
+                                <div className="flex justify-between items-start border-b border-slate-50 pb-2">
+                                    <div className="flex items-center gap-2 text-slate-500">
+                                        <Calendar size={14} className="text-blue-600" />
+                                        <span className="font-medium text-slate-700">
+                                            {record.date ? new Date(record.date).toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '-'}
+                                        </span>
+                                        <span className="text-xs text-slate-400">
+                                            {record.date ? new Date(record.date).toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit' }) : ''}
+                                        </span>
+                                    </div>
+                                    <div className="text-lg font-bold text-emerald-600 font-mono">
+                                        ${(Number(record.totalPrice) || 0).toLocaleString()}
+                                    </div>
+                                </div>
+
+                                {/* Content Grid */}
+                                <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
+                                    <div className="col-span-2">
+                                        <span className="text-xs text-slate-400 block mb-0.5">廠商</span>
+                                        <span className="font-medium text-slate-800">{record.vendorName || record.vendor || '-'}</span>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <span className="text-xs text-slate-400 block mb-0.5">產品名稱</span>
+                                        <span className="font-bold text-slate-900 text-base">{record.productName}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-slate-400 block mb-0.5">數量</span>
+                                        <span className="font-mono text-blue-600 font-bold">{record.quantity}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-slate-400 block mb-0.5">單價</span>
+                                        <span className="font-mono text-slate-600">${(Number(record.unitPrice) || 0).toLocaleString()}</span>
+                                    </div>
+                                </div>
+
+                                {/* Footer: Expiry & Operator */}
+                                <div className="pt-2 border-t border-slate-50 flex justify-between items-center text-xs">
+                                    <div className="flex items-center gap-1 text-slate-400 bg-slate-50 px-2 py-1 rounded">
+                                        <span>效期:</span>
+                                        <span className="font-mono text-slate-600">
+                                            {record.expiry ? new Date(record.expiry).toLocaleDateString('zh-TW') : '-'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-1 text-slate-400">
+                                        <User size={12} />
+                                        <span>{record.operator || '-'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-center py-10 text-slate-500 bg-slate-50 rounded-xl border border-slate-100">
+                            沒有找到進貨記錄
+                        </div>
+                    )}
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden md:block rounded-xl border border-slate-200 overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
                             <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider sticky top-0">
