@@ -29,6 +29,16 @@ import {
 // Google Apps Script (GAS) API Endpoint
 const GAS_API_URL = import.meta.env.VITE_GAS_API_URL;
 
+console.log('--- 系統偵錯資訊 ---');
+console.log('Base URL:', import.meta.env.BASE_URL);
+if (!GAS_API_URL || GAS_API_URL.includes('YOUR_SCRIPT_ID')) {
+    console.error('❌ 錯誤：找不到 VITE_GAS_API_URL 環境變數。');
+    console.log('請確認 GitHub Settings -> Secrets 中已新增該變數。');
+} else {
+    console.log('✅ API URL 已載入:', GAS_API_URL);
+}
+console.log('------------------');
+
 const NavDropdown = ({ label, icon: Icon, active, children, id, openDropdown, setOpenDropdown }) => {
     const isOpen = openDropdown === id;
 
@@ -200,7 +210,7 @@ export default function App() {
             <header className="h-16 border-b border-slate-200 bg-white/80 backdrop-blur-md flex justify-between items-center px-6 sticky top-0 z-[60]">
                 {/* ... Navbar content ... */}
                 <div className="flex items-center gap-2">
-                    <img src="/logo.png" alt="Logo" className="h-10 w-auto object-contain" />
+                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-10 w-auto object-contain" />
                 </div>
 
                 <nav className="flex gap-1">
