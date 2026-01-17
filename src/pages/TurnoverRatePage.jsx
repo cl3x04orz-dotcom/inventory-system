@@ -65,7 +65,6 @@ export default function TurnoverRatePage({ user, apiUrl }) {
 
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shrink-0 grid grid-cols-1 md:grid-cols-3 gap-4 shadow-sm">
                 <div className="flex items-center gap-2">
-                    <Calendar size={18} className="text-slate-400" />
                     <input type="date" className="input-field flex-1 bg-white text-sm" value={startDate} onChange={e => setStartDate(e.target.value)} />
                     <span className="text-slate-500 font-bold hidden md:inline">至</span>
                     <input type="date" className="input-field flex-1 bg-white text-sm" value={endDate} onChange={e => setEndDate(e.target.value)} />
