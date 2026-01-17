@@ -109,21 +109,7 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
                 {/* Filters */}
                 <div className="mb-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
                     <div className="flex flex-col md:flex-row gap-4 items-end">
-                        <div className="flex-1 space-y-1.5 w-full">
-                            <label className="text-[10px] text-slate-500 font-bold uppercase px-1">商品名稱</label>
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                <input
-                                    type="text"
-                                    placeholder="搜尋商品名稱..."
-                                    className="input-field pl-10 w-full"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Mobile: Date Range Stacked */}
+                        {/* Mobile: Date Range First */}
                         <div className="contents md:hidden">
                             <div className="w-full space-y-3">
                                 <div className="space-y-1">
@@ -144,6 +130,20 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
                                         onChange={(e) => setEndDate(e.target.value)}
                                     />
                                 </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 space-y-1.5 w-full">
+                            <label className="text-[10px] text-slate-500 font-bold uppercase px-1">商品名稱</label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="搜尋商品名稱..."
+                                    className="input-field pl-10 w-full"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
                             </div>
                         </div>
 
@@ -177,7 +177,7 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
                                     onChange={(e) => setDiffOnly(e.target.checked)}
                                     className="w-4 h-4 rounded border-slate-600 text-blue-500 focus:ring-blue-500"
                                 />
-                                <span className="text-sm text-slate-500 font-medium">僅顯示有差異</span>
+                                <span className="text-sm text-slate-500 font-medium whitespace-nowrap">僅顯示有差異</span>
                             </label>
 
                             <button
@@ -191,8 +191,8 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
                     </div>
                 </div>
 
-                {/* Table */}
-                <div className="rounded-xl border border-slate-200 overflow-hidden">
+                {/* Table (Hidden on Mobile) */}
+                <div className="hidden md:block rounded-xl border border-slate-200 overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
                             <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider sticky top-0">
@@ -267,6 +267,67 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
                             </tbody>
                         </table>
                     </div>
+                </div>
+
+                {/* Mobile Card View (Visible only on Mobile) */}
+                <div className="md:hidden space-y-4">
+                    {loading ? (
+                        <div className="text-center py-8 text-slate-500">載入中...</div>
+                    ) : filtered.length > 0 ? (
+                        filtered.map((record, idx) => (
+                            <div key={idx} className={`bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col gap-3 ${record.diff !== 0 ? 'bg-amber-50/50' : ''}`}>
+                                <div className="flex justify-between items-start border-b border-slate-100 pb-2">
+                                    <div className="flex flex-col gap-1">
+                                        <div className="flex items-center gap-1 text-xs text-slate-400">
+                                            <Calendar size={12} />
+                                            {record.date}
+                                        </div>
+                                        <h3 className="font-bold text-slate-800 text-lg">{record.productName}</h3>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold ${record.diff === 0 ? 'bg-emerald-100 text-emerald-700' :
+                                            record.diff > 0 ? 'bg-blue-100 text-blue-700' : 'bg-rose-100 text-rose-700'
+                                            }`}>
+                                            {record.diff === 0 ? <CheckCircle size={12} /> : <AlertTriangle size={12} />}
+                                            {record.diff > 0 ? `+${record.diff}` : record.diff}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-2 text-center bg-slate-50 p-2 rounded -mx-1">
+                                    <div>
+                                        <div className="text-[10px] text-slate-400 uppercase">帳面</div>
+                                        <div className="font-mono font-medium text-slate-600">{record.bookQty}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] text-slate-400 uppercase">實盤</div>
+                                        <div className="font-mono font-bold text-blue-600">{record.physicalQty}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] text-slate-400 uppercase">差異</div>
+                                        <div className={`font-mono font-bold ${record.diff === 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                            {record.diff}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {(record.reason || record.accountability) && (
+                                    <div className="text-sm bg-slate-50 p-2 rounded text-slate-600">
+                                        {record.reason && <div><span className="text-slate-400 text-xs mr-2">原因:</span>{record.reason}</div>}
+                                        {record.accountability && <div><span className="text-slate-400 text-xs mr-2">責任:</span>{record.accountability}</div>}
+                                    </div>
+                                )}
+
+                                <div className="flex justify-between items-center text-xs text-slate-400 pt-1">
+                                    <span>執行人: <span className="text-slate-600 font-medium">{record.operator || '-'}</span></span>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-center py-8 text-slate-500 bg-white rounded-xl border border-slate-200">
+                            <p>沒有找到盤點記錄</p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
