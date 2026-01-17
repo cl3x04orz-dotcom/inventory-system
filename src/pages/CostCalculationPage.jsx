@@ -142,7 +142,8 @@ export default function CostCalculationPage({ user, apiUrl }) {
             </div>
 
             <div className="bg-white rounded-xl shadow-sm p-0 flex-1 border border-slate-200 relative overflow-hidden">
-                <div className="h-full overflow-auto custom-scrollbar">
+                {/* Desktop Table View */}
+                <div className="hidden md:block h-full overflow-auto custom-scrollbar">
                     <table className="w-full text-left text-sm border-separate border-spacing-0 min-w-[1100px]">
                         <thead className="bg-slate-50 text-slate-500 text-xs uppercase sticky top-0 z-30">
                             <tr>
@@ -222,6 +223,78 @@ export default function CostCalculationPage({ user, apiUrl }) {
                             )}
                         </tbody>
                     </table>
+                </div>
+
+                {/* Mobile Card List View */}
+                <div className="md:hidden h-full overflow-y-auto p-3 space-y-3 custom-scrollbar">
+                    {loading ? (
+                        <div className="p-10 text-center text-slate-500 font-medium flex flex-col items-center gap-2">
+                            <RefreshCw className="animate-spin text-rose-500" />
+                            <span>正在讀取支出數據...</span>
+                        </div>
+                    ) : filteredData.length > 0 ? (
+                        filteredData.map((item, idx) => (
+                            <div key={idx} className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm text-xs space-y-3">
+                                {/* Header: Date & Customer */}
+                                <div className="flex justify-between items-start border-b border-slate-100 pb-2">
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="font-bold text-slate-800 text-sm">{item.customer || '未知對象'}</span>
+                                        <span className="text-slate-400 font-mono text-[10px] flex items-center gap-1">
+                                            {(() => {
+                                                const rawDate = item.date || item.serverTimestamp;
+                                                const d = new Date(rawDate);
+                                                return isNaN(d.getTime()) ? String(rawDate) : d.toLocaleString('zh-TW', { hour12: false });
+                                            })()}
+                                        </span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-500 font-medium bg-slate-100 px-2 py-1 rounded-full">{item.salesRep || '-'}</span>
+                                </div>
+
+                                {/* Body: Categories Directly Presented */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    {/* Left Col: Basic Ops */}
+                                    <div className="space-y-1.5">
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase">基礎營運</p>
+                                        <div className="space-y-0.5 text-slate-500">
+                                            <div className="flex justify-between"><span>攤位</span> <span className="font-medium text-slate-700">${Number(item.stall || 0).toLocaleString()}</span></div>
+                                            <div className="flex justify-between"><span>清潔</span> <span className="font-medium text-slate-700">${Number(item.cleaning || 0).toLocaleString()}</span></div>
+                                            <div className="flex justify-between"><span>電費</span> <span className="font-medium text-slate-700">${Number(item.electricity || 0).toLocaleString()}</span></div>
+                                            <div className="flex justify-between"><span>加油</span> <span className="font-medium text-slate-700">${Number(item.gas || 0).toLocaleString()}</span></div>
+                                            <div className="flex justify-between"><span>停車</span> <span className="font-medium text-slate-700">${Number(item.parking || 0).toLocaleString()}</span></div>
+                                            <div className="flex justify-between"><span>貨款</span> <span className="font-medium text-slate-700">${Number(item.goods || 0).toLocaleString()}</span></div>
+                                            <div className="flex justify-between"><span>袋子</span> <span className="font-medium text-slate-700">${Number(item.bags || 0).toLocaleString()}</span></div>
+                                            <div className="flex justify-between"><span>其他</span> <span className="font-medium text-slate-700">${Number(item.others || 0).toLocaleString()}</span></div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right Col: Cash & Personnel */}
+                                    <div className="space-y-3">
+                                        <div className="space-y-1.5">
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">金流服務</p>
+                                            <div className="space-y-1">
+                                                <div className="flex justify-between items-center text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                                    <span>LP</span> <span className="font-bold">+${Number(item.linePay || 0).toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
+                                                    <span>服務</span> <span className="font-bold">-${Number(item.serviceFee || 0).toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">人事車輛</p>
+                                            <div className="space-y-0.5 text-slate-500">
+                                                <div className="flex justify-between"><span className="text-indigo-600">保養</span> <span className="font-bold text-indigo-600">${Number(item.vehicleMaintenance || 0).toLocaleString()}</span></div>
+                                                <div className="flex justify-between"><span className="text-amber-600">薪資</span> <span className="font-bold text-amber-600">${Number(item.salary || 0).toLocaleString()}</span></div>
+                                                <div className="flex justify-between"><span className="text-purple-600">公積</span> <span className="font-bold text-purple-600">${Number(item.reserve || 0).toLocaleString()}</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="p-10 text-center text-slate-500 font-medium">區間內無紀錄</div>
+                    )}
                 </div>
             </div>
         </div>
