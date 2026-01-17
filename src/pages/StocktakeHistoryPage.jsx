@@ -83,25 +83,25 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-6 border-b border-slate-200 pb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-2">
                             <ClipboardList className="text-blue-600" /> 盤點歷史查詢
                         </h1>
                         <p className="text-slate-500 text-sm mt-1">查看過去的盤點記錄，追蹤差異與原因</p>
                     </div>
 
                     {/* Stats Integrated */}
-                    <div className="flex gap-4">
-                        <div className="px-5 py-2 rounded-xl bg-blue-50 border border-blue-200">
-                            <p className="text-xs text-slate-500 uppercase font-bold text-center">總記錄</p>
-                            <p className="text-xl font-bold text-slate-800 text-center">{totalRecords}</p>
+                    <div className="grid grid-cols-3 gap-2 w-full md:w-auto md:flex md:gap-4">
+                        <div className="px-2 md:px-5 py-2 rounded-xl bg-blue-50 border border-blue-200 flex flex-col items-center justify-center">
+                            <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold text-center">總記錄</p>
+                            <p className="text-lg md:text-xl font-bold text-slate-800 text-center">{totalRecords}</p>
                         </div>
-                        <div className="px-5 py-2 rounded-xl bg-rose-50 border border-rose-200">
-                            <p className="text-xs text-slate-500 uppercase font-bold text-center">有差異</p>
-                            <p className="text-xl font-bold text-rose-600 text-center">{withDiff}</p>
+                        <div className="px-2 md:px-5 py-2 rounded-xl bg-rose-50 border border-rose-200 flex flex-col items-center justify-center">
+                            <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold text-center">有差異</p>
+                            <p className="text-lg md:text-xl font-bold text-rose-600 text-center">{withDiff}</p>
                         </div>
-                        <div className="px-5 py-2 rounded-xl bg-emerald-50 border border-emerald-200">
-                            <p className="text-xs text-slate-500 uppercase font-bold text-center">無差異</p>
-                            <p className="text-xl font-bold text-emerald-600 text-center">{noDiff}</p>
+                        <div className="px-2 md:px-5 py-2 rounded-xl bg-emerald-50 border border-emerald-200 flex flex-col items-center justify-center">
+                            <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold text-center">無差異</p>
+                            <p className="text-lg md:text-xl font-bold text-emerald-600 text-center">{noDiff}</p>
                         </div>
                     </div>
                 </div>
@@ -123,7 +123,32 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
                             </div>
                         </div>
 
-                        <div className="w-full md:w-32 space-y-1.5">
+                        {/* Mobile: Date Range Stacked */}
+                        <div className="contents md:hidden">
+                            <div className="w-full space-y-3">
+                                <div className="space-y-1">
+                                    <label className="text-xs text-slate-500 font-bold uppercase px-1">開始日期</label>
+                                    <input
+                                        type="date"
+                                        className="input-field w-full text-sm px-2 py-2"
+                                        value={startDate}
+                                        onChange={(e) => setStartDate(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs text-slate-500 font-bold uppercase px-1">結束日期</label>
+                                    <input
+                                        type="date"
+                                        className="input-field w-full text-sm px-2 py-2"
+                                        value={endDate}
+                                        onChange={(e) => setEndDate(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Desktop: Dates (Hidden on mobile) */}
+                        <div className="hidden md:block w-32 space-y-1.5">
                             <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
                             <input
                                 type="date"
@@ -133,7 +158,7 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
                             />
                         </div>
 
-                        <div className="w-full md:w-32 space-y-1.5">
+                        <div className="hidden md:block w-32 space-y-1.5">
                             <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
                             <input
                                 type="date"
@@ -143,25 +168,26 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
                             />
                         </div>
 
-                        <div className="pb-1">
-                            <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors select-none">
+                        {/* Actions Row: Checkbox & Refresh - Improved for Mobile */}
+                        <div className="w-full md:w-auto flex flex-row items-center gap-2 justify-between md:justify-start">
+                            <label className="flex-1 md:flex-none flex items-center justify-center md:justify-start gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors select-none h-[42px]">
                                 <input
                                     type="checkbox"
                                     checked={diffOnly}
                                     onChange={(e) => setDiffOnly(e.target.checked)}
                                     className="w-4 h-4 rounded border-slate-600 text-blue-500 focus:ring-blue-500"
                                 />
-                                <span className="text-sm text-slate-300">僅顯示有差異</span>
+                                <span className="text-sm text-slate-500 font-medium">僅顯示有差異</span>
                             </label>
-                        </div>
 
-                        <button
-                            onClick={fetchHistory}
-                            disabled={loading}
-                            className="btn-secondary h-[42px] flex items-center gap-2 whitespace-nowrap px-6"
-                        >
-                            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} /> 刷新
-                        </button>
+                            <button
+                                onClick={fetchHistory}
+                                disabled={loading}
+                                className="btn-secondary h-[42px] px-6 flex items-center gap-2 whitespace-nowrap"
+                            >
+                                <RefreshCw size={18} className={loading ? 'animate-spin' : ''} /> 刷新
+                            </button>
+                        </div>
                     </div>
                 </div>
 
