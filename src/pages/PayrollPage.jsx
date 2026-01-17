@@ -360,9 +360,9 @@ export default function PayrollPage({ user, apiUrl }) {
         <div className="p-2 md:p-8 space-y-4 md:space-y-6 max-w-7xl mx-auto pb-24">
 
             {/* --- Mobile View Header & Controls --- */}
-            <div className="md:hidden space-y-3">
+            <div className="md:hidden space-y-4">
                 {/* Row 1: Title (Left) + Recalculate (Right) - Adjusted */}
-                <div className="flex justify-between items-center px-1">
+                <div className="flex justify-between items-center px-1 mb-2">
                     <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                         <DollarSign className="text-blue-500" size={24} /> 薪資結算中心
                     </h1>
@@ -373,7 +373,7 @@ export default function PayrollPage({ user, apiUrl }) {
 
                 {/* Row 2: Filters Capsule */}
                 <div className="flex justify-center">
-                    <div className="bg-white rounded-lg border border-slate-200 shadow-sm h-10 px-1 flex items-center gap-1">
+                    <div className="bg-white rounded-lg border border-slate-200 shadow-sm h-10 px-1 flex items-center gap-1 w-full max-w-[340px] justify-center">
                         <select value={year} onChange={e => setYear(Number(e.target.value))} className="bg-transparent text-sm font-medium text-slate-700 h-8 pl-2 pr-1 outline-none text-center">
                             {[2025, 2026, 2027].map(y => <option key={y} value={y}>{y}年</option>)}
                         </select>
@@ -396,16 +396,16 @@ export default function PayrollPage({ user, apiUrl }) {
                 {/* Row 3: Action Buttons Capsule */}
                 {user.role === 'BOSS' && (
                     <div className="flex justify-center">
-                        <div className="bg-white rounded-lg border border-slate-200 shadow-sm h-10 px-1 flex items-center gap-1">
-                            <button onClick={() => setShowSettings(true)} className="h-8 px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-md flex items-center gap-1">
+                        <div className="bg-white rounded-lg border border-slate-200 shadow-sm h-10 px-1 flex items-center gap-1 w-full max-w-[340px] justify-center">
+                            <button onClick={() => setShowSettings(true)} className="h-8 px-2 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-md flex items-center gap-1">
                                 <User size={14} /> 薪資設定
                             </button>
                             <div className="w-px h-4 bg-slate-200"></div>
-                            <button onClick={() => setShowProfile(true)} className="h-8 px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-md flex items-center gap-1">
+                            <button onClick={() => setShowProfile(true)} className="h-8 px-2 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-md flex items-center gap-1">
                                 <Calendar size={14} /> 基本資料
                             </button>
                             <div className="w-px h-4 bg-slate-200"></div>
-                            <button onClick={handleSavePayroll} disabled={isSubmitting || !data} className="h-8 px-3 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-md flex items-center gap-1 disabled:opacity-50">
+                            <button onClick={handleSavePayroll} disabled={isSubmitting || !data} className="h-8 px-2 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-md flex items-center gap-1 disabled:opacity-50">
                                 <DollarSign size={14} /> 薪資存檔
                             </button>
                         </div>
