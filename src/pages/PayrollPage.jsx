@@ -489,42 +489,87 @@ export default function PayrollPage({ user, apiUrl }) {
             {/* --- Summary Cards (Mobile One-Line 4-Cols) --- */}
             {/* Row 4: Base / Perf / Ins / Net */}
             <div className="grid grid-cols-4 gap-2 px-1 md:hidden">
-                <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-center items-center h-16">
-                    <p className="text-[10px] text-slate-500 font-bold">底薪</p>
-                    <p className="text-xs font-bold text-slate-800 mt-1">${(data?.config?.baseSalary || 0).toLocaleString()}</p>
-                </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-center items-center h-16">
-                    <p className="text-[10px] text-slate-500 font-bold">業績獎金</p>
-                    <p className="text-xs font-bold text-indigo-600 mt-1">${(summary.bonus || 0).toLocaleString()}</p>
-                </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-center items-center h-16">
-                    <p className="text-[10px] text-slate-500 font-bold">勞健保</p>
-                    <p className="text-xs font-bold text-red-600 mt-1">-${(summary.insurance || 0).toLocaleString()}</p>
-                </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-center items-center h-16 bg-blue-50/50 border-blue-100">
-                    <p className="text-[10px] text-slate-500 font-bold">實領薪資</p>
-                    <p className="text-xs font-bold text-blue-600 mt-1">${(summary.finalSalary || 0).toLocaleString()}</p>
-                </div>
+                <SummaryCard title="底薪" amount={data?.config?.baseSalary} color="text-slate-800" isMobile />
+                <SummaryCard
+                    title="業績獎金"
+                    amount={summary.bonus}
+                    color="text-indigo-600"
+                    isMobile
+                />
+                <SummaryCard
+                    title="勞健保"
+                    amount={summary.insurance}
+                    isDeduction
+                    color="text-red-600"
+                    isMobile
+                    hoverContent={
+                        <div className="flex flex-col items-end">
+                            <p className="text-[10px] text-slate-400 leading-none mb-0.5">獎金扣額</p>
+                            <p className="text-xs font-bold text-emerald-600 font-mono">${(summary.bonus || 0).toLocaleString()}</p>
+                        </div>
+                    }
+                />
+                <SummaryCard
+                    title="實領薪資"
+                    amount={summary.finalSalary}
+                    color="text-blue-600"
+                    isMobile
+                    className="bg-blue-50/50 border-blue-100"
+                />
             </div>
 
             {/* Row 5: Attend / Normal / Special / Sick */}
             <div className="grid grid-cols-4 gap-2 px-1 mt-2 md:hidden">
-                <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-center items-center h-16">
-                    <p className="text-[10px] text-slate-500 font-bold">全勤</p>
-                    <p className="text-xs font-bold text-yellow-600 mt-1">${(summary.attendanceBonus || 0).toLocaleString()}</p>
-                </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-center items-center h-16">
-                    <p className="text-[10px] text-slate-500 font-bold">一般休假</p>
-                    <p className="text-xs font-bold text-slate-500 mt-1">{generalLeaveDaysCount}天</p>
-                </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-center items-center h-16">
-                    <p className="text-[10px] text-slate-500 font-bold">特休紀錄</p>
-                    <p className="text-xs font-bold text-emerald-500 mt-1">{specialLeaveDaysCount}天</p>
-                </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-center items-center h-16">
-                    <p className="text-[10px] text-slate-500 font-bold">病假紀錄</p>
-                    <p className="text-xs font-bold text-amber-500 mt-1">{sickLeaveDaysCount}天</p>
-                </div>
+                <SummaryCard
+                    title="全勤"
+                    amount={summary.attendanceBonus}
+                    color="text-yellow-600"
+                    isMobile
+                    hoverContent={
+                        <div className="flex flex-col items-end">
+                            <p className="text-[10px] text-slate-400 leading-none mb-0.5">出勤天</p>
+                            <p className="text-xs font-bold text-emerald-600">{attendanceDaysCount} 天</p>
+                        </div>
+                    }
+                />
+                <SummaryCard
+                    title="一般休假"
+                    amount={generalLeaveDaysCount}
+                    isCurrency={false}
+                    suffix="天"
+                    color="text-slate-500"
+                    isMobile
+                    hoverContent={
+                        <div className="flex flex-col items-end gap-1">
+                            <p className="text-[10px] text-slate-400 leading-none">補貼</p>
+                            <p className={`text-xs font-bold ${(summary.leaveCompensation || 0) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                                ${(summary.leaveCompensation || 0).toLocaleString()}
+                            </p>
+                        </div>
+                    }
+                />
+                <SummaryCard
+                    title="特休紀錄"
+                    amount={specialLeaveDaysCount}
+                    isCurrency={false}
+                    suffix="天"
+                    color="text-emerald-500"
+                    isMobile
+                />
+                <SummaryCard
+                    title="病假紀錄"
+                    amount={sickLeaveDaysCount}
+                    isCurrency={false}
+                    suffix="天"
+                    color="text-amber-500"
+                    isMobile
+                    hoverContent={
+                        <div className="flex flex-col items-end">
+                            <p className="text-[10px] text-slate-400 leading-none">扣款</p>
+                            <p className="text-xs font-bold text-red-600">-${(sickLeaveDaysCount * 500).toLocaleString()}</p>
+                        </div>
+                    }
+                />
             </div>
 
             {/* Desktop Summary Cards (Original Layout) */}
@@ -997,33 +1042,45 @@ export default function PayrollPage({ user, apiUrl }) {
     );
 }
 
-function SummaryCard({ title, amount, subtext, color, isDeduction, isCurrency = true, suffix = '', hiddenAmount, hiddenTitle = '總額參考', hoverContent }) {
+function SummaryCard({ title, amount, subtext, color, isDeduction, isCurrency = true, suffix = '', hiddenAmount, hiddenTitle = '總額參考', hoverContent, isMobile, className = '' }) {
     const [showHidden, setShowHidden] = useState(false);
+
+    const handleToggle = () => {
+        if (isMobile || 'ontouchstart' in window) {
+            setShowHidden(!showHidden);
+        }
+    };
 
     return (
         <div
-            className="glass-panel p-4 flex flex-col justify-between h-28 relative overflow-hidden group hover:border-blue-500 transition-all cursor-default"
-            onMouseEnter={() => setShowHidden(true)}
-            onMouseLeave={() => setShowHidden(false)}
+            onClick={handleToggle}
+            className={`
+                relative overflow-hidden transition-all cursor-default border border-slate-100 bg-white
+                ${isMobile ? 'h-16 p-2 rounded-lg flex flex-col justify-center items-center text-center shadow-sm' : 'h-28 p-4 rounded-xl flex flex-col justify-between glass-panel hover:border-blue-500'}
+                ${className}
+            `}
+            onMouseEnter={() => !isMobile && setShowHidden(true)}
+            onMouseLeave={() => !isMobile && setShowHidden(false)}
         >
-            <div className="flex justify-between items-start z-10">
-                <span className="text-slate-500 text-sm font-medium">{title}</span>
-            </div>
-            <div className="z-10">
-                <span className={`text-2xl font-bold tracking-tight ${color}`}>
-                    {isDeduction && '-'}{isCurrency && '$'}{(amount || 0).toLocaleString()}{suffix}
-                </span>
-                {subtext && <p className="text-xs text-slate-500 mt-1">{subtext}</p>}
+            <div className={`flex justify-between items-start z-10 w-full ${isMobile ? 'justify-center' : ''}`}>
+                <span className={`${isMobile ? 'text-[10px]' : 'text-sm'} text-slate-500 font-bold`}>{title}</span>
             </div>
 
-            {/* Hidden Details Tab overlay - shows on hover if hiddenAmount OR hoverContent is provided */}
+            <div className={`z-10 w-full ${isMobile ? 'mt-1' : ''}`}>
+                <span className={`${isMobile ? 'text-xs' : 'text-2xl'} font-bold tracking-tight ${color}`}>
+                    {isDeduction && '-'}{isCurrency && '$'}{(amount || 0).toLocaleString()}{suffix}
+                </span>
+                {!isMobile && subtext && <p className="text-xs text-slate-500 mt-1">{subtext}</p>}
+            </div>
+
+            {/* Hidden Details Tab overlay */}
             {(hiddenAmount !== undefined || hoverContent) && (
-                <div className={`absolute top-0 right-0 p-2 transition-all duration-300 ${showHidden ? 'translate-y-2 opacity-100' : '-translate-y-full opacity-0'}`}>
-                    <div className="bg-white/90 backdrop-blur shadow-sm border border-emerald-100 rounded px-2 py-0.5 text-right">
+                <div className={`absolute top-0 right-0 p-1 md:p-2 transition-all duration-300 ${showHidden ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
+                    <div className="bg-white/95 backdrop-blur shadow-sm border border-emerald-100 rounded px-1.5 py-0.5 text-right">
                         {hoverContent ? hoverContent : (
                             <>
-                                {hiddenTitle && <p className="text-xs text-slate-400 font-medium">{hiddenTitle}</p>}
-                                <p className="text-sm font-bold text-emerald-600 font-mono">
+                                {hiddenTitle && <p className="text-[8px] md:text-xs text-slate-400 font-medium">{hiddenTitle}</p>}
+                                <p className="text-xs md:text-sm font-bold text-emerald-600 font-mono">
                                     {isCurrency && '$'}{(hiddenAmount || 0).toLocaleString()}
                                 </p>
                             </>
@@ -1033,7 +1090,9 @@ function SummaryCard({ title, amount, subtext, color, isDeduction, isCurrency = 
             )}
 
             {/* Decor */}
-            <div className={`absolute -right-2 -bottom-2 w-16 h-16 rounded-full opacity-5 ${color?.replace('text-', 'bg-') || 'bg-slate-400'}`}></div>
+            {!isMobile && (
+                <div className={`absolute -right-2 -bottom-2 w-16 h-16 rounded-full opacity-5 ${color?.replace('text-', 'bg-') || 'bg-slate-400'}`}></div>
+            )}
         </div>
     );
 }
