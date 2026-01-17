@@ -85,15 +85,17 @@ export default function PayablePage({ user, apiUrl }) {
 
     return (
         <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Wallet className="text-rose-600" /> 應付帳款 (Payables)
+            {/* Header */}
+            <div className="flex flex-row justify-between items-center gap-4">
+                <div className="flex-1 min-w-0">
+                    <h1 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2 truncate">
+                        <Wallet className="text-rose-600 w-6 h-6 shrink-0" />
+                        <span className="truncate">應付帳款</span>
                     </h1>
                 </div>
-                <div className="glass-panel px-4 py-2 border-rose-200 bg-rose-50">
-                    <p className="text-xs text-slate-500">總應付金額</p>
-                    <p className="text-xl font-bold text-rose-600">${totalAmount.toLocaleString()}</p>
+                <div className="glass-panel px-3 py-2 border-rose-200 bg-rose-50 shrink-0 flex flex-col items-end">
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">總應付金額</p>
+                    <p className="text-lg md:text-xl font-bold text-rose-600">${totalAmount.toLocaleString()}</p>
                 </div>
             </div>
 
@@ -104,7 +106,7 @@ export default function PayablePage({ user, apiUrl }) {
                         <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
                         <input
                             type="date"
-                            className="input-field w-full"
+                            className="input-field w-full h-10 appearance-none bg-white"
                             value={startDate}
                             onChange={(e) => setStartDate(e.target.value)}
                         />
@@ -113,7 +115,7 @@ export default function PayablePage({ user, apiUrl }) {
                         <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
                         <input
                             type="date"
-                            className="input-field w-full"
+                            className="input-field w-full h-10 appearance-none bg-white"
                             value={endDate}
                             onChange={(e) => setEndDate(e.target.value)}
                         />
@@ -123,7 +125,7 @@ export default function PayablePage({ user, apiUrl }) {
                         <input
                             type="text"
                             placeholder="輸入廠商..."
-                            className="input-field w-full"
+                            className="input-field w-full h-10"
                             value={vendorSearch}
                             onChange={(e) => setVendorSearch(e.target.value)}
                         />
@@ -133,20 +135,20 @@ export default function PayablePage({ user, apiUrl }) {
                         <input
                             type="text"
                             placeholder="輸入姓名..."
-                            className="input-field w-full"
+                            className="input-field w-full h-10"
                             value={operatorSearch}
                             onChange={(e) => setOperatorSearch(e.target.value)}
                         />
                     </div>
 
-                    <button onClick={fetchData} className="btn-secondary h-[42px] px-6 flex items-center gap-2 justify-center">
+                    <button onClick={fetchData} className="btn-secondary h-10 px-6 flex items-center gap-2 justify-center w-full md:w-auto">
                         <RefreshCw size={18} /> 查詢
                     </button>
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="rounded-xl border border-slate-200 overflow-hidden">
+            {/* Desktop Table */}
+            <div className="hidden md:block rounded-xl border border-slate-200 overflow-hidden">
                 <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 text-slate-500 text-xs uppercase sticky top-0">
                         <tr>
@@ -171,18 +173,8 @@ export default function PayablePage({ user, apiUrl }) {
                                         <td className="p-4 text-slate-500 text-center">
                                             {(() => {
                                                 const dateVal = r.serverTimestamp || r.timestamp || r.date;
-                                                if (!dateVal) return '-';
-
-                                                const dateStr = String(dateVal);
                                                 const d = new Date(dateVal);
-                                                if (isNaN(d.getTime())) return dateStr;
-
-                                                // If it's a date-only string like YYYY-MM-DD (length 10), don't show time
-                                                const isDateOnly = dateStr.length <= 10 && !dateStr.includes('T') && !dateStr.includes(':');
-
-                                                return isDateOnly
-                                                    ? d.toLocaleDateString('zh-TW')
-                                                    : d.toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+                                                return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('zh-TW');
                                             })()}
                                         </td>
                                         <td className="p-4 font-medium text-slate-800">{r.vendorName || r.vendor || '-'}</td>
@@ -222,32 +214,17 @@ export default function PayablePage({ user, apiUrl }) {
                                                             {(r.items || r.products || []).length > 0 ? (
                                                                 (r.items || r.products || []).map((item, idx) => (
                                                                     <tr key={idx} className="hover:bg-slate-50">
-                                                                        <td className="py-3 px-4 text-slate-500">
-                                                                            {getOperatorName(r)}
-                                                                        </td>
-                                                                        <td className="py-3 px-4 text-slate-800 font-medium">
-                                                                            {item.productName || item.name || '-'}
-                                                                        </td>
-                                                                        <td className="py-3 px-4 text-right text-slate-500 font-mono">
-                                                                            ${(Number(item.price) || Number(item.unitPrice) || 0).toLocaleString()}
-                                                                        </td>
-                                                                        <td className="py-3 px-4 text-center text-slate-500 font-mono">
-                                                                            {item.qty || item.quantity || item.soldQty || 1}
-                                                                        </td>
+                                                                        <td className="py-3 px-4 text-slate-500">{getOperatorName(r)}</td>
+                                                                        <td className="py-3 px-4 text-slate-800 font-medium">{item.productName || item.name || '-'}</td>
+                                                                        <td className="py-3 px-4 text-right text-slate-500 font-mono">${(Number(item.price) || Number(item.unitPrice) || 0).toLocaleString()}</td>
+                                                                        <td className="py-3 px-4 text-center text-slate-500 font-mono">{item.qty || item.quantity || 1}</td>
                                                                     </tr>
                                                                 ))
                                                             ) : (
-                                                                <tr>
-                                                                    <td colSpan="4" className="py-4 text-center text-slate-500 italic">無產品明細</td>
-                                                                </tr>
+                                                                <tr><td colSpan="4" className="py-4 text-center text-slate-500 italic">無產品明細</td></tr>
                                                             )}
                                                         </tbody>
                                                     </table>
-                                                    <div className="p-3 bg-slate-50 text-xs text-slate-400 flex gap-4 border-t border-slate-100">
-                                                        <span>單據編號: {r.id || '-'}</span>
-                                                        <span>操作員: {r.operator || r.Operator || r.buyer || '-'}</span>
-                                                        <span>位置: {r.location || r.customer || '-'}</span>
-                                                    </div>
                                                 </div>
                                             </td>
                                         </tr>
@@ -259,6 +236,75 @@ export default function PayablePage({ user, apiUrl }) {
                         )}
                     </tbody>
                 </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4">
+                {loading ? (
+                    <div className="p-10 text-center text-slate-500">載入中...</div>
+                ) : filtered.length > 0 ? (
+                    filtered.map((r, i) => (
+                        <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm" onClick={() => toggleRow(i)}>
+                            <div className="flex justify-between items-start mb-3">
+                                <div>
+                                    <div className="text-xs text-slate-400 mb-1">
+                                        {(() => {
+                                            const dateVal = r.serverTimestamp || r.timestamp || r.date;
+                                            const d = new Date(dateVal);
+                                            return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('zh-TW');
+                                        })()}
+                                    </div>
+                                    <div className="font-bold text-slate-800 text-lg">{r.vendorName || r.vendor || '未命名廠商'}</div>
+                                    <div className="text-xs text-slate-500 mt-1">採購: {getOperatorName(r)}</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-xl font-black font-mono text-rose-600">
+                                        ${(Number(r.amount) || Number(r.total) || 0).toLocaleString()}
+                                    </div>
+                                    <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold ${r.status === 'PAID' ? 'bg-green-100 text-green-700' : 'bg-rose-100 text-rose-700'}`}>
+                                        {r.status === 'PAID' ? '已付款' : '未付款'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Action Button & Expand Details */}
+                            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                                <button className="text-slate-400 flex items-center gap-1 text-xs">
+                                    {expandedRows.has(i) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                    明細
+                                </button>
+                                {r.status !== 'PAID' && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // prevent card toggle
+                                            handleMarkAsPaid(r.id);
+                                        }}
+                                        className="px-4 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg shadow-sm hover:bg-blue-500 active:scale-95 transition-all"
+                                    >
+                                        確認付款
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Mobile Expanded Details */}
+                            {expandedRows.has(i) && (
+                                <div className="mt-3 bg-slate-50 rounded-lg p-3 text-sm space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                    {(r.items || r.products || []).map((item, idx) => (
+                                        <div key={idx} className="flex justify-between items-center border-b border-slate-100 last:border-0 pb-2 last:pb-0">
+                                            <span className="text-slate-700">{item.productName || item.name}</span>
+                                            <div className="text-right">
+                                                <div className="text-slate-900 font-mono">${(Number(item.price) || 0).toLocaleString()} x {item.qty || 1}</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {(!r.items && !r.products) && <div className="text-slate-400 text-center py-2 italic">無產品明細</div>}
+                                </div>
+                            )}
+                        </div>
+                    ))
+                ) : (
+                    <div className="p-10 text-center text-slate-500">無應付帳款</div>
+                )}
             </div>
         </div>
     );
