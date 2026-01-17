@@ -116,7 +116,7 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
                                     <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
                                     <input
                                         type="date"
-                                        className="input-field w-full text-sm bg-white"
+                                        className="input-field w-full"
                                         value={startDate}
                                         onChange={(e) => setStartDate(e.target.value)}
                                     />
@@ -125,7 +125,7 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
                                     <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
                                     <input
                                         type="date"
-                                        className="input-field w-full text-sm bg-white"
+                                        className="input-field w-full"
                                         value={endDate}
                                         onChange={(e) => setEndDate(e.target.value)}
                                     />
