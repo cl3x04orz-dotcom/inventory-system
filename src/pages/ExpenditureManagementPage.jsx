@@ -24,7 +24,11 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
     const handleSubmit = async () => {
         if (!note.trim()) {
             alert('請輸入備註！');
-            document.getElementById('input-note')?.focus();
+            const el = document.getElementById('input-expense-note');
+            if (el) {
+                el.focus();
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
             return;
         }
 
@@ -133,20 +137,21 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                 </div>
             )}
             {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <div className="p-2 bg-rose-100 rounded-lg">
-                            <DollarSign className="text-rose-600" size={24} />
+            {/* Header */}
+            <div className="flex flex-row justify-between items-center gap-4">
+                <div className="flex-1 min-w-0">
+                    <h1 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2 truncate">
+                        <div className="p-1.5 md:p-2 bg-rose-100 rounded-lg shrink-0">
+                            <DollarSign className="text-rose-600 w-5 h-5 md:w-6 md:h-6" />
                         </div>
                         支出管理
                     </h1>
-                    <p className="text-slate-500 text-sm mt-1">整理與紀錄經營成本，並同步至雲端試算表</p>
+                    <p className="text-slate-500 text-xs md:text-sm mt-1 truncate">整理與紀錄經營成本</p>
                 </div>
 
-                <div className="bg-rose-50 px-6 py-3 border border-rose-200 rounded-xl shadow-sm">
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">今日計算總額 (結算)</p>
-                    <p className="text-2xl font-black text-rose-600">${finalTotal.toLocaleString()}</p>
+                <div className="bg-rose-50 px-3 md:px-6 py-2 md:py-3 border border-rose-200 rounded-xl shadow-sm shrink-0 flex flex-col items-end">
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">今日總額</p>
+                    <p className="text-lg md:text-2xl font-black text-rose-600">${finalTotal.toLocaleString()}</p>
                 </div>
             </div>
 
