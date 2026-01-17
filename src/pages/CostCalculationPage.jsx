@@ -77,45 +77,54 @@ export default function CostCalculationPage({ user, apiUrl }) {
 
     return (
         <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6 flex flex-col h-[calc(100vh-6rem)] animate-in fade-in duration-500">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <DollarSign className="text-rose-600" /> 成本支出計算
-                    </h1>
-                    <p className="text-slate-500 text-sm mt-1">分析 Expenditures 分頁中的各項經營成本與支出</p>
+            <div className="flex justify-between items-start gap-4 shrink-0">
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                        <DollarSign className="text-rose-600 shrink-0" />
+                        <h1 className="text-2xl font-bold text-slate-800 whitespace-nowrap">成本支出計算</h1>
+                    </div>
+                    <p className="text-slate-500 text-sm mt-1 pl-8 md:pl-0 truncate">
+                        (Cost Calculation) 分析各項經營成本
+                    </p>
                 </div>
-                <div className="flex gap-4 flex-wrap">
-                    <div className="glass-panel px-4 py-2 bg-rose-50 border-rose-200">
-                        <p className="text-[10px] text-slate-500 uppercase font-bold text-center">總營運成本</p>
-                        <p className="text-xl font-bold text-rose-600 text-center">${totalOperationalCost.toLocaleString()}</p>
-                    </div>
-                    <div className="glass-panel px-4 py-2 bg-emerald-50 border-emerald-200">
-                        <p className="text-[10px] text-slate-500 uppercase font-bold text-center">貨款</p>
-                        <p className="text-xl font-bold text-emerald-700 text-center">${summary.goods.toLocaleString()}</p>
-                    </div>
-                    <div className="glass-panel px-4 py-2 bg-teal-50 border-teal-200">
-                        <p className="text-[10px] text-slate-500 uppercase font-bold text-center">公積金</p>
-                        <p className="text-xl font-bold text-teal-700 text-center">${summary.reserve.toLocaleString()}</p>
-                    </div>
-                    <div className="glass-panel px-4 py-2 bg-slate-50 border-slate-200">
-                        <p className="text-[10px] text-slate-500 uppercase font-bold text-center">Line Pay 收款</p>
-                        <p className="text-xl font-bold text-slate-800 text-center">${summary.linePay.toLocaleString()}</p>
-                    </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2 shrink-0">
+                <div className="glass-panel px-1 py-2 md:px-4 bg-rose-50 border-rose-200 flex flex-col justify-center items-center">
+                    <p className="text-[9px] md:text-[10px] text-slate-500 uppercase font-bold text-center leading-tight">總營運成本</p>
+                    <p className="text-sm md:text-xl font-bold text-rose-600 text-center text-nowrap mt-1">${totalOperationalCost.toLocaleString()}</p>
+                </div>
+                <div className="glass-panel px-1 py-2 md:px-4 bg-emerald-50 border-emerald-200 flex flex-col justify-center items-center">
+                    <p className="text-[9px] md:text-[10px] text-slate-500 uppercase font-bold text-center leading-tight">貨款</p>
+                    <p className="text-sm md:text-xl font-bold text-emerald-700 text-center text-nowrap mt-1">${summary.goods.toLocaleString()}</p>
+                </div>
+                <div className="glass-panel px-1 py-2 md:px-4 bg-teal-50 border-teal-200 flex flex-col justify-center items-center">
+                    <p className="text-[9px] md:text-[10px] text-slate-500 uppercase font-bold text-center leading-tight">公積金</p>
+                    <p className="text-sm md:text-xl font-bold text-teal-700 text-center text-nowrap mt-1">${summary.reserve.toLocaleString()}</p>
+                </div>
+                <div className="glass-panel px-1 py-2 md:px-4 bg-slate-50 border-slate-200 flex flex-col justify-center items-center">
+                    <p className="text-[9px] md:text-[10px] text-slate-500 uppercase font-bold text-center leading-tight">Line Pay</p>
+                    <p className="text-sm md:text-xl font-bold text-slate-800 text-center text-nowrap mt-1">${summary.linePay.toLocaleString()}</p>
                 </div>
             </div>
 
             <div className="mb-2 p-4 shrink-0 grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 rounded-xl border border-slate-200">
-                <div className="flex items-center gap-2">
-                    <Calendar size={18} className="text-slate-400" />
-                    <input type="date" className="input-field flex-1 text-slate-800 bg-white" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                    <span className="text-slate-400">至</span>
-                    <input type="date" className="input-field flex-1 text-slate-800 bg-white" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                <div className="flex flex-col md:flex-row md:items-center gap-3 w-full">
+                    <div className="space-y-1 w-full md:w-auto md:flex-1">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase px-1 md:hidden">開始日期</label>
+                        <input type="date" className="input-field w-full h-10 appearance-none bg-white text-slate-800" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                    </div>
+                    <span className="text-slate-400 font-bold text-center md:text-left self-center hidden md:block">至</span>
+                    <div className="space-y-1 w-full md:w-auto md:flex-1">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase px-1 md:hidden">結束日期</label>
+                        <input type="date" className="input-field w-full h-10 appearance-none bg-white text-slate-800" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                    </div>
                 </div>
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input type="text" placeholder="搜尋對象或業務..." className="input-field pl-10 w-full text-slate-800 bg-white" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                    <input type="text" placeholder="搜尋對象或業務..." className="input-field pl-10 w-full h-10 text-slate-800 bg-white" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
-                <button onClick={fetchData} className="btn-primary flex items-center justify-center gap-2">
+                <button onClick={fetchData} className="btn-primary w-full md:w-auto h-10 flex items-center justify-center gap-2">
                     <RefreshCw size={18} className={loading ? 'animate-spin' : ''} /> 執行計算
                 </button>
             </div>
