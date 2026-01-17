@@ -76,7 +76,7 @@ export default function CostCalculationPage({ user, apiUrl }) {
     ];
 
     return (
-        <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6 flex flex-col h-auto md:h-[calc(100vh-6rem)] animate-in fade-in duration-500">
+        <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-4 md:space-y-6 flex flex-col h-[calc(100vh-6rem)] animate-in fade-in duration-500 overflow-hidden">
             <div className="flex justify-between items-start gap-4 shrink-0">
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -90,57 +90,59 @@ export default function CostCalculationPage({ user, apiUrl }) {
             </div>
 
             <div className="grid grid-cols-4 gap-2 shrink-0">
-                <div className="glass-panel px-1 py-2 md:px-4 bg-rose-50 border-rose-200 flex flex-col justify-center items-center">
+                <div className="glass-panel px-1 py-1.5 md:px-4 bg-rose-50 border-rose-200 flex flex-col justify-center items-center">
                     <p className="text-[9px] md:text-[10px] text-slate-500 uppercase font-bold text-center leading-tight">總營運成本</p>
-                    <p className="text-sm md:text-xl font-bold text-rose-600 text-center text-nowrap mt-1">${totalOperationalCost.toLocaleString()}</p>
+                    <p className="text-xs md:text-xl font-bold text-rose-600 text-center text-nowrap mt-0.5 md:mt-1">${totalOperationalCost.toLocaleString()}</p>
                 </div>
-                <div className="glass-panel px-1 py-2 md:px-4 bg-emerald-50 border-emerald-200 flex flex-col justify-center items-center">
+                <div className="glass-panel px-1 py-1.5 md:px-4 bg-emerald-50 border-emerald-200 flex flex-col justify-center items-center">
                     <p className="text-[9px] md:text-[10px] text-slate-500 uppercase font-bold text-center leading-tight">貨款</p>
-                    <p className="text-sm md:text-xl font-bold text-emerald-700 text-center text-nowrap mt-1">${summary.goods.toLocaleString()}</p>
+                    <p className="text-xs md:text-xl font-bold text-emerald-700 text-center text-nowrap mt-0.5 md:mt-1">${summary.goods.toLocaleString()}</p>
                 </div>
-                <div className="glass-panel px-1 py-2 md:px-4 bg-teal-50 border-teal-200 flex flex-col justify-center items-center">
+                <div className="glass-panel px-1 py-1.5 md:px-4 bg-teal-50 border-teal-200 flex flex-col justify-center items-center">
                     <p className="text-[9px] md:text-[10px] text-slate-500 uppercase font-bold text-center leading-tight">公積金</p>
-                    <p className="text-sm md:text-xl font-bold text-teal-700 text-center text-nowrap mt-1">${summary.reserve.toLocaleString()}</p>
+                    <p className="text-xs md:text-xl font-bold text-teal-700 text-center text-nowrap mt-0.5 md:mt-1">${summary.reserve.toLocaleString()}</p>
                 </div>
-                <div className="glass-panel px-1 py-2 md:px-4 bg-slate-50 border-slate-200 flex flex-col justify-center items-center">
+                <div className="glass-panel px-1 py-1.5 md:px-4 bg-slate-50 border-slate-200 flex flex-col justify-center items-center">
                     <p className="text-[9px] md:text-[10px] text-slate-500 uppercase font-bold text-center leading-tight">Line Pay</p>
-                    <p className="text-sm md:text-xl font-bold text-slate-800 text-center text-nowrap mt-1">${summary.linePay.toLocaleString()}</p>
+                    <p className="text-xs md:text-xl font-bold text-slate-800 text-center text-nowrap mt-0.5 md:mt-1">${summary.linePay.toLocaleString()}</p>
                 </div>
             </div>
 
-            <div className="mb-2 p-4 shrink-0 grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 rounded-xl border border-slate-200">
-                <div className="flex flex-col md:flex-row md:items-center gap-3 w-full">
+            <div className="p-3 shrink-0 grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-50 rounded-xl border border-slate-200">
+                {/* Date Inputs: Grid cols 2 on mobile to take only 1 row height */}
+                <div className="grid grid-cols-2 md:flex md:flex-row md:items-center gap-2 w-full">
                     <div className="space-y-1 w-full md:w-auto md:flex-1">
-                        <label className="text-[10px] text-slate-500 font-bold uppercase px-1 md:hidden">開始日期</label>
-                        <input type="date" className="input-field w-full h-10 appearance-none bg-white text-slate-800" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                        <input type="date" className="input-field w-full h-10 appearance-none bg-white text-slate-800 text-xs md:text-sm" value={startDate} onChange={e => setStartDate(e.target.value)} />
                     </div>
+                    {/* Hide '至' on mobile completely as inputs are side-by-side or clearly range */}
                     <span className="text-slate-400 font-bold text-center md:text-left self-center hidden md:block">至</span>
                     <div className="space-y-1 w-full md:w-auto md:flex-1">
-                        <label className="text-[10px] text-slate-500 font-bold uppercase px-1 md:hidden">結束日期</label>
-                        <input type="date" className="input-field w-full h-10 appearance-none bg-white text-slate-800" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                        <input type="date" className="input-field w-full h-10 appearance-none bg-white text-slate-800 text-xs md:text-sm" value={endDate} onChange={e => setEndDate(e.target.value)} />
                     </div>
                 </div>
+
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input type="text" placeholder="搜尋對象或業務..." className="input-field pl-10 w-full h-10 text-slate-800 bg-white" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                    <input type="text" placeholder="搜尋..." className="input-field pl-10 w-full h-10 text-slate-800 bg-white" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
+
                 <button onClick={fetchData} className="btn-primary w-full md:w-auto h-10 flex items-center justify-center gap-2">
-                    <RefreshCw size={18} className={loading ? 'animate-spin' : ''} /> 執行計算
+                    <RefreshCw size={18} className={loading ? 'animate-spin' : ''} /> 計算
                 </button>
             </div>
 
-            {/* 九大支出統計卡片 - 重新加入 */}
-            <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-12 gap-3 shrink-0">
+            {/* Compact 5-Col Grid for Expenses on Mobile (2 Rows x 5 Cols = 10 items) */}
+            <div className="grid grid-cols-5 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-12 gap-2 shrink-0">
                 {expenseCategories.map(cat => (
-                    <div key={cat.key} className="p-3 bg-white border border-slate-200 rounded-xl shadow-sm">
-                        <p className="text-[10px] text-slate-500 font-bold uppercase truncate">{cat.label}</p>
-                        <p className={`text-sm md:text-md font-bold ${cat.color} mt-1`}>${summary[cat.key].toLocaleString()}</p>
+                    <div key={cat.key} className="p-1 md:p-3 bg-white border border-slate-200 rounded-lg shadow-sm flex flex-col justify-center items-center h-14 md:h-20">
+                        <p className="text-[9px] md:text-[10px] text-slate-500 font-bold uppercase truncate w-full text-center">{cat.label}</p>
+                        <p className={`text-xs md:text-base font-bold ${cat.color} mt-0.5 md:mt-1`}>${summary[cat.key].toLocaleString()}</p>
                     </div>
                 ))}
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm p-0 flex-none md:flex-1 border border-slate-200 relative overflow-visible md:overflow-hidden">
-                <div className="md:h-full overflow-x-auto md:overflow-y-auto custom-scrollbar">
+            <div className="bg-white rounded-xl shadow-sm p-0 flex-1 border border-slate-200 relative overflow-hidden">
+                <div className="h-full overflow-auto custom-scrollbar">
                     <table className="w-full text-left text-sm border-separate border-spacing-0 min-w-[1100px]">
                         <thead className="bg-slate-50 text-slate-500 text-xs uppercase sticky top-0 z-30">
                             <tr>
