@@ -65,9 +65,9 @@ export default function SalesRankingPage({ user, apiUrl }) {
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shrink-0 grid grid-cols-1 md:grid-cols-3 gap-4 shadow-sm">
                 <div className="flex items-center gap-2">
                     <Calendar size={18} className="text-slate-400" />
-                    <input type="date" className="input-field flex-1 bg-white" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                    <span className="text-slate-500 font-bold">至</span>
-                    <input type="date" className="input-field flex-1 bg-white" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                    <input type="date" className="input-field flex-1 bg-white text-sm" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                    <span className="text-slate-500 font-bold hidden md:inline">至</span>
+                    <input type="date" className="input-field flex-1 bg-white text-sm" value={endDate} onChange={e => setEndDate(e.target.value)} />
                 </div>
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -86,7 +86,8 @@ export default function SalesRankingPage({ user, apiUrl }) {
 
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex-1 flex flex-col shadow-sm">
                 <div className="overflow-y-auto flex-1">
-                    <table className="w-full text-left text-sm">
+                    {/* Desktop View */}
+                    <table className="hidden md:table w-full text-left text-sm">
                         <thead className="bg-slate-50 text-slate-500 text-xs uppercase sticky top-0 z-10 font-bold border-b border-slate-100">
                             <tr>
                                 <th className="p-4 w-16 text-center">排名</th>
@@ -123,6 +124,45 @@ export default function SalesRankingPage({ user, apiUrl }) {
                             )}
                         </tbody>
                     </table>
+
+                    {/* Mobile View */}
+                    <div className="md:hidden divide-y divide-slate-100">
+                        {loading ? (
+                            <div className="p-10 text-center text-slate-500">載入中...</div>
+                        ) : filteredData.length > 0 ? (
+                            filteredData.map((item, idx) => (
+                                <div key={idx} className="p-4 bg-white active:bg-slate-50 transition-colors">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="flex items-center gap-3">
+                                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 shadow-sm ${idx === 0 ? 'bg-amber-100 text-amber-700' :
+                                                idx === 1 ? 'bg-slate-100 text-slate-600' :
+                                                    idx === 2 ? 'bg-orange-100 text-orange-700' : 'bg-slate-50 text-slate-400 border border-slate-100'
+                                                }`}>
+                                                {idx + 1}
+                                            </span>
+                                            <div className="text-sm font-bold text-slate-800">{productMap[item.productName] || item.productName}</div>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2 pl-9">
+                                        <div className="space-y-0.5">
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">數量</p>
+                                            <p className="text-xs font-mono font-bold text-emerald-600">{item.totalQty.toLocaleString()}</p>
+                                        </div>
+                                        <div className="space-y-0.5">
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">總額</p>
+                                            <p className="text-xs font-mono font-bold text-blue-600">${item.totalAmount.toLocaleString()}</p>
+                                        </div>
+                                        <div className="space-y-0.5">
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">均價</p>
+                                            <p className="text-xs font-mono font-bold text-slate-500">${(item.totalAmount / item.totalQty).toFixed(1)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="p-10 text-center text-slate-500">暫無資料</div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

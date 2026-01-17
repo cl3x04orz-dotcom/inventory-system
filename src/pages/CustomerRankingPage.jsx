@@ -52,9 +52,9 @@ export default function CustomerRankingPage({ user, apiUrl }) {
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shrink-0 grid grid-cols-1 md:grid-cols-3 gap-4 shadow-sm">
                 <div className="flex items-center gap-2">
                     <Calendar size={18} className="text-slate-400" />
-                    <input type="date" className="input-field flex-1 bg-white" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                    <span className="text-slate-500 font-bold">至</span>
-                    <input type="date" className="input-field flex-1 bg-white" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                    <input type="date" className="input-field flex-1 bg-white text-sm" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                    <span className="text-slate-500 font-bold hidden md:inline">至</span>
+                    <input type="date" className="input-field flex-1 bg-white text-sm" value={endDate} onChange={e => setEndDate(e.target.value)} />
                 </div>
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -73,7 +73,8 @@ export default function CustomerRankingPage({ user, apiUrl }) {
 
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex-1 flex flex-col shadow-sm">
                 <div className="overflow-y-auto flex-1">
-                    <table className="w-full text-left text-sm">
+                    {/* Desktop View */}
+                    <table className="hidden md:table w-full text-left text-sm">
                         <thead className="bg-slate-50 text-slate-500 text-xs uppercase sticky top-0 z-10 font-bold border-b border-slate-100">
                             <tr>
                                 <th className="p-4 w-16 text-center">排名</th>
@@ -112,6 +113,45 @@ export default function CustomerRankingPage({ user, apiUrl }) {
                             )}
                         </tbody>
                     </table>
+
+                    {/* Mobile View */}
+                    <div className="md:hidden divide-y divide-slate-100">
+                        {loading ? (
+                            <div className="p-10 text-center text-slate-500">載入中...</div>
+                        ) : filteredData.length > 0 ? (
+                            filteredData.map((item, idx) => {
+                                const totalRevenue = data.reduce((sum, i) => sum + i.totalAmount, 0);
+                                const percentage = (item.totalAmount / totalRevenue) * 100;
+                                return (
+                                    <div key={idx} className="p-4 bg-white active:bg-slate-50 transition-colors">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="flex items-center gap-3">
+                                                <span className="w-6 h-6 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 shrink-0 shadow-sm">
+                                                    {idx + 1}
+                                                </span>
+                                                <div className="text-sm font-bold text-slate-800">{item.customerName}</div>
+                                            </div>
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-xs font-mono font-bold text-purple-700">${item.totalAmount.toLocaleString()}</span>
+                                                <span className="text-[10px] text-slate-400 font-bold">{percentage.toFixed(1)}%</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center justify-between pl-9 mt-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-slate-400 font-bold uppercase">交易次數</span>
+                                                <span className="text-xs font-mono text-slate-600">{item.transactionCount.toLocaleString()}</span>
+                                            </div>
+                                            <div className="w-24 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                                <div className="h-full bg-purple-500" style={{ width: `${percentage}%` }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <div className="p-10 text-center text-slate-500">暫無資料</div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

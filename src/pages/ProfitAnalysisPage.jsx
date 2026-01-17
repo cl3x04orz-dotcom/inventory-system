@@ -62,14 +62,14 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
                     </h1>
                     <p className="text-slate-500 text-sm mt-1">針對指定期間內各商品的銷售額、成本與毛利結構</p>
                 </div>
-                <div className="flex gap-4">
-                    <div className="bg-emerald-50 px-4 py-2 border border-emerald-200 rounded-xl shadow-sm">
-                        <p className="text-[10px] text-slate-500 uppercase font-bold text-center">總毛利</p>
-                        <p className="text-xl font-bold text-emerald-700 text-center">${totalProfit.toLocaleString()}</p>
+                <div className="flex gap-2 md:gap-4">
+                    <div className="bg-emerald-50 px-3 py-1.5 md:px-4 md:py-2 border border-emerald-200 rounded-xl shadow-sm flex-1">
+                        <p className="text-[8px] md:text-[10px] text-slate-500 uppercase font-bold text-center">總毛利</p>
+                        <p className="text-sm md:text-xl font-bold text-emerald-700 text-center">${totalProfit.toLocaleString()}</p>
                     </div>
-                    <div className="bg-blue-50 px-4 py-2 border border-blue-200 rounded-xl shadow-sm">
-                        <p className="text-[10px] text-slate-500 uppercase font-bold text-center">平均毛利率</p>
-                        <p className="text-xl font-bold text-blue-700 text-center">{avgMargin.toFixed(1)}%</p>
+                    <div className="bg-blue-50 px-3 py-1.5 md:px-4 md:py-2 border border-blue-200 rounded-xl shadow-sm flex-1">
+                        <p className="text-[8px] md:text-[10px] text-slate-500 uppercase font-bold text-center">平均毛利率</p>
+                        <p className="text-sm md:text-xl font-bold text-blue-700 text-center">{avgMargin.toFixed(1)}%</p>
                     </div>
                 </div>
             </div>
@@ -77,9 +77,9 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shrink-0 grid grid-cols-1 md:grid-cols-3 gap-4 shadow-sm">
                 <div className="flex items-center gap-2">
                     <Calendar size={18} className="text-slate-400" />
-                    <input type="date" className="input-field flex-1 bg-white" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                    <span className="text-slate-500 font-bold">至</span>
-                    <input type="date" className="input-field flex-1 bg-white" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                    <input type="date" className="input-field flex-1 bg-white text-sm" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                    <span className="text-slate-500 font-bold hidden md:inline">至</span>
+                    <input type="date" className="input-field flex-1 bg-white text-sm" value={endDate} onChange={e => setEndDate(e.target.value)} />
                 </div>
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -92,7 +92,8 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
 
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex-1 flex flex-col shadow-sm">
                 <div className="overflow-y-auto flex-1">
-                    <table className="w-full text-left text-sm border-collapse">
+                    {/* Desktop View */}
+                    <table className="hidden md:table w-full text-left text-sm border-collapse">
                         <thead className="bg-slate-50 text-slate-500 text-xs uppercase sticky top-0 z-10 font-bold border-b border-slate-100">
                             <tr>
                                 <th className="p-4 whitespace-nowrap">產品名稱</th>
@@ -153,6 +154,50 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
                             )}
                         </tbody>
                     </table>
+
+                    {/* Mobile View */}
+                    <div className="md:hidden divide-y divide-slate-100">
+                        {loading ? (
+                            <div className="p-10 text-center text-slate-500 italic">正在計算毛利數據...</div>
+                        ) : filteredData.length > 0 ? (
+                            filteredData.map((item, idx) => {
+                                const profit = item.revenue - item.cost;
+                                const margin = item.revenue > 0 ? (profit / item.revenue) * 100 : 0;
+                                const displayName = productMap[item.productName] || item.productName;
+
+                                return (
+                                    <div key={idx} className="p-4 bg-white active:bg-slate-50 transition-colors">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="text-sm font-bold text-slate-800 max-w-[65%] leading-tight">{displayName}</div>
+                                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${margin >= 30 ? 'bg-emerald-100 text-emerald-700' :
+                                                margin >= 10 ? 'bg-blue-100 text-blue-700' : 'bg-rose-100 text-rose-700'
+                                                }`}>
+                                                {margin.toFixed(1)}%
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 mt-3">
+                                            <div className="space-y-1">
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase">收入</p>
+                                                <p className="text-xs font-mono font-bold text-slate-600">${Math.round(item.revenue).toLocaleString()}</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase">成本</p>
+                                                <p className="text-xs font-mono font-bold text-rose-500/80">${Math.round(item.cost).toLocaleString()}</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase">毛利</p>
+                                                <p className={`text-xs font-mono font-bold ${profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                    ${Math.abs(Math.round(profit)).toLocaleString()}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <div className="p-10 text-center text-slate-500">暫無資料</div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
