@@ -190,25 +190,22 @@ export default function PermissionControlPage({ user, apiUrl }) {
                 </div>
             )}
 
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
-                <div className="space-y-1">
-                    <h1 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Shield className="text-rose-600" size={24} /> 權限控管表
+            <div className="flex justify-between items-center shrink-0">
+                <div className="flex flex-col">
+                    <h1 className="text-lg md:text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <Shield className="text-rose-600" size={20} /> 權限控管
                     </h1>
-                    <p className="text-slate-500 text-xs md:text-sm font-medium">
-                        (Permission Control) <span className="hidden md:inline text-slate-400 mx-1">|</span>
-                        <span className="block md:inline mt-0.5 md:mt-0">管理系統使用者與訪問權限</span>
-                    </p>
+                    <p className="text-[10px] md:text-sm text-slate-400 font-medium">(Permission Control)</p>
                 </div>
-                <button onClick={fetchUsers} className="btn-secondary p-2 rounded-xl self-end md:self-auto">
-                    <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+                <button onClick={fetchUsers} className="btn-secondary p-2 rounded-xl">
+                    <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                 </button>
             </div>
 
             {/* Add User Panel */}
-            <div className="glass-panel p-6 border-l-4 border-l-emerald-500 shrink-0">
-                <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-slate-800">
-                    <UserPlus size={20} className="text-emerald-600" /> 新增使用者
+            <div className="glass-panel p-4 md:p-6 border-l-4 border-l-emerald-500 shrink-0">
+                <h3 className="font-bold text-base md:text-lg mb-3 flex items-center gap-2 text-slate-800">
+                    <UserPlus size={18} className="text-emerald-600" /> 新增使用者
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end relative">
                     <div className="space-y-1">
@@ -385,12 +382,12 @@ export default function PermissionControlPage({ user, apiUrl }) {
                     <div className="md:hidden divide-y divide-slate-100">
                         {users.length > 0 ? (
                             users.map((u, idx) => (
-                                <div key={idx} className="p-4 bg-white hover:bg-slate-50 transition-colors">
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div className="space-y-1">
-                                            <div className="text-base font-bold text-slate-900">{u.username}</div>
-                                            <div className="flex items-center gap-2">
-                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${u.role === 'BOSS' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                                <div key={idx} className="p-6 bg-white hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0 shadow-sm">
+                                    <div className="flex justify-between items-center">
+                                        <div className="space-y-2">
+                                            <div className="text-lg font-extrabold text-slate-900 leading-tight">{u.username}</div>
+                                            <div className="flex items-center gap-3">
+                                                <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold border ${u.role === 'BOSS' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
                                                     u.role === 'ADMIN' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' :
                                                         u.role === 'EMPLOYEE' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
                                                             'bg-slate-500/10 text-slate-500 border-slate-500/20'
@@ -398,19 +395,19 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                                     {u.role}
                                                 </span>
                                                 {u.status === 'ACTIVE' ? (
-                                                    <span className="flex items-center gap-1 text-emerald-600 font-bold text-[10px]">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> ACTIVE
+                                                    <span className="flex items-center gap-1.5 text-emerald-600 font-bold text-[11px]">
+                                                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span> ACTIVE
                                                     </span>
                                                 ) : (
-                                                    <span className="flex items-center gap-1 text-slate-400 font-bold text-[10px]">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span> {u.status || 'OFF'}
+                                                    <span className="flex items-center gap-1.5 text-slate-400 font-bold text-[11px]">
+                                                        <span className="w-2 h-2 rounded-full bg-slate-300"></span> {u.status || 'OFF'}
                                                     </span>
                                                 )}
                                             </div>
                                         </div>
 
                                         {u.username !== 'admin' && (
-                                            <div className="flex items-center gap-1">
+                                            <div className="flex items-center gap-2">
                                                 <button
                                                     onClick={() => {
                                                         let currentPerms = Array.isArray(u.permissions) ? [...u.permissions] : [];
@@ -432,15 +429,15 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                                         });
                                                         setEditingUser({ username: u.username, permissions: currentPerms });
                                                     }}
-                                                    className="w-10 h-10 flex items-center justify-center text-blue-500 bg-blue-50 rounded-lg active:scale-95 transition-transform"
+                                                    className="w-12 h-12 flex items-center justify-center text-blue-500 bg-blue-50 rounded-xl active:scale-90 transition-transform shadow-sm"
                                                 >
-                                                    <Shield size={18} />
+                                                    <Shield size={22} />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDeleteUser(u.username)}
-                                                    className="w-10 h-10 flex items-center justify-center text-rose-500 bg-rose-50 rounded-lg active:scale-95 transition-transform"
+                                                    className="w-12 h-12 flex items-center justify-center text-rose-500 bg-rose-50 rounded-xl active:scale-90 transition-transform shadow-sm"
                                                 >
-                                                    <Trash2 size={18} />
+                                                    <Trash2 size={22} />
                                                 </button>
                                             </div>
                                         )}
