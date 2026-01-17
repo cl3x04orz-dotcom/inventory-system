@@ -373,18 +373,18 @@ export default function PayrollPage({ user, apiUrl }) {
 
                 {/* Row 2: Filters Capsule */}
                 <div className="flex justify-center">
-                    <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-1 flex items-center gap-1">
-                        <select value={year} onChange={e => setYear(Number(e.target.value))} className="bg-transparent text-sm font-medium text-slate-700 py-1 pl-2 pr-1 outline-none text-center">
+                    <div className="bg-white rounded-lg border border-slate-200 shadow-sm h-10 px-1 flex items-center gap-1">
+                        <select value={year} onChange={e => setYear(Number(e.target.value))} className="bg-transparent text-sm font-medium text-slate-700 h-8 pl-2 pr-1 outline-none text-center">
                             {[2025, 2026, 2027].map(y => <option key={y} value={y}>{y}年</option>)}
                         </select>
                         <div className="w-px h-4 bg-slate-200"></div>
-                        <select value={month} onChange={e => setMonth(Number(e.target.value))} className="bg-transparent text-sm font-bold text-blue-600 py-1 px-1 outline-none text-center w-16">
+                        <select value={month} onChange={e => setMonth(Number(e.target.value))} className="bg-transparent text-sm font-bold text-blue-600 h-8 px-1 outline-none text-center w-16">
                             {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}月</option>)}
                         </select>
                         {user.role === 'BOSS' && (
                             <>
                                 <div className="w-px h-4 bg-slate-200"></div>
-                                <select value={targetUser} onChange={e => setTargetUser(e.target.value)} className="bg-transparent text-sm font-medium text-slate-700 py-1 pl-1 pr-2 outline-none text-center min-w-[5rem]">
+                                <select value={targetUser} onChange={e => setTargetUser(e.target.value)} className="bg-transparent text-sm font-medium text-slate-700 h-8 pl-1 pr-2 outline-none text-center min-w-[5rem]">
                                     {userList.map(u => <option key={u.userid} value={u.username}>{u.username}</option>)}
                                     {!userList.some(u => u.username === targetUser) && <option value={targetUser}>{targetUser}</option>}
                                 </select>
@@ -396,16 +396,16 @@ export default function PayrollPage({ user, apiUrl }) {
                 {/* Row 3: Action Buttons Capsule */}
                 {user.role === 'BOSS' && (
                     <div className="flex justify-center">
-                        <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-1 flex items-center gap-1">
-                            <button onClick={() => setShowSettings(true)} className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-md flex items-center gap-1">
+                        <div className="bg-white rounded-lg border border-slate-200 shadow-sm h-10 px-1 flex items-center gap-1">
+                            <button onClick={() => setShowSettings(true)} className="h-8 px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-md flex items-center gap-1">
                                 <User size={14} /> 薪資設定
                             </button>
                             <div className="w-px h-4 bg-slate-200"></div>
-                            <button onClick={() => setShowProfile(true)} className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-md flex items-center gap-1">
+                            <button onClick={() => setShowProfile(true)} className="h-8 px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-md flex items-center gap-1">
                                 <Calendar size={14} /> 基本資料
                             </button>
                             <div className="w-px h-4 bg-slate-200"></div>
-                            <button onClick={handleSavePayroll} disabled={isSubmitting || !data} className="px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-md flex items-center gap-1 disabled:opacity-50">
+                            <button onClick={handleSavePayroll} disabled={isSubmitting || !data} className="h-8 px-3 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-md flex items-center gap-1 disabled:opacity-50">
                                 <DollarSign size={14} /> 薪資存檔
                             </button>
                         </div>
