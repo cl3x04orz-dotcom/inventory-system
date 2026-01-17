@@ -357,59 +357,64 @@ export default function PayrollPage({ user, apiUrl }) {
     };
 
     return (
-        <div className="p-2 md:p-8 space-y-4 md:space-y-6 max-w-7xl mx-auto pb-24">
+        <div className="p-3 md:p-8 space-y-4 md:space-y-6 max-w-7xl mx-auto pb-24">
 
-            {/* --- Mobile View Header & Controls --- */}
+            {/* --- Mobile View Header & Controls (Cleaner & Tighter) --- */}
             <div className="md:hidden space-y-3">
                 {/* Row 1: Title (Left) + Recalculate (Right) */}
-                <div className="flex justify-between items-center px-1">
-                    <h1 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 flex items-center gap-2">
-                        <DollarSign size={20} /> 薪資結算中心
+                <div className="flex justify-between items-center">
+                    <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <DollarSign className="text-blue-500" size={18} /> 薪資結算中心
                     </h1>
-                    <button onClick={fetchData} className="btn-primary py-1 px-3 text-sm h-8">
+                    <button onClick={fetchData} className="btn-secondary h-7 px-3 text-xs rounded-full border-slate-200">
                         重新計算
                     </button>
                 </div>
 
-                {/* Row 2: Year / Month / User (Centered) */}
+                {/* Row 2: Year / Month / User (Centered & Unified) */}
                 <div className="flex justify-center items-center gap-2">
-                    <select value={year} onChange={e => setYear(Number(e.target.value))} className="input-field w-20 h-9 text-sm text-center">
-                        {[2025, 2026, 2027].map(y => <option key={y} value={y}>{y}年</option>)}
-                    </select>
-                    <select value={month} onChange={e => setMonth(Number(e.target.value))} className="input-field w-16 h-9 text-sm text-center">
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}月</option>)}
-                    </select>
-                    {user.role === 'BOSS' && (
-                        <select value={targetUser} onChange={e => setTargetUser(e.target.value)} className="input-field w-24 h-9 text-sm text-center">
-                            {userList.map(u => <option key={u.userid} value={u.username}>{u.username}</option>)}
-                            {!userList.some(u => u.username === targetUser) && <option value={targetUser}>{targetUser}</option>}
+                    <div className="flex items-center bg-white rounded-lg border border-slate-200 p-0.5 shadow-sm">
+                        <select value={year} onChange={e => setYear(Number(e.target.value))} className="bg-transparent text-sm text-center font-medium py-1 pl-2 pr-1 outline-none text-slate-700">
+                            {[2025, 2026, 2027].map(y => <option key={y} value={y}>{y}年</option>)}
                         </select>
+                        <div className="w-px h-4 bg-slate-200 mx-1"></div>
+                        <select value={month} onChange={e => setMonth(Number(e.target.value))} className="bg-transparent text-sm text-center font-bold py-1 pl-1 pr-2 outline-none text-blue-600">
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}月</option>)}
+                        </select>
+                    </div>
+
+                    {user.role === 'BOSS' && (
+                        <div className="flex items-center bg-white rounded-lg border border-slate-200 p-0.5 shadow-sm">
+                            <select value={targetUser} onChange={e => setTargetUser(e.target.value)} className="bg-transparent text-sm text-center font-medium py-1 px-3 outline-none text-slate-700 min-w-[5rem]">
+                                {userList.map(u => <option key={u.userid} value={u.username}>{u.username}</option>)}
+                                {!userList.some(u => u.username === targetUser) && <option value={targetUser}>{targetUser}</option>}
+                            </select>
+                        </div>
                     )}
                 </div>
 
-                {/* Row 3: Settings / Profile / Save (Centered) */}
+                {/* Row 3: Action Buttons (Flat & Simple) */}
                 {user.role === 'BOSS' && (
                     <div className="flex justify-center items-center gap-2">
-                        <button onClick={() => setShowSettings(true)} className="btn-secondary h-8 px-3 text-xs flex items-center gap-1">
-                            <User size={14} /> 薪資設定
+                        <button onClick={() => setShowSettings(true)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-600 shadow-sm active:scale-95 transition-transform flex items-center gap-1">
+                            <User size={12} /> 薪資設定
                         </button>
-                        <button onClick={() => setShowProfile(true)} className="btn-secondary h-8 px-3 text-xs flex items-center gap-1 border-emerald-200 text-emerald-700">
-                            <Calendar size={14} /> 基本資料
+                        <button onClick={() => setShowProfile(true)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-600 shadow-sm active:scale-95 transition-transform flex items-center gap-1">
+                            <Calendar size={12} /> 基本資料
                         </button>
-                        <button onClick={handleSavePayroll} disabled={isSubmitting || !data} className="btn-secondary h-8 px-3 text-xs flex items-center gap-1 border-blue-200 text-blue-700 disabled:opacity-50">
-                            <DollarSign size={14} /> 薪資存檔
+                        <button onClick={handleSavePayroll} disabled={isSubmitting || !data} className="px-3 py-1.5 bg-blue-600 border border-blue-600 rounded-lg text-xs font-medium text-white shadow-sm active:scale-95 transition-transform flex items-center gap-1 disabled:opacity-50">
+                            <DollarSign size={12} /> 薪資存檔
                         </button>
                     </div>
                 )}
 
-                {/* Info (Seniority etc) - Keep compact */}
-                <div className="flex flex-wrap justify-center gap-2 px-1 text-[10px]">
-                    <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100">到職: {profileData.profile.joinedDate || '-'}</span>
-                    <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">年資: {profileData.seniorityText}</span>
-                    <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-100">剩餘特休: {(profileData.estimatedLeaveDays - (data?.totalSpecialLeaveUsed || 0))}天</span>
+                {/* Info Tags (Simple text row) */}
+                <div className="flex flex-wrap justify-center gap-2 text-[10px] text-slate-500">
+                    <span className="bg-slate-100 px-2 py-0.5 rounded">到職: {profileData.profile.joinedDate || '-'}</span>
+                    <span className="bg-slate-100 px-2 py-0.5 rounded">年資: {profileData.seniorityText}</span>
+                    <span className="bg-slate-100 px-2 py-0.5 rounded">剩餘特休: {(profileData.estimatedLeaveDays - (data?.totalSpecialLeaveUsed || 0))}天</span>
                 </div>
             </div>
-
 
             {/* --- Desktop View Header & Controls --- */}
             <div className="hidden md:flex glass-panel p-6 flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -476,44 +481,49 @@ export default function PayrollPage({ user, apiUrl }) {
                 </div>
             )}
 
-            {/* --- Summary Cards (Mobile One-Line 4-Cols) --- */}
-            {/* Row 4: Base / Perf / Ins / Net */}
-            <div className="grid grid-cols-4 gap-2 px-1 md:hidden">
-                <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-center items-center h-16">
-                    <p className="text-[10px] text-slate-500 font-bold">底薪</p>
-                    <p className="text-xs font-bold text-slate-800 mt-1">${(data?.config?.baseSalary || 0).toLocaleString()}</p>
+            {/* --- Mobile Summary (Cleaned Up) --- */}
+            <div className="md:hidden space-y-2">
+                <div className="grid grid-cols-4 gap-1.5">
+                    <div className="bg-white p-1.5 rounded-lg border border-slate-100 flex flex-col justify-center items-center h-14">
+                        <p className="text-[10px] text-slate-400">底薪</p>
+                        <p className="text-xs font-bold text-slate-700 pt-0.5">${(data?.config?.baseSalary || 0).toLocaleString()}</p>
+                    </div>
+                    <div className="bg-white p-1.5 rounded-lg border border-slate-100 flex flex-col justify-center items-center h-14">
+                        <p className="text-[10px] text-slate-400">業績獎金</p>
+                        <p className="text-xs font-bold text-indigo-600 pt-0.5">${(summary.bonus || 0).toLocaleString()}</p>
+                    </div>
+                    <div className="bg-white p-1.5 rounded-lg border border-slate-100 flex flex-col justify-center items-center h-14">
+                        <p className="text-[10px] text-slate-400">勞健保</p>
+                        <p className="text-xs font-bold text-red-600 pt-0.5">-${(summary.insurance || 0).toLocaleString()}</p>
+                    </div>
+                    <div className="bg-blue-50 p-1.5 rounded-lg border border-blue-100 flex flex-col justify-center items-center h-14">
+                        <p className="text-[10px] text-blue-400">實領薪資</p>
+                        <p className="text-xs font-bold text-blue-700 pt-0.5">${(summary.finalSalary || 0).toLocaleString()}</p>
+                    </div>
                 </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-center items-center h-16">
-                    <p className="text-[10px] text-slate-500 font-bold">業績獎金</p>
-                    <p className="text-xs font-bold text-indigo-600 mt-1">${(summary.bonus || 0).toLocaleString()}</p>
-                </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-center items-center h-16">
-                    <p className="text-[10px] text-slate-500 font-bold">勞健保</p>
-                    <p className="text-xs font-bold text-red-600 mt-1">-${(summary.insurance || 0).toLocaleString()}</p>
-                </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-center items-center h-16 bg-blue-50/50 border-blue-100">
-                    <p className="text-[10px] text-slate-500 font-bold">實領薪資</p>
-                    <p className="text-xs font-bold text-blue-600 mt-1">${(summary.finalSalary || 0).toLocaleString()}</p>
-                </div>
-            </div>
 
-            {/* Row 5: Attend / Normal / Special / Sick */}
-            <div className="grid grid-cols-4 gap-2 px-1 mt-2 md:hidden">
-                <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-center items-center h-16">
-                    <p className="text-[10px] text-slate-500 font-bold">全勤</p>
-                    <p className="text-xs font-bold text-yellow-600 mt-1">${(summary.attendanceBonus || 0).toLocaleString()}</p>
+                <div className="grid grid-cols-4 gap-1.5">
+                    <div className="bg-white p-1.5 rounded-lg border border-slate-100 flex flex-col justify-center items-center h-14">
+                        <p className="text-[10px] text-slate-400">全勤</p>
+                        <p className="text-xs font-bold text-yellow-600 pt-0.5">${(summary.attendanceBonus || 0).toLocaleString()}</p>
+                    </div>
+                    <div className="bg-white p-1.5 rounded-lg border border-slate-100 flex flex-col justify-center items-center h-14">
+                        <p className="text-[10px] text-slate-400">一般休假</p>
+                        <p className="text-xs font-bold text-slate-500 pt-0.5">{generalLeaveDaysCount}天</p>
+                    </div>
+                    <div className="bg-white p-1.5 rounded-lg border border-slate-100 flex flex-col justify-center items-center h-14">
+                        <p className="text-[10px] text-slate-400">特休紀錄</p>
+                        <p className="text-xs font-bold text-emerald-500 pt-0.5">{specialLeaveDaysCount}天</p>
+                    </div>
+                    <div className="bg-white p-1.5 rounded-lg border border-slate-100 flex flex-col justify-center items-center h-14">
+                        <p className="text-[10px] text-slate-400">病假紀錄</p>
+                        <p className="text-xs font-bold text-amber-500 pt-0.5">{sickLeaveDaysCount}天</p>
+                    </div>
                 </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-center items-center h-16">
-                    <p className="text-[10px] text-slate-500 font-bold">一般休假</p>
-                    <p className="text-xs font-bold text-slate-500 mt-1">{generalLeaveDaysCount}天</p>
-                </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-center items-center h-16">
-                    <p className="text-[10px] text-slate-500 font-bold">特休紀錄</p>
-                    <p className="text-xs font-bold text-emerald-500 mt-1">{specialLeaveDaysCount}天</p>
-                </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-center items-center h-16">
-                    <p className="text-[10px] text-slate-500 font-bold">病假紀錄</p>
-                    <p className="text-xs font-bold text-amber-500 mt-1">{sickLeaveDaysCount}天</p>
+
+                <div className="bg-white px-3 py-2 rounded-lg border border-red-100 flex justify-between items-center">
+                    <span className="text-xs text-red-600/70 font-medium">盤損/扣款合計</span>
+                    <span className="text-sm font-bold text-red-600">-${(summary.loss || 0).toLocaleString()}</span>
                 </div>
             </div>
 
@@ -671,7 +681,7 @@ export default function PayrollPage({ user, apiUrl }) {
                 </table>
             </div>
 
-            {/* --- Mobile Daily Records (Direct Presentation) --- */}
+            {/* --- Mobile Daily Records (Cleaned Up) --- */}
             <div className="md:hidden space-y-2">
                 {days.map((dayItem) => {
                     const dateStr = dayItem.date;
@@ -682,49 +692,43 @@ export default function PayrollPage({ user, apiUrl }) {
                     const hasSales = sales > 0;
 
                     let status = '休';
-                    let statusColor = 'bg-yellow-100 text-yellow-700';
-                    if (hasSales) { status = '勤'; statusColor = 'bg-green-100 text-green-700'; }
-                    else if (record.isLeave) { status = '休'; statusColor = 'bg-yellow-100 text-yellow-700'; }
-                    else if (record.isSpecialLeave) { status = '特'; statusColor = 'bg-emerald-100 text-emerald-700'; }
+                    let statusColor = 'bg-slate-100 text-slate-500';
+                    if (hasSales) { status = '勤'; statusColor = 'bg-emerald-100 text-emerald-700'; }
+                    else if (record.isLeave) { status = '休'; statusColor = 'bg-slate-100 text-slate-500'; }
+                    else if (record.isSpecialLeave) { status = '特'; statusColor = 'bg-teal-100 text-teal-700'; }
                     else if (record.isSickLeave) { status = '病'; statusColor = 'bg-amber-100 text-amber-700'; }
 
                     const isWeekend = dayItem.weekday === '六' || dayItem.weekday === '日';
 
                     return (
-                        <div key={dateStr} className={`bg-white rounded-lg border border-slate-100 p-2 flex items-center shadow-sm text-xs ${isWeekend ? 'bg-slate-50/50' : ''}`}>
-                            {/* Date & Week */}
-                            <div className="w-14 items-center flex flex-col justify-center border-r border-slate-100 pr-2 mr-2">
+                        <div key={dateStr} className={`bg-white rounded-lg border border-slate-100 p-2 flex items-center justify-between text-xs`}>
+                            {/* Date */}
+                            <div className="flex items-center gap-2 w-16">
                                 <span className={`font-bold text-sm ${dayItem.weekday === '日' ? 'text-rose-500' : 'text-slate-700'}`}>{shortDate}</span>
-                                <span className={`text-[10px] ${dayItem.weekday === '日' ? 'text-rose-400' : 'text-slate-400'}`}>週{dayItem.weekday}</span>
+                                <span className={`text-[10px] ${dayItem.weekday === '日' ? 'text-rose-400' : 'text-slate-400'}`}>{dayItem.weekday}</span>
                             </div>
 
-                            {/* Content Middle */}
-                            <div className="flex-1 grid grid-cols-3 gap-1 items-center">
-                                {/* Sales */}
-                                <div className="text-center">
-                                    <p className="text-[9px] text-slate-400 mb-0.5">業績</p>
-                                    <p className={`font-bold ${sales > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>{sales > 0 ? `$${sales.toLocaleString()}` : '-'}</p>
+                            {/* Sales & Status */}
+                            <div className="flex-1 flex justify-center gap-3">
+                                <div className="text-center w-12">
+                                    <span className={`block font-bold ${sales > 0 ? 'text-slate-800' : 'text-slate-200'}`}>{sales > 0 ? `$${(sales / 1000).toFixed(1)}k` : '-'}</span>
                                 </div>
-                                {/* Status */}
-                                <div className="text-center">
-                                    <p className="text-[9px] text-slate-400 mb-0.5">狀態</p>
+                                <div className="text-center w-8">
                                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${statusColor}`}>{status}</span>
                                 </div>
-                                {/* Loss */}
-                                <div className="text-center">
-                                    <p className="text-[9px] text-slate-400 mb-0.5">虧損</p>
-                                    <p className={`font-bold ${record.loss ? 'text-red-500' : 'text-slate-300'}`}>{record.loss ? `-$${Number(record.loss).toLocaleString()}` : '-'}</p>
+                                <div className="text-center w-12">
+                                    <span className={`block font-bold ${record.loss ? 'text-red-500' : 'text-slate-200'}`}>{record.loss ? `-$${Number(record.loss).toLocaleString()}` : '-'}</span>
                                 </div>
                             </div>
 
-                            {/* Edit Button Right */}
-                            <div className="pl-2 ml-1 border-l border-slate-100">
+                            {/* Edit */}
+                            <div className="w-8 flex justify-end">
                                 {user.role === 'BOSS' && (
                                     <button
                                         onClick={() => { setEditingDay(dayItem); setEditType('LEAVE'); }}
-                                        className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-blue-50 hover:text-blue-500"
+                                        className="w-7 h-7 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 active:bg-blue-50 active:text-blue-500"
                                     >
-                                        <span className="text-[10px]">編輯</span>
+                                        <span className="text-[10px]">✎</span>
                                     </button>
                                 )}
                             </div>
