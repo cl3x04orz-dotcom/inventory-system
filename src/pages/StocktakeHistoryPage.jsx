@@ -110,13 +110,13 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
                 <div className="mb-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
                     <div className="flex flex-col md:flex-row gap-4 items-end">
                         {/* Mobile: Date Range First */}
-                        <div className="contents md:hidden">
+                        <div className="w-full md:hidden">
                             <div className="w-full space-y-3">
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
                                     <input
                                         type="date"
-                                        className="input-field w-full"
+                                        className="input-field w-full h-10 appearance-none bg-transparent"
                                         value={startDate}
                                         onChange={(e) => setStartDate(e.target.value)}
                                     />
@@ -125,7 +125,7 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
                                     <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
                                     <input
                                         type="date"
-                                        className="input-field w-full"
+                                        className="input-field w-full h-10 appearance-none bg-transparent"
                                         value={endDate}
                                         onChange={(e) => setEndDate(e.target.value)}
                                     />
@@ -140,7 +140,7 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
                                 <input
                                     type="text"
                                     placeholder="搜尋商品名稱..."
-                                    className="input-field pl-10 w-full"
+                                    className="input-field pl-10 w-full h-10"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
