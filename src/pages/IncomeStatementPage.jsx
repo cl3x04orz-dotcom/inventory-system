@@ -118,7 +118,7 @@ export default function IncomeStatementPage({ user, apiUrl }) {
                         />
                     </div>
 
-                    <span className="text-slate-500 font-bold text-center md:text-left self-center">至</span>
+                    <span className="text-slate-500 font-bold text-center md:text-left self-center hidden md:block">至</span>
 
                     <div className="space-y-1 w-full md:w-auto md:flex-1">
                         <label className="text-[10px] text-slate-500 font-bold uppercase px-1 md:hidden">結束日期</label>
@@ -135,11 +135,11 @@ export default function IncomeStatementPage({ user, apiUrl }) {
             </div>
 
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex-1 flex flex-col shadow-sm">
-                <div className="overflow-y-auto flex-1 p-8">
-                    <div className="space-y-6 max-w-2xl mx-auto font-mono text-sm md:text-base">
+                <div className="overflow-y-auto flex-1 p-4 md:p-8">
+                    <div className="space-y-4 md:space-y-6 max-w-2xl mx-auto font-mono text-sm md:text-base">
                         {/* Revenue Section */}
                         <div className="space-y-2">
-                            <h3 className="text-emerald-700 font-bold text-lg border-b border-emerald-200 pb-2 mb-4">營業收入 (Revenue)</h3>
+                            <h3 className="text-emerald-700 font-bold text-lg border-b border-emerald-200 pb-2 mb-2 md:mb-4">營業收入 (Revenue)</h3>
                             <div className="flex justify-between items-center">
                                 <span className="text-slate-600">銷貨收入</span>
                                 <span className="text-slate-900 font-bold">{formatCurrency(data.revenue)}</span>
@@ -158,25 +158,27 @@ export default function IncomeStatementPage({ user, apiUrl }) {
                         </div>
 
                         {/* Expenses Section */}
-                        <div className="space-y-2 mt-8">
-                            <h3 className="text-orange-700 font-bold text-lg border-b border-orange-200 pb-2 mb-4 whitespace-nowrap">營業費用 (Operating Expenses)</h3>
+                        <div className="space-y-2 mt-4 md:mt-8">
+                            <h3 className="text-orange-700 font-bold text-lg border-b border-orange-200 pb-2 mb-2 md:mb-4 whitespace-nowrap">營業費用 (Operating Expenses)</h3>
 
-                            {Object.entries(data.expenses).map(([key, val]) => {
-                                const labels = {
-                                    stall: '攤位費', cleaning: '清潔費', electricity: '電費', gas: '加油費',
-                                    parking: '停車費', bags: '塑膠袋', serviceFee: '服務費', others: '其他支出',
-                                    vehicleMaintenance: '車輛保養', salary: '薪資支出'
-                                };
-                                if (val === 0) return null;
-                                return (
-                                    <div key={key} className="flex justify-between items-center text-slate-400 text-sm">
-                                        <span>{labels[key]}</span>
-                                        <span>{formatCurrency(val)}</span>
-                                    </div>
-                                );
-                            })}
+                            <div className="grid grid-cols-2 md:grid-cols-1 gap-x-4 gap-y-1 md:gap-y-0">
+                                {Object.entries(data.expenses).map(([key, val]) => {
+                                    const labels = {
+                                        stall: '攤位費', cleaning: '清潔費', electricity: '電費', gas: '加油費',
+                                        parking: '停車費', bags: '塑膠袋', serviceFee: '服務費', others: '其他支出',
+                                        vehicleMaintenance: '車輛保養', salary: '薪資支出'
+                                    };
+                                    if (val === 0) return null;
+                                    return (
+                                        <div key={key} className="flex justify-between items-center text-slate-400 text-sm">
+                                            <span>{labels[key]}</span>
+                                            <span>{formatCurrency(val)}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
 
-                            <div className="flex justify-between items-center pt-2 border-t border-slate-100 text-orange-700">
+                            <div className="flex justify-between items-center pt-2 border-t border-slate-100 text-orange-700 mt-2">
                                 <span className="font-bold">費用總計</span>
                                 <span className="font-bold">- {formatCurrency(data.totalExpenses)}</span>
                             </div>
