@@ -83,7 +83,7 @@ export default function IncomeStatementPage({ user, apiUrl }) {
     const getPercent = (val, total) => total === 0 ? '0%' : `${((val / total) * 100).toFixed(1)}%`;
 
     return (
-        <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6 flex flex-col h-[calc(100vh-6rem)]">
+        <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-4 md:space-y-6 flex flex-col h-[calc(100dvh-6rem)] overflow-hidden">
             <div className="flex justify-between items-start shrink-0 gap-4">
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
