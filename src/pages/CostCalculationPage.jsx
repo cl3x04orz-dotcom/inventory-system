@@ -76,7 +76,7 @@ export default function CostCalculationPage({ user, apiUrl }) {
     ];
 
     return (
-        <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6 flex flex-col h-[calc(100vh-6rem)] animate-in fade-in duration-500">
+        <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6 flex flex-col h-auto md:h-[calc(100vh-6rem)] animate-in fade-in duration-500">
             <div className="flex justify-between items-start gap-4 shrink-0">
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -139,8 +139,8 @@ export default function CostCalculationPage({ user, apiUrl }) {
                 ))}
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm p-0 overflow-hidden flex-1 border border-slate-200 relative">
-                <div className="h-full overflow-auto custom-scrollbar">
+            <div className="bg-white rounded-xl shadow-sm p-0 flex-none md:flex-1 border border-slate-200 relative overflow-visible md:overflow-hidden">
+                <div className="md:h-full overflow-x-auto md:overflow-y-auto custom-scrollbar">
                     <table className="w-full text-left text-sm border-separate border-spacing-0 min-w-[1100px]">
                         <thead className="bg-slate-50 text-slate-500 text-xs uppercase sticky top-0 z-30">
                             <tr>
