@@ -362,7 +362,7 @@ export default function PayrollPage({ user, apiUrl }) {
             {/* --- Mobile View Header & Controls --- */}
             <div className="md:hidden space-y-4">
                 {/* Row 1: Title (Left) + Recalculate (Right) - Adjusted */}
-                <div className="flex justify-between items-center px-1 mb-2">
+                <div className="flex justify-between items-center px-1 mb-6">
                     <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                         <DollarSign className="text-blue-500" size={24} /> 薪資結算中心
                     </h1>
