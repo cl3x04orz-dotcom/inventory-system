@@ -72,22 +72,22 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                 {/* Filter */}
                 <div className="mb-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
                     <div className="flex flex-col md:flex-row gap-4">
-                        {/* Mobile: Date Range in separate rows, horizontal alignment */}
+                        {/* Mobile: Date Range in separate rows, stacked alignment for better width control */}
                         <div className="w-full md:hidden flex flex-col gap-3">
-                            <div className="flex items-center justify-between gap-2">
-                                <label className="text-sm text-slate-500 font-bold uppercase whitespace-nowrap">開始日期</label>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
                                 <input
                                     type="date"
-                                    className="input-field flex-1 text-sm px-2 py-2 min-w-0 bg-white"
+                                    className="input-field w-full text-sm px-2 py-2"
                                     value={startDate}
                                     onChange={(e) => setStartDate(e.target.value)}
                                 />
                             </div>
-                            <div className="flex items-center justify-between gap-2">
-                                <label className="text-sm text-slate-500 font-bold uppercase whitespace-nowrap">結束日期</label>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
                                 <input
                                     type="date"
-                                    className="input-field flex-1 text-sm px-2 py-2 min-w-0 bg-white"
+                                    className="input-field w-full text-sm px-2 py-2"
                                     value={endDate}
                                     onChange={(e) => setEndDate(e.target.value)}
                                 />
