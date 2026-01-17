@@ -84,24 +84,54 @@ export default function IncomeStatementPage({ user, apiUrl }) {
 
     return (
         <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6 flex flex-col h-[calc(100vh-6rem)]">
-            <div className="flex justify-between items-center shrink-0">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <PieChart className="text-emerald-600" /> 損益表 (Income Statement)
-                    </h1>
-                    <p className="text-slate-500 text-sm mt-1">檢視指定期間的營收、成本、費用與淨利</p>
+            <div className="flex justify-between items-start shrink-0 gap-4">
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                        <PieChart className="text-emerald-600 shrink-0" />
+                        <h1 className="text-2xl font-bold text-slate-800 whitespace-nowrap">損益表</h1>
+                    </div>
+                    <div className="text-slate-400 text-sm font-medium mt-0.5 pl-8 md:pl-0 md:inline md:ml-2">
+                        (Income Statement)
+                    </div>
+                    <p className="text-slate-500 text-sm mt-1 pl-8 md:pl-0 truncate">
+                        檢視指定期間的營收、成本、費用與淨利
+                    </p>
                 </div>
-                <button onClick={fetchData} className="btn-secondary p-2 rounded-xl">
+                <button onClick={fetchData} className="btn-secondary p-2 rounded-xl shrink-0">
                     <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
                 </button>
             </div>
 
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shrink-0 flex items-center gap-4 shadow-sm">
-                <Calendar size={18} className="text-slate-400" />
-                <input type="date" className="input-field flex-1 bg-white" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                <span className="text-slate-500 font-bold">至</span>
-                <input type="date" className="input-field flex-1 bg-white" value={endDate} onChange={e => setEndDate(e.target.value)} />
-                <button onClick={fetchData} className="btn-primary h-[42px] px-6">查詢</button>
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shrink-0 flex flex-col md:flex-row md:items-center gap-4 shadow-sm">
+                <div className="hidden md:block">
+                    <Calendar size={18} className="text-slate-400" />
+                </div>
+
+                <div className="flex flex-col md:flex-row md:items-center gap-3 flex-1 w-full">
+                    <div className="space-y-1 w-full md:w-auto md:flex-1">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase px-1 md:hidden">開始日期</label>
+                        <input
+                            type="date"
+                            className="input-field w-full h-10 appearance-none bg-white"
+                            value={startDate}
+                            onChange={e => setStartDate(e.target.value)}
+                        />
+                    </div>
+
+                    <span className="text-slate-500 font-bold text-center md:text-left self-center">至</span>
+
+                    <div className="space-y-1 w-full md:w-auto md:flex-1">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase px-1 md:hidden">結束日期</label>
+                        <input
+                            type="date"
+                            className="input-field w-full h-10 appearance-none bg-white"
+                            value={endDate}
+                            onChange={e => setEndDate(e.target.value)}
+                        />
+                    </div>
+                </div>
+
+                <button onClick={fetchData} className="btn-primary h-10 px-6 w-full md:w-auto mt-2 md:mt-0">查詢</button>
             </div>
 
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex-1 flex flex-col shadow-sm">
@@ -129,7 +159,7 @@ export default function IncomeStatementPage({ user, apiUrl }) {
 
                         {/* Expenses Section */}
                         <div className="space-y-2 mt-8">
-                            <h3 className="text-orange-700 font-bold text-lg border-b border-orange-200 pb-2 mb-4">營業費用 (Operating Expenses)</h3>
+                            <h3 className="text-orange-700 font-bold text-lg border-b border-orange-200 pb-2 mb-4 whitespace-nowrap">營業費用 (Operating Expenses)</h3>
 
                             {Object.entries(data.expenses).map(([key, val]) => {
                                 const labels = {
