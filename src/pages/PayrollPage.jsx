@@ -492,7 +492,7 @@ export default function PayrollPage({ user, apiUrl }) {
                 <SummaryCard title="底薪" amount={data?.config?.baseSalary} color="text-slate-800" isMobile />
                 <SummaryCard
                     title="業績獎金"
-                    amount={summary.bonus}
+                    amount={0}
                     color="text-indigo-600"
                     isMobile
                 />
@@ -504,7 +504,6 @@ export default function PayrollPage({ user, apiUrl }) {
                     isMobile
                     hoverContent={
                         <div className="flex flex-col items-end">
-                            <p className="text-[10px] text-slate-400 leading-none mb-0.5">獎金扣額</p>
                             <p className="text-xs font-bold text-emerald-600 font-mono">${(summary.bonus || 0).toLocaleString()}</p>
                         </div>
                     }
@@ -577,7 +576,7 @@ export default function PayrollPage({ user, apiUrl }) {
                 <SummaryCard title="底薪" amount={data?.config?.baseSalary} color="text-slate-800" />
                 <SummaryCard
                     title="業績獎金"
-                    amount={summary.bonus} // Changed from 0 to summary.bonus for actual bonus amount
+                    amount={0} // Changed to 0 as requested
                     subtext={`業績總額: $${(summary.sales || 0).toLocaleString()}`}
                     color="text-indigo-600"
                 />
