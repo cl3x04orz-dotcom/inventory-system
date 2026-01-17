@@ -190,14 +190,17 @@ export default function PermissionControlPage({ user, apiUrl }) {
                 </div>
             )}
 
-            <div className="flex justify-between items-center shrink-0">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Shield className="text-rose-600" /> 權限控管表 (Permission Control)
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
+                <div className="space-y-1">
+                    <h1 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <Shield className="text-rose-600" size={24} /> 權限控管表
                     </h1>
-                    <p className="text-slate-500 text-sm mt-1">管理系統使用者與訪問權限</p>
+                    <p className="text-slate-500 text-xs md:text-sm font-medium">
+                        (Permission Control) <span className="hidden md:inline text-slate-400 mx-1">|</span>
+                        <span className="block md:inline mt-0.5 md:mt-0">管理系統使用者與訪問權限</span>
+                    </p>
                 </div>
-                <button onClick={fetchUsers} className="btn-secondary p-2 rounded-xl">
+                <button onClick={fetchUsers} className="btn-secondary p-2 rounded-xl self-end md:self-auto">
                     <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
                 </button>
             </div>
@@ -288,7 +291,8 @@ export default function PermissionControlPage({ user, apiUrl }) {
             {/* User List */}
             <div className="glass-panel p-0 overflow-hidden flex-1 flex flex-col">
                 <div className="overflow-y-auto flex-1">
-                    <table className="w-full text-left text-sm">
+                    {/* Desktop Table View */}
+                    <table className="hidden md:table w-full text-left text-sm">
                         <thead className="bg-slate-50 text-slate-500 text-xs uppercase sticky top-0 z-10">
                             <tr>
                                 <th className="p-4">帳號 (Username)</th>
@@ -326,10 +330,9 @@ export default function PermissionControlPage({ user, apiUrl }) {
 
                                         <td className="p-4 text-center flex items-center justify-center gap-2">
                                             {u.username !== 'admin' && (
-                                                <>
+                                                <div className="flex items-center gap-1">
                                                     <button
                                                         onClick={() => {
-                                                            // [Migration Logic] Convert old permissions to new granular ones
                                                             let currentPerms = Array.isArray(u.permissions) ? [...u.permissions] : [];
                                                             const legacyMap = {
                                                                 'sales': ['sales_entry', 'sales_report'],
@@ -340,25 +343,16 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                                                 'system': ['system_config']
                                                             };
 
-                                                            let hasMigration = false;
                                                             Object.keys(legacyMap).forEach(legacyKey => {
                                                                 if (currentPerms.includes(legacyKey)) {
-                                                                    hasMigration = true;
-                                                                    // Remove legacy key
                                                                     currentPerms = currentPerms.filter(p => p !== legacyKey);
-                                                                    // Add all new granular keys (avoid duplicates)
                                                                     legacyMap[legacyKey].forEach(newKey => {
-                                                                        if (!currentPerms.includes(newKey)) {
-                                                                            currentPerms.push(newKey);
-                                                                        }
+                                                                        if (!currentPerms.includes(newKey)) currentPerms.push(newKey);
                                                                     });
                                                                 }
                                                             });
 
-                                                            setEditingUser({
-                                                                username: u.username,
-                                                                permissions: currentPerms
-                                                            });
+                                                            setEditingUser({ username: u.username, permissions: currentPerms });
                                                         }}
                                                         className="p-2 text-slate-400 hover:text-blue-400 transition-colors"
                                                         title="設定權限"
@@ -372,7 +366,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                                     >
                                                         <Trash2 size={16} />
                                                     </button>
-                                                </>
+                                                </div>
                                             )}
                                         </td>
                                     </tr>
@@ -385,10 +379,82 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                 </tr>
                             )}
                         </tbody>
-
                     </table>
+
+                    {/* Mobile Card Layout */}
+                    <div className="md:hidden divide-y divide-slate-100">
+                        {users.length > 0 ? (
+                            users.map((u, idx) => (
+                                <div key={idx} className="p-4 bg-white hover:bg-slate-50 transition-colors">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className="space-y-1">
+                                            <div className="text-base font-bold text-slate-900">{u.username}</div>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${u.role === 'BOSS' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                                                    u.role === 'ADMIN' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' :
+                                                        u.role === 'EMPLOYEE' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                                                            'bg-slate-500/10 text-slate-500 border-slate-500/20'
+                                                    }`}>
+                                                    {u.role}
+                                                </span>
+                                                {u.status === 'ACTIVE' ? (
+                                                    <span className="flex items-center gap-1 text-emerald-600 font-bold text-[10px]">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> ACTIVE
+                                                    </span>
+                                                ) : (
+                                                    <span className="flex items-center gap-1 text-slate-400 font-bold text-[10px]">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span> {u.status || 'OFF'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {u.username !== 'admin' && (
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => {
+                                                        let currentPerms = Array.isArray(u.permissions) ? [...u.permissions] : [];
+                                                        const legacyMap = {
+                                                            'sales': ['sales_entry', 'sales_report'],
+                                                            'purchase': ['purchase_entry', 'purchase_history'],
+                                                            'inventory': ['inventory_adjust', 'inventory_stocktake', 'inventory_valuation', 'inventory_history'],
+                                                            'finance': ['finance_expenditure', 'finance_receivable', 'finance_payable', 'finance_income', 'finance_cost'],
+                                                            'analytics': ['analytics_sales', 'analytics_customer', 'analytics_profit', 'analytics_turnover'],
+                                                            'system': ['system_config']
+                                                        };
+                                                        Object.keys(legacyMap).forEach(legacyKey => {
+                                                            if (currentPerms.includes(legacyKey)) {
+                                                                currentPerms = currentPerms.filter(p => p !== legacyKey);
+                                                                legacyMap[legacyKey].forEach(newKey => {
+                                                                    if (!currentPerms.includes(newKey)) currentPerms.push(newKey);
+                                                                });
+                                                            }
+                                                        });
+                                                        setEditingUser({ username: u.username, permissions: currentPerms });
+                                                    }}
+                                                    className="w-10 h-10 flex items-center justify-center text-blue-500 bg-blue-50 rounded-lg active:scale-95 transition-transform"
+                                                >
+                                                    <Shield size={18} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteUser(u.username)}
+                                                    className="w-10 h-10 flex items-center justify-center text-rose-500 bg-rose-50 rounded-lg active:scale-95 transition-transform"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="p-10 text-center text-slate-500">
+                                {loading ? '載入中...' : '無使用者資料'}
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div >
+            </div>
 
             {/* Permission Editor Modal */}
             {editingUser && (
