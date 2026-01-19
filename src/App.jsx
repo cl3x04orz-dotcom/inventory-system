@@ -310,7 +310,7 @@ export default function App() {
                                 )}
 
                                 {/* 財務管理 Group */}
-                                {(user.role === 'BOSS' || checkPermission('receivable') || checkPermission('payable') || checkPermission('incomeStatement') || checkPermission('costCalculation')) && (
+                                {(user.role === 'BOSS' || checkPermission('receivable') || checkPermission('payable') || checkPermission('incomeStatement') || checkPermission('costCalculation') || checkPermission('payroll')) && (
                                     <MobileNavGroup label="財務帳務" icon={Wallet}>
                                         {checkPermission('receivable') && <NavItem label="應收帳款" icon={Wallet} onClick={() => handlePageChange('receivable')} active={page === 'receivable'} />}
                                         {checkPermission('payable') && <NavItem label="應付帳款" icon={Wallet} onClick={() => handlePageChange('payable')} active={page === 'payable'} />}
@@ -408,7 +408,8 @@ export default function App() {
                     )}
 
                     {/* 財務管理 Group */}
-                    {(user.role === 'BOSS' || checkPermission('receivable') || checkPermission('payable') || checkPermission('incomeStatement') || checkPermission('costCalculation')) && (
+                    {/* 財務管理 Group */}
+                    {(user.role === 'BOSS' || checkPermission('receivable') || checkPermission('payable') || checkPermission('incomeStatement') || checkPermission('costCalculation') || checkPermission('payroll')) && (
                         <NavDropdown
                             id="accounting"
                             label="財務帳務"
