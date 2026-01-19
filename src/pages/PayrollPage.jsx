@@ -363,28 +363,28 @@ export default function PayrollPage({ user, apiUrl }) {
             <div className="md:hidden space-y-4">
                 {/* Row 1: Title (Left) + Recalculate (Right) - Adjusted */}
                 <div className="flex justify-between items-center px-1 mb-6">
-                    <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                        <DollarSign className="text-blue-500" size={24} /> 薪資結算中心
+                    <h1 className="text-xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+                        <DollarSign className="text-[var(--accent-blue)]" size={24} /> 薪資結算中心
                     </h1>
-                    <button onClick={fetchData} className="btn-secondary py-1 px-3 text-xs h-7 rounded-full border-slate-200 text-slate-500">
+                    <button onClick={fetchData} className="btn-secondary py-1 px-3 text-xs h-7 rounded-full border-[var(--border-primary)] text-[var(--text-secondary)]">
                         重新計算
                     </button>
                 </div>
 
                 {/* Row 2: Filters Capsule */}
                 <div className="flex justify-center">
-                    <div className="bg-white rounded-lg border border-slate-200 shadow-sm h-10 px-1 flex items-center gap-1 w-full max-w-[340px] justify-center">
-                        <select value={year} onChange={e => setYear(Number(e.target.value))} className="bg-transparent text-sm font-medium text-slate-700 h-8 pl-2 pr-1 outline-none text-center">
+                    <div className="bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)] shadow-sm h-10 px-1 flex items-center gap-1 w-full max-w-[340px] justify-center">
+                        <select value={year} onChange={e => setYear(Number(e.target.value))} className="bg-transparent text-sm font-medium text-[var(--text-primary)] h-8 pl-2 pr-1 outline-none text-center">
                             {[2025, 2026, 2027].map(y => <option key={y} value={y}>{y}年</option>)}
                         </select>
                         <div className="w-px h-4 bg-slate-200"></div>
-                        <select value={month} onChange={e => setMonth(Number(e.target.value))} className="bg-transparent text-sm font-bold text-blue-600 h-8 px-1 outline-none text-center w-16">
+                        <select value={month} onChange={e => setMonth(Number(e.target.value))} className="bg-transparent text-sm font-bold text-[var(--accent-blue)] h-8 px-1 outline-none text-center w-16">
                             {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}月</option>)}
                         </select>
                         {user.role === 'BOSS' && (
                             <>
                                 <div className="w-px h-4 bg-slate-200"></div>
-                                <select value={targetUser} onChange={e => setTargetUser(e.target.value)} className="bg-transparent text-sm font-medium text-slate-700 h-8 pl-1 pr-2 outline-none text-center min-w-[5rem]">
+                                <select value={targetUser} onChange={e => setTargetUser(e.target.value)} className="bg-transparent text-sm font-medium text-[var(--text-primary)] h-8 pl-1 pr-2 outline-none text-center min-w-[5rem]">
                                     {userList.map(u => <option key={u.userid} value={u.username}>{u.username}</option>)}
                                     {!userList.some(u => u.username === targetUser) && <option value={targetUser}>{targetUser}</option>}
                                 </select>
@@ -396,16 +396,16 @@ export default function PayrollPage({ user, apiUrl }) {
                 {/* Row 3: Action Buttons Capsule */}
                 {user.role === 'BOSS' && (
                     <div className="flex justify-center">
-                        <div className="bg-white rounded-lg border border-slate-200 shadow-sm h-10 px-1 flex items-center gap-1 w-full max-w-[340px] justify-center">
-                            <button onClick={() => setShowSettings(true)} className="h-8 px-2 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-md flex items-center gap-1">
+                        <div className="bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)] shadow-sm h-10 px-1 flex items-center gap-1 w-full max-w-[340px] justify-center">
+                            <button onClick={() => setShowSettings(true)} className="h-8 px-2 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] rounded-md flex items-center gap-1">
                                 <User size={14} /> 薪資設定
                             </button>
                             <div className="w-px h-4 bg-slate-200"></div>
-                            <button onClick={() => setShowProfile(true)} className="h-8 px-2 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-md flex items-center gap-1">
+                            <button onClick={() => setShowProfile(true)} className="h-8 px-2 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] rounded-md flex items-center gap-1">
                                 <Calendar size={14} /> 基本資料
                             </button>
                             <div className="w-px h-4 bg-slate-200"></div>
-                            <button onClick={handleSavePayroll} disabled={isSubmitting || !data} className="h-8 px-2 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-md flex items-center gap-1 disabled:opacity-50">
+                            <button onClick={handleSavePayroll} disabled={isSubmitting || !data} className="h-8 px-2 text-xs font-medium text-[var(--accent-blue)] hover:bg-[var(--bg-secondary)] rounded-md flex items-center gap-1 disabled:opacity-50">
                                 <DollarSign size={14} /> 薪資存檔
                             </button>
                         </div>
@@ -414,9 +414,9 @@ export default function PayrollPage({ user, apiUrl }) {
 
                 {/* Info (Seniority etc) - Keep compact */}
                 <div className="flex flex-wrap justify-center gap-2 px-1 text-[10px]">
-                    <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100">到職: {profileData.profile.joinedDate || '-'}</span>
-                    <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">年資: {profileData.seniorityText}</span>
-                    <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-100">剩餘特休: {(profileData.estimatedLeaveDays - (data?.totalSpecialLeaveUsed || 0))}天</span>
+                    <span className="bg-[var(--bg-secondary)] text-[var(--accent-blue)] px-2 py-0.5 rounded border border-[var(--border-primary)]">到職: {profileData.profile.joinedDate || '-'}</span>
+                    <span className="bg-[var(--bg-secondary)] text-indigo-500 px-2 py-0.5 rounded border border-[var(--border-primary)]">年資: {profileData.seniorityText}</span>
+                    <span className="bg-[var(--bg-secondary)] text-emerald-500 px-2 py-0.5 rounded border border-[var(--border-primary)]">剩餘特休: {(profileData.estimatedLeaveDays - (data?.totalSpecialLeaveUsed || 0))}天</span>
                 </div>
             </div>
 
@@ -424,10 +424,10 @@ export default function PayrollPage({ user, apiUrl }) {
             {/* --- Desktop View Header & Controls --- */}
             <div className="hidden md:flex glass-panel p-6 flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[var(--accent-blue)] to-indigo-500 flex items-center gap-3">
                         <DollarSign /> 薪資結算中心
                     </h1>
-                    <p className="text-slate-400 text-sm mt-1">自動彙整業績、出勤與各項扣除額</p>
+                    <p className="text-[var(--text-tertiary)] text-sm mt-1">自動彙整業績、出勤與各項扣除額</p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
@@ -448,10 +448,10 @@ export default function PayrollPage({ user, apiUrl }) {
                             <button onClick={() => setShowSettings(true)} className="btn-secondary flex items-center gap-2">
                                 <User size={16} /> 薪資設定
                             </button>
-                            <button onClick={() => setShowProfile(true)} className="btn-secondary flex items-center gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+                            <button onClick={() => setShowProfile(true)} className="btn-secondary flex items-center gap-2 border-[var(--border-primary)] text-emerald-500 hover:bg-[var(--bg-secondary)]">
                                 <Calendar size={16} /> 基本資料
                             </button>
-                            <button onClick={handleSavePayroll} disabled={isSubmitting || !data} className="btn-secondary flex items-center gap-2 border-blue-200 text-blue-700 hover:bg-blue-50 disabled:opacity-50">
+                            <button onClick={handleSavePayroll} disabled={isSubmitting || !data} className="btn-secondary flex items-center gap-2 border-[var(--border-primary)] text-blue-700 hover:bg-[var(--bg-secondary)] disabled:opacity-50">
                                 <DollarSign size={16} /> {isSubmitting ? '存檔中...' : '薪資存檔'}
                             </button>
                         </>
@@ -462,13 +462,13 @@ export default function PayrollPage({ user, apiUrl }) {
 
             {/* Desktop Info */}
             <div className="hidden md:flex flex-wrap gap-4 px-2">
-                <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-sm font-medium border border-blue-100">
+                <div className="flex items-center gap-2 bg-[var(--bg-secondary)] text-[var(--accent-blue)] px-3 py-1.5 rounded-full text-sm font-medium border border-[var(--border-primary)]">
                     <Calendar size={14} /> 到職日: {profileData.profile.joinedDate || '未設定'}
                 </div>
-                <div className="flex items-center gap-2 bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-full text-sm font-medium border border-indigo-100">
+                <div className="flex items-center gap-2 bg-[var(--bg-secondary)] text-indigo-500 px-3 py-1.5 rounded-full text-sm font-medium border border-[var(--border-primary)]">
                     <User size={14} /> 年資: {profileData.seniorityText}
                 </div>
-                <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-full text-sm font-medium border border-emerald-100">
+                <div className="flex items-center gap-2 bg-[var(--bg-secondary)] text-emerald-500 px-3 py-1.5 rounded-full text-sm font-medium border border-[var(--border-primary)]">
                     <CheckCircle size={14} /> 特休狀況: 預估總額 {profileData.estimatedLeaveDays} 天 / 已請 {data?.totalSpecialLeaveUsed || 0} 天 / 剩餘 {(profileData.estimatedLeaveDays - (data?.totalSpecialLeaveUsed || 0))} 天
                 </div>
             </div>
@@ -477,7 +477,7 @@ export default function PayrollPage({ user, apiUrl }) {
             {user.role === 'BOSS' && data?.isBirthdayMonth && (
                 <div className="px-1 md:px-2">
                     <div className="bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-100 rounded-xl p-3 md:p-4 flex items-center gap-3 md:gap-4 animate-bounce-subtle">
-                        <div className="bg-white p-1.5 md:p-2 rounded-full shadow-sm text-lg md:text-2xl">🎂</div>
+                        <div className="bg-[var(--bg-primary)] p-1.5 md:p-2 rounded-full shadow-sm text-lg md:text-2xl">🎂</div>
                         <div>
                             <h4 className="text-rose-700 font-bold text-sm md:text-base">本月適逢該員工生日 {profileData.profile.birthday ? `(${formatBirthday(profileData.profile.birthday)})` : ''}！</h4>
                             <p className="text-rose-600/80 text-xs md:text-sm">結算薪資時，別忘了發放生日禮金或準備小驚喜喔！</p>
@@ -489,7 +489,7 @@ export default function PayrollPage({ user, apiUrl }) {
             {/* --- Summary Cards (Mobile One-Line 4-Cols) --- */}
             {/* Row 4: Base / Perf / Ins / Net */}
             <div className="grid grid-cols-4 gap-2 px-1 md:hidden">
-                <SummaryCard title="底薪" amount={data?.config?.baseSalary} color="text-slate-800" isMobile />
+                <SummaryCard title="底薪" amount={data?.config?.baseSalary} color="text-[var(--text-primary)]" isMobile />
                 <SummaryCard
                     title="業績獎金"
                     amount={0}
@@ -504,16 +504,16 @@ export default function PayrollPage({ user, apiUrl }) {
                     isMobile
                     hoverContent={
                         <div className="flex flex-col items-end">
-                            <p className="text-xs font-bold text-emerald-600 font-mono">${(summary.bonus || 0).toLocaleString()}</p>
+                            <p className="text-xs font-bold text-emerald-500 font-mono">${(summary.bonus || 0).toLocaleString()}</p>
                         </div>
                     }
                 />
                 <SummaryCard
                     title="實領薪資"
                     amount={summary.finalSalary}
-                    color="text-blue-600"
+                    color="text-[var(--accent-blue)]"
                     isMobile
-                    className="bg-blue-50/50 border-blue-100"
+                    className="bg-[var(--bg-secondary)]/50 border-blue-100"
                 />
             </div>
 
@@ -526,8 +526,8 @@ export default function PayrollPage({ user, apiUrl }) {
                     isMobile
                     hoverContent={
                         <div className="flex flex-col items-end">
-                            <p className="text-[10px] text-slate-400 leading-none mb-0.5">出勤天</p>
-                            <p className="text-xs font-bold text-emerald-600">{attendanceDaysCount} 天</p>
+                            <p className="text-[10px] text-[var(--text-tertiary)] leading-none mb-0.5">出勤天</p>
+                            <p className="text-xs font-bold text-emerald-500">{attendanceDaysCount} 天</p>
                         </div>
                     }
                 />
@@ -536,12 +536,12 @@ export default function PayrollPage({ user, apiUrl }) {
                     amount={generalLeaveDaysCount}
                     isCurrency={false}
                     suffix="天"
-                    color="text-slate-500"
+                    color="text-[var(--text-secondary)]"
                     isMobile
                     hoverContent={
                         <div className="flex flex-col items-end gap-1">
-                            <p className="text-[10px] text-slate-400 leading-none">補貼</p>
-                            <p className={`text-xs font-bold ${(summary.leaveCompensation || 0) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                            <p className="text-[10px] text-[var(--text-tertiary)] leading-none">補貼</p>
+                            <p className={`text-xs font-bold ${(summary.leaveCompensation || 0) >= 0 ? 'text-[var(--accent-blue)]' : 'text-red-600'}`}>
                                 ${(summary.leaveCompensation || 0).toLocaleString()}
                             </p>
                         </div>
@@ -564,7 +564,7 @@ export default function PayrollPage({ user, apiUrl }) {
                     isMobile
                     hoverContent={
                         <div className="flex flex-col items-end">
-                            <p className="text-[10px] text-slate-400 leading-none">扣款</p>
+                            <p className="text-[10px] text-[var(--text-tertiary)] leading-none">扣款</p>
                             <p className="text-xs font-bold text-red-600">-${(sickLeaveDaysCount * 500).toLocaleString()}</p>
                         </div>
                     }
@@ -573,7 +573,7 @@ export default function PayrollPage({ user, apiUrl }) {
 
             {/* Desktop Summary Cards (Original Layout) */}
             <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-4 px-2">
-                <SummaryCard title="底薪" amount={data?.config?.baseSalary} color="text-slate-800" />
+                <SummaryCard title="底薪" amount={data?.config?.baseSalary} color="text-[var(--text-primary)]" />
                 <SummaryCard
                     title="業績獎金"
                     amount={0} // Changed to 0 as requested
@@ -587,11 +587,11 @@ export default function PayrollPage({ user, apiUrl }) {
                     color="text-red-600"
                     hoverContent={
                         <div className="flex flex-col items-end">
-                            <p className="text-sm font-bold text-emerald-600 font-mono">${(summary.bonus || 0).toLocaleString()}</p>
+                            <p className="text-sm font-bold text-emerald-500 font-mono">${(summary.bonus || 0).toLocaleString()}</p>
                         </div>
                     }
                 />
-                <SummaryCard title="實領薪資" amount={summary.finalSalary} color="text-blue-600" subtext="含獎金/扣除保險與扣款" />
+                <SummaryCard title="實領薪資" amount={summary.finalSalary} color="text-[var(--accent-blue)]" subtext="含獎金/扣除保險與扣款" />
             </div>
 
             <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4 px-2">
@@ -601,8 +601,8 @@ export default function PayrollPage({ user, apiUrl }) {
                     color="text-yellow-600"
                     hoverContent={
                         <div className="flex flex-col items-end">
-                            <p className="text-[10px] text-slate-400 font-medium leading-none mb-1">出勤天</p>
-                            <p className="text-sm font-bold text-emerald-600 font-mono">{attendanceDaysCount} 天</p>
+                            <p className="text-[10px] text-[var(--text-tertiary)] font-medium leading-none mb-1">出勤天</p>
+                            <p className="text-sm font-bold text-emerald-500 font-mono">{attendanceDaysCount} 天</p>
                         </div>
                     }
                 />
@@ -611,16 +611,16 @@ export default function PayrollPage({ user, apiUrl }) {
                     amount={generalLeaveDaysCount}
                     isCurrency={false}
                     suffix=" 天"
-                    color="text-slate-500"
+                    color="text-[var(--text-secondary)]"
                     hoverContent={
                         <div className="flex flex-col items-end gap-1">
                             <div>
-                                <p className="text-[10px] text-slate-400 font-medium leading-none mb-1">月休天數標準</p>
-                                <p className="text-sm font-bold text-emerald-600 font-mono">{data?.config?.monthlyOffDays || 0} 天</p>
+                                <p className="text-[10px] text-[var(--text-tertiary)] font-medium leading-none mb-1">月休天數標準</p>
+                                <p className="text-sm font-bold text-emerald-500 font-mono">{data?.config?.monthlyOffDays || 0} 天</p>
                             </div>
                             <div className="w-full border-t border-emerald-100 pt-1 mt-0.5">
-                                <p className="text-[10px] text-slate-400 font-medium leading-none mb-1">補：</p>
-                                <p className={`text-sm font-bold font-mono ${(summary.leaveCompensation || 0) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                                <p className="text-[10px] text-[var(--text-tertiary)] font-medium leading-none mb-1">補：</p>
+                                <p className={`text-sm font-bold font-mono ${(summary.leaveCompensation || 0) >= 0 ? 'text-[var(--accent-blue)]' : 'text-red-600'}`}>
                                     {(summary.leaveCompensation || 0) >= 0 ? '+' : '-'}${Math.abs(summary.leaveCompensation || 0).toLocaleString()}
                                 </p>
                             </div>
@@ -636,7 +636,7 @@ export default function PayrollPage({ user, apiUrl }) {
                     color="text-amber-500"
                     hoverContent={
                         <div className="flex flex-col items-end">
-                            <p className="text-[10px] text-slate-400 font-medium leading-none mb-1">扣款：</p>
+                            <p className="text-[10px] text-[var(--text-tertiary)] font-medium leading-none mb-1">扣款：</p>
                             <p className="text-sm font-bold text-red-600 font-mono">-${(sickLeaveDaysCount * 500).toLocaleString()}</p>
                         </div>
                     }
@@ -644,7 +644,7 @@ export default function PayrollPage({ user, apiUrl }) {
             </div>
 
             <div className="px-1 md:px-2 mt-2 md:mt-4">
-                <div className="bg-white p-3 rounded-lg border border-red-100 flex justify-between items-center shadow-sm">
+                <div className="bg-[var(--bg-primary)] p-3 rounded-lg border border-red-100 flex justify-between items-center shadow-sm">
                     <span className="text-sm text-red-600 font-bold">盤損/扣款合計</span>
                     <span className="text-lg font-bold text-red-600">-${(summary.loss || 0).toLocaleString()}</span>
                 </div>
@@ -653,7 +653,7 @@ export default function PayrollPage({ user, apiUrl }) {
             {/* Calendar Table (Desktop) */}
             <div className="hidden md:block glass-panel overflow-hidden">
                 <table className="w-full text-left border-collapse">
-                    <thead className="bg-slate-50 text-slate-500 text-sm">
+                    <thead className="bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-sm">
                         <tr>
                             <th className="p-4 w-32">日期</th>
                             <th className="p-4 w-24 text-center">星期</th>
@@ -663,7 +663,7 @@ export default function PayrollPage({ user, apiUrl }) {
                             <th className="p-4 text-center">操作</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-[var(--border-primary)]">
                         {days.map((dayItem) => {
                             const dateStr = dayItem.date;
                             const sales = data?.dailyData?.[dateStr] || 0;
@@ -690,12 +690,12 @@ export default function PayrollPage({ user, apiUrl }) {
                             const isWeekend = dayItem.weekday === '六' || dayItem.weekday === '日';
 
                             return (
-                                <tr key={dateStr} className={`hover:bg-slate-50 transition-colors ${isWeekend ? 'bg-slate-50/50' : ''}`}>
-                                    <td className="p-4 font-mono text-slate-600">{dateStr}</td>
-                                    <td className={`p-4 text-center ${dayItem.weekday === '日' ? 'text-red-600' : 'text-slate-500'}`}>
+                                <tr key={dateStr} className={`hover:bg-[var(--bg-secondary)] transition-colors ${isWeekend ? 'bg-[var(--bg-secondary)]/50' : ''}`}>
+                                    <td className="p-4 font-mono text-[var(--text-secondary)]">{dateStr}</td>
+                                    <td className={`p-4 text-center ${dayItem.weekday === '日' ? 'text-red-600' : 'text-[var(--text-secondary)]'}`}>
                                         {dayItem.weekday}
                                     </td>
-                                    <td className="p-4 text-right font-mono text-emerald-600">
+                                    <td className="p-4 text-right font-mono text-emerald-500">
                                         {Math.abs(sales) > 0.01 ? `$${sales.toLocaleString()}` : '-'}
                                     </td>
                                     <td className="p-4 text-center">
@@ -703,7 +703,7 @@ export default function PayrollPage({ user, apiUrl }) {
                                     </td>
                                     <td className="p-4 text-right font-mono text-red-600">
                                         {Math.abs(record.loss || 0) > 0.01 ? `-$${Math.abs(record.loss).toLocaleString()}` : ''}
-                                        {record.note && <span className="block text-xs text-slate-500">{record.note}</span>}
+                                        {record.note && <span className="block text-xs text-[var(--text-secondary)]">{record.note}</span>}
                                     </td>
                                     <td className="p-4 text-center">
                                         {user.role === 'BOSS' && (
@@ -739,44 +739,44 @@ export default function PayrollPage({ user, apiUrl }) {
                     let statusColor = 'bg-yellow-100 text-yellow-700';
                     if (hasSales) { status = '勤'; statusColor = 'bg-green-100 text-green-700'; }
                     else if (record.isLeave) { status = '休'; statusColor = 'bg-yellow-100 text-yellow-700'; }
-                    else if (record.isSpecialLeave) { status = '特'; statusColor = 'bg-emerald-100 text-emerald-700'; }
+                    else if (record.isSpecialLeave) { status = '特'; statusColor = 'bg-emerald-100 text-emerald-500'; }
                     else if (record.isSickLeave) { status = '病'; statusColor = 'bg-amber-100 text-amber-700'; }
 
                     const isWeekend = dayItem.weekday === '六' || dayItem.weekday === '日';
 
                     return (
-                        <div key={dateStr} className={`bg-white rounded-lg border border-slate-100 p-2 flex items-center shadow-sm text-xs ${isWeekend ? 'bg-slate-50/50' : ''}`}>
+                        <div key={dateStr} className={`bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)] p-2 flex items-center shadow-sm text-xs ${isWeekend ? 'bg-[var(--bg-secondary)]/50' : ''}`}>
                             {/* Date & Week */}
-                            <div className="w-14 items-center flex flex-col justify-center border-r border-slate-100 pr-2 mr-2">
-                                <span className={`font-bold text-sm ${dayItem.weekday === '日' ? 'text-rose-500' : 'text-slate-700'}`}>{shortDate}</span>
-                                <span className={`text-[10px] ${dayItem.weekday === '日' ? 'text-rose-400' : 'text-slate-400'}`}>週{dayItem.weekday}</span>
+                            <div className="w-14 items-center flex flex-col justify-center border-r border-[var(--border-primary)] pr-2 mr-2">
+                                <span className={`font-bold text-sm ${dayItem.weekday === '日' ? 'text-rose-500' : 'text-[var(--text-primary)]'}`}>{shortDate}</span>
+                                <span className={`text-[10px] ${dayItem.weekday === '日' ? 'text-rose-400' : 'text-[var(--text-tertiary)]'}`}>週{dayItem.weekday}</span>
                             </div>
 
                             {/* Content Middle */}
                             <div className="flex-1 grid grid-cols-3 gap-1 items-center">
                                 {/* Sales */}
                                 <div className="text-center">
-                                    <p className="text-[9px] text-slate-400 mb-0.5">業績</p>
-                                    <p className={`font-bold ${sales > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>{sales > 0 ? `$${sales.toLocaleString()}` : '-'}</p>
+                                    <p className="text-[9px] text-[var(--text-tertiary)] mb-0.5">業績</p>
+                                    <p className={`font-bold ${sales > 0 ? 'text-emerald-500' : 'text-slate-300'}`}>{sales > 0 ? `$${sales.toLocaleString()}` : '-'}</p>
                                 </div>
                                 {/* Status */}
                                 <div className="text-center">
-                                    <p className="text-[9px] text-slate-400 mb-0.5">狀態</p>
+                                    <p className="text-[9px] text-[var(--text-tertiary)] mb-0.5">狀態</p>
                                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${statusColor}`}>{status}</span>
                                 </div>
                                 {/* Loss */}
                                 <div className="text-center">
-                                    <p className="text-[9px] text-slate-400 mb-0.5">虧損</p>
+                                    <p className="text-[9px] text-[var(--text-tertiary)] mb-0.5">虧損</p>
                                     <p className={`font-bold ${record.loss ? 'text-red-500' : 'text-slate-300'}`}>{record.loss ? `-$${Number(record.loss).toLocaleString()}` : '-'}</p>
                                 </div>
                             </div>
 
                             {/* Edit Button Right */}
-                            <div className="pl-2 ml-1 border-l border-slate-100">
+                            <div className="pl-2 ml-1 border-l border-[var(--border-primary)]">
                                 {user.role === 'BOSS' && (
                                     <button
                                         onClick={() => { setEditingDay(dayItem); setEditType('LEAVE'); }}
-                                        className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-blue-50 hover:text-blue-500"
+                                        className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] text-[var(--text-tertiary)] hover:bg-[var(--bg-secondary)] hover:text-blue-500"
                                     >
                                         <span className="text-[10px]">編輯</span>
                                     </button>
@@ -796,9 +796,9 @@ export default function PayrollPage({ user, apiUrl }) {
 
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-sm text-slate-400 mb-2">類型 (左右鍵切換)</label>
+                                    <label className="block text-sm text-[var(--text-tertiary)] mb-2">類型 (左右鍵切換)</label>
                                     <div
-                                        className="flex bg-slate-50 rounded p-1 border border-slate-200 outline-none focus-within:ring-2 focus-within:ring-blue-500/20"
+                                        className="flex bg-[var(--bg-secondary)] rounded p-1 border border-[var(--border-primary)] outline-none focus-within:ring-2 focus-within:ring-blue-500/20"
                                         tabIndex="0"
                                         onKeyDown={e => handleDayEditKeyDown(e, 'editType')}
                                     >
@@ -811,7 +811,7 @@ export default function PayrollPage({ user, apiUrl }) {
                                         ].map(t => (
                                             <button
                                                 key={t.id}
-                                                className={`flex-1 py-2 rounded text-xs transition-all ${editType === t.id ? `${t.color} text-white shadow-sm` : 'text-slate-500 hover:bg-slate-100'}`}
+                                                className={`flex-1 py-2 rounded text-xs transition-all ${editType === t.id ? `${t.color} text-white shadow-sm` : 'text-[var(--text-secondary)] hover:bg-slate-100'}`}
                                                 onClick={() => setEditType(t.id)}
                                             >{t.label}</button>
                                         ))}
@@ -820,7 +820,7 @@ export default function PayrollPage({ user, apiUrl }) {
 
                                 {editType === 'LOSS' && (
                                     <div>
-                                        <label className="block text-sm text-slate-400 mb-1">金額 (負數為扣款)</label>
+                                        <label className="block text-sm text-[var(--text-tertiary)] mb-1">金額 (負數為扣款)</label>
                                         <input
                                             type="number"
                                             className="input-field w-full"
@@ -834,7 +834,7 @@ export default function PayrollPage({ user, apiUrl }) {
                                 )}
 
                                 <div>
-                                    <label className="block text-sm text-slate-400 mb-1">備註</label>
+                                    <label className="block text-sm text-[var(--text-tertiary)] mb-1">備註</label>
                                     <input
                                         type="text"
                                         className="input-field w-full"
@@ -856,10 +856,10 @@ export default function PayrollPage({ user, apiUrl }) {
 
                             {/* Loading Overlay within Modal */}
                             {isSubmitting && (
-                                <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg">
+                                <div className="absolute inset-0 bg-[var(--bg-primary)]/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg">
                                     <div className="flex flex-col items-center gap-2">
                                         <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                                        <span className="text-sm font-medium text-blue-600">資料存盤中...</span>
+                                        <span className="text-sm font-medium text-[var(--accent-blue)]">資料存盤中...</span>
                                     </div>
                                 </div>
                             )}
@@ -924,7 +924,7 @@ export default function PayrollPage({ user, apiUrl }) {
                                         onKeyDown={e => handleSettingKeyDown(e, 'bonusTiers')}
                                         placeholder='[{"threshold": 50000, "bonus": 1000}]'
                                     />
-                                    <p className="text-xs text-slate-400 mt-1">{"格式: `[{\"threshold\": 目標金額, \"bonus\": 獎金 }]` (按 Enter 儲存)"}</p>
+                                    <p className="text-xs text-[var(--text-tertiary)] mt-1">{"格式: `[{\"threshold\": 目標金額, \"bonus\": 獎金 }]` (按 Enter 儲存)"}</p>
                                 </div>
                             </div>
 
@@ -937,10 +937,10 @@ export default function PayrollPage({ user, apiUrl }) {
 
                             {/* Loading Overlay within Modal */}
                             {isSubmitting && (
-                                <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg text-center">
+                                <div className="absolute inset-0 bg-[var(--bg-primary)]/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg text-center">
                                     <div className="flex flex-col items-center gap-2">
                                         <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                                        <span className="text-sm font-medium text-blue-600 font-bold">設定儲存中<br /><span className="text-[10px] opacity-70">正在同步至雲端</span></span>
+                                        <span className="text-sm font-medium text-[var(--accent-blue)] font-bold">設定儲存中<br /><span className="text-[10px] opacity-70">正在同步至雲端</span></span>
                                     </div>
                                 </div>
                             )}
@@ -957,11 +957,11 @@ export default function PayrollPage({ user, apiUrl }) {
                             <div className="flex justify-between items-start mb-6">
                                 <div>
                                     <h3 className="text-xl font-bold">員工基本資料 - {targetUser}</h3>
-                                    <p className="text-sm text-slate-400 mt-1">設定到職日以自動計算年資假</p>
+                                    <p className="text-sm text-[var(--text-tertiary)] mt-1">設定到職日以自動計算年資假</p>
                                 </div>
                                 <div className="text-right">
-                                    <span className="block text-xs text-slate-400 uppercase font-bold tracking-wider">目前年資</span>
-                                    <span className="text-lg font-bold text-blue-600">{profileData.seniorityText}</span>
+                                    <span className="block text-xs text-[var(--text-tertiary)] uppercase font-bold tracking-wider">目前年資</span>
+                                    <span className="text-lg font-bold text-[var(--accent-blue)]">{profileData.seniorityText}</span>
                                 </div>
                             </div>
 
@@ -1021,9 +1021,9 @@ export default function PayrollPage({ user, apiUrl }) {
                                     />
                                 </div>
 
-                                <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-3 flex justify-between items-center">
+                                <div className="bg-[var(--bg-secondary)] border border-emerald-100 rounded-lg p-3 flex justify-between items-center">
                                     <span className="text-sm text-emerald-800 font-medium">勞基法預估特休額度</span>
-                                    <span className="text-xl font-bold text-emerald-600 font-mono">{profileData.estimatedLeaveDays} 天</span>
+                                    <span className="text-xl font-bold text-emerald-500 font-mono">{profileData.estimatedLeaveDays} 天</span>
                                 </div>
                             </div>
 
@@ -1054,7 +1054,7 @@ function SummaryCard({ title, amount, subtext, color, isDeduction, isCurrency = 
         <div
             onClick={handleToggle}
             className={`
-                relative overflow-hidden transition-all cursor-default border border-slate-100 bg-white
+                relative overflow-hidden transition-all cursor-default border border-[var(--border-primary)] bg-[var(--bg-primary)]
                 ${isMobile ? 'h-16 p-2 rounded-lg flex flex-col justify-center items-center text-center shadow-sm' : 'h-28 p-4 rounded-xl flex flex-col justify-between glass-panel hover:border-blue-500'}
                 ${className}
             `}
@@ -1062,24 +1062,24 @@ function SummaryCard({ title, amount, subtext, color, isDeduction, isCurrency = 
             onMouseLeave={() => !isMobile && setShowHidden(false)}
         >
             <div className={`flex justify-between items-start z-10 w-full ${isMobile ? 'justify-center' : ''}`}>
-                <span className={`${isMobile ? 'text-[10px]' : 'text-sm'} text-slate-500 font-bold`}>{title}</span>
+                <span className={`${isMobile ? 'text-[10px]' : 'text-sm'} text-[var(--text-secondary)] font-bold`}>{title}</span>
             </div>
 
             <div className={`z-10 w-full ${isMobile ? 'mt-1' : ''}`}>
                 <span className={`${isMobile ? 'text-xs' : 'text-2xl'} font-bold tracking-tight ${color}`}>
                     {isDeduction && '-'}{isCurrency && '$'}{(amount || 0).toLocaleString()}{suffix}
                 </span>
-                {!isMobile && subtext && <p className="text-xs text-slate-500 mt-1">{subtext}</p>}
+                {!isMobile && subtext && <p className="text-xs text-[var(--text-secondary)] mt-1">{subtext}</p>}
             </div>
 
             {/* Hidden Details Tab overlay */}
             {(hiddenAmount !== undefined || hoverContent) && (
                 <div className={`absolute top-0 right-0 p-1 md:p-2 transition-all duration-300 ${showHidden ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
-                    <div className="bg-white/95 backdrop-blur shadow-sm border border-emerald-100 rounded px-1.5 py-0.5 text-right">
+                    <div className="bg-[var(--bg-primary)]/95 backdrop-blur shadow-sm border border-emerald-100 rounded px-1.5 py-0.5 text-right">
                         {hoverContent ? hoverContent : (
                             <>
-                                {hiddenTitle && <p className="text-[8px] md:text-xs text-slate-400 font-medium">{hiddenTitle}</p>}
-                                <p className="text-xs md:text-sm font-bold text-emerald-600 font-mono">
+                                {hiddenTitle && <p className="text-[8px] md:text-xs text-[var(--text-tertiary)] font-medium">{hiddenTitle}</p>}
+                                <p className="text-xs md:text-sm font-bold text-emerald-500 font-mono">
                                     {isCurrency && '$'}{(hiddenAmount || 0).toLocaleString()}
                                 </p>
                             </>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PlusCircle } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
-export default function PurchasePage({ user, apiUrl }) {
+export default function PurchasePage({ user, apiUrl, logActivity }) {
     // Each item now includes its own vendor field
     const currentYear = new Date().getFullYear().toString();
     const [items, setItems] = useState([
@@ -146,6 +146,20 @@ export default function PurchasePage({ user, apiUrl }) {
                 paymentMethod: paymentMethod // 'CASH' or 'CREDIT'
             }, user.token);
 
+            // Log activity
+            if (logActivity) {
+                logActivity({
+                    actionType: 'DATA_EDIT',
+                    page: '進貨作業',
+                    details: JSON.stringify({
+                        vendorCount: new Set(payloadItems.map(i => i.vendor)).size,
+                        productCount: payloadItems.length,
+                        totalPrice: payloadItems.reduce((acc, i) => acc + (i.quantity * i.price), 0),
+                        paymentMethod: paymentMethod
+                    })
+                });
+            }
+
             alert(`成功進貨 ${result.count} 筆商品！`);
             // Reset
             setItems([{ id: Date.now(), vendor: '', productName: '', quantity: '', unitPrice: '', expiryYear: currentYear, expiryMonth: '', expiryDay: '' }]);
@@ -162,22 +176,22 @@ export default function PurchasePage({ user, apiUrl }) {
             {loading && (
                 <div className="loading-overlay">
                     <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-lg font-bold text-slate-800">資料存盤中，請稍後...</p>
+                    <p className="text-lg font-bold text-[var(--text-primary)]">資料存盤中，請稍後...</p>
                 </div>
             )}
             <div className="glass-panel p-6">
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold flex items-center gap-2 text-slate-800">
+                    <h2 className="text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
                         進貨作業
                     </h2>
 
                     {/* Payment Method Toggle */}
-                    <div className="flex bg-slate-50 p-1 rounded-lg border border-slate-200">
+                    <div className="flex bg-[var(--bg-tertiary)] p-1 rounded-lg border border-[var(--border-primary)]">
                         <button
                             onClick={() => setPaymentMethod('CASH')}
                             className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${paymentMethod === 'CASH'
                                 ? 'bg-emerald-500 text-white shadow-sm'
-                                : 'text-slate-400 hover:text-slate-600'
+                                : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
                                 }`}
                         >
                             現金進貨
@@ -186,7 +200,7 @@ export default function PurchasePage({ user, apiUrl }) {
                             onClick={() => setPaymentMethod('CREDIT')}
                             className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${paymentMethod === 'CREDIT'
                                 ? 'bg-purple-600 text-white shadow-sm'
-                                : 'text-slate-400 hover:text-slate-600'
+                                : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
                                 }`}
                         >
                             賒帳進貨
@@ -198,8 +212,8 @@ export default function PurchasePage({ user, apiUrl }) {
                     {/* Items Grid */}
                     <div className="space-y-3">
                         <div className="flex items-center justify-between px-2">
-                            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">商品清單</h3>
-                            <span className="text-xs text-slate-400">共 {items.length} 項商品</span>
+                            <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider">商品清單</h3>
+                            <span className="text-xs text-[var(--text-tertiary)]">共 {items.length} 項商品</span>
                         </div>
 
                         <datalist id="vendors-list">
@@ -210,20 +224,20 @@ export default function PurchasePage({ user, apiUrl }) {
                             const currentProductSuggestions = getProductSuggestions(item.vendor);
 
                             return (
-                                <div key={item.id} className="group relative p-0 md:p-4 bg-transparent md:bg-slate-50 rounded-none md:rounded-xl border-b md:border border-slate-100 md:border-slate-200 hover:md:border-emerald-500/30 hover:md:shadow-lg transition-all duration-200 mb-6 md:mb-0">
+                                <div key={item.id} className="group relative p-0 md:p-4 bg-transparent md:bg-[var(--bg-tertiary)] rounded-none md:rounded-xl border-b md:border border-[var(--border-primary)] hover:md:shadow-lg transition-all duration-200 mb-6 md:mb-0">
                                     {/* Number Badge */}
                                     <div className="md:absolute md:-left-2 md:top-1/2 md:-translate-y-1/2 mb-2 md:mb-0 flex items-center gap-2 md:block">
-                                        <div className="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-                                            <span className="text-[10px] font-bold text-emerald-600">{idx + 1}</span>
+                                        <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                                            <span className="text-[10px] font-bold text-emerald-600"> {idx + 1}</span>
                                         </div>
-                                        <span className="md:hidden text-sm font-bold text-slate-700">商品資料</span>
+                                        <span className="md:hidden text-sm font-bold text-[var(--text-secondary)]">商品資料</span>
                                     </div>
 
                                     {/* MOBILE VIEW (Horizontal Layout) */}
                                     <div className="md:hidden space-y-3 pb-4">
                                         {/* Vendor */}
                                         <div className="flex items-center gap-3">
-                                            <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">廠商:</label>
+                                            <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">廠商:</label>
                                             <input
                                                 id={`item-m-${idx}-vendor`}
                                                 list="vendors-list"
@@ -237,7 +251,7 @@ export default function PurchasePage({ user, apiUrl }) {
 
                                         {/* Product */}
                                         <div className="flex items-center gap-3">
-                                            <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">產品名稱:</label>
+                                            <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">產品名稱:</label>
                                             <input
                                                 id={`item-m-${idx}-product`}
                                                 list={`products-list-${idx}`}
@@ -254,7 +268,7 @@ export default function PurchasePage({ user, apiUrl }) {
 
                                         {/* Qty */}
                                         <div className="flex items-center gap-3">
-                                            <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">數量:</label>
+                                            <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">數量:</label>
                                             <input
                                                 id={`item-m-${idx}-qty`}
                                                 type="number"
@@ -268,7 +282,7 @@ export default function PurchasePage({ user, apiUrl }) {
 
                                         {/* Price */}
                                         <div className="flex items-center gap-3">
-                                            <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">單價:</label>
+                                            <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">單價:</label>
                                             <input
                                                 id={`item-m-${idx}-price`}
                                                 type="number"
@@ -282,7 +296,7 @@ export default function PurchasePage({ user, apiUrl }) {
 
                                         {/* Expiry */}
                                         <div className="flex items-center gap-3">
-                                            <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">有效期限:</label>
+                                            <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">有效期限:</label>
                                             <div className="flex flex-1 gap-1 items-center">
                                                 <input
                                                     id={`item-m-${idx}-year`}
@@ -319,7 +333,7 @@ export default function PurchasePage({ user, apiUrl }) {
                                                     <button
                                                         type="button"
                                                         onClick={() => removeItem(item.id)}
-                                                        className="w-8 h-8 ml-1 rounded-lg bg-red-50 text-red-500 flex items-center justify-center border border-red-100"
+                                                        className="w-8 h-8 ml-1 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center border border-red-500/20"
                                                     >
                                                         ✕
                                                     </button>
@@ -333,13 +347,13 @@ export default function PurchasePage({ user, apiUrl }) {
 
                                         {/* Vendor (3 cols) */}
                                         <div className="col-span-12 md:col-span-2">
-                                            <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1 uppercase">
+                                            <label className="text-xs font-semibold text-[var(--text-secondary)] mb-1.5 flex items-center gap-1 uppercase">
                                                 廠商
                                             </label>
                                             <input
                                                 id={`item-${idx}-vendor`}
                                                 list="vendors-list"
-                                                className="input-field w-full bg-white"
+                                                className="input-field w-full"
                                                 placeholder="廠商名稱"
                                                 value={item.vendor}
                                                 onChange={e => handleItemChange(item.id, 'vendor', e.target.value)}
@@ -350,13 +364,13 @@ export default function PurchasePage({ user, apiUrl }) {
 
                                         {/* Product (3 cols) */}
                                         <div className="col-span-12 md:col-span-3">
-                                            <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1 uppercase">
+                                            <label className="text-xs font-semibold text-[var(--text-secondary)] mb-1.5 flex items-center gap-1 uppercase">
                                                 產品名稱
                                             </label>
                                             <input
                                                 id={`item-${idx}-product`}
                                                 list={`products-list-${idx}`}
-                                                className="input-field w-full bg-white"
+                                                className="input-field w-full"
                                                 placeholder="產品名稱"
                                                 value={item.productName}
                                                 onChange={e => handleItemChange(item.id, 'productName', e.target.value)}
@@ -367,13 +381,13 @@ export default function PurchasePage({ user, apiUrl }) {
 
                                         {/* Qty (2 cols) */}
                                         <div className="col-span-6 md:col-span-2">
-                                            <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1 uppercase">
+                                            <label className="text-xs font-semibold text-[var(--text-secondary)] mb-1.5 flex items-center gap-1 uppercase">
                                                 數量
                                             </label>
                                             <input
                                                 id={`item-${idx}-qty`}
                                                 type="number"
-                                                className="input-field w-full text-center bg-white"
+                                                className="input-field w-full text-center"
                                                 placeholder="0"
                                                 value={item.quantity}
                                                 onChange={e => handleItemChange(item.id, 'quantity', e.target.value)}
@@ -383,13 +397,13 @@ export default function PurchasePage({ user, apiUrl }) {
 
                                         {/* Price (2 cols) */}
                                         <div className="col-span-6 md:col-span-2">
-                                            <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1 uppercase">
+                                            <label className="text-xs font-semibold text-[var(--text-secondary)] mb-1.5 flex items-center gap-1 uppercase">
                                                 單價
                                             </label>
                                             <input
                                                 id={`item-${idx}-price`}
                                                 type="number"
-                                                className="input-field w-full text-center bg-white"
+                                                className="input-field w-full text-center"
                                                 placeholder="0"
                                                 value={item.unitPrice}
                                                 onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)}
@@ -399,32 +413,32 @@ export default function PurchasePage({ user, apiUrl }) {
 
                                         {/* Expiry (2 cols + delete btn space) */}
                                         <div className="col-span-12 md:col-span-3 grid grid-cols-[1fr_auto_1fr_auto_1fr_auto] gap-1 relative">
-                                            <label className="absolute -top-6 left-0 text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1 uppercase">
+                                            <label className="absolute -top-6 left-0 text-xs font-semibold text-[var(--text-secondary)] mb-1.5 flex items-center gap-1 uppercase">
                                                 有效期限
                                             </label>
 
                                             <input
                                                 id={`item-${idx}-year`}
-                                                className="input-field w-full text-center font-mono px-1 bg-white"
+                                                className="input-field w-full text-center font-mono px-1"
                                                 placeholder="YYYY"
                                                 value={item.expiryYear}
                                                 onChange={e => handleItemChange(item.id, 'expiryYear', e.target.value)}
                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'year')}
                                             />
-                                            <span className="text-slate-400 self-center">/</span>
+                                            <span className="text-[var(--text-tertiary)] self-center">/</span>
                                             <input
                                                 id={`item-${idx}-month`}
-                                                className="input-field w-full text-center font-mono px-1 bg-white"
+                                                className="input-field w-full text-center font-mono px-1"
                                                 placeholder="MM"
                                                 value={item.expiryMonth}
                                                 onChange={e => handleItemChange(item.id, 'expiryMonth', e.target.value)}
                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'month')}
                                             />
-                                            <span className="text-slate-200 self-center">/</span>
+                                            <span className="text-[var(--text-tertiary)] self-center">/</span>
                                             <input
                                                 id={`item-${idx}-day`}
                                                 type="number"
-                                                className="input-field w-full text-center font-mono px-1 bg-white"
+                                                className="input-field w-full text-center font-mono px-1"
                                                 placeholder="DD"
                                                 value={item.expiryDay}
                                                 onChange={e => handleItemChange(item.id, 'expiryDay', e.target.value)}
@@ -436,7 +450,7 @@ export default function PurchasePage({ user, apiUrl }) {
                                                 <button
                                                     type="button"
                                                     onClick={() => removeItem(item.id)}
-                                                    className="w-8 h-8 ml-2 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-all flex items-center justify-center self-center"
+                                                    className="w-8 h-8 ml-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all flex items-center justify-center self-center"
                                                     title="刪除此列"
                                                 >
                                                     ✕
@@ -449,7 +463,7 @@ export default function PurchasePage({ user, apiUrl }) {
                         })}
                     </div>
 
-                    <div className="flex gap-4 mt-8 pt-6 border-t border-slate-100">
+                    <div className="flex gap-4 mt-8 pt-6 border-t border-[var(--border-primary)]">
                         <button
                             type="button"
                             onClick={addItem}

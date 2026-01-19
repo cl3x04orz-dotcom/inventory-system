@@ -80,7 +80,11 @@ function apiHandler(request) {
         'addUser': 'system_config',
         'deleteUser': 'system_config',
         'updateUserPermissions': 'system_config',
-        'updateUserStatus': 'system_config'
+        'updateUserStatus': 'system_config',
+        
+        // Activity Logging (操作紀錄)
+        'logActivity': null, // 所有人都可以記錄自己的活動
+        'getActivityLogs': 'system_activity_logs' // 需要特殊權限才能查看
     };
 
     // 進行授權校驗 (Authorization)
@@ -165,6 +169,10 @@ function apiHandler(request) {
             case 'markAsPaid': return typeof markAsPaidService !== 'undefined' ? markAsPaidService(payload) : {error: 'Service missing'};
             case 'getPayables': return typeof getPayablesService !== 'undefined' ? getPayablesService(payload) : {error: 'Service missing'};
             case 'markPayableAsPaid': return typeof markPayableAsPaidService !== 'undefined' ? markPayableAsPaidService(payload) : {error: 'Service missing'};
+
+            // Activity Logging (操作紀錄)
+            case 'logActivity': return typeof logActivityService !== 'undefined' ? logActivityService(payload) : {error: 'Service missing'};
+            case 'getActivityLogs': return typeof getActivityLogsService !== 'undefined' ? getActivityLogsService(payload, user.role, user.username) : {error: 'Service missing'};
 
             default: throw new Error('Unknown action: [' + action + '] (length: ' + (action ? action.length : 0) + ')');
         }

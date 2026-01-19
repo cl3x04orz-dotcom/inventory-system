@@ -53,19 +53,19 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                 {/* Header & Stats */}
                 <div className="flex flex-row justify-between items-center mb-6 gap-2 md:gap-6">
                     <div>
-                        <h1 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2">
-                            <Truck className="text-blue-600 w-6 h-6 md:w-auto md:h-auto" />
+                        <h1 className="text-xl md:text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+                            <Truck className="text-[var(--accent-blue)] w-6 h-6 md:w-auto md:h-auto" />
                             <span className="whitespace-nowrap">進貨查詢</span>
                         </h1>
-                        <p className="text-slate-500 text-xs md:text-sm mt-1 hidden md:block">查看完整的採購與入庫記錄</p>
+                        <p className="text-[var(--text-secondary)] text-xs md:text-sm mt-1 hidden md:block">查看完整的採購與入庫記錄</p>
                     </div>
-                    <div className="px-3 md:px-5 py-2 md:py-3 rounded-xl border border-emerald-200 bg-emerald-50 flex items-center gap-2 md:gap-3">
-                        <div className="p-1.5 md:p-2 rounded-full bg-emerald-100 text-emerald-700">
+                    <div className="px-3 md:px-5 py-2 md:py-3 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] flex items-center gap-2 md:gap-3">
+                        <div className="p-1.5 md:p-2 rounded-full bg-[var(--bg-tertiary)] text-emerald-500">
                             <DollarSign size={16} className="md:w-5 md:h-5" />
                         </div>
                         <div>
-                            <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold whitespace-nowrap">總進貨金額</p>
-                            <p className="text-base md:text-xl font-bold text-emerald-700">
+                            <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold whitespace-nowrap">總進貨金額</p>
+                            <p className="text-base md:text-xl font-bold text-emerald-500">
                                 ${totalAmount.toLocaleString()}
                             </p>
                         </div>
@@ -76,7 +76,7 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                 {/* Filters - Mobile View (Horizontal, No Border) */}
                 <div className="md:hidden mb-6 space-y-3">
                     <div className="flex items-center gap-3">
-                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">開始日期:</label>
+                        <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">開始日期:</label>
                         <input
                             type="date"
                             className="input-field flex-1 py-1.5 px-3"
@@ -85,7 +85,7 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                         />
                     </div>
                     <div className="flex items-center gap-3">
-                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">結束日期:</label>
+                        <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">結束日期:</label>
                         <input
                             type="date"
                             className="input-field flex-1 py-1.5 px-3"
@@ -94,7 +94,7 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                         />
                     </div>
                     <div className="flex items-center gap-3">
-                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">廠商名稱:</label>
+                        <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">廠商名稱:</label>
                         <div className="relative flex-1">
                             <input
                                 type="text"
@@ -106,7 +106,7 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">產品名稱:</label>
+                        <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">產品名稱:</label>
                         <div className="relative flex-1">
                             <input
                                 type="text"
@@ -128,12 +128,12 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                 </div>
 
                 {/* Filters - Desktop View (Original Grid) */}
-                <div className="hidden md:block mb-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="hidden md:block mb-6 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)]">
                     <div className="flex flex-col md:flex-row gap-4 items-end">
                         <div className="flex-1 space-y-1.5 w-full">
-                            <label className="text-[10px] text-slate-500 font-bold uppercase px-1">產品名稱</label>
+                            <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase px-1">產品名稱</label>
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
                                 <input
                                     type="text"
                                     placeholder="搜尋產品..."
@@ -145,9 +145,9 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                         </div>
 
                         <div className="flex-1 space-y-1.5 w-full">
-                            <label className="text-[10px] text-slate-500 font-bold uppercase px-1">廠商名稱</label>
+                            <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase px-1">廠商名稱</label>
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
                                 <input
                                     type="text"
                                     placeholder="搜尋廠商..."
@@ -159,7 +159,7 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                         </div>
 
                         <div className="w-full md:w-40 space-y-1.5">
-                            <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
+                            <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase px-1">開始日期</label>
                             <input
                                 type="date"
                                 className="input-field w-full text-sm"
@@ -169,7 +169,7 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                         </div>
 
                         <div className="w-full md:w-40 space-y-1.5">
-                            <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
+                            <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase px-1">結束日期</label>
                             <input
                                 type="date"
                                 className="input-field w-full text-sm"
@@ -191,18 +191,18 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                 {/* Mobile Card View (Vertical Layout) */}
                 <div className="md:hidden space-y-4">
                     {loading ? (
-                        <div className="text-center py-10 text-slate-500">載入中...</div>
+                        <div className="text-center py-10 text-[var(--text-secondary)]">載入中...</div>
                     ) : filtered.length > 0 ? (
                         filtered.map((record, idx) => (
-                            <div key={idx} className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3">
+                            <div key={idx} className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)] shadow-sm space-y-3">
                                 {/* Header: Date & Total Price */}
-                                <div className="flex justify-between items-start border-b border-slate-50 pb-2">
-                                    <div className="flex items-center gap-2 text-slate-500">
-                                        <Calendar size={14} className="text-blue-600" />
-                                        <span className="font-medium text-slate-700">
+                                <div className="flex justify-between items-start border-b border-[var(--border-primary)] pb-2">
+                                    <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+                                        <Calendar size={14} className="text-[var(--accent-blue)]" />
+                                        <span className="font-medium text-[var(--text-primary)]">
                                             {record.date ? new Date(record.date).toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '-'}
                                         </span>
-                                        <span className="text-xs text-slate-400">
+                                        <span className="text-xs text-[var(--text-tertiary)]">
                                             {record.date ? new Date(record.date).toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit' }) : ''}
                                         </span>
                                     </div>
@@ -214,32 +214,32 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                                 {/* Content Grid */}
                                 <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
                                     <div className="col-span-2">
-                                        <span className="text-xs text-slate-400 block mb-0.5">廠商</span>
-                                        <span className="font-medium text-slate-800">{record.vendorName || record.vendor || '-'}</span>
+                                        <span className="text-xs text-[var(--text-tertiary)] block mb-0.5">廠商</span>
+                                        <span className="font-medium text-[var(--text-primary)]">{record.vendorName || record.vendor || '-'}</span>
                                     </div>
                                     <div className="col-span-2">
-                                        <span className="text-xs text-slate-400 block mb-0.5">產品名稱</span>
-                                        <span className="font-bold text-slate-900 text-base">{record.productName}</span>
+                                        <span className="text-xs text-[var(--text-tertiary)] block mb-0.5">產品名稱</span>
+                                        <span className="font-bold text-[var(--text-primary)] text-base">{record.productName}</span>
                                     </div>
                                     <div>
-                                        <span className="text-xs text-slate-400 block mb-0.5">數量</span>
-                                        <span className="font-mono text-blue-600 font-bold">{record.quantity}</span>
+                                        <span className="text-xs text-[var(--text-tertiary)] block mb-0.5">數量</span>
+                                        <span className="font-mono text-blue-500 font-bold">{record.quantity}</span>
                                     </div>
                                     <div>
-                                        <span className="text-xs text-slate-400 block mb-0.5">單價</span>
-                                        <span className="font-mono text-slate-600">${(Number(record.unitPrice) || 0).toLocaleString()}</span>
+                                        <span className="text-xs text-[var(--text-tertiary)] block mb-0.5">單價</span>
+                                        <span className="font-mono text-[var(--text-secondary)]">${(Number(record.unitPrice) || 0).toLocaleString()}</span>
                                     </div>
                                 </div>
 
                                 {/* Footer: Expiry & Operator */}
-                                <div className="pt-2 border-t border-slate-50 flex justify-between items-center text-xs">
-                                    <div className="flex items-center gap-1 text-slate-400 bg-slate-50 px-2 py-1 rounded">
+                                <div className="pt-2 border-t border-[var(--border-primary)] flex justify-between items-center text-xs">
+                                    <div className="flex items-center gap-1 text-[var(--text-tertiary)] bg-[var(--bg-tertiary)] px-2 py-1 rounded">
                                         <span>效期:</span>
-                                        <span className="font-mono text-slate-600">
+                                        <span className="font-mono text-[var(--text-secondary)]">
                                             {record.expiry ? new Date(record.expiry).toLocaleDateString('zh-TW') : '-'}
                                         </span>
                                     </div>
-                                    <div className="flex items-center gap-1 text-slate-400">
+                                    <div className="flex items-center gap-1 text-[var(--text-tertiary)]">
                                         <User size={12} />
                                         <span>{record.operator || '-'}</span>
                                     </div>
@@ -247,17 +247,17 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                             </div>
                         ))
                     ) : (
-                        <div className="text-center py-10 text-slate-500 bg-slate-50 rounded-xl border border-slate-100">
+                        <div className="text-center py-10 text-[var(--text-secondary)] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">
                             沒有找到進貨記錄
                         </div>
                     )}
                 </div>
 
                 {/* Desktop Table View */}
-                <div className="hidden md:block rounded-xl border border-slate-200 overflow-hidden">
+                <div className="hidden md:block rounded-xl border border-[var(--border-primary)] overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider sticky top-0">
+                            <thead className="bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-xs uppercase tracking-wider sticky top-0">
                                 <tr>
                                     <th className="p-4">進貨日期</th>
                                     <th className="p-4">廠商</th>
@@ -269,34 +269,34 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                                     <th className="p-4">執行人</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 bg-white">
+                            <tbody className="divide-y divide-[var(--border-primary)] bg-[var(--bg-primary)]">
                                 {loading ? (
-                                    <tr><td colSpan="8" className="p-20 text-center text-slate-500">載入中...</td></tr>
+                                    <tr><td colSpan="8" className="p-20 text-center text-[var(--text-secondary)]">載入中...</td></tr>
                                 ) : filtered.length > 0 ? (
                                     filtered.map((record, idx) => (
-                                        <tr key={idx} className="hover:bg-slate-50 transition-colors group">
+                                        <tr key={idx} className="hover:bg-[var(--bg-hover)] transition-colors group">
                                             <td className="p-4">
-                                                <div className="flex items-center gap-2 text-slate-500">
-                                                    <Calendar size={14} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
+                                                <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+                                                    <Calendar size={14} className="text-[var(--text-tertiary)] group-hover:text-[var(--accent-blue)] transition-colors" />
                                                     <div className="flex flex-col">
-                                                        <span className="font-medium text-slate-600">{record.date ? new Date(record.date).toLocaleDateString('zh-TW') : '-'}</span>
-                                                        <span className="text-xs text-slate-400">
+                                                        <span className="font-medium text-[var(--text-secondary)]">{record.date ? new Date(record.date).toLocaleDateString('zh-TW') : '-'}</span>
+                                                        <span className="text-xs text-[var(--text-tertiary)]">
                                                             {record.date ? new Date(record.date).toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit' }) : ''}
                                                         </span>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="p-4 text-slate-600">{record.vendorName || record.vendor || '-'}</td>
-                                            <td className="p-4 font-medium text-slate-900">{record.productName}</td>
-                                            <td className="p-4 text-right font-mono text-blue-600">{record.quantity}</td>
-                                            <td className="p-4 text-right font-mono text-slate-500">
+                                            <td className="p-4 text-[var(--text-secondary)]">{record.vendorName || record.vendor || '-'}</td>
+                                            <td className="p-4 font-medium text-[var(--text-primary)]">{record.productName}</td>
+                                            <td className="p-4 text-right font-mono text-blue-500">{record.quantity}</td>
+                                            <td className="p-4 text-right font-mono text-[var(--text-secondary)]">
                                                 ${(Number(record.unitPrice) || 0).toLocaleString()}
                                             </td>
-                                            <td className="p-4 text-right font-mono font-bold text-emerald-600">
+                                            <td className="p-4 text-right font-mono font-bold text-emerald-500">
                                                 ${(Number(record.totalPrice) || 0).toLocaleString()}
                                             </td>
-                                            <td className="p-4 text-slate-400 text-xs">{record.expiry ? new Date(record.expiry).toLocaleDateString('zh-TW') : '-'}</td>
-                                            <td className="p-4 text-slate-400">
+                                            <td className="p-4 text-[var(--text-tertiary)] text-xs">{record.expiry ? new Date(record.expiry).toLocaleDateString('zh-TW') : '-'}</td>
+                                            <td className="p-4 text-[var(--text-tertiary)]">
                                                 <div className="flex items-center gap-1">
                                                     <User size={12} /> {record.operator || '-'}
                                                 </div>
@@ -307,8 +307,8 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                                     <tr>
                                         <td colSpan="8" className="p-20 text-center">
                                             <div className="flex flex-col items-center gap-4">
-                                                <Filter size={32} className="text-slate-600" />
-                                                <p className="text-slate-500">沒有找到進貨記錄</p>
+                                                <Filter size={32} className="text-[var(--text-secondary)]" />
+                                                <p className="text-[var(--text-secondary)]">沒有找到進貨記錄</p>
                                             </div>
                                         </td>
                                     </tr>

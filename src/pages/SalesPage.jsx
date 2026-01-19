@@ -3,7 +3,7 @@ import { Save, RefreshCw, Calculator, DollarSign } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import { PRICE_MAP, sortProducts } from '../utils/constants';
 
-export default function SalesPage({ user, apiUrl }) {
+export default function SalesPage({ user, apiUrl, logActivity }) {
     const [rows, setRows] = useState([]);
     const [cashCounts, setCashCounts] = useState({ 1000: 0, 500: 0, 100: 0, 50: 0, 10: 0, 5: 0, 1: 0 });
     // Initialize reserve with 5000 for Cash default
@@ -250,6 +250,21 @@ export default function SalesPage({ user, apiUrl }) {
         setIsSubmitting(true);
         try {
             await callGAS(apiUrl, 'saveSales', payload, user.token);
+
+            // Log activity
+            if (logActivity) {
+                logActivity({
+                    actionType: 'DATA_EDIT',
+                    page: '銷售登錄',
+                    details: JSON.stringify({
+                        customer: location,
+                        paymentMethod: paymentType,
+                        totalAmount: isCredit ? totalSalesAmount : finalTotal,
+                        productCount: rows.filter(r => r.sold > 0).length
+                    })
+                });
+            }
+
             alert('保存成功！資料已寫入 Google Sheet。');
             window.location.reload();
         } catch (e) {
@@ -264,24 +279,24 @@ export default function SalesPage({ user, apiUrl }) {
             {isSubmitting && (
                 <div className="loading-overlay">
                     <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-lg font-bold text-slate-800">資料存盤中，請稍後...</p>
+                    <p className="text-lg font-bold text-[var(--text-primary)]">資料存盤中，請稍後...</p>
                 </div>
             )}
             {/* Product Table */}
             <div className="xl:col-span-2 glass-panel p-6 overflow-hidden flex flex-col h-auto min-h-[60vh] xl:h-[calc(100vh-10rem)]">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
-                    <h2 className="text-xl font-bold flex items-center gap-2 text-slate-800">
-                        <RefreshCw size={20} className="text-blue-600" /> 商品銷售登錄
+                    <h2 className="text-xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
+                        <RefreshCw size={20} className="text-[var(--accent-blue)]" /> 商品銷售登錄
                     </h2>
 
                     <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full md:w-auto">
                         {/* Toggle on Left */}
-                        <div className="flex bg-slate-50 rounded-lg p-1 border border-slate-200 self-start md:self-auto">
+                        <div className="flex bg-[var(--bg-tertiary)] rounded-lg p-1 border border-[var(--border-primary)] self-start md:self-auto">
                             <button
                                 onClick={() => setPaymentType('CASH')}
                                 className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${paymentType === 'CASH'
                                     ? 'bg-emerald-500 text-white shadow-sm'
-                                    : 'text-slate-400 hover:text-slate-600'
+                                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
                                     }`}
                             >
                                 現金
@@ -290,7 +305,7 @@ export default function SalesPage({ user, apiUrl }) {
                                 onClick={() => setPaymentType('CREDIT')}
                                 className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${paymentType === 'CREDIT'
                                     ? 'bg-amber-500 text-white shadow-sm'
-                                    : 'text-slate-400 hover:text-slate-600'
+                                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
                                     }`}
                             >
                                 賒銷
@@ -298,7 +313,7 @@ export default function SalesPage({ user, apiUrl }) {
                         </div>
 
                         <div className="flex items-center gap-2 w-full md:w-auto">
-                            <label className="text-sm text-slate-500 font-bold whitespace-nowrap">銷售對象:</label>
+                            <label className="text-sm text-[var(--text-secondary)] font-bold whitespace-nowrap">銷售對象:</label>
                             <input
                                 id="input-location"
                                 type="text"
@@ -321,22 +336,22 @@ export default function SalesPage({ user, apiUrl }) {
                     {/* Mobile Card View (Visible on < md) */}
                     <div className="md:hidden space-y-4">
                         {rows.map((row, idx) => (
-                            <div key={row.id} className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                            <div key={row.id} className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)]">
                                 {/* Header: Name & Stock */}
                                 <div className="flex justify-between items-start mb-3">
-                                    <div className="font-bold text-slate-800 text-lg">{row.name}</div>
-                                    <div className="text-xs font-mono bg-white px-2 py-1 rounded border border-slate-200">
-                                        <span className="text-slate-400 mr-1">庫存</span>
-                                        <span className="text-blue-600 font-bold">{row.stock}</span>
-                                        <span className="text-slate-300 mx-1">/</span>
-                                        <span className="text-orange-600 font-bold">{row.originalStock || 0}</span>
+                                    <div className="font-bold text-[var(--text-primary)] text-lg">{row.name}</div>
+                                    <div className="text-xs font-mono bg-[var(--bg-tertiary)] px-2 py-1 rounded border border-[var(--border-primary)]">
+                                        <span className="text-[var(--text-tertiary)] mr-1">庫存</span>
+                                        <span className="text-blue-500 font-bold">{row.stock}</span>
+                                        <span className="text-[var(--text-tertiary)] mx-1">/</span>
+                                        <span className="text-orange-500 font-bold">{row.originalStock || 0}</span>
                                     </div>
                                 </div>
 
                                 {/* Inputs Grid */}
                                 <div className="grid grid-cols-4 gap-2 mb-3">
                                     <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] text-slate-500 text-center font-bold">領貨</label>
+                                        <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">領貨</label>
                                         <input
                                             id={`input-m-${idx}-picked`}
                                             type="number"
@@ -347,7 +362,7 @@ export default function SalesPage({ user, apiUrl }) {
                                         />
                                     </div>
                                     <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] text-slate-500 text-center font-bold">原貨</label>
+                                        <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">原貨</label>
                                         <input
                                             id={`input-m-${idx}-original`}
                                             type="number"
@@ -358,7 +373,7 @@ export default function SalesPage({ user, apiUrl }) {
                                         />
                                     </div>
                                     <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] text-slate-500 text-center font-bold">退貨</label>
+                                        <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">退貨</label>
                                         <input
                                             id={`input-m-${idx}-returns`}
                                             type="number"
@@ -369,7 +384,7 @@ export default function SalesPage({ user, apiUrl }) {
                                         />
                                     </div>
                                     <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] text-slate-500 text-center font-bold">單價</label>
+                                        <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">單價</label>
                                         <input
                                             id={`input-m-${idx}-price`}
                                             type="number"
@@ -382,12 +397,12 @@ export default function SalesPage({ user, apiUrl }) {
                                 </div>
 
                                 {/* Summary Footer */}
-                                <div className="flex justify-between items-center pt-2 border-t border-slate-200">
-                                    <div className="text-xs text-slate-500">
-                                        售出: <span className="font-bold text-blue-600 text-sm ml-1">{row.sold}</span>
+                                <div className="flex justify-between items-center pt-2 border-t border-[var(--border-primary)]">
+                                    <div className="text-xs text-[var(--text-secondary)]">
+                                        售出: <span className="font-bold text-blue-500 text-sm ml-1">{row.sold}</span>
                                     </div>
-                                    <div className="text-sm font-bold text-emerald-600 font-mono">
-                                        <span className="text-xs text-slate-400 font-normal mr-1">小計</span>
+                                    <div className="text-sm font-bold text-emerald-500 font-mono">
+                                        <span className="text-xs text-[var(--text-tertiary)] font-normal mr-1">小計</span>
                                         ${row.subtotal?.toLocaleString()}
                                     </div>
                                 </div>
@@ -397,7 +412,7 @@ export default function SalesPage({ user, apiUrl }) {
 
                     {/* Desktop Table View (Hidden on < md) */}
                     <table className="hidden md:table w-full text-left border-collapse">
-                        <thead className="sticky top-0 bg-white z-10 text-slate-500 text-xs uppercase font-bold border-b border-slate-100">
+                        <thead className="sticky top-0 bg-[var(--bg-secondary)] z-10 text-[var(--text-secondary)] text-xs uppercase font-bold border-b border-[var(--border-primary)]">
                             <tr>
                                 <th className="p-3">品項</th>
                                 <th className="p-3 w-20">庫存</th>
@@ -409,20 +424,20 @@ export default function SalesPage({ user, apiUrl }) {
                                 <th className="p-3 w-28 text-right">繳回金額</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-[var(--border-primary)]">
                             {rows.map((row, idx) => (
-                                <tr key={row.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="p-3 font-medium text-slate-800">{row.name}</td>
-                                    <td className="p-3 text-slate-500 font-mono tracking-wider">
-                                        <span className="text-blue-600">{row.stock}</span>
-                                        <span className="text-slate-200 mx-1">/</span>
-                                        <span className="text-orange-600">{row.originalStock || 0}</span>
+                                <tr key={row.id} className="hover:bg-[var(--bg-hover)] transition-colors">
+                                    <td className="p-3 font-medium text-[var(--text-primary)]">{row.name}</td>
+                                    <td className="p-3 text-[var(--text-secondary)] font-mono tracking-wider">
+                                        <span className="text-blue-500">{row.stock}</span>
+                                        <span className="text-[var(--text-tertiary)] mx-1">/</span>
+                                        <span className="text-orange-500">{row.originalStock || 0}</span>
                                     </td>
                                     <td className="p-3">
                                         <input
                                             id={`input-${idx}-picked`}
                                             type="number"
-                                            className="input-field text-center p-1 bg-white"
+                                            className="input-field text-center p-1"
                                             value={row.picked || ''}
                                             onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
                                             onKeyDown={(e) => handleKeyDown(e, idx, 'picked')}
@@ -432,7 +447,7 @@ export default function SalesPage({ user, apiUrl }) {
                                         <input
                                             id={`input-${idx}-original`}
                                             type="number"
-                                            className="input-field text-center p-1 bg-white"
+                                            className="input-field text-center p-1"
                                             value={row.original || ''}
                                             onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
                                             onKeyDown={(e) => handleKeyDown(e, idx, 'original')}
@@ -448,17 +463,17 @@ export default function SalesPage({ user, apiUrl }) {
                                             onKeyDown={(e) => handleKeyDown(e, idx, 'returns')}
                                         />
                                     </td>
-                                    <td className="p-3 text-center font-bold text-blue-600">{row.sold}</td>
-                                    <td className="p-3"><input id={`input-${idx}-price`} type="number" className="input-field text-center p-1 w-20 bg-white" value={row.price} onChange={(e) => handleRowChange(row.id, 'price', e.target.value)} onKeyDown={(e) => handleKeyDown(e, idx, 'price')} /></td>
-                                    <td className="p-3 text-right font-mono text-emerald-600">${row.subtotal?.toLocaleString()}</td>
+                                    <td className="p-3 text-center font-bold text-blue-500">{row.sold}</td>
+                                    <td className="p-3"><input id={`input-${idx}-price`} type="number" className="input-field text-center p-1 w-20" value={row.price} onChange={(e) => handleRowChange(row.id, 'price', e.target.value)} onKeyDown={(e) => handleKeyDown(e, idx, 'price')} /></td>
+                                    <td className="p-3 text-right font-mono text-emerald-500">${row.subtotal?.toLocaleString()}</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
-                <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center bg-slate-50 p-4 rounded-lg">
-                    <span className="text-slate-500">總繳回金額 (商品計算)</span>
-                    <span className="text-2xl font-bold text-emerald-600">${totalSalesAmount.toLocaleString()}</span>
+                <div className="mt-4 pt-4 border-t border-[var(--border-primary)] flex justify-between items-center bg-[var(--bg-secondary)] p-4 rounded-lg">
+                    <span className="text-[var(--text-secondary)]">總繳回金額 (商品計算)</span>
+                    <span className="text-2xl font-bold text-emerald-500">${totalSalesAmount.toLocaleString()}</span>
                 </div>
             </div>
 
@@ -472,8 +487,8 @@ export default function SalesPage({ user, apiUrl }) {
                     <div className="glass-panel p-6 relative">
                         {isCredit && <div className="absolute inset-0 z-50 cursor-not-allowed"></div>}
 
-                        <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-slate-800">
-                            <Calculator size={20} className="text-amber-600" /> 錢點清算
+                        <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-[var(--text-primary)]">
+                            <Calculator size={20} className="text-amber-500" /> 錢點清算
                         </h2>
                         <div className="space-y-3">
                             {[1000, 500, 100, 50, 10, 5, 1].map((denom, idx, arr) => {
@@ -482,8 +497,8 @@ export default function SalesPage({ user, apiUrl }) {
                                 const prevId = idx > 0 ? `input-cash-${arr[idx - 1]}` : null; // null means jump to table
                                 return (
                                     <div key={denom} className="flex items-center gap-4">
-                                        <span className="w-12 text-slate-500 font-mono text-right">{denom}</span>
-                                        <span className="text-slate-300">x</span>
+                                        <span className="w-12 text-[var(--text-secondary)] font-mono text-right">{denom}</span>
+                                        <span className="text-[var(--text-tertiary)]">x</span>
                                         <input
                                             id={currentId}
                                             type="number"
@@ -494,13 +509,13 @@ export default function SalesPage({ user, apiUrl }) {
                                             onKeyDown={(e) => handleSidebarKeyDown(e, currentId, nextId, prevId)}
                                             disabled={isCredit}
                                         />
-                                        <span className="w-20 text-right font-mono text-slate-500">${(denom * cashCounts[denom]).toLocaleString()}</span>
+                                        <span className="w-20 text-right font-mono text-[var(--text-secondary)]">${(denom * cashCounts[denom]).toLocaleString()}</span>
                                     </div>
                                 );
                             })}
-                            <div className="border-t border-slate-100 my-2 pt-2 flex items-center gap-4 text-red-600">
+                            <div className="border-t border-[var(--border-primary)] my-2 pt-2 flex items-center gap-4 text-red-500">
                                 <span className="w-12 text-right">預備金</span>
-                                <span className="text-slate-300">-</span>
+                                <span className="text-[var(--text-tertiary)]">-</span>
                                 <input
                                     id="input-reserve"
                                     type="number"
@@ -511,9 +526,9 @@ export default function SalesPage({ user, apiUrl }) {
                                     disabled={isCredit}
                                 />
                             </div>
-                            <div className="bg-slate-50 p-3 rounded flex justify-between items-center border border-slate-100">
-                                <span className="text-slate-500">總金額</span>
-                                <span className="text-xl font-bold text-amber-600">${(isCredit ? 0 : totalCashNet).toLocaleString()}</span>
+                            <div className="bg-[var(--bg-secondary)] p-3 rounded flex justify-between items-center border border-[var(--border-primary)]">
+                                <span className="text-[var(--text-secondary)]">總金額</span>
+                                <span className="text-xl font-bold text-amber-500">${(isCredit ? 0 : totalCashNet).toLocaleString()}</span>
                             </div>
                         </div>
                     </div>
@@ -521,7 +536,7 @@ export default function SalesPage({ user, apiUrl }) {
                     <div className="glass-panel p-6 relative">
                         {isCredit && <div className="absolute inset-0 z-50 cursor-not-allowed"></div>}
 
-                        <h2 className="text-lg font-bold mb-4 text-rose-600">支出與其他</h2>
+                        <h2 className="text-lg font-bold mb-4 text-rose-500">支出與其他</h2>
                         <div className="grid grid-cols-2 gap-3">
                             {['stall:攤位', 'cleaning:清潔', 'electricity:電費', 'gas:加油', 'parking:停車', 'goods:貨款', 'bags:塑膠袋', 'others:其他'].map((item, idx, arr) => {
                                 const [key, label] = item.split(':');
@@ -540,7 +555,7 @@ export default function SalesPage({ user, apiUrl }) {
 
                                 return (
                                     <div key={key}>
-                                        <label className="text-xs text-slate-500 block mb-1">{label}</label>
+                                        <label className="text-xs text-[var(--text-secondary)] block mb-1">{label}</label>
                                         <input
                                             id={currentId}
                                             type="number"
@@ -556,7 +571,7 @@ export default function SalesPage({ user, apiUrl }) {
                         </div>
                         <div className="mt-4 space-y-3">
                             <div>
-                                <label className="text-xs text-slate-500 block mb-1">Line Pay (收款)</label>
+                                <label className="text-xs text-[var(--text-secondary)] block mb-1">Line Pay (收款)</label>
                                 <input
                                     id="input-expense-linePay"
                                     type="number"
@@ -568,7 +583,7 @@ export default function SalesPage({ user, apiUrl }) {
                                 />
                             </div>
                             <div>
-                                <label className="text-xs text-slate-500 block mb-1">服務費 (扣除)</label>
+                                <label className="text-xs text-[var(--text-secondary)] block mb-1">服務費 (扣除)</label>
                                 <input
                                     id="input-expense-serviceFee"
                                     type="number"
@@ -586,7 +601,7 @@ export default function SalesPage({ user, apiUrl }) {
 
                 {/* Final Result Card (Fixed at bottom of the right column) */}
                 <div className="p-6 glass-panel shadow-lg border-t-4 border-t-blue-600 opacity-100 pointer-events-auto">
-                    <div className="text-sm text-slate-500 mb-1 font-bold">扣除後總金額 (結算)</div>
+                    <div className="text-sm text-[var(--text-secondary)] mb-1 font-bold">扣除後總金額 (結算)</div>
                     <div className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-indigo-700">
                         ${(isCredit ? totalSalesAmount : finalTotal).toLocaleString()}
                     </div>

@@ -3,7 +3,7 @@ import { Save, Search, AlertTriangle, CheckSquare, RotateCcw, Package, AlertCirc
 import { callGAS } from '../utils/api';
 import { sortProducts, getLocalDateString } from '../utils/constants';
 
-export default function StocktakePage({ user, apiUrl }) {
+export default function StocktakePage({ user, apiUrl, logActivity }) {
     const [inventory, setInventory] = useState([]);
     const [stocktakeData, setStocktakeData] = useState({}); // { [productId]: { physicalQty, reason, accountability } }
     const [loading, setLoading] = useState(true);
@@ -180,6 +180,19 @@ export default function StocktakePage({ user, apiUrl }) {
                 operator: user.username
             }, user.token);
 
+            // Log activity
+            if (logActivity) {
+                logActivity({
+                    actionType: 'DATA_EDIT',
+                    page: '庫存盤點',
+                    details: JSON.stringify({
+                        itemCount: items.length,
+                        hasDifferences: items.some(i => i.diff !== 0),
+                        totalDiff: items.reduce((acc, i) => acc + Math.abs(i.diff), 0)
+                    })
+                });
+            }
+
             alert('盤點資料提交成功！');
             // Reset and reload
             setStocktakeData({});
@@ -207,14 +220,14 @@ export default function StocktakePage({ user, apiUrl }) {
     const originalItems = filteredInventory.filter(item => item.type !== 'STOCK');
 
     const renderStocktakeTable = (items, title, Icon, colorClass, isStockType) => (
-        <div className="hidden md:flex bg-white rounded-xl border border-slate-200 p-6 flex-col shadow-sm">
+        <div className="hidden md:flex bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] p-6 flex-col shadow-sm">
             <h3 className={`text-lg font-bold mb-4 flex items-center gap-2 ${colorClass}`}>
                 <Icon size={20} /> {title}
-                {!isStockType && <span className="text-xs text-slate-500 font-normal ml-2">（無需盤點）</span>}
+                {!isStockType && <span className="text-xs text-[var(--text-secondary)] font-normal ml-2">（無需盤點）</span>}
             </h3>
-            <div className="rounded-lg border border-slate-200 overflow-hidden">
+            <div className="rounded-lg border border-[var(--border-primary)] overflow-hidden">
                 <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b border-slate-100">
+                    <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs uppercase font-bold border-b border-[var(--border-primary)]">
                         <tr>
                             <th className="p-4">產品名稱</th>
                             <th className="p-4 text-right">帳面庫存</th>
@@ -228,11 +241,11 @@ export default function StocktakePage({ user, apiUrl }) {
                             )}
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-[var(--border-primary)]">
                         {loading ? (
-                            <tr><td colSpan={isStockType ? "6" : "2"} className="p-6 text-center text-slate-500">載入中...</td></tr>
+                            <tr><td colSpan={isStockType ? "6" : "2"} className="p-6 text-center text-[var(--text-secondary)]">載入中...</td></tr>
                         ) : items.length === 0 ? (
-                            <tr><td colSpan={isStockType ? "6" : "2"} className="p-6 text-center text-slate-500">無資料</td></tr>
+                            <tr><td colSpan={isStockType ? "6" : "2"} className="p-6 text-center text-[var(--text-secondary)]">無資料</td></tr>
                         ) : (
                             items.map((item, idx) => {
                                 if (!item) return null;
@@ -244,13 +257,13 @@ export default function StocktakePage({ user, apiUrl }) {
                                 const hasQuantity = !isStockType && Number(item.quantity) > 0;
 
                                 return (
-                                    <tr key={rowKey} className={`hover:bg-slate-50 transition-colors ${isStockType && diff !== 0 && entry.physicalQty !== '' ? 'bg-amber-50' :
-                                        hasQuantity ? 'bg-orange-50 border-l-4 border-orange-500' : ''
+                                    <tr key={rowKey} className={`hover:bg-[var(--bg-hover)] transition-colors ${isStockType && diff !== 0 && entry.physicalQty !== '' ? 'bg-amber-500/10' :
+                                        hasQuantity ? 'bg-orange-500/10 border-l-4 border-orange-500' : ''
                                         }`}>
-                                        <td className={`p-4 font-medium ${hasQuantity ? 'text-orange-700 font-bold' : 'text-slate-800'}`}>
+                                        <td className={`p-4 font-medium ${hasQuantity ? 'text-orange-600 font-bold' : 'text-[var(--text-primary)]'}`}>
                                             {item.productName || '未命名商品'}
                                         </td>
-                                        <td className={`p-4 text-right font-mono ${hasQuantity ? 'text-orange-600 font-bold text-lg' : 'text-slate-500'}`}>
+                                        <td className={`p-4 text-right font-mono ${hasQuantity ? 'text-orange-500 font-bold text-lg' : 'text-[var(--text-secondary)]'}`}>
                                             {item.quantity}
                                         </td>
                                         {isStockType && (
@@ -259,7 +272,7 @@ export default function StocktakePage({ user, apiUrl }) {
                                                     <input
                                                         id={`qty-${rowKey}`}
                                                         type="number"
-                                                        className={`input-field w-full text-right font-mono bg-white ${diff !== 0 && entry.physicalQty !== '' ? 'border-red-300 text-red-700' : ''}`}
+                                                        className={`input-field w-full text-right font-mono ${diff !== 0 && entry.physicalQty !== '' ? 'border-red-500 text-red-500' : ''}`}
                                                         placeholder="0"
                                                         value={entry.physicalQty}
                                                         onChange={(e) => handleInputChange(rowKey, 'physicalQty', e.target.value)}
@@ -278,7 +291,7 @@ export default function StocktakePage({ user, apiUrl }) {
                                                         id={`reason-${rowKey}`}
                                                         type="text"
                                                         disabled={entry.physicalQty === '' || diff === 0}
-                                                        className={`input-field w-full text-xs transition-all ${entry.physicalQty !== '' && diff !== 0 ? 'bg-white' : 'bg-slate-100 cursor-not-allowed opacity-50'}`}
+                                                        className={`input-field w-full text-xs transition-all ${entry.physicalQty !== '' && diff !== 0 ? '' : 'bg-[var(--bg-tertiary)] cursor-not-allowed opacity-50'}`}
                                                         placeholder={diff !== 0 && entry.physicalQty !== '' ? "原因..." : "-"}
                                                         value={entry.reason}
                                                         onChange={(e) => handleInputChange(rowKey, 'reason', e.target.value)}
@@ -290,7 +303,7 @@ export default function StocktakePage({ user, apiUrl }) {
                                                         id={`acc-${rowKey}`}
                                                         type="text"
                                                         disabled={entry.physicalQty === '' || diff === 0}
-                                                        className={`input-field w-full text-xs transition-all ${entry.physicalQty !== '' && diff !== 0 ? 'bg-white' : 'bg-slate-100 cursor-not-allowed opacity-50'}`}
+                                                        className={`input-field w-full text-xs transition-all ${entry.physicalQty !== '' && diff !== 0 ? '' : 'bg-[var(--bg-tertiary)] cursor-not-allowed opacity-50'}`}
                                                         placeholder={diff !== 0 && entry.physicalQty !== '' ? "責任人..." : "-"}
                                                         value={entry.accountability}
                                                         onChange={(e) => handleInputChange(rowKey, 'accountability', e.target.value)}
@@ -317,9 +330,9 @@ export default function StocktakePage({ user, apiUrl }) {
             </h3>
             <div className="space-y-4">
                 {loading ? (
-                    <div className="text-center py-8 text-slate-500">載入中...</div>
+                    <div className="text-center py-8 text-[var(--text-secondary)]">載入中...</div>
                 ) : items.length === 0 ? (
-                    <div className="text-center py-8 text-slate-500 bg-white rounded-xl border border-slate-200">無資料</div>
+                    <div className="text-center py-8 text-[var(--text-secondary)] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">無資料</div>
                 ) : (
                     items.map((item, idx) => {
                         if (!item) return null;
@@ -332,17 +345,17 @@ export default function StocktakePage({ user, apiUrl }) {
                         const hasQuantity = !isStockType && Number(item.quantity) > 0;
 
                         return (
-                            <div key={rowKey} className={`bg-white rounded-xl p-4 border shadow-sm space-y-3 ${isStockType && hasDiff ? 'border-amber-200 bg-amber-50' :
-                                    hasQuantity ? 'border-orange-200 bg-orange-50' : 'border-slate-200'
+                            <div key={rowKey} className={`bg-[var(--bg-secondary)] rounded-xl p-4 border shadow-sm space-y-3 ${isStockType && hasDiff ? 'border-amber-500/30 bg-amber-500/5' :
+                                hasQuantity ? 'border-orange-500/30 bg-orange-500/5' : 'border-[var(--border-primary)]'
                                 }`}>
                                 {/* Header: Product Name & System Stock */}
-                                <div className="flex justify-between items-start border-b border-slate-100 pb-2">
-                                    <span className={`font-bold text-lg ${hasQuantity ? 'text-orange-700' : 'text-slate-800'}`}>
+                                <div className="flex justify-between items-start border-b border-[var(--border-primary)] pb-2">
+                                    <span className={`font-bold text-lg ${hasQuantity ? 'text-orange-600' : 'text-[var(--text-primary)]'}`}>
                                         {item.productName || '未命名商品'}
                                     </span>
                                     <div className="flex flex-col items-end">
-                                        <span className="text-xs text-slate-400">帳面庫存</span>
-                                        <span className={`font-mono text-lg font-bold ${hasQuantity ? 'text-orange-600' : 'text-slate-600'}`}>
+                                        <span className="text-xs text-[var(--text-secondary)]">帳面庫存</span>
+                                        <span className={`font-mono text-lg font-bold ${hasQuantity ? 'text-orange-500' : 'text-[var(--text-secondary)]'}`}>
                                             {item.quantity}
                                         </span>
                                     </div>
@@ -352,11 +365,11 @@ export default function StocktakePage({ user, apiUrl }) {
                                     <>
                                         {/* Physical Qty Input */}
                                         <div className="flex items-center gap-3">
-                                            <label className="text-sm font-bold text-slate-600 min-w-[70px]">實盤數量:</label>
+                                            <label className="text-sm font-bold text-[var(--text-secondary)] min-w-[70px]">實盤數量:</label>
                                             <input
                                                 id={`m-qty-${rowKey}`}
                                                 type="number"
-                                                className={`input-field flex-1 text-right font-mono py-2 ${hasDiff ? 'border-red-300 text-red-700 bg-white' : ''}`}
+                                                className={`input-field flex-1 text-right font-mono py-2 ${hasDiff ? 'border-red-500 text-red-500' : ''}`}
                                                 placeholder="輸入數量"
                                                 value={entry.physicalQty}
                                                 onChange={(e) => handleInputChange(rowKey, 'physicalQty', e.target.value)}
@@ -372,9 +385,9 @@ export default function StocktakePage({ user, apiUrl }) {
 
                                         {/* Reason & Accountability (Only show if Diff exists) */}
                                         {hasDiff && (
-                                            <div className="bg-white/50 p-3 rounded-lg border border-amber-100 space-y-3">
+                                            <div className="bg-[var(--bg-tertiary)] p-3 rounded-lg border border-amber-500/20 space-y-3">
                                                 <div className="flex flex-col gap-1">
-                                                    <label className="text-xs font-bold text-slate-500">差異原因</label>
+                                                    <label className="text-xs font-bold text-[var(--text-secondary)]">差異原因</label>
                                                     <input
                                                         id={`m-reason-${rowKey}`}
                                                         type="text"
@@ -414,17 +427,17 @@ export default function StocktakePage({ user, apiUrl }) {
             {submitting && (
                 <div className="loading-overlay">
                     <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-lg font-bold text-slate-800">盤點存盤中，請稍後...</p>
+                    <p className="text-lg font-bold text-[var(--text-primary)]">盤點存盤中，請稍後...</p>
                 </div>
             )}
             {/* Desktop Header & Controls (Hidden on Mobile) */}
             <div className="hidden md:flex flex-col gap-6 shrink-0">
                 <div className="flex justify-between items-center gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
                             <CheckSquare className="text-blue-600" /> 庫存盤點
                         </h1>
-                        <p className="text-slate-500 text-sm mt-1">現貨進貨需核對盤點，原貨退貨無需盤點</p>
+                        <p className="text-[var(--text-secondary)] text-sm mt-1">現貨進貨需核對盤點，原貨退貨無需盤點</p>
                     </div>
 
                     <div className="flex gap-3">
@@ -445,20 +458,20 @@ export default function StocktakePage({ user, apiUrl }) {
                     </div>
                 </div>
 
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex gap-4 items-center">
+                <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] flex gap-4 items-center">
                     <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
                         <input
                             type="text"
                             placeholder="搜尋產品名稱..."
-                            className="input-field pl-10 w-full bg-white"
+                            className="input-field pl-10 w-full"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
 
-                    <div className="flex items-center gap-3 bg-white p-2 px-4 rounded-xl border border-slate-200 shadow-sm shrink-0">
-                        <label className="text-sm font-bold text-slate-600 flex items-center gap-2 cursor-pointer">
+                    <div className="flex items-center gap-3 bg-[var(--bg-primary)] p-2 px-4 rounded-xl border border-[var(--border-primary)] shadow-sm shrink-0">
+                        <label className="text-sm font-bold text-[var(--text-secondary)] flex items-center gap-2 cursor-pointer">
                             <input
                                 type="checkbox"
                                 className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
@@ -473,18 +486,18 @@ export default function StocktakePage({ user, apiUrl }) {
 
             {/* Mobile Header & Controls (Visible only on Mobile) */}
             <div className="md:hidden flex flex-col gap-3 shrink-0">
-                <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <h1 className="text-xl font-bold text-[var(--text-primary)] flex items-center gap-2">
                     <CheckSquare className="text-blue-600" /> 庫存盤點
                 </h1>
 
                 {/* Row 1: Search + Refresh */}
                 <div className="flex gap-2">
                     <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
                         <input
                             type="text"
                             placeholder="搜尋產品..."
-                            className="input-field pl-10 w-full bg-white"
+                            className="input-field pl-10 w-full"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -500,14 +513,14 @@ export default function StocktakePage({ user, apiUrl }) {
 
                 {/* Row 2: Show Zero Stock + Submit */}
                 <div className="flex gap-2">
-                    <div className="flex-1 flex items-center justify-center gap-2 bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-sm">
+                    <div className="flex-1 flex items-center justify-center gap-2 bg-[var(--bg-secondary)] px-3 py-2 rounded-xl border border-[var(--border-primary)] shadow-sm">
                         <input
                             type="checkbox"
                             className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                             checked={showZeroStock}
                             onChange={(e) => setShowZeroStock(e.target.checked)}
                         />
-                        <span className="text-xs font-bold text-slate-600">顯示 0 庫存</span>
+                        <span className="text-xs font-bold text-[var(--text-secondary)]">顯示 0 庫存</span>
                     </div>
                     <button
                         onClick={handleSubmit}

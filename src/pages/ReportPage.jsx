@@ -139,39 +139,39 @@ export default function ReportPage({ user, apiUrl }) {
         <div className="max-w-[90rem] mx-auto p-4">
             <div className="glass-panel p-6">
                 {/* Header Section */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-6 border-b border-slate-200 pb-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-6 border-b border-[var(--border-primary)] pb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
                             <FileText className="text-blue-600" /> 銷售查詢報表
                         </h1>
-                        <p className="text-slate-500 text-sm mt-1">查詢特定日期、銷售對象或業務的銷售紀錄</p>
+                        <p className="text-[var(--text-secondary)] text-sm mt-1">查詢特定日期、銷售對象或業務的銷售紀錄</p>
                     </div>
 
                     {/* Summary Stats (Integrated in Header) */}
                     {reportData && (
                         <div className="grid grid-cols-3 md:grid-cols-6 gap-2 md:gap-3 w-full md:w-auto">
-                            <div className="px-2 md:px-4 py-2 rounded-xl bg-amber-50 border border-amber-200 shadow-sm">
-                                <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold text-center">應繳回</p>
+                            <div className="px-2 md:px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-200/20 shadow-sm">
+                                <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">應繳回</p>
                                 <p className="text-sm md:text-xl font-bold text-amber-700 text-center">${totalReturnAmount.toLocaleString()}</p>
                             </div>
-                            <div className="px-2 md:px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-200 shadow-sm">
-                                <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold text-center">總銷售</p>
+                            <div className="px-2 md:px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-200/20 shadow-sm">
+                                <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總銷售</p>
                                 <p className="text-sm md:text-xl font-bold text-emerald-700 text-center">${totalSales.toLocaleString()}</p>
                             </div>
-                            <div className="px-2 md:px-4 py-2 rounded-xl bg-rose-50 border border-rose-200 shadow-sm">
-                                <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold text-center">總支出</p>
+                            <div className="px-2 md:px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-200/20 shadow-sm">
+                                <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總支出</p>
                                 <p className="text-sm md:text-xl font-bold text-rose-700 text-center">${totalExpenses.toLocaleString()}</p>
                             </div>
-                            <div className="px-2 md:px-4 py-2 rounded-xl bg-cyan-50 border border-cyan-200 shadow-sm">
-                                <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold text-center">結算</p>
+                            <div className="px-2 md:px-4 py-2 rounded-xl bg-cyan-500/10 border border-cyan-200/20 shadow-sm">
+                                <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">結算</p>
                                 <p className="text-sm md:text-xl font-bold text-cyan-700 text-center">${totalFinalTotal.toLocaleString()}</p>
                             </div>
-                            <div className="px-2 md:px-4 py-2 rounded-xl bg-blue-50 border border-blue-200 shadow-sm">
-                                <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold text-center">總數量</p>
+                            <div className="px-2 md:px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-200/20 shadow-sm">
+                                <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總數量</p>
                                 <p className="text-sm md:text-xl font-bold text-blue-700 text-center">{totalQty.toLocaleString()}</p>
                             </div>
-                            <div className="px-2 md:px-4 py-2 rounded-xl bg-purple-50 border border-purple-200 shadow-sm">
-                                <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold text-center">總筆數</p>
+                            <div className="px-2 md:px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-200/20 shadow-sm">
+                                <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總筆數</p>
                                 <p className="text-sm md:text-xl font-bold text-purple-700 text-center">{reportData.length}</p>
                             </div>
                         </div>
@@ -181,7 +181,7 @@ export default function ReportPage({ user, apiUrl }) {
                 {/* Filters - Mobile View (Horizontal, No Border, mimics SalesPage) */}
                 <form onSubmit={handleSearch} className="md:hidden mb-6 space-y-3">
                     <div className="flex items-center gap-3">
-                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">開始日期:</label>
+                        <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">開始日期:</label>
                         <input
                             type="date"
                             required
@@ -191,7 +191,7 @@ export default function ReportPage({ user, apiUrl }) {
                         />
                     </div>
                     <div className="flex items-center gap-3">
-                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">結束日期:</label>
+                        <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">結束日期:</label>
                         <input
                             type="date"
                             required
@@ -201,7 +201,7 @@ export default function ReportPage({ user, apiUrl }) {
                         />
                     </div>
                     <div className="flex items-center gap-3">
-                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">銷售對象:</label>
+                        <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">銷售對象:</label>
                         <input
                             type="text"
                             placeholder="輸入銷售對象..."
@@ -211,7 +211,7 @@ export default function ReportPage({ user, apiUrl }) {
                         />
                     </div>
                     <div className="flex items-center gap-3">
-                        <label className="text-sm font-bold text-slate-500 whitespace-nowrap w-[70px]">業務員:</label>
+                        <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">業務員:</label>
                         <div className="flex flex-1 gap-2">
                             <input
                                 type="text"
@@ -232,11 +232,11 @@ export default function ReportPage({ user, apiUrl }) {
                 </form>
 
                 {/* Filters - Desktop View (Original Grid) */}
-                <form onSubmit={handleSearch} className="hidden md:block mb-6 p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
+                <form onSubmit={handleSearch} className="hidden md:block mb-6 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] shadow-sm">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="grid grid-cols-2 gap-4 md:contents">
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-slate-500 uppercase px-1">開始日期</label>
+                                <label className="text-xs font-bold text-[var(--text-secondary)] uppercase px-1">開始日期</label>
                                 <input
                                     type="date"
                                     required
@@ -246,7 +246,7 @@ export default function ReportPage({ user, apiUrl }) {
                                 />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-slate-500 uppercase px-1">結束日期</label>
+                                <label className="text-xs font-bold text-[var(--text-secondary)] uppercase px-1">結束日期</label>
                                 <input
                                     type="date"
                                     required
@@ -257,7 +257,7 @@ export default function ReportPage({ user, apiUrl }) {
                             </div>
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase px-1">銷售對象</label>
+                            <label className="text-xs font-bold text-[var(--text-secondary)] uppercase px-1">銷售對象</label>
                             <input
                                 type="text"
                                 placeholder="關鍵字..."
@@ -268,7 +268,7 @@ export default function ReportPage({ user, apiUrl }) {
                         </div>
                         <div className="flex gap-2">
                             <div className="space-y-1 flex-1">
-                                <label className="text-xs font-bold text-slate-500 uppercase px-1">業務員</label>
+                                <label className="text-xs font-bold text-[var(--text-secondary)] uppercase px-1">業務員</label>
                                 <input
                                     type="text"
                                     placeholder="姓名..."
@@ -292,33 +292,33 @@ export default function ReportPage({ user, apiUrl }) {
                 {reportData && (
                     <div className="space-y-6">
                         {/* 1. Summary Table */}
-                        <div className="rounded-xl border border-slate-200 overflow-hidden">
-                            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
-                                <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                        <div className="rounded-xl border border-[var(--border-primary)] overflow-hidden">
+                            <div className="px-4 py-3 bg-[var(--bg-tertiary)] border-b border-[var(--border-primary)]">
+                                <h3 className="font-bold text-[var(--text-primary)] flex items-center gap-2">
                                     <Package size={16} className="text-blue-600" /> 商品銷售統計
                                 </h3>
                             </div>
                             <div className="overflow-x-auto max-h-60">
                                 <table className="w-full text-left">
-                                    <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold border-b border-slate-100">
+                                    <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs uppercase font-bold border-b border-[var(--border-primary)]">
                                         <tr>
                                             <th className="p-4">商品名稱</th>
                                             <th className="p-4 text-right">銷售數量</th>
                                             <th className="p-4 text-right">銷售金額</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-100 bg-white">
+                                    <tbody className="divide-y divide-[var(--border-primary)] bg-[var(--bg-secondary)]">
                                         {summaryList.length > 0 ? (
                                             summaryList.map((item, idx) => (
-                                                <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="p-4 text-slate-900">{item.name}</td>
-                                                    <td className="p-4 text-right text-slate-500">{item.qty}</td>
+                                                <tr key={idx} className="hover:bg-[var(--bg-hover)] transition-colors">
+                                                    <td className="p-4 text-[var(--text-primary)]">{item.name}</td>
+                                                    <td className="p-4 text-right text-[var(--text-tertiary)]">{item.qty}</td>
                                                     <td className="p-4 text-right text-emerald-600">${item.amount.toLocaleString()}</td>
                                                 </tr>
                                             ))
                                         ) : (
                                             <tr>
-                                                <td colSpan="3" className="p-8 text-center text-slate-500">查無資料</td>
+                                                <td colSpan="3" className="p-8 text-center text-[var(--text-secondary)]">查無資料</td>
                                             </tr>
                                         )}
                                     </tbody>
@@ -327,17 +327,17 @@ export default function ReportPage({ user, apiUrl }) {
                         </div>
 
                         {/* 2. Detailed Lists with Tabs */}
-                        <div className="rounded-xl border border-slate-200 overflow-hidden flex flex-col h-[600px]">
-                            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex gap-4">
+                        <div className="rounded-xl border border-[var(--border-primary)] overflow-hidden flex flex-col h-[600px]">
+                            <div className="px-4 py-3 bg-[var(--bg-tertiary)] border-b border-[var(--border-primary)] flex gap-4">
                                 <button
                                     onClick={() => setViewMode('SALES')}
-                                    className={`font-bold flex items-center gap-2 pb-2 border-b-2 transition-colors ${viewMode === 'SALES' ? 'text-blue-600 border-blue-600' : 'text-slate-500 border-transparent hover:text-slate-900'}`}
+                                    className={`font-bold flex items-center gap-2 pb-2 border-b-2 transition-colors ${viewMode === 'SALES' ? 'text-blue-600 border-blue-600' : 'text-[var(--text-secondary)] border-transparent hover:text-[var(--text-primary)]'}`}
                                 >
                                     <TrendingUp size={16} /> 銷售明細 ({reportData.length})
                                 </button>
                                 <button
                                     onClick={() => setViewMode('EXPENSES')}
-                                    className={`font-bold flex items-center gap-2 pb-2 border-b-2 transition-colors ${viewMode === 'EXPENSES' ? 'text-rose-600 border-rose-600' : 'text-slate-500 border-transparent hover:text-slate-900'}`}
+                                    className={`font-bold flex items-center gap-2 pb-2 border-b-2 transition-colors ${viewMode === 'EXPENSES' ? 'text-rose-600 border-rose-600' : 'text-[var(--text-secondary)] border-transparent hover:text-[var(--text-primary)]'}`}
                                 >
                                     <DollarSign size={16} /> 支出明細 ({expenseData.length})
                                 </button>
@@ -347,11 +347,11 @@ export default function ReportPage({ user, apiUrl }) {
                                 {viewMode === 'SALES' ? (
                                     <>
                                         {/* Mobile Card View (SALES) */}
-                                        <div className="md:hidden divide-y divide-slate-100">
+                                        <div className="md:hidden divide-y divide-[var(--border-primary)]">
                                             {reportData.map((item, idx) => (
-                                                <div key={idx} className="p-4 space-y-3 bg-white hover:bg-slate-50 transition-colors">
+                                                <div key={idx} className="p-4 space-y-3 bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] transition-colors">
                                                     <div className="flex justify-between items-start">
-                                                        <div className="text-xs font-mono text-slate-400">
+                                                        <div className="text-xs font-mono text-[var(--text-tertiary)]">
                                                             {new Date(item.date).toLocaleString('zh-TW', {
                                                                 year: 'numeric', month: '2-digit', day: '2-digit',
                                                                 hour: '2-digit', minute: '2-digit', hour12: false
@@ -360,16 +360,16 @@ export default function ReportPage({ user, apiUrl }) {
                                                         <div className="text-emerald-600 font-bold font-mono text-lg">${item.totalAmount}</div>
                                                     </div>
                                                     <div className="flex flex-wrap gap-2 text-sm">
-                                                        <div className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md">
+                                                        <div className="flex items-center gap-1 bg-blue-500/10 text-blue-700 px-2 py-0.5 rounded-md">
                                                             <MapPin size={12} /> <span className="font-medium">{item.location}</span>
                                                         </div>
-                                                        <div className="flex items-center gap-1 bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                                                        <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-md">
                                                             <User size={12} /> <span>{item.salesRep}</span>
                                                         </div>
                                                     </div>
-                                                    <div className="flex justify-between items-center pt-1 border-t border-slate-50">
-                                                        <div className="font-bold text-slate-800">{item.productName}</div>
-                                                        <div className="text-slate-500">數量: <span className="font-bold text-slate-900">{item.soldQty}</span></div>
+                                                    <div className="flex justify-between items-center pt-1 border-t border-[var(--border-primary)]">
+                                                        <div className="font-bold text-[var(--text-primary)]">{item.productName}</div>
+                                                        <div className="text-[var(--text-secondary)]">數量: <span className="font-bold text-[var(--text-primary)]">{item.soldQty}</span></div>
                                                     </div>
                                                 </div>
                                             ))}
@@ -377,7 +377,7 @@ export default function ReportPage({ user, apiUrl }) {
 
                                         {/* Desktop Table View (SALES) */}
                                         <table className="hidden md:table w-full text-left text-sm">
-                                            <thead className="bg-slate-50 text-slate-500 sticky top-0 z-10">
+                                            <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] sticky top-0 z-10">
                                                 <tr>
                                                     <th className="p-3 font-medium w-48">日期</th>
                                                     <th className="p-3 font-medium w-32">銷售對象</th>
@@ -387,10 +387,10 @@ export default function ReportPage({ user, apiUrl }) {
                                                     <th className="p-3 font-medium text-right w-32">金額</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-slate-100 text-slate-600 bg-white">
+                                            <tbody className="divide-y divide-[var(--border-primary)] text-[var(--text-secondary)] bg-[var(--bg-secondary)]">
                                                 {reportData.map((item, idx) => (
-                                                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                                        <td className="p-3 text-slate-500">
+                                                    <tr key={idx} className="hover:bg-[var(--bg-hover)] transition-colors">
+                                                        <td className="p-3 text-[var(--text-tertiary)]">
                                                             {new Date(item.date).toLocaleString('zh-TW', {
                                                                 year: 'numeric', month: '2-digit', day: '2-digit',
                                                                 hour: '2-digit', minute: '2-digit', hour12: false
@@ -398,7 +398,7 @@ export default function ReportPage({ user, apiUrl }) {
                                                         </td>
                                                         <td className="p-3">{item.location}</td>
                                                         <td className="p-3">{item.salesRep}</td>
-                                                        <td className="p-3 text-slate-900">{item.productName}</td>
+                                                        <td className="p-3 text-[var(--text-primary)]">{item.productName}</td>
                                                         <td className="p-3 text-right">{item.soldQty}</td>
                                                         <td className="p-3 text-right">${item.totalAmount}</td>
                                                     </tr>
@@ -409,7 +409,7 @@ export default function ReportPage({ user, apiUrl }) {
                                 ) : (
                                     <>
                                         {/* Mobile Card View (EXPENSES) */}
-                                        <div className="md:hidden divide-y divide-slate-100">
+                                        <div className="md:hidden divide-y divide-[var(--border-primary)]">
                                             {expenseData.map((item, idx) => {
                                                 const cats = [];
                                                 if (item.stall) cats.push(`攤位 $${item.stall}`);
@@ -427,9 +427,9 @@ export default function ReportPage({ user, apiUrl }) {
                                                 if (item.salary) cats.push(`薪資 $${item.salary}`);
 
                                                 return (
-                                                    <div key={idx} className="p-4 space-y-3 bg-white hover:bg-slate-50 transition-colors">
+                                                    <div key={idx} className="p-4 space-y-3 bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] transition-colors">
                                                         <div className="flex justify-between items-start">
-                                                            <div className="text-xs font-mono text-slate-400">
+                                                            <div className="text-xs font-mono text-[var(--text-tertiary)]">
                                                                 {new Date(item.date).toLocaleString('zh-TW', {
                                                                     year: 'numeric', month: '2-digit', day: '2-digit',
                                                                     hour: '2-digit', minute: '2-digit', hour12: false
@@ -437,22 +437,22 @@ export default function ReportPage({ user, apiUrl }) {
                                                             </div>
                                                             <div className="flex flex-col items-end">
                                                                 <div className="text-emerald-600 font-bold font-mono text-lg">${Number(item.displayFinalTotal).toLocaleString()}</div>
-                                                                <div className="text-[10px] text-slate-400 font-mono">支出: ${Number(item.rowTotal).toLocaleString()}</div>
+                                                                <div className="text-[10px] text-[var(--text-tertiary)] font-mono">支出: ${Number(item.rowTotal).toLocaleString()}</div>
                                                             </div>
                                                         </div>
                                                         <div className="flex flex-wrap gap-2 text-sm">
-                                                            <div className="flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md">
+                                                            <div className="flex items-center gap-1 bg-amber-500/10 text-amber-700 px-2 py-0.5 rounded-md">
                                                                 <MapPin size={12} /> <span className="font-medium">{item.customer || item.note || '-'}</span>
                                                             </div>
-                                                            <div className="flex items-center gap-1 bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                                                            <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-md">
                                                                 <User size={12} /> <span>{item.salesRep}</span>
                                                             </div>
                                                         </div>
-                                                        <div className="pt-2 border-t border-slate-50">
-                                                            <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">支出細項</p>
+                                                        <div className="pt-2 border-t border-[var(--border-primary)]">
+                                                            <p className="text-[10px] uppercase font-bold text-[var(--text-tertiary)] mb-1">支出細項</p>
                                                             <div className="flex flex-wrap gap-1">
                                                                 {cats.map((c, i) => (
-                                                                    <span key={i} className="text-[10px] bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded border border-slate-100">{c}</span>
+                                                                    <span key={i} className="text-[10px] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] px-1.5 py-0.5 rounded border border-[var(--border-primary)]">{c}</span>
                                                                 ))}
                                                             </div>
                                                         </div>
@@ -463,7 +463,7 @@ export default function ReportPage({ user, apiUrl }) {
 
                                         {/* Desktop Table View (EXPENSES) */}
                                         <table className="hidden md:table w-full text-left text-sm">
-                                            <thead className="bg-slate-50 text-slate-500 sticky top-0 z-10">
+                                            <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] sticky top-0 z-10">
                                                 <tr>
                                                     <th className="p-3 font-medium w-48">日期</th>
                                                     <th className="p-3 font-medium w-32">對象/備註</th>
@@ -473,7 +473,7 @@ export default function ReportPage({ user, apiUrl }) {
                                                     <th className="p-3 font-medium text-right w-28 text-emerald-600">結算金額</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-slate-100 text-slate-600 bg-white">
+                                            <tbody className="divide-y divide-[var(--border-primary)] text-[var(--text-secondary)] bg-[var(--bg-secondary)]">
                                                 {expenseData.map((item, idx) => {
                                                     const cats = [];
                                                     if (item.stall) cats.push(`攤位 $${item.stall}`);
@@ -491,16 +491,16 @@ export default function ReportPage({ user, apiUrl }) {
                                                     if (item.salary) cats.push(`薪資 $${item.salary}`);
 
                                                     return (
-                                                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                                            <td className="p-3 text-slate-500">
+                                                        <tr key={idx} className="hover:bg-[var(--bg-hover)] transition-colors">
+                                                            <td className="p-3 text-[var(--text-tertiary)]">
                                                                 {new Date(item.date).toLocaleString('zh-TW', {
                                                                     year: 'numeric', month: '2-digit', day: '2-digit',
                                                                     hour: '2-digit', minute: '2-digit', hour12: false
                                                                 })}
                                                             </td>
-                                                            <td className="p-3 font-bold text-slate-900">{item.customer || item.note || '-'}</td>
+                                                            <td className="p-3 font-bold text-[var(--text-primary)]">{item.customer || item.note || '-'}</td>
                                                             <td className="p-3">{item.salesRep}</td>
-                                                            <td className="p-3 text-xs text-slate-400">{cats.join(', ')}</td>
+                                                            <td className="p-3 text-xs text-[var(--text-tertiary)]">{cats.join(', ')}</td>
                                                             <td className="p-3 text-right font-mono text-rose-600">
                                                                 ${(item.rowTotal || 0).toLocaleString()}
                                                             </td>

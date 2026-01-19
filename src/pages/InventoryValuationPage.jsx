@@ -45,24 +45,24 @@ export default function InventoryValuationPage({ user, apiUrl }) {
         <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <DollarSign className="text-amber-600" /> 庫存估值報告
+                    <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+                        <DollarSign className="text-amber-500" /> 庫存估值報告
                     </h1>
-                    <p className="text-slate-500 text-sm mt-1">即時庫存價值分析與統計</p>
+                    <p className="text-[var(--text-secondary)] text-sm mt-1">即時庫存價值分析與統計</p>
                 </div>
 
                 {/* Stats Cards */}
                 <div className="flex w-full md:w-auto gap-3">
-                    <div className="flex-1 bg-amber-50 px-3 py-3 border border-amber-200 rounded-xl shadow-sm text-center">
-                        <p className="text-xs text-slate-500 uppercase font-bold">總庫存價值</p>
-                        <p className="text-xl md:text-2xl font-bold text-amber-600 flex justify-center items-baseline gap-1">
+                    <div className="flex-1 bg-[var(--bg-secondary)] px-3 py-3 border border-[var(--border-primary)] rounded-xl shadow-sm text-center">
+                        <p className="text-xs text-[var(--text-secondary)] uppercase font-bold">總庫存價值</p>
+                        <p className="text-xl md:text-2xl font-bold text-amber-500 flex justify-center items-baseline gap-1">
                             <span className="text-sm opacity-50">$</span>
                             {totalValue.toLocaleString()}
                         </p>
                     </div>
-                    <div className="flex-1 bg-blue-50 px-3 py-3 border border-blue-200 rounded-xl shadow-sm text-center">
-                        <p className="text-xs text-slate-500 uppercase font-bold">總庫存數量</p>
-                        <p className="text-xl md:text-2xl font-bold text-blue-600">
+                    <div className="flex-1 bg-[var(--bg-secondary)] px-3 py-3 border border-[var(--border-primary)] rounded-xl shadow-sm text-center">
+                        <p className="text-xs text-[var(--text-secondary)] uppercase font-bold">總庫存數量</p>
+                        <p className="text-xl md:text-2xl font-bold text-blue-500">
                             {totalItems.toLocaleString()}
                         </p>
                     </div>
@@ -70,13 +70,13 @@ export default function InventoryValuationPage({ user, apiUrl }) {
             </div>
 
             {/* Controls */}
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex gap-4 items-center shadow-sm">
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] flex gap-4 items-center shadow-sm">
                 <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
                     <input
                         type="text"
                         placeholder="搜尋產品名稱..."
-                        className="input-field pl-10 w-full bg-white"
+                        className="input-field pl-10 w-full bg-[var(--bg-primary)]"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -91,10 +91,10 @@ export default function InventoryValuationPage({ user, apiUrl }) {
             </div>
 
             {/* Desktop Table View */}
-            <div className="hidden md:block bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="hidden md:block bg-[var(--bg-primary)] rounded-xl border border-[var(--border-primary)] overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider sticky top-0 font-bold border-b border-slate-100">
+                        <thead className="bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-xs uppercase tracking-wider sticky top-0 font-bold border-b border-[var(--border-primary)]">
                             <tr>
                                 <th className="p-4">產品名稱</th>
                                 <th className="p-4 text-right">庫存數量</th>
@@ -103,9 +103,9 @@ export default function InventoryValuationPage({ user, apiUrl }) {
                                 <th className="p-4 text-right">佔比</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-[var(--border-primary)]">
                             {loading ? (
-                                <tr><td colSpan="5" className="p-20 text-center text-slate-500">計算中...</td></tr>
+                                <tr><td colSpan="5" className="p-20 text-center text-[var(--text-secondary)]">計算中...</td></tr>
                             ) : filteredData.length > 0 ? (
                                 filteredData.map((item, idx) => {
                                     const qty = Number(item.totalQty) || 0;
@@ -114,23 +114,23 @@ export default function InventoryValuationPage({ user, apiUrl }) {
                                     const percent = totalValue > 0 ? (value / totalValue * 100) : 0;
 
                                     return (
-                                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-4 font-medium text-slate-800">
+                                        <tr key={idx} className="hover:bg-[var(--bg-hover)] transition-colors">
+                                            <td className="p-4 font-medium text-[var(--text-primary)]">
                                                 {item.name}
                                             </td>
-                                            <td className="p-4 text-right font-mono text-slate-600">
+                                            <td className="p-4 text-right font-mono text-[var(--text-secondary)]">
                                                 {qty.toLocaleString()}
                                             </td>
-                                            <td className="p-4 text-right font-mono text-slate-500">
+                                            <td className="p-4 text-right font-mono text-[var(--text-secondary)]">
                                                 ${unitCost.toFixed(2)}
                                             </td>
-                                            <td className="p-4 text-right font-mono font-bold text-amber-600">
+                                            <td className="p-4 text-right font-mono font-bold text-amber-500">
                                                 ${value.toLocaleString()}
                                             </td>
                                             <td className="p-4 text-right w-24">
                                                 <div className="flex items-center gap-2 justify-end">
-                                                    <span className="text-xs text-slate-500 w-8">{percent.toFixed(1)}%</span>
-                                                    <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                    <span className="text-xs text-[var(--text-secondary)] w-8">{percent.toFixed(1)}%</span>
+                                                    <div className="w-12 h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
                                                         <div
                                                             className="h-full bg-amber-500"
                                                             style={{ width: `${Math.min(percent, 100)}%` }}
@@ -145,8 +145,8 @@ export default function InventoryValuationPage({ user, apiUrl }) {
                                 <tr>
                                     <td colSpan="5" className="p-20 text-center">
                                         <div className="flex flex-col items-center gap-4">
-                                            <TrendingUp size={32} className="text-slate-600" />
-                                            <p className="text-slate-500">無估值資料</p>
+                                            <TrendingUp size={32} className="text-[var(--text-secondary)]" />
+                                            <p className="text-[var(--text-secondary)]">無估值資料</p>
                                         </div>
                                     </td>
                                 </tr>
@@ -159,7 +159,7 @@ export default function InventoryValuationPage({ user, apiUrl }) {
             {/* Mobile Card View */}
             <div className="md:hidden space-y-4">
                 {loading ? (
-                    <div className="text-center py-8 text-slate-500">載入中...</div>
+                    <div className="text-center py-8 text-[var(--text-secondary)]">載入中...</div>
                 ) : filteredData.length > 0 ? (
                     filteredData.map((item, idx) => {
                         const qty = Number(item.totalQty) || 0;
@@ -168,32 +168,32 @@ export default function InventoryValuationPage({ user, apiUrl }) {
                         const percent = totalValue > 0 ? (value / totalValue * 100) : 0;
 
                         return (
-                            <div key={idx} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col gap-3">
-                                <div className="flex justify-between items-start border-b border-slate-100 pb-2">
-                                    <h3 className="font-bold text-slate-800 text-lg">{item.name}</h3>
+                            <div key={idx} className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] p-4 shadow-sm flex flex-col gap-3">
+                                <div className="flex justify-between items-start border-b border-[var(--border-primary)] pb-2">
+                                    <h3 className="font-bold text-[var(--text-primary)] text-lg">{item.name}</h3>
                                     <div className="text-right">
-                                        <div className="text-xs text-slate-400">總價值</div>
-                                        <div className="font-bold text-amber-600 text-lg font-mono">${value.toLocaleString()}</div>
+                                        <div className="text-xs text-[var(--text-tertiary)]">總價值</div>
+                                        <div className="font-bold text-amber-500 text-lg font-mono">${value.toLocaleString()}</div>
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-3 gap-2 text-center text-sm">
-                                    <div className="bg-slate-50 p-2 rounded-lg">
-                                        <div className="text-xs text-slate-400 mb-1">庫存量</div>
-                                        <div className="font-mono font-bold text-slate-700">{qty.toLocaleString()}</div>
+                                    <div className="bg-[var(--bg-tertiary)] p-2 rounded-lg">
+                                        <div className="text-xs text-[var(--text-tertiary)] mb-1">庫存量</div>
+                                        <div className="font-mono font-bold text-[var(--text-primary)]">{qty.toLocaleString()}</div>
                                     </div>
-                                    <div className="bg-slate-50 p-2 rounded-lg">
-                                        <div className="text-xs text-slate-400 mb-1">單位成本</div>
-                                        <div className="font-mono text-slate-600">${unitCost.toFixed(0)}</div>
+                                    <div className="bg-[var(--bg-tertiary)] p-2 rounded-lg">
+                                        <div className="text-xs text-[var(--text-tertiary)] mb-1">單位成本</div>
+                                        <div className="font-mono text-[var(--text-secondary)]">${unitCost.toFixed(0)}</div>
                                     </div>
-                                    <div className="bg-slate-50 p-2 rounded-lg">
-                                        <div className="text-xs text-slate-400 mb-1">價值佔比</div>
-                                        <div className="font-mono text-slate-600">{percent.toFixed(1)}%</div>
+                                    <div className="bg-[var(--bg-tertiary)] p-2 rounded-lg">
+                                        <div className="text-xs text-[var(--text-tertiary)] mb-1">價值佔比</div>
+                                        <div className="font-mono text-[var(--text-secondary)]">{percent.toFixed(1)}%</div>
                                     </div>
                                 </div>
 
                                 {/* Percentage Bar */}
-                                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
+                                <div className="w-full h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden mt-1">
                                     <div
                                         className="h-full bg-amber-500 transition-all duration-500"
                                         style={{ width: `${Math.min(percent, 100)}%` }}
@@ -203,8 +203,8 @@ export default function InventoryValuationPage({ user, apiUrl }) {
                         );
                     })
                 ) : (
-                    <div className="text-center py-8 text-slate-500 bg-white rounded-xl border border-slate-200">
-                        <TrendingUp size={24} className="mx-auto mb-2 text-slate-400" />
+                    <div className="text-center py-8 text-[var(--text-secondary)] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">
+                        <TrendingUp size={24} className="mx-auto mb-2 text-[var(--text-tertiary)]" />
                         <p>無估值資料</p>
                     </div>
                 )}

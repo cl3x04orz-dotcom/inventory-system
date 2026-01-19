@@ -189,19 +189,19 @@ export default function PermissionControlPage({ user, apiUrl }) {
             {/* Global Processing Overlay */}
             {processing && (
                 <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-[60] flex items-center justify-center animate-in fade-in duration-200">
-                    <div className="bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center gap-4 min-w-[200px]">
-                        <RefreshCw className="animate-spin text-blue-600" size={32} />
-                        <span className="text-slate-700 font-bold text-base">{processMessage}</span>
+                    <div className="bg-[var(--bg-primary)] p-6 rounded-2xl shadow-xl flex flex-col items-center gap-4 min-w-[200px]">
+                        <RefreshCw className="animate-spin text-[var(--accent-blue)]" size={32} />
+                        <span className="text-[var(--text-primary)] font-bold text-base">{processMessage}</span>
                     </div>
                 </div>
             )}
 
             <div className="flex justify-between items-center shrink-0">
                 <div className="flex flex-col">
-                    <h1 className="text-lg md:text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Shield className="text-rose-600" size={20} /> 權限控管
+                    <h1 className="text-lg md:text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+                        <Shield className="text-rose-500" size={20} /> 權限控管
                     </h1>
-                    <p className="text-[10px] md:text-sm text-slate-400 font-medium">(Permission Control)</p>
+                    <p className="text-[10px] md:text-sm text-[var(--text-tertiary)] font-medium">(Permission Control)</p>
                 </div>
                 <button onClick={fetchUsers} className="btn-secondary p-2 rounded-xl">
                     <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
@@ -210,12 +210,12 @@ export default function PermissionControlPage({ user, apiUrl }) {
 
             {/* Add User Panel */}
             <div className="glass-panel p-4 md:p-6 border-l-4 border-l-emerald-500 shrink-0">
-                <h3 className="font-bold text-base md:text-lg mb-3 flex items-center gap-2 text-slate-800">
-                    <UserPlus size={18} className="text-emerald-600" /> 新增使用者
+                <h3 className="font-bold text-base md:text-lg mb-3 flex items-center gap-2 text-[var(--text-primary)]">
+                    <UserPlus size={18} className="text-emerald-500" /> 新增使用者
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end relative">
                     <div className="space-y-1">
-                        <label className="text-xs text-slate-500 uppercase font-bold px-1">帳號 (Username)</label>
+                        <label className="text-xs text-[var(--text-secondary)] uppercase font-bold px-1">帳號 (Username)</label>
                         <input
                             id="input-new-username"
                             type="text"
@@ -232,7 +232,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
                         />
                     </div>
                     <div className="space-y-1">
-                        <label className="text-xs text-slate-500 uppercase font-bold px-1">密碼 (Password)</label>
+                        <label className="text-xs text-[var(--text-secondary)] uppercase font-bold px-1">密碼 (Password)</label>
                         <input
                             id="input-new-password"
                             type="password"
@@ -252,7 +252,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
                         />
                     </div>
                     <div className="space-y-1">
-                        <label className="text-xs text-slate-500 uppercase font-bold px-1">權限角色 (Role)</label>
+                        <label className="text-xs text-[var(--text-secondary)] uppercase font-bold px-1">權限角色 (Role)</label>
                         <select
                             id="input-new-role"
                             className="input-field w-full"
@@ -296,7 +296,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
                 <div className="overflow-y-auto flex-1">
                     {/* Desktop Table View */}
                     <table className="hidden md:table w-full text-left text-sm">
-                        <thead className="bg-slate-50 text-slate-500 text-xs uppercase sticky top-0 z-10">
+                        <thead className="bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-xs uppercase sticky top-0 z-10">
                             <tr>
                                 <th className="p-4">帳號 (Username)</th>
                                 <th className="p-4">角色 (Role)</th>
@@ -304,28 +304,28 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                 <th className="p-4 text-center">操作</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 bg-white">
+                        <tbody className="divide-y divide-[var(--border-primary)] bg-[var(--bg-primary)]">
                             {users.length > 0 ? (
                                 users.map((u, idx) => (
-                                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                        <td className="p-4 text-slate-900 font-bold">{u.username}</td>
+                                    <tr key={idx} className="hover:bg-[var(--bg-secondary)] transition-colors">
+                                        <td className="p-4 text-[var(--text-primary)] font-bold">{u.username}</td>
                                         <td className="p-4">
                                             <span className={`px-2 py-1 rounded text-xs font-bold border ${u.role === 'BOSS' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
                                                 u.role === 'ADMIN' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' :
                                                     u.role === 'EMPLOYEE' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
-                                                        u.role === 'VIEWER' ? 'bg-slate-500/10 text-slate-500 border-slate-500/20' :
-                                                            'bg-slate-500/10 text-slate-500 border-slate-500/20'
+                                                        u.role === 'VIEWER' ? 'bg-slate-500/10 text-[var(--text-secondary)] border-slate-500/20' :
+                                                            'bg-slate-500/10 text-[var(--text-secondary)] border-slate-500/20'
                                                 }`}>
                                                 {u.role}
                                             </span>
                                         </td>
                                         <td className="p-4 text-center">
                                             {u.status === 'ACTIVE' ? (
-                                                <span className="flex items-center justify-center gap-2 text-emerald-600 font-bold text-xs">
+                                                <span className="flex items-center justify-center gap-2 text-emerald-500 font-bold text-xs">
                                                     <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]"></span> ACTIVE
                                                 </span>
                                             ) : (
-                                                <span className="flex items-center justify-center gap-2 text-slate-500 font-bold text-xs">
+                                                <span className="flex items-center justify-center gap-2 text-[var(--text-secondary)] font-bold text-xs">
                                                     <span className="w-2 h-2 rounded-full bg-slate-500"></span> {u.status || 'UNKNOWN'}
                                                 </span>
                                             )}
@@ -358,14 +358,14 @@ export default function PermissionControlPage({ user, apiUrl }) {
 
                                                             setEditingUser({ username: u.username, permissions: currentPerms });
                                                         }}
-                                                        className="p-2 text-slate-400 hover:text-blue-400 transition-colors"
+                                                        className="p-2 text-[var(--text-tertiary)] hover:text-[var(--accent-blue)] transition-colors"
                                                         title="設定權限"
                                                     >
                                                         <Shield size={16} />
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteUser(u.username)}
-                                                        className="p-2 text-slate-400 hover:text-rose-400 transition-colors"
+                                                        className="p-2 text-[var(--text-tertiary)] hover:text-rose-400 transition-colors"
                                                         title="刪除"
                                                     >
                                                         <Trash2 size={16} />
@@ -377,7 +377,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="4" className="p-20 text-center text-slate-500">
+                                    <td colSpan="4" className="p-20 text-center text-[var(--text-secondary)]">
                                         {loading ? '載入中...' : '無使用者資料'}
                                     </td>
                                 </tr>
@@ -386,27 +386,27 @@ export default function PermissionControlPage({ user, apiUrl }) {
                     </table>
 
                     {/* Mobile Card Layout */}
-                    <div className="md:hidden divide-y divide-slate-100">
+                    <div className="md:hidden divide-y divide-[var(--border-primary)]">
                         {users.length > 0 ? (
                             users.map((u, idx) => (
-                                <div key={idx} className="p-6 bg-white hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0 shadow-sm">
+                                <div key={idx} className="p-6 bg-[var(--bg-primary)] hover:bg-[var(--bg-secondary)] transition-colors border-b border-[var(--border-primary)] last:border-0 shadow-sm">
                                     <div className="flex justify-between items-center">
                                         <div className="space-y-2">
-                                            <div className="text-lg font-extrabold text-slate-900 leading-tight">{u.username}</div>
+                                            <div className="text-lg font-extrabold text-[var(--text-primary)] leading-tight">{u.username}</div>
                                             <div className="flex items-center gap-3">
                                                 <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold border ${u.role === 'BOSS' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
                                                     u.role === 'ADMIN' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' :
                                                         u.role === 'EMPLOYEE' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
-                                                            'bg-slate-500/10 text-slate-500 border-slate-500/20'
+                                                            'bg-slate-500/10 text-[var(--text-secondary)] border-slate-500/20'
                                                     }`}>
                                                     {u.role}
                                                 </span>
                                                 {u.status === 'ACTIVE' ? (
-                                                    <span className="flex items-center gap-1.5 text-emerald-600 font-bold text-[11px]">
+                                                    <span className="flex items-center gap-1.5 text-emerald-500 font-bold text-[11px]">
                                                         <span className="w-2 h-2 rounded-full bg-emerald-500"></span> ACTIVE
                                                     </span>
                                                 ) : (
-                                                    <span className="flex items-center gap-1.5 text-slate-400 font-bold text-[11px]">
+                                                    <span className="flex items-center gap-1.5 text-[var(--text-tertiary)] font-bold text-[11px]">
                                                         <span className="w-2 h-2 rounded-full bg-slate-300"></span> {u.status || 'OFF'}
                                                     </span>
                                                 )}
@@ -437,13 +437,13 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                                         });
                                                         setEditingUser({ username: u.username, permissions: currentPerms });
                                                     }}
-                                                    className="w-12 h-12 flex items-center justify-center text-blue-500 bg-blue-50 rounded-xl active:scale-90 transition-transform shadow-sm"
+                                                    className="w-12 h-12 flex items-center justify-center text-[var(--accent-blue)] bg-[var(--bg-secondary)] rounded-xl active:scale-90 transition-transform shadow-sm"
                                                 >
                                                     <Shield size={22} />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDeleteUser(u.username)}
-                                                    className="w-12 h-12 flex items-center justify-center text-rose-500 bg-rose-50 rounded-xl active:scale-90 transition-transform shadow-sm"
+                                                    className="w-12 h-12 flex items-center justify-center text-rose-500 bg-[var(--bg-secondary)] rounded-xl active:scale-90 transition-transform shadow-sm"
                                                 >
                                                     <Trash2 size={22} />
                                                 </button>
@@ -453,7 +453,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                 </div>
                             ))
                         ) : (
-                            <div className="p-10 text-center text-slate-500">
+                            <div className="p-10 text-center text-[var(--text-secondary)]">
                                 {loading ? '載入中...' : '無使用者資料'}
                             </div>
                         )}
@@ -464,12 +464,12 @@ export default function PermissionControlPage({ user, apiUrl }) {
             {/* Permission Editor Modal */}
             {editingUser && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
-                        <div className="p-6 border-b border-slate-100 bg-slate-50">
-                            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                                <Shield className="text-blue-600" /> 設定權限 ({editingUser.username})
+                    <div className="bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+                        <div className="p-6 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+                            <h3 className="text-xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+                                <Shield className="text-[var(--accent-blue)]" /> 設定權限 ({editingUser.username})
                             </h3>
-                            <p className="text-slate-500 text-sm mt-1">勾選該使用者可存取的功能模組 (BOSS 擁有預設全權限)</p>
+                            <p className="text-[var(--text-secondary)] text-sm mt-1">勾選該使用者可存取的功能模組 (BOSS 擁有預設全權限)</p>
                         </div>
 
                         <div className="p-6 space-y-6 max-h-[65vh] overflow-y-auto custom-scrollbar">
@@ -484,10 +484,10 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                             className="flex items-center justify-between px-1 cursor-pointer group/title"
                                             onClick={() => toggleGroup(group.items)}
                                         >
-                                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 group-hover/title:text-blue-600 transition-colors">
+                                            <h4 className="text-xs font-bold text-[var(--text-tertiary)] uppercase tracking-widest flex items-center gap-2 group-hover/title:text-[var(--accent-blue)] transition-colors">
                                                 {group.group}
                                             </h4>
-                                            <span className="text-[10px] text-blue-600 font-bold opacity-0 group-hover/title:opacity-100 transition-opacity">
+                                            <span className="text-[10px] text-[var(--accent-blue)] font-bold opacity-0 group-hover/title:opacity-100 transition-opacity">
                                                 {isGroupAllSelected ? '取消全選' : '全選'}
                                             </span>
                                         </div>
@@ -535,14 +535,14 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                                         id={uniqueId}
                                                         tabIndex="0"
                                                         onKeyDown={handleKeyDown}
-                                                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group outline-none ring-offset-2 focus:ring-2 focus:ring-blue-400 ${editingUser.permissions?.includes(perm.key)
-                                                            ? 'bg-blue-50 border-blue-200 shadow-sm'
-                                                            : 'bg-slate-50 border-slate-100 hover:bg-slate-100 hover:border-slate-200'
+                                                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group outline-none ring-offset-2 focus:ring-2 focus:ring-[var(--accent-blue)]/50 ${editingUser.permissions?.includes(perm.key)
+                                                            ? 'bg-[var(--bg-secondary)] border-[var(--border-primary)] shadow-sm'
+                                                            : 'bg-[var(--bg-secondary)] border-[var(--border-primary)] hover:bg-[var(--bg-hover)]'
                                                             }`}
                                                     >
                                                         <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${editingUser.permissions?.includes(perm.key)
-                                                            ? 'bg-blue-600 border-blue-600 text-white scale-110'
-                                                            : 'bg-white border-slate-200 group-hover:border-blue-300'
+                                                            ? 'bg-[var(--accent-blue)] border-[var(--accent-blue)] text-white scale-110'
+                                                            : 'bg-[var(--bg-primary)] border-[var(--border-primary)] group-hover:border-[var(--accent-blue)]/50'
                                                             }`}>
                                                             {editingUser.permissions?.includes(perm.key) && <CheckSquare size={12} fill="currentColor" />}
                                                         </div>
@@ -552,7 +552,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                                             checked={editingUser.permissions?.includes(perm.key)}
                                                             onChange={() => togglePermission(perm.key)}
                                                         />
-                                                        <span className={`text-sm transition-colors ${editingUser.permissions?.includes(perm.key) ? 'text-slate-900 font-bold' : 'text-slate-500'
+                                                        <span className={`text-sm transition-colors ${editingUser.permissions?.includes(perm.key) ? 'text-[var(--text-primary)] font-bold' : 'text-[var(--text-secondary)]'
                                                             }`}>
                                                             {perm.label}
                                                         </span>
@@ -565,10 +565,10 @@ export default function PermissionControlPage({ user, apiUrl }) {
                             })}
                         </div>
 
-                        <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
+                        <div className="p-6 border-t border-[var(--border-primary)] flex justify-end gap-3 bg-[var(--bg-secondary)]">
                             <button
                                 onClick={() => setEditingUser(null)}
-                                className="px-4 py-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-black/5 transition-colors"
+                                className="px-4 py-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/5 transition-colors"
                             >
                                 取消
                             </button>

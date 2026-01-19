@@ -52,10 +52,10 @@ export default function TurnoverRatePage({ user, apiUrl }) {
         <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6 flex flex-col h-[calc(100vh-6rem)]">
             <div className="flex justify-between items-center shrink-0">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
                         <Activity className="text-orange-600" /> 庫存周轉率
                     </h1>
-                    <p className="text-slate-500 text-sm mt-1">評估庫存流動性：周轉率 = 銷售成本 / 平均庫存金額</p>
+                    <p className="text-[var(--text-secondary)] text-sm mt-1">評估庫存流動性：周轉率 = 銷售成本 / 平均庫存金額</p>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 shadow-sm font-bold">
                     <Info size={14} />
@@ -63,26 +63,26 @@ export default function TurnoverRatePage({ user, apiUrl }) {
                 </div>
             </div>
 
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shrink-0 grid grid-cols-1 md:grid-cols-3 gap-4 shadow-sm">
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shrink-0 grid grid-cols-1 md:grid-cols-3 gap-4 shadow-sm">
                 <div className="flex items-center gap-2">
-                    <input type="date" className="input-field flex-1 bg-white text-sm" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                    <span className="text-slate-500 font-bold hidden md:inline">至</span>
-                    <input type="date" className="input-field flex-1 bg-white text-sm" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                    <input type="date" className="input-field flex-1 text-sm" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                    <span className="text-[var(--text-secondary)] font-bold hidden md:inline">至</span>
+                    <input type="date" className="input-field flex-1 text-sm" value={endDate} onChange={e => setEndDate(e.target.value)} />
                 </div>
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input type="text" placeholder="搜尋產品名稱..." className="input-field pl-10 w-full bg-white" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
+                    <input type="text" placeholder="搜尋產品名稱..." className="input-field pl-10 w-full" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
                 <button onClick={fetchData} className="btn-primary flex items-center justify-center gap-2 h-[42px]">
                     <RefreshCw size={18} /> 計算周轉率
                 </button>
             </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex-1 flex flex-col shadow-sm">
+            <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] overflow-hidden flex-1 flex flex-col shadow-sm">
                 <div className="overflow-y-auto flex-1">
                     {/* Desktop View */}
                     <table className="hidden md:table w-full text-left text-sm">
-                        <thead className="bg-slate-50 text-slate-500 text-xs uppercase sticky top-0 z-10 font-bold border-b border-slate-100">
+                        <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs uppercase sticky top-0 z-10 font-bold border-b border-[var(--border-primary)]">
                             <tr>
                                 <th className="p-4">產品名稱</th>
                                 <th className="p-4 text-right">銷售成本 (COGS)</th>
@@ -91,17 +91,17 @@ export default function TurnoverRatePage({ user, apiUrl }) {
                                 <th className="p-4 text-center">狀態</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-[var(--border-primary)]">
                             {loading ? (
-                                <tr><td colSpan="5" className="p-20 text-center text-slate-500">運算中...</td></tr>
+                                <tr><td colSpan="5" className="p-20 text-center text-[var(--text-secondary)]">運算中...</td></tr>
                             ) : filteredData.length > 0 ? (
                                 filteredData.map((item, idx) => {
                                     const turnover = item.avgInventory > 0 ? (item.cogs / item.avgInventory) : 0;
                                     return (
-                                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-4 font-bold text-slate-900">{productMap[item.productName] || item.productName}</td>
-                                            <td className="p-4 text-right font-mono text-slate-600 font-bold">${item.cogs.toLocaleString()}</td>
-                                            <td className="p-4 text-right font-mono text-slate-500">${item.avgInventory.toLocaleString()}</td>
+                                        <tr key={idx} className="hover:bg-[var(--bg-hover)] transition-colors">
+                                            <td className="p-4 font-bold text-[var(--text-primary)]">{productMap[item.productName] || item.productName}</td>
+                                            <td className="p-4 text-right font-mono text-[var(--text-secondary)] font-bold">${item.cogs.toLocaleString()}</td>
+                                            <td className="p-4 text-right font-mono text-[var(--text-tertiary)]">${item.avgInventory.toLocaleString()}</td>
                                             <td className="p-4 text-right font-mono text-orange-600 font-bold">{turnover.toFixed(2)} 次</td>
                                             <td className="p-4 text-center">
                                                 {turnover >= 4 ? (
@@ -122,16 +122,16 @@ export default function TurnoverRatePage({ user, apiUrl }) {
                     </table>
 
                     {/* Mobile View */}
-                    <div className="md:hidden divide-y divide-slate-100">
+                    <div className="md:hidden divide-y divide-[var(--border-primary)]">
                         {loading ? (
-                            <div className="p-10 text-center text-slate-500">運算中...</div>
+                            <div className="p-10 text-center text-[var(--text-secondary)]">運算中...</div>
                         ) : filteredData.length > 0 ? (
                             filteredData.map((item, idx) => {
                                 const turnover = item.avgInventory > 0 ? (item.cogs / item.avgInventory) : 0;
                                 return (
-                                    <div key={idx} className="p-4 bg-white active:bg-slate-50 transition-colors">
+                                    <div key={idx} className="p-4 bg-[var(--bg-secondary)] active:bg-[var(--bg-hover)] transition-colors">
                                         <div className="flex justify-between items-start mb-2">
-                                            <div className="text-sm font-bold text-slate-800 leading-tight max-w-[70%]">{productMap[item.productName] || item.productName}</div>
+                                            <div className="text-sm font-bold text-[var(--text-primary)] leading-tight max-w-[70%]">{productMap[item.productName] || item.productName}</div>
                                             {turnover >= 4 ? (
                                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">高流動</span>
                                             ) : turnover >= 1 ? (
@@ -142,15 +142,15 @@ export default function TurnoverRatePage({ user, apiUrl }) {
                                         </div>
                                         <div className="grid grid-cols-3 gap-2 mt-2">
                                             <div className="space-y-0.5">
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase">成本</p>
-                                                <p className="text-[11px] font-mono font-bold text-slate-600">${item.cogs.toLocaleString()}</p>
+                                                <p className="text-[10px] text-[var(--text-tertiary)] font-bold uppercase">成本</p>
+                                                <p className="text-[11px] font-mono font-bold text-[var(--text-secondary)]">${item.cogs.toLocaleString()}</p>
                                             </div>
                                             <div className="space-y-0.5">
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase">平均庫存</p>
-                                                <p className="text-[11px] font-mono font-bold text-slate-500">${item.avgInventory.toLocaleString()}</p>
+                                                <p className="text-[10px] text-[var(--text-tertiary)] font-bold uppercase">平均庫存</p>
+                                                <p className="text-[11px] font-mono font-bold text-[var(--text-tertiary)]">${item.avgInventory.toLocaleString()}</p>
                                             </div>
                                             <div className="space-y-0.5">
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase">周轉次數</p>
+                                                <p className="text-[10px] text-[var(--text-tertiary)] font-bold uppercase">周轉次數</p>
                                                 <p className="text-[11px] font-mono font-extrabold text-orange-600">{turnover.toFixed(2)} 次</p>
                                             </div>
                                         </div>
@@ -158,7 +158,7 @@ export default function TurnoverRatePage({ user, apiUrl }) {
                                 );
                             })
                         ) : (
-                            <div className="p-10 text-center text-slate-500">暫無資料</div>
+                            <div className="p-10 text-center text-[var(--text-secondary)]">暫無資料</div>
                         )}
                     </div>
                 </div>

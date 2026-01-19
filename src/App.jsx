@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import LoginPage from './pages/LoginPage';
 import SalesPage from './pages/SalesPage';
 import InventoryPage from './pages/InventoryPage';
@@ -20,10 +20,15 @@ import IncomeStatementPage from './pages/IncomeStatementPage';
 import ExpenditureManagementPage from './pages/ExpenditureManagementPage';
 import PermissionControlPage from './pages/PermissionControlPage';
 import PayrollPage from './pages/PayrollPage';
+import ActivityLogPage from './pages/ActivityLogPage';
+import { ThemeProvider } from './contexts/ThemeContext';
+import ThemeToggle from './components/ThemeToggle';
+import SessionManager from './utils/SessionManager';
+import useActivityLogger from './hooks/useActivityLogger';
 import {
     LayoutDashboard, ShoppingCart, Archive, LogOut, PackagePlus,
     FileText, ClipboardList, DollarSign, CheckSquare, Wallet, ChevronDown,
-    TrendingUp, BarChart2, Users, Activity, PieChart, Shield
+    TrendingUp, BarChart2, Users, Activity, PieChart, Shield, WifiOff
 } from 'lucide-react';
 
 // Google Apps Script (GAS) API Endpoint
@@ -51,7 +56,7 @@ const NavDropdown = ({ label, icon: Icon, active, children, id, openDropdown, se
                 }}
                 className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all duration-200 ${active
                     ? 'bg-blue-50 text-blue-600 border border-blue-200 shadow-sm'
-                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
                     }`}
             >
                 <Icon size={18} />
@@ -61,7 +66,7 @@ const NavDropdown = ({ label, icon: Icon, active, children, id, openDropdown, se
 
             {isOpen && (
                 <div
-                    className="absolute top-full left-0 mt-2 w-48 bg-white/95 backdrop-blur-xl border border-slate-200 rounded-xl shadow-2xl py-2 z-[100] animate-in fade-in slide-in-from-top-2 duration-200"
+                    className="absolute top-full left-0 mt-2 w-48 bg-[var(--bg-secondary)] backdrop-blur-xl border border-[var(--border-primary)] rounded-xl shadow-2xl py-2 z-[100] animate-in fade-in slide-in-from-top-2 duration-200"
                     onClick={(e) => e.stopPropagation()}
                 >
                     <div className="flex flex-col gap-1 px-1">
@@ -109,21 +114,56 @@ const MobileNavGroup = ({ label, icon: Icon, children }) => {
     );
 };
 
-export default function App() {
+function AppContent() {
     const [user, setUser] = useState(null); // { token, role, name, ... }
     const [page, setPage] = useState('sales');
     const [openDropdown, setOpenDropdown] = useState(null);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [isOffline, setIsOffline] = useState(false);
+    const [sessionManager, setSessionManager] = useState(null);
+
+    // Activity Logger
+    const { logActivity, logLogin, logLogout, logPageView } = useActivityLogger({
+        user,
+        apiUrl: GAS_API_URL,
+        enabled: !!user
+    });
+
+    // Initialize SessionManager
+    useEffect(() => {
+        if (user) {
+            const sm = new SessionManager({
+                idleTimeout: 30 * 60 * 1000, // 30 分鐘
+                onLogout: (reason) => {
+                    console.log('Session timeout:', reason);
+                    logLogout(reason);
+                    handleLogout();
+                    if (reason === 'IDLE_TIMEOUT') {
+                        alert('閒置時間過長,已自動登出');
+                    }
+                },
+                onOffline: () => {
+                    setIsOffline(true);
+                },
+                onOnline: () => {
+                    setIsOffline(false);
+                }
+            });
+            setSessionManager(sm);
+
+            return () => sm.destroy();
+        }
+    }, [user]);
 
     // Check for saved user session on component mount
-    React.useEffect(() => {
-        const savedUser = localStorage.getItem('inventory_user');
+    useEffect(() => {
+        const savedUser = sessionStorage.getItem('inventory_user');
         if (savedUser) {
             const parsed = JSON.parse(savedUser);
             // [Fix] Old session data might not have permissions. Force logout if undefined.
             if (parsed && typeof parsed.permissions === 'undefined') {
                 console.warn('Detected stale user data (no permissions). Clearing session.');
-                localStorage.removeItem('inventory_user');
+                sessionStorage.removeItem('inventory_user');
                 setUser(null);
             } else {
                 setUser(parsed);
@@ -137,6 +177,13 @@ export default function App() {
         window.addEventListener('click', handleGlobalClick);
         return () => window.removeEventListener('click', handleGlobalClick);
     }, []);
+
+    // Log page changes
+    useEffect(() => {
+        if (user && page) {
+            logPageView(page);
+        }
+    }, [page, user]);
 
     const checkPermission = (targetPage) => {
         if (!user) return false;
@@ -200,6 +247,8 @@ export default function App() {
                 return perms.includes('analytics_turnover') || perms.includes('analytics');
             case 'permissionControl':
                 return perms.includes('system_config') || perms.includes('system');
+            case 'activityLog':
+                return perms.includes('system_activity_logs') || perms.includes('system') || user.role === 'BOSS' || user.role === 'ADMIN';
             default:
                 return true;
         }
@@ -219,12 +268,28 @@ export default function App() {
 
     const handleLogin = (userData) => {
         setUser(userData);
-        localStorage.setItem('inventory_user', JSON.stringify(userData));
+        sessionStorage.setItem('inventory_user', JSON.stringify(userData));
     };
 
+    // 監聽登入動作：當使用者從 null 變為有值時，紀錄登入活動
+    const prevUserRef = React.useRef(user);
+    useEffect(() => {
+        if (!prevUserRef.current && user) {
+            // 使用 setTimeout 確保 hook 內部的 state 已更新
+            setTimeout(() => {
+                if (logLogin) logLogin();
+            }, 500);
+        }
+        prevUserRef.current = user;
+    }, [user, logLogin]);
+
     const handleLogout = () => {
+        if (logLogout) logLogout('MANUAL');
         setUser(null);
-        localStorage.removeItem('inventory_user');
+        sessionStorage.removeItem('inventory_user');
+        if (sessionManager) {
+            sessionManager.destroy();
+        }
     };
 
     if (!GAS_API_URL || GAS_API_URL.includes('YOUR_SCRIPT_ID')) {
@@ -252,8 +317,16 @@ export default function App() {
 
     return (
         <div className="min-h-screen flex flex-col">
+            {/* Offline Indicator */}
+            {isOffline && (
+                <div className="bg-yellow-500 text-white text-center py-2 text-sm font-medium flex items-center justify-center gap-2">
+                    <WifiOff size={16} />
+                    網路已離線,部分功能可能無法使用
+                </div>
+            )}
+
             {/* Navbar */}
-            <header className="h-16 border-b border-slate-200 bg-white/80 backdrop-blur-md flex justify-between items-center px-6 sticky top-0 z-[60]">
+            <header className="h-16 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)] backdrop-blur-md flex justify-between items-center px-6 sticky top-0 z-[60]">
                 {/* ... Navbar content ... */}
                 <div className="flex items-center gap-2">
                     <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-10 w-auto object-contain" />
@@ -265,7 +338,7 @@ export default function App() {
                         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                         className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${mobileMenuOpen
                             ? 'bg-blue-50 border-blue-200 text-blue-600 ring-2 ring-blue-100'
-                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                            : 'bg-[var(--bg-secondary)] border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                             }`}
                     >
                         <span className="font-bold text-sm">功能選單</span>
@@ -274,7 +347,7 @@ export default function App() {
 
                     {/* Mobile Dropdown Panel */}
                     {mobileMenuOpen && (
-                        <div className="fixed top-16 left-0 right-0 mx-auto mt-2 w-[90%] max-w-md bg-white/95 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-2xl overflow-y-auto max-h-[80vh] animate-in fade-in slide-in-from-top-4 duration-200 z-[100]">
+                        <div className="fixed top-16 left-0 right-0 mx-auto mt-2 w-[90%] max-w-md bg-[var(--bg-secondary)] backdrop-blur-xl border border-[var(--border-primary)] rounded-2xl shadow-2xl overflow-y-auto max-h-[80vh] animate-in fade-in slide-in-from-top-4 duration-200 z-[100]">
                             <div className="p-2 flex flex-col">
                                 {/* 銷售管理 Group */}
                                 {(user.role === 'BOSS' || checkPermission('sales') || checkPermission('report')) && (
@@ -332,9 +405,10 @@ export default function App() {
                                 )}
 
                                 {/* 系統管理 Group */}
-                                {(user.role === 'BOSS' || checkPermission('permissionControl')) && (
+                                {(user.role === 'BOSS' || checkPermission('permissionControl') || checkPermission('activityLog')) && (
                                     <MobileNavGroup label="系統管理" icon={Shield}>
-                                        <NavItem label="權限控管表" icon={Shield} onClick={() => handlePageChange('permissionControl')} active={page === 'permissionControl'} />
+                                        {checkPermission('permissionControl') && <NavItem label="權限控管表" icon={Shield} onClick={() => handlePageChange('permissionControl')} active={page === 'permissionControl'} />}
+                                        {checkPermission('activityLog') && <NavItem label="操作紀錄查詢" icon={Activity} onClick={() => handlePageChange('activityLog')} active={page === 'activityLog'} />}
                                     </MobileNavGroup>
                                 )}
                             </div>
@@ -446,28 +520,32 @@ export default function App() {
                     )}
 
                     {/* 系統管理 Group */}
-                    {(user.role === 'BOSS' || checkPermission('permissionControl')) && (
+                    {(user.role === 'BOSS' || checkPermission('permissionControl') || checkPermission('activityLog')) && (
                         <NavDropdown
                             id="system"
                             label="系統管理"
                             icon={Shield}
                             openDropdown={openDropdown}
                             setOpenDropdown={setOpenDropdown}
-                            active={page === 'permissionControl'}
+                            active={['permissionControl', 'activityLog'].includes(page)}
                         >
-                            <NavItem label="權限控管表" icon={Shield} onClick={() => handlePageChange('permissionControl')} active={page === 'permissionControl'} />
+                            {checkPermission('permissionControl') && <NavItem label="權限控管表" icon={Shield} onClick={() => handlePageChange('permissionControl')} active={page === 'permissionControl'} />}
+                            {checkPermission('activityLog') && <NavItem label="操作紀錄查詢" icon={Activity} onClick={() => handlePageChange('activityLog')} active={page === 'activityLog'} />}
                         </NavDropdown>
                     )}
                 </nav>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                    {/* Theme Toggle */}
+                    <ThemeToggle />
+
                     <div className="hidden md:flex flex-col items-end">
-                        <span className="text-xs font-bold text-blue-600 leading-none">{user.username}</span>
-                        <span className="text-[10px] text-slate-400 uppercase font-bold tracking-tighter">{user.role}</span>
+                        <span className="text-xs font-bold text-blue-600 dark:text-blue-400 leading-none">{user.username}</span>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold tracking-tighter">{user.role}</span>
                     </div>
                     <button
                         onClick={handleLogout}
-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all border border-transparent hover:border-red-100"
+                        className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all border border-transparent hover:border-red-100 dark:hover:border-red-800"
                         title="登出系統"
                     >
                         <LogOut size={20} />
@@ -479,26 +557,27 @@ export default function App() {
             <main className="flex-1 p-4 md:p-6 overflow-hidden">
                 {checkPermission(page) ? (
                     <>
-                        {page === 'sales' && <SalesPage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'inventory' && <InventoryPage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'purchase' && <PurchasePage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'report' && <ReportPage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'purchaseHistory' && <PurchaseHistoryPage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'adjustHistory' && <AdjustmentHistoryPage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'valuation' && <InventoryValuationPage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'stocktake' && <StocktakePage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'stocktakeHistory' && <StocktakeHistoryPage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'receivable' && <ReceivablePage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'payable' && <PayablePage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'salesRanking' && <SalesRankingPage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'customerRanking' && <CustomerRankingPage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'profitAnalysis' && <ProfitAnalysisPage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'turnoverRate' && <TurnoverRatePage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'costCalculation' && <CostCalculationPage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'expenditureManagement' && <ExpenditureManagementPage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'incomeStatement' && <IncomeStatementPage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'permissionControl' && <PermissionControlPage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'payroll' && <PayrollPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'sales' && <SalesPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'inventory' && <InventoryPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'purchase' && <PurchasePage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'report' && <ReportPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'purchaseHistory' && <PurchaseHistoryPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'adjustHistory' && <AdjustmentHistoryPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'valuation' && <InventoryValuationPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'stocktake' && <StocktakePage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'stocktakeHistory' && <StocktakeHistoryPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'receivable' && <ReceivablePage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'payable' && <PayablePage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'salesRanking' && <SalesRankingPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'customerRanking' && <CustomerRankingPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'profitAnalysis' && <ProfitAnalysisPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'turnoverRate' && <TurnoverRatePage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'costCalculation' && <CostCalculationPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'expenditureManagement' && <ExpenditureManagementPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'incomeStatement' && <IncomeStatementPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'permissionControl' && <PermissionControlPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'payroll' && <PayrollPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'activityLog' && <ActivityLogPage user={user} apiUrl={GAS_API_URL} />}
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full text-slate-400">
@@ -516,5 +595,14 @@ export default function App() {
             </main>
 
         </div>
+    );
+}
+
+// Wrap with ThemeProvider
+export default function App() {
+    return (
+        <ThemeProvider>
+            <AppContent />
+        </ThemeProvider>
     );
 }

@@ -3,7 +3,7 @@ import { Package, Search, AlertCircle, RefreshCw, AlertTriangle, Trash2, Clock }
 import { callGAS } from '../utils/api';
 import { CASE_MAP, sortProducts } from '../utils/constants';
 
-export default function InventoryPage({ user, apiUrl }) {
+export default function InventoryPage({ user, apiUrl, logActivity }) {
     const [inventory, setInventory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -94,6 +94,21 @@ export default function InventoryPage({ user, apiUrl }) {
                 quantity: Number(adjustmentQty),
                 note: adjustmentNote
             }, user.token);
+
+            // Log activity
+            if (logActivity) {
+                logActivity({
+                    actionType: 'DATA_EDIT',
+                    page: '庫存檢視',
+                    details: JSON.stringify({
+                        type: 'ADJUSTMENT',
+                        product: selectedItem.productName,
+                        adjustType: adjustmentType,
+                        quantity: Number(adjustmentQty),
+                        note: adjustmentNote
+                    })
+                });
+            }
 
             alert('庫存異動成功');
             setShowAdjustModal(false);
@@ -199,13 +214,13 @@ export default function InventoryPage({ user, apiUrl }) {
     });
 
     const renderInventoryTable = (items, title, Icon, colorClass) => (
-        <div className="hidden md:flex bg-white rounded-xl border border-slate-200 p-6 flex-col shadow-sm">
+        <div className="hidden md:flex bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] p-6 flex-col shadow-sm">
             <h3 className={`text-lg font-bold mb-4 flex items-center gap-2 ${colorClass}`}>
                 <Icon size={20} /> {title}
             </h3>
-            <div className="rounded-lg border border-slate-200 overflow-hidden">
+            <div className="rounded-lg border border-[var(--border-primary)] overflow-hidden">
                 <table className="w-full text-left border-collapse">
-                    <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
+                    <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-sm uppercase">
                         <tr>
                             <th className="p-4">產品名稱</th>
                             <th className="p-4 text-center">數量 / 箱數</th>
@@ -215,11 +230,11 @@ export default function InventoryPage({ user, apiUrl }) {
                             <th className="p-4 text-center">操作</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-[var(--border-primary)]">
                         {loading ? (
-                            <tr><td colSpan="6" className="p-6 text-center text-slate-500">載入中...</td></tr>
+                            <tr><td colSpan="6" className="p-6 text-center text-[var(--text-secondary)]">載入中...</td></tr>
                         ) : items.length === 0 ? (
-                            <tr><td colSpan="6" className="p-6 text-center text-slate-500">無資料</td></tr>
+                            <tr><td colSpan="6" className="p-6 text-center text-[var(--text-secondary)]">無資料</td></tr>
                         ) : (
                             items.map((item, idx) => {
                                 const safetyLevel = safetyStocks[item.productName] || 0;
@@ -240,8 +255,8 @@ export default function InventoryPage({ user, apiUrl }) {
                                 const isExpired = expiryDate && expiryDate < today;
 
                                 return (
-                                    <tr key={idx} className={`hover:bg-slate-50 transition-colors ${isLowStock ? 'bg-red-50' : ''} ${isExpired ? 'bg-rose-50' : isExpiringSoon ? 'bg-amber-50' : ''}`}>
-                                        <td className="p-4 font-medium text-slate-900">
+                                    <tr key={idx} className={`hover:bg-[var(--bg-hover)] transition-colors ${isLowStock ? 'bg-red-50/10' : ''} ${isExpired ? 'bg-rose-50/10' : isExpiringSoon ? 'bg-amber-50/10' : ''}`}>
+                                        <td className="p-4 font-medium text-[var(--text-primary)]">
                                             <div className="flex items-center gap-2">
                                                 {isLowStock && <AlertTriangle size={16} className="text-red-400" />}
                                                 {item.productName}
@@ -259,7 +274,7 @@ export default function InventoryPage({ user, apiUrl }) {
                                         </td>
                                         <td className="p-4 text-sm whitespace-nowrap">
                                             <div className="flex flex-col gap-1">
-                                                <span className={isExpired ? 'text-rose-600 line-through' : isExpiringSoon ? 'text-amber-600 font-bold' : 'text-slate-500'}>
+                                                <span className={isExpired ? 'text-rose-500 line-through' : isExpiringSoon ? 'text-amber-500 font-bold' : 'text-[var(--text-secondary)]'}>
                                                     {formatDate(item.expiry)}
                                                 </span>
                                                 {isExpiringSoon && (
@@ -278,7 +293,7 @@ export default function InventoryPage({ user, apiUrl }) {
                                             <input
                                                 id={`case-input-${item.productName}-${item.batchId}`}
                                                 type="number"
-                                                className="input-field w-16 text-center text-xs p-1 bg-white border-blue-200"
+                                                className="input-field w-16 text-center text-xs p-1 border-blue-200/30"
                                                 value={customCaseSize !== undefined ? customCaseSize : (CASE_MAP[item.productName] || '')}
                                                 onChange={(e) => updateCustomCaseSize(item.productName, e.target.value)}
                                                 onKeyDown={(e) => handleSafetyKeyDown(e, idx, 'case', items)}
@@ -289,7 +304,7 @@ export default function InventoryPage({ user, apiUrl }) {
                                             <input
                                                 id={`safety-input-${item.productName}-${item.batchId}`}
                                                 type="number"
-                                                className="input-field w-16 text-center text-xs p-1 bg-white border-amber-200"
+                                                className="input-field w-16 text-center text-xs p-1 border-amber-200/30"
                                                 value={tempSafetyInput[item.productName] !== undefined ? tempSafetyInput[item.productName] : (safetyStocks[item.productName] || '')}
                                                 onChange={(e) => handleSafetyInputChange(item.productName, e.target.value)}
                                                 onBlur={() => handleSafetyInputBlur(item.productName)}
@@ -322,9 +337,9 @@ export default function InventoryPage({ user, apiUrl }) {
             </h3>
             <div className="space-y-4">
                 {loading ? (
-                    <div className="text-center py-8 text-slate-500">載入中...</div>
+                    <div className="text-center py-8 text-[var(--text-secondary)]">載入中...</div>
                 ) : items.length === 0 ? (
-                    <div className="text-center py-8 text-slate-500 bg-white rounded-xl border border-slate-200">無資料</div>
+                    <div className="text-center py-8 text-[var(--text-secondary)] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">無資料</div>
                 ) : (
                     items.map((item, idx) => {
                         const safetyLevel = safetyStocks[item.productName] || 0;
@@ -344,12 +359,12 @@ export default function InventoryPage({ user, apiUrl }) {
                         const isExpired = expiryDate && expiryDate < today;
 
                         return (
-                            <div key={idx} className={`bg-white rounded-xl p-4 border shadow-sm ${isLowStock ? 'border-red-200 bg-red-50' : 'border-slate-200'}`}>
+                            <div key={idx} className={`bg-[var(--bg-secondary)] rounded-xl p-4 border shadow-sm ${isLowStock ? 'border-red-500/30 bg-red-500/5' : 'border-[var(--border-primary)]'}`}>
                                 {/* Header: Product Name & Stock */}
-                                <div className="flex justify-between items-start mb-3 border-b border-slate-100 pb-2">
+                                <div className="flex justify-between items-start mb-3 border-b border-[var(--border-primary)] pb-2">
                                     <div className="flex items-center gap-2">
                                         {isLowStock && <AlertTriangle size={18} className="text-red-500" />}
-                                        <span className="font-bold text-slate-800 text-lg">{item.productName}</span>
+                                        <span className="font-bold text-[var(--text-primary)] text-lg">{item.productName}</span>
                                     </div>
                                     <div className="text-right">
                                         <div className="text-2xl font-bold text-emerald-600 font-mono">{item.quantity}</div>
@@ -363,8 +378,8 @@ export default function InventoryPage({ user, apiUrl }) {
 
                                 {/* Details Grid */}
                                 <div className="grid grid-cols-2 gap-3 mb-3">
-                                    <div className="bg-slate-50 p-2 rounded-lg">
-                                        <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">效期</span>
+                                    <div className="bg-[var(--bg-tertiary)] p-2 rounded-lg">
+                                        <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-bold block mb-1">效期</span>
                                         <div className="flex flex-col">
                                             <span className={`text-sm font-medium ${isExpired ? 'text-rose-600 line-through' : isExpiringSoon ? 'text-amber-600 font-bold' : 'text-slate-600'}`}>
                                                 {formatDate(item.expiry)}
@@ -381,24 +396,24 @@ export default function InventoryPage({ user, apiUrl }) {
                                             )}
                                         </div>
                                     </div>
-                                    <div className="bg-slate-50 p-2 rounded-lg flex flex-col justify-between">
+                                    <div className="bg-[var(--bg-tertiary)] p-2 rounded-lg flex flex-col justify-between">
                                         <div className="flex items-center justify-between gap-1 mb-1">
-                                            <span className="text-[10px] text-slate-400 uppercase font-bold">箱規</span>
+                                            <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-bold">箱規</span>
                                             <input
                                                 id={`m-case-input-${item.productName}-${item.batchId}`}
                                                 type="number"
-                                                className="w-12 text-center text-xs p-0.5 rounded border border-blue-200 bg-white"
+                                                className="w-12 text-center text-xs p-0.5 rounded border border-[var(--border-primary)] bg-[var(--bg-primary)] text-[var(--text-primary)]"
                                                 value={customCaseSize !== undefined ? customCaseSize : (CASE_MAP[item.productName] || '')}
                                                 onChange={(e) => updateCustomCaseSize(item.productName, e.target.value)}
                                                 onKeyDown={(e) => handleSafetyKeyDown(e, idx, 'case', items, true)}
                                             />
                                         </div>
                                         <div className="flex items-center justify-between gap-1">
-                                            <span className="text-[10px] text-slate-400 uppercase font-bold">低標</span>
+                                            <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-bold">低標</span>
                                             <input
                                                 id={`m-safety-input-${item.productName}-${item.batchId}`}
                                                 type="number"
-                                                className="w-12 text-center text-xs p-0.5 rounded border border-amber-200 bg-white"
+                                                className="w-12 text-center text-xs p-0.5 rounded border border-[var(--border-primary)] bg-[var(--bg-primary)] text-[var(--text-primary)]"
                                                 value={tempSafetyInput[item.productName] !== undefined ? tempSafetyInput[item.productName] : (safetyStocks[item.productName] || '')}
                                                 onChange={(e) => handleSafetyInputChange(item.productName, e.target.value)}
                                                 onBlur={() => handleSafetyInputBlur(item.productName)}
@@ -426,17 +441,17 @@ export default function InventoryPage({ user, apiUrl }) {
     return (
         <div className="max-w-6xl mx-auto h-[calc(100vh-6rem)] flex flex-col p-4 gap-4">
             {/* Search Bar - Responsive */}
-            <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm gap-4">
-                <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2 text-slate-800">
+            <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shadow-sm gap-4">
+                <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
                     <Package className="text-blue-600" /> 庫存檢視
                 </h2>
                 <div className="flex gap-2 w-full md:w-auto">
                     <div className="relative flex-1 md:flex-none">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
                         <input
                             type="text"
                             placeholder="搜尋產品..."
-                            className="input-field pl-10 w-full md:w-64 bg-white"
+                            className="input-field pl-10 w-full md:w-64"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -467,9 +482,9 @@ export default function InventoryPage({ user, apiUrl }) {
                         <h3 className="text-xl font-bold mb-4">庫存異動</h3>
                         <div className="space-y-4">
                             <div>
-                                <label className="text-sm text-slate-500 block mb-1">產品資訊</label>
-                                <div className="flex justify-between items-center p-2 bg-slate-50 rounded-lg border border-slate-100">
-                                    <div className="text-slate-900 font-bold">{selectedItem?.productName}</div>
+                                <label className="text-sm text-[var(--text-secondary)] block mb-1">產品資訊</label>
+                                <div className="flex justify-between items-center p-2 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-primary)]">
+                                    <div className="text-[var(--text-primary)] font-bold">{selectedItem?.productName}</div>
                                     <div className="flex items-center gap-2">
                                         <span className="text-xs text-slate-400">當前庫存:</span>
                                         <span className="text-emerald-600 font-mono font-bold text-lg">{selectedItem?.quantity}</span>

@@ -52,28 +52,28 @@ export default function SalesRankingPage({ user, apiUrl }) {
         <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6 flex flex-col h-[calc(100vh-6rem)]">
             <div className="flex justify-between items-center shrink-0">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <BarChart2 className="text-blue-600" /> 商品銷售排行
+                    <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+                        <BarChart2 className="text-[var(--accent-blue)]" /> 商品銷售排行
                     </h1>
-                    <p className="text-slate-500 text-sm mt-1">分析指定期間內各商品的銷售數量與金額排名</p>
+                    <p className="text-[var(--text-secondary)] text-sm mt-1">分析指定期間內各商品的銷售數量與金額排名</p>
                 </div>
                 <button onClick={fetchData} disabled={loading} className="btn-secondary p-2 rounded-xl">
                     <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
                 </button>
             </div>
 
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shrink-0 grid grid-cols-1 md:grid-cols-3 gap-4 shadow-sm">
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shrink-0 grid grid-cols-1 md:grid-cols-3 gap-4 shadow-sm">
                 <div className="flex items-center gap-2">
-                    <input type="date" className="input-field flex-1 bg-white text-sm" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                    <span className="text-slate-500 font-bold hidden md:inline">至</span>
-                    <input type="date" className="input-field flex-1 bg-white text-sm" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                    <input type="date" className="input-field flex-1 text-sm bg-[var(--bg-tertiary)]" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                    <span className="text-[var(--text-secondary)] font-bold hidden md:inline">至</span>
+                    <input type="date" className="input-field flex-1 text-sm bg-[var(--bg-tertiary)]" value={endDate} onChange={e => setEndDate(e.target.value)} />
                 </div>
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
                     <input
                         type="text"
                         placeholder="搜尋產品名稱..."
-                        className="input-field pl-10 w-full bg-white"
+                        className="input-field pl-10 w-full bg-[var(--bg-tertiary)]"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                     />
@@ -83,11 +83,11 @@ export default function SalesRankingPage({ user, apiUrl }) {
                 </button>
             </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex-1 flex flex-col shadow-sm">
+            <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] overflow-hidden flex-1 flex flex-col shadow-sm">
                 <div className="overflow-y-auto flex-1">
                     {/* Desktop View */}
                     <table className="hidden md:table w-full text-left text-sm">
-                        <thead className="bg-slate-50 text-slate-500 text-xs uppercase sticky top-0 z-10 font-bold border-b border-slate-100">
+                        <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs uppercase sticky top-0 z-10 font-bold border-b border-[var(--border-primary)]">
                             <tr>
                                 <th className="p-4 w-16 text-center">排名</th>
                                 <th className="p-4">產品名稱</th>
@@ -96,12 +96,12 @@ export default function SalesRankingPage({ user, apiUrl }) {
                                 <th className="p-4 text-right">平均單價</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-[var(--border-primary)]">
                             {loading ? (
-                                <tr><td colSpan="5" className="p-20 text-center text-slate-500">載入中...</td></tr>
+                                <tr><td colSpan="5" className="p-20 text-center text-[var(--text-tertiary)]">載入中...</td></tr>
                             ) : filteredData.length > 0 ? (
                                 filteredData.map((item, idx) => (
-                                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                    <tr key={idx} className="hover:bg-[var(--bg-hover)] transition-colors">
                                         <td className="p-4 text-center font-mono">
                                             {idx < 3 ? (
                                                 <span className={`w-6 h-6 rounded-full inline-flex items-center justify-center text-[10px] font-bold shadow-sm ${idx === 0 ? 'bg-amber-100 text-amber-700 border border-amber-200' :
@@ -112,14 +112,14 @@ export default function SalesRankingPage({ user, apiUrl }) {
                                                 </span>
                                             ) : (idx + 1)}
                                         </td>
-                                        <td className="p-4 font-bold text-slate-800">{productMap[item.productName] || item.productName}</td>
-                                        <td className="p-4 text-right font-mono text-emerald-700">{item.totalQty.toLocaleString()}</td>
-                                        <td className="p-4 text-right font-mono text-blue-700">${item.totalAmount.toLocaleString()}</td>
-                                        <td className="p-4 text-right font-mono text-slate-500">${(item.totalAmount / item.totalQty).toFixed(1)}</td>
+                                        <td className="p-4 font-bold text-[var(--text-primary)]">{productMap[item.productName] || item.productName}</td>
+                                        <td className="p-4 text-right font-mono text-emerald-500">{item.totalQty.toLocaleString()}</td>
+                                        <td className="p-4 text-right font-mono text-blue-500">${item.totalAmount.toLocaleString()}</td>
+                                        <td className="p-4 text-right font-mono text-[var(--text-secondary)]">${(item.totalAmount / item.totalQty).toFixed(1)}</td>
                                     </tr>
                                 ))
                             ) : (
-                                <tr><td colSpan="5" className="p-20 text-center text-slate-500">暫無資料</td></tr>
+                                <tr><td colSpan="5" className="p-20 text-center text-[var(--text-secondary)]">暫無資料</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -130,7 +130,7 @@ export default function SalesRankingPage({ user, apiUrl }) {
                             <div className="p-10 text-center text-slate-500">載入中...</div>
                         ) : filteredData.length > 0 ? (
                             filteredData.map((item, idx) => (
-                                <div key={idx} className="p-4 bg-white active:bg-slate-50 transition-colors">
+                                <div key={idx} className="p-4 bg-[var(--bg-secondary)] active:bg-[var(--bg-hover)] transition-colors">
                                     <div className="flex justify-between items-start mb-2">
                                         <div className="flex items-center gap-3">
                                             <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 shadow-sm ${idx === 0 ? 'bg-amber-100 text-amber-700' :
@@ -139,7 +139,7 @@ export default function SalesRankingPage({ user, apiUrl }) {
                                                 }`}>
                                                 {idx + 1}
                                             </span>
-                                            <div className="text-sm font-bold text-slate-800">{productMap[item.productName] || item.productName}</div>
+                                            <div className="text-sm font-bold text-[var(--text-primary)]">{productMap[item.productName] || item.productName}</div>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-3 gap-2 pl-9">

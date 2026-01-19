@@ -133,24 +133,24 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
             {isSubmitting && (
                 <div className="loading-overlay">
                     <div className="w-12 h-12 border-4 border-rose-600 border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-lg font-bold text-slate-800">資料存盤中，請稍後...</p>
+                    <p className="text-lg font-bold text-[var(--text-primary)]">資料存盤中，請稍後...</p>
                 </div>
             )}
             {/* Header */}
             {/* Header */}
             <div className="flex flex-row justify-between items-center gap-4">
                 <div className="flex-1 min-w-0">
-                    <h1 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2 truncate">
+                    <h1 className="text-xl md:text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2 truncate">
                         <div className="p-1.5 md:p-2 bg-rose-100 rounded-lg shrink-0">
                             <DollarSign className="text-rose-600 w-5 h-5 md:w-6 md:h-6" />
                         </div>
                         支出管理
                     </h1>
-                    <p className="text-slate-500 text-xs md:text-sm mt-1 truncate">整理與紀錄經營成本</p>
+                    <p className="text-[var(--text-secondary)] text-xs md:text-sm mt-1 truncate">整理與紀錄經營成本</p>
                 </div>
 
                 <div className="bg-rose-50 px-3 md:px-6 py-2 md:py-3 border border-rose-200 rounded-xl shadow-sm shrink-0 flex flex-col items-end">
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">今日總額</p>
+                    <p className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider">今日總額</p>
                     <p className="text-lg md:text-2xl font-black text-rose-600">${finalTotal.toLocaleString()}</p>
                 </div>
             </div>
@@ -160,16 +160,16 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                 <div className="lg:col-span-2 space-y-6">
                     {/* Basic Info */}
                     <div className="glass-panel p-6">
-                        <div className="flex items-center gap-2 mb-4 text-blue-600 font-bold">
+                        <div className="flex items-center gap-2 mb-4 text-[var(--accent-blue)] font-bold">
                             <Clipboard size={18} />
                             <span>基本資訊</span>
                         </div>
                         <div>
-                            <label className="text-xs text-slate-500 font-bold block mb-2">備註 / 說明 *</label>
+                            <label className="text-xs text-[var(--text-secondary)] font-bold block mb-2">備註 / 說明 *</label>
                             <input
                                 id="input-expense-note"
                                 type="text"
-                                className="input-field w-full text-lg py-3 bg-white"
+                                className="input-field w-full text-lg py-3 bg-[var(--bg-primary)]"
                                 placeholder="例如：1/7 台北攤位支出..."
                                 value={note}
                                 onChange={(e) => setNote(e.target.value)}
@@ -180,7 +180,7 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
 
                     {/* Operational Expenses */}
                     <div className="glass-panel p-6">
-                        <div className="flex items-center gap-2 mb-6 text-emerald-600 font-bold">
+                        <div className="flex items-center gap-2 mb-6 text-emerald-500 font-bold">
                             <Settings size={18} />
                             <span>基礎營運支出</span>
                         </div>
@@ -195,12 +195,12 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                                 { key: 'bags', label: '塑膠袋', next: 'others', prev: 'goods' },
                                 { key: 'others', label: '其他', next: 'linePay', prev: 'bags' },
                             ].map((item) => (
-                                <div key={item.key} className="flex items-center justify-between gap-4 p-2 hover:bg-slate-50 rounded-lg transition-colors border-b border-slate-100 last:border-0">
-                                    <label className="text-sm text-slate-600 font-medium whitespace-nowrap">{item.label}</label>
+                                <div key={item.key} className="flex items-center justify-between gap-4 p-2 hover:bg-[var(--bg-secondary)] rounded-lg transition-colors border-b border-[var(--border-primary)] last:border-0">
+                                    <label className="text-sm text-[var(--text-secondary)] font-medium whitespace-nowrap">{item.label}</label>
                                     <input
                                         id={`input-expense-${item.key}`}
                                         type="number"
-                                        className="input-field text-right w-32 bg-white"
+                                        className="input-field text-right w-32 bg-[var(--bg-primary)]"
                                         value={expenses[item.key] || ''}
                                         onChange={(e) => setExpenses({ ...expenses, [item.key]: Number(e.target.value) })}
                                         onKeyDown={(e) => handleKeyDown(e, item.key)}
@@ -215,29 +215,29 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                 {/* Right Column: Special Items & Submit */}
                 <div className="space-y-6">
                     {/* Money & Services */}
-                    <div className="glass-panel p-6 border-amber-200">
-                        <div className="flex items-center gap-2 mb-6 text-amber-600 font-bold">
+                    <div className="glass-panel p-6 border-[var(--border-primary)]">
+                        <div className="flex items-center gap-2 mb-6 text-amber-500 font-bold">
                             <CreditCard size={18} />
                             <span>金流與服務費</span>
                         </div>
                         <div className="space-y-4">
                             <div>
-                                <label className="text-xs text-slate-500 block mb-1">Line Pay 收款</label>
+                                <label className="text-xs text-[var(--text-secondary)] block mb-1">Line Pay 收款</label>
                                 <div className="relative">
                                     <input
                                         id="input-expense-linePay"
                                         type="number"
-                                        className="input-field w-full pl-8 border-emerald-200 text-emerald-700 bg-emerald-50"
+                                        className="input-field w-full pl-8 border-[var(--border-primary)] text-emerald-500 bg-[var(--bg-secondary)]"
                                         value={expenses.linePay || ''}
                                         onChange={(e) => setExpenses({ ...expenses, linePay: Number(e.target.value) })}
                                         onKeyDown={(e) => handleKeyDown(e, 'linePay')}
                                         onWheel={(e) => e.target.blur()}
                                     />
-                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 font-bold">+</div>
+                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-bold">+</div>
                                 </div>
                             </div>
                             <div>
-                                <label className="text-xs text-slate-500 block mb-1">服務費扣除</label>
+                                <label className="text-xs text-[var(--text-secondary)] block mb-1">服務費扣除</label>
                                 <div className="relative">
                                     <input
                                         id="input-expense-serviceFee"
@@ -262,13 +262,13 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                         </div>
                         <div className="space-y-4">
                             <div className="flex items-center justify-between gap-2">
-                                <label className="text-xs text-slate-500 flex items-center gap-2 font-bold">
+                                <label className="text-xs text-[var(--text-secondary)] flex items-center gap-2 font-bold">
                                     <Truck size={14} /> 車輛保養
                                 </label>
                                 <input
                                     id="input-expense-vehicleMaintenance"
                                     type="number"
-                                    className="input-field w-28 text-right bg-white"
+                                    className="input-field w-28 text-right bg-[var(--bg-primary)]"
                                     value={expenses.vehicleMaintenance || ''}
                                     onChange={(e) => setExpenses({ ...expenses, vehicleMaintenance: Number(e.target.value) })}
                                     onKeyDown={(e) => handleKeyDown(e, 'vehicleMaintenance')}
@@ -276,13 +276,13 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                                 />
                             </div>
                             <div className="flex items-center justify-between gap-2">
-                                <label className="text-xs text-slate-500 flex items-center gap-2 font-bold">
+                                <label className="text-xs text-[var(--text-secondary)] flex items-center gap-2 font-bold">
                                     <Users size={14} /> 薪資發放
                                 </label>
                                 <input
                                     id="input-expense-salary"
                                     type="number"
-                                    className="input-field w-28 text-right bg-white"
+                                    className="input-field w-28 text-right bg-[var(--bg-primary)]"
                                     value={expenses.salary || ''}
                                     onChange={(e) => setExpenses({ ...expenses, salary: Number(e.target.value) })}
                                     onKeyDown={(e) => handleKeyDown(e, 'salary')}
@@ -290,13 +290,13 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                                 />
                             </div>
                             <div className="flex items-center justify-between gap-2">
-                                <label className="text-xs text-slate-500 flex items-center gap-2 font-bold">
+                                <label className="text-xs text-[var(--text-secondary)] flex items-center gap-2 font-bold">
                                     <PiggyBank size={14} /> 公積金
                                 </label>
                                 <input
                                     id="input-expense-reserve"
                                     type="number"
-                                    className="input-field w-28 text-right bg-white"
+                                    className="input-field w-28 text-right bg-[var(--bg-primary)]"
                                     value={expenses.reserve || ''}
                                     onChange={(e) => setExpenses({ ...expenses, reserve: Number(e.target.value) })}
                                     onKeyDown={(e) => handleKeyDown(e, 'reserve')}
@@ -314,7 +314,7 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                         <Save size={22} /> 保存今日支出
                     </button>
 
-                    <p className="text-center text-slate-500 text-[10px] uppercase font-bold tracking-tighter">
+                    <p className="text-center text-[var(--text-secondary)] text-[10px] uppercase font-bold tracking-tighter">
                         Data will be saved to Expenditures Sheet
                     </p>
                 </div>
