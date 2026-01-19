@@ -169,14 +169,15 @@ export default function App() {
             case 'purchaseHistory':
                 return perms.includes('purchase_history') || perms.includes('purchase');
             case 'inventory':
-                return perms.includes('inventory_adjust') || perms.includes('inventory');
+                return perms.includes('inventory_adjust');
             case 'stocktake':
-                return perms.includes('inventory_stocktake') || perms.includes('inventory');
+                return perms.includes('inventory_stocktake');
             case 'valuation':
-                return perms.includes('inventory_valuation') || perms.includes('inventory');
+                return perms.includes('inventory_valuation');
             case 'adjustHistory':
+                return perms.includes('inventory_adjust_history') || perms.includes('inventory_history');
             case 'stocktakeHistory':
-                return perms.includes('inventory_history') || perms.includes('inventory');
+                return perms.includes('inventory_stocktake_history') || perms.includes('inventory_history');
             case 'expenditureManagement':
                 return perms.includes('finance_expenditure') || perms.includes('finance');
             case 'receivable':
@@ -416,7 +417,7 @@ export default function App() {
                             icon={Wallet}
                             openDropdown={openDropdown}
                             setOpenDropdown={setOpenDropdown}
-                            active={['receivable', 'payable', 'incomeStatement', 'costCalculation'].includes(page)}
+                            active={['receivable', 'payable', 'incomeStatement', 'costCalculation', 'payroll'].includes(page)}
                         >
                             {checkPermission('receivable') && <NavItem label="應收帳款" icon={Wallet} onClick={() => handlePageChange('receivable')} active={page === 'receivable'} />}
                             {checkPermission('payable') && <NavItem label="應付帳款" icon={Wallet} onClick={() => handlePageChange('payable')} active={page === 'payable'} />}

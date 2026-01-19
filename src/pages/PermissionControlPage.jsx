@@ -21,26 +21,32 @@ export default function PermissionControlPage({ user, apiUrl }) {
         {
             group: '進貨管理',
             items: [
-                { key: 'purchase_entry', label: '進貨資料登錄' },
-                { key: 'purchase_history', label: '進貨歷史紀錄' }
+                { key: 'purchase_entry', label: '商品進貨登錄' },
+                { key: 'purchase_history', label: '進貨查詢' }
             ]
         },
         {
             group: '庫存管理',
             items: [
-                { key: 'inventory_adjust', label: '庫存異動作業' },
-                { key: 'inventory_stocktake', label: '現場盤點作業' },
-                { key: 'inventory_valuation', label: '庫存估值報告' },
-                { key: 'inventory_history', label: '異動/盤點紀錄查詢' }
+                { key: 'inventory_adjust', label: '庫存檢視' },
+                { key: 'inventory_stocktake', label: '庫存盤點' },
+                { key: 'inventory_valuation', label: '庫存估值' },
+                { key: 'inventory_adjust_history', label: '異動查詢' },
+                { key: 'inventory_stocktake_history', label: '盤點歷史' }
+            ]
+        },
+        {
+            group: '支出管理',
+            items: [
+                { key: 'finance_expenditure', label: '支出登錄' }
             ]
         },
         {
             group: '財務帳務',
             items: [
-                { key: 'finance_expenditure', label: '外場支出作業' },
-                { key: 'finance_receivable', label: '應收帳款管理' },
-                { key: 'finance_payable', label: '應付帳款管理' },
-                { key: 'finance_income', label: '簡易損益表' },
+                { key: 'finance_receivable', label: '應收帳款' },
+                { key: 'finance_payable', label: '應付帳款' },
+                { key: 'finance_income', label: '損益表' },
                 { key: 'finance_cost', label: '成本計算分析' },
                 { key: 'finance_payroll', label: '薪資結算中心' }
             ]
@@ -334,10 +340,11 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                                             const legacyMap = {
                                                                 'sales': ['sales_entry', 'sales_report'],
                                                                 'purchase': ['purchase_entry', 'purchase_history'],
-                                                                'inventory': ['inventory_adjust', 'inventory_stocktake', 'inventory_valuation', 'inventory_history'],
+                                                                'inventory': ['inventory_adjust', 'inventory_stocktake', 'inventory_valuation', 'inventory_adjust_history', 'inventory_stocktake_history'],
                                                                 'finance': ['finance_expenditure', 'finance_receivable', 'finance_payable', 'finance_income', 'finance_cost'],
                                                                 'analytics': ['analytics_sales', 'analytics_customer', 'analytics_profit', 'analytics_turnover'],
-                                                                'system': ['system_config']
+                                                                'system': ['system_config'],
+                                                                'inventory_history': ['inventory_adjust_history', 'inventory_stocktake_history']
                                                             };
 
                                                             Object.keys(legacyMap).forEach(legacyKey => {
@@ -414,10 +421,11 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                                         const legacyMap = {
                                                             'sales': ['sales_entry', 'sales_report'],
                                                             'purchase': ['purchase_entry', 'purchase_history'],
-                                                            'inventory': ['inventory_adjust', 'inventory_stocktake', 'inventory_valuation', 'inventory_history'],
+                                                            'inventory': ['inventory_adjust', 'inventory_stocktake', 'inventory_valuation', 'inventory_adjust_history', 'inventory_stocktake_history'],
                                                             'finance': ['finance_expenditure', 'finance_receivable', 'finance_payable', 'finance_income', 'finance_cost'],
                                                             'analytics': ['analytics_sales', 'analytics_customer', 'analytics_profit', 'analytics_turnover'],
-                                                            'system': ['system_config']
+                                                            'system': ['system_config'],
+                                                            'inventory_history': ['inventory_adjust_history', 'inventory_stocktake_history']
                                                         };
                                                         Object.keys(legacyMap).forEach(legacyKey => {
                                                             if (currentPerms.includes(legacyKey)) {
