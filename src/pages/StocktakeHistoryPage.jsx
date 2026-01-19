@@ -78,68 +78,47 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
     const noDiff = filtered.filter(r => r.diff === 0).length;
 
     return (
-        <div className="max-w-[90rem] mx-auto p-4">
-            <div className="glass-panel p-6">
+        <div className="max-w-7xl mx-auto p-4 md:p-6 animate-in fade-in duration-500">
+            <div className="glass-panel p-4 md:p-6 text-[var(--text-primary)]">
                 {/* Header Section */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-6 border-b border-slate-200 pb-6">
-                    <div>
-                        <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-2">
-                            <ClipboardList className="text-blue-600" /> 盤點歷史查詢
-                        </h1>
-                        <p className="text-slate-500 text-sm mt-1">查看過去的盤點記錄，追蹤差異與原因</p>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-6 border-b border-[var(--border-primary)] pb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center shrink-0">
+                            <ClipboardList className="text-blue-500" size={24} />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-bold text-[var(--text-primary)]">盤點歷史查詢</h1>
+                            <p className="text-[var(--text-tertiary)] text-xs mt-0.5">查看過去的盤點記錄，追蹤差異與原因</p>
+                        </div>
                     </div>
 
                     {/* Stats Integrated */}
-                    <div className="grid grid-cols-3 gap-2 w-full md:w-auto md:flex md:gap-4">
-                        <div className="px-2 md:px-5 py-2 rounded-xl bg-blue-50 border border-blue-200 flex flex-col items-center justify-center">
-                            <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold text-center">總記錄</p>
-                            <p className="text-lg md:text-xl font-bold text-slate-800 text-center">{totalRecords}</p>
+                    <div className="grid grid-cols-3 gap-2 w-full md:w-auto md:flex md:gap-3">
+                        <div className="px-3 py-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] flex flex-col items-center justify-center min-w-[80px]">
+                            <p className="text-[10px] text-[var(--text-tertiary)] uppercase font-bold tracking-wider">總記錄</p>
+                            <p className="text-lg font-bold text-[var(--text-primary)]">{totalRecords}</p>
                         </div>
-                        <div className="px-2 md:px-5 py-2 rounded-xl bg-rose-50 border border-rose-200 flex flex-col items-center justify-center">
-                            <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold text-center">有差異</p>
-                            <p className="text-lg md:text-xl font-bold text-rose-600 text-center">{withDiff}</p>
+                        <div className="px-3 py-2 rounded-xl bg-rose-50 border border-rose-100 flex flex-col items-center justify-center min-w-[80px]">
+                            <p className="text-[10px] text-rose-500 uppercase font-bold tracking-wider">有差異</p>
+                            <p className="text-lg font-bold text-rose-600">{withDiff}</p>
                         </div>
-                        <div className="px-2 md:px-5 py-2 rounded-xl bg-emerald-50 border border-emerald-200 flex flex-col items-center justify-center">
-                            <p className="text-[10px] md:text-xs text-slate-500 uppercase font-bold text-center">無差異</p>
-                            <p className="text-lg md:text-xl font-bold text-emerald-600 text-center">{noDiff}</p>
+                        <div className="px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-100 flex flex-col items-center justify-center min-w-[80px]">
+                            <p className="text-[10px] text-emerald-500 uppercase font-bold tracking-wider">無差異</p>
+                            <p className="text-lg font-bold text-emerald-600">{noDiff}</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Filters */}
-                <div className="mb-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="flex flex-col md:flex-row gap-4 items-end">
-                        {/* Mobile: Date Range First */}
-                        <div className="w-full md:hidden">
-                            <div className="w-full space-y-3">
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
-                                    <input
-                                        type="date"
-                                        className="input-field w-full h-10 appearance-none bg-transparent"
-                                        value={startDate}
-                                        onChange={(e) => setStartDate(e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
-                                    <input
-                                        type="date"
-                                        className="input-field w-full h-10 appearance-none bg-transparent"
-                                        value={endDate}
-                                        onChange={(e) => setEndDate(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex-1 space-y-1.5 w-full">
-                            <label className="text-[10px] text-slate-500 font-bold uppercase px-1">商品名稱</label>
+                <div className="mb-6 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)]">
+                    <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-4 items-end">
+                        <div className="md:col-span-2 lg:col-span-4 space-y-1.5 w-full">
+                            <label className="text-[10px] text-[var(--text-tertiary)] font-bold uppercase px-1 tracking-wider">商品名稱</label>
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} />
                                 <input
                                     type="text"
-                                    placeholder="搜尋商品名稱..."
+                                    placeholder="搜尋商品..."
                                     className="input-field pl-10 w-full h-10"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -147,119 +126,118 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
                             </div>
                         </div>
 
-                        {/* Desktop: Dates (Hidden on mobile) */}
-                        <div className="hidden md:block w-32 space-y-1.5">
-                            <label className="text-[10px] text-slate-500 font-bold uppercase px-1">開始日期</label>
+                        <div className="md:col-span-1 lg:col-span-2 space-y-1.5">
+                            <label className="text-[10px] text-[var(--text-tertiary)] font-bold uppercase px-1 tracking-wider">開始日期</label>
                             <input
                                 type="date"
-                                className="input-field w-full text-sm"
+                                className="input-field w-full h-10"
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
                             />
                         </div>
 
-                        <div className="hidden md:block w-32 space-y-1.5">
-                            <label className="text-[10px] text-slate-500 font-bold uppercase px-1">結束日期</label>
+                        <div className="md:col-span-1 lg:col-span-2 space-y-1.5">
+                            <label className="text-[10px] text-[var(--text-tertiary)] font-bold uppercase px-1 tracking-wider">結束日期</label>
                             <input
                                 type="date"
-                                className="input-field w-full text-sm"
+                                className="input-field w-full h-10"
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
                             />
                         </div>
 
-                        {/* Actions Row: Checkbox & Refresh - Improved for Mobile */}
-                        <div className="w-full md:w-auto flex flex-row items-center gap-2 justify-between md:justify-start">
-                            <label className="flex-1 md:flex-none flex items-center justify-center md:justify-start gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors select-none h-[42px]">
+                        <div className="md:col-span-2 lg:col-span-3 flex items-center gap-2">
+                            <label className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-primary)] cursor-pointer hover:bg-[var(--bg-hover)] transition-colors h-10">
                                 <input
                                     type="checkbox"
                                     checked={diffOnly}
                                     onChange={(e) => setDiffOnly(e.target.checked)}
-                                    className="w-4 h-4 rounded border-slate-600 text-blue-500 focus:ring-blue-500"
+                                    className="w-4 h-4 rounded border-[var(--border-primary)] text-blue-500 focus:ring-blue-500"
                                 />
-                                <span className="text-sm text-slate-500 font-medium whitespace-nowrap">僅顯示有差異</span>
+                                <span className="text-[11px] text-[var(--text-secondary)] font-bold whitespace-nowrap">僅顯示差異</span>
                             </label>
 
                             <button
                                 onClick={fetchHistory}
                                 disabled={loading}
-                                className="btn-secondary h-[42px] px-6 flex items-center gap-2 whitespace-nowrap"
+                                className="btn-secondary h-10 px-4 flex items-center gap-2 whitespace-nowrap"
                             >
-                                <RefreshCw size={18} className={loading ? 'animate-spin' : ''} /> 刷新
+                                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> 刷新
                             </button>
                         </div>
                     </div>
                 </div>
 
                 {/* Table (Hidden on Mobile) */}
-                <div className="hidden md:block rounded-xl border border-slate-200 overflow-hidden">
+                <div className="hidden md:block rounded-xl border border-[var(--border-primary)] overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider sticky top-0">
+                            <thead className="bg-[var(--bg-secondary)] text-[var(--text-tertiary)] text-[10px] uppercase tracking-wider sticky top-0 font-bold">
                                 <tr>
-                                    <th className="p-4">盤點日期</th>
-                                    <th className="p-4">商品名稱</th>
-                                    <th className="p-4 text-right">帳面數量</th>
-                                    <th className="p-4 text-right">實盤數量</th>
-                                    <th className="p-4 text-center">差異</th>
-                                    <th className="p-4">差異原因</th>
-                                    <th className="p-4">責任歸屬</th>
-                                    <th className="p-4">執行人</th>
+                                    <th className="px-4 py-3">盤點日期</th>
+                                    <th className="px-4 py-3">商品名稱</th>
+                                    <th className="px-4 py-3 text-right">帳面/實盤</th>
+                                    <th className="px-4 py-3 text-center">差異</th>
+                                    <th className="px-4 py-3">差異原因/歸屬</th>
+                                    <th className="px-4 py-3">執行人</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 bg-white">
+                            <tbody className="divide-y divide-[var(--border-primary)] bg-[var(--bg-primary)]">
                                 {loading ? (
                                     <tr>
-                                        <td colSpan="8" className="p-20 text-center">
-                                            <div className="flex flex-col items-center gap-3">
-                                                <div className="w-8 h-8 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
-                                                <span className="text-slate-500">載入盤點記錄中...</span>
+                                        <td colSpan="6" className="p-20 text-center">
+                                            <div className="flex flex-col items-center gap-2">
+                                                <RefreshCw className="animate-spin text-blue-500" />
+                                                <span className="text-[var(--text-tertiary)] text-sm">載入中...</span>
                                             </div>
                                         </td>
                                     </tr>
                                 ) : filtered.length > 0 ? (
                                     filtered.map((record, idx) => (
-                                        <tr key={idx} className={`hover:bg-slate-50 transition-colors ${record.diff !== 0 ? 'bg-amber-50' : ''}`}>
-                                            <td className="p-4">
-                                                <div className="flex items-center gap-2 text-slate-500">
-                                                    <Calendar size={14} className="text-slate-400" />
+                                        <tr key={idx} className={`hover:bg-[var(--bg-hover)] transition-colors group ${record.diff !== 0 ? 'bg-amber-50/30' : ''}`}>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-1.5 text-[var(--text-tertiary)] font-mono text-[11px]">
+                                                    <Calendar size={10} />
                                                     {record.date}
                                                 </div>
                                             </td>
-                                            <td className="p-4 font-medium text-slate-900">{record.productName}</td>
-                                            <td className="p-4 text-right font-mono text-slate-500">{record.bookQty}</td>
-                                            <td className="p-4 text-right font-mono text-blue-600">{record.physicalQty}</td>
-                                            <td className="p-4 text-center">
+                                            <td className="px-4 py-3 font-bold text-[var(--text-primary)]">{record.productName}</td>
+                                            <td className="px-4 py-3 text-right">
+                                                <div className="flex flex-col items-end gap-0.5">
+                                                    <span className="text-[10px] text-[var(--text-tertiary)] font-mono">帳: {record.bookQty}</span>
+                                                    <span className="text-sm text-blue-600 font-bold font-mono">實: {record.physicalQty}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
                                                 {record.diff === 0 ? (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
-                                                        <CheckCircle size={14} /> 0
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-bold border border-emerald-100">
+                                                        <CheckCircle size={10} /> 0
                                                     </span>
                                                 ) : (
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold ${record.diff > 0
-                                                        ? 'bg-blue-100 text-blue-700'
-                                                        : 'bg-rose-100 text-rose-700'
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${record.diff > 0
+                                                        ? 'bg-blue-50 text-blue-600 border-blue-100'
+                                                        : 'bg-rose-50 text-rose-600 border-rose-100'
                                                         }`}>
-                                                        <AlertTriangle size={14} />
+                                                        <AlertTriangle size={10} />
                                                         {record.diff > 0 ? `+${record.diff}` : record.diff}
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="p-4 text-slate-600">{record.reason || '-'}</td>
-                                            <td className="p-4 text-slate-600">{record.accountability || '-'}</td>
-                                            <td className="p-4 text-slate-500">{record.operator || '-'}</td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex flex-col gap-0.5 max-w-[150px]">
+                                                    <p className="text-[11px] text-[var(--text-secondary)] truncate" title={record.reason}>{record.reason || '-'}</p>
+                                                    <p className="text-[10px] text-[var(--text-tertiary)] font-bold">{record.accountability || '-'}</p>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-[var(--text-tertiary)] text-xs font-medium">{record.operator || '-'}</td>
                                         </tr>
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan="8" className="p-20 text-center">
-                                            <div className="flex flex-col items-center gap-4">
-                                                <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center">
-                                                    <Filter size={32} className="text-slate-300" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-slate-900 font-medium">沒有找到盤點記錄</p>
-                                                    <p className="text-slate-400 text-sm mt-1">請調整篩選條件或日期區間</p>
-                                                </div>
+                                        <td colSpan="6" className="p-20 text-center">
+                                            <div className="flex flex-col items-center gap-3">
+                                                <Filter size={32} className="text-[var(--text-tertiary)] opacity-30" />
+                                                <p className="text-[var(--text-secondary)] font-medium">沒有找到盤點記錄</p>
                                             </div>
                                         </td>
                                     </tr>
@@ -270,41 +248,41 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
                 </div>
 
                 {/* Mobile Card View (Visible only on Mobile) */}
-                <div className="md:hidden space-y-4">
+                <div className="md:hidden space-y-3">
                     {loading ? (
-                        <div className="text-center py-8 text-slate-500">載入中...</div>
+                        <div className="text-center py-10 text-[var(--text-tertiary)] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">載入中...</div>
                     ) : filtered.length > 0 ? (
                         filtered.map((record, idx) => (
-                            <div key={idx} className={`bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col gap-3 ${record.diff !== 0 ? 'bg-amber-50/50' : ''}`}>
-                                <div className="flex justify-between items-start border-b border-slate-100 pb-2">
-                                    <div className="flex flex-col gap-1">
-                                        <div className="flex items-center gap-1 text-xs text-slate-400">
-                                            <Calendar size={12} />
+                            <div key={idx} className={`bg-[var(--bg-primary)] rounded-xl border border-[var(--border-primary)] p-3 shadow-sm flex flex-col gap-2 ${record.diff !== 0 ? 'bg-amber-50/20' : ''}`}>
+                                <div className="flex justify-between items-start border-b border-[var(--border-primary)] pb-2">
+                                    <div className="flex flex-col gap-0.5">
+                                        <div className="flex items-center gap-1 text-[10px] text-[var(--text-tertiary)] font-mono uppercase tracking-wider">
+                                            <Calendar size={10} />
                                             {record.date}
                                         </div>
-                                        <h3 className="font-bold text-slate-800 text-lg">{record.productName}</h3>
+                                        <h3 className="font-bold text-[var(--text-primary)] text-base">{record.productName}</h3>
                                     </div>
                                     <div className="text-right">
-                                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold ${record.diff === 0 ? 'bg-emerald-100 text-emerald-700' :
-                                            record.diff > 0 ? 'bg-blue-100 text-blue-700' : 'bg-rose-100 text-rose-700'
+                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${record.diff === 0 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                            record.diff > 0 ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-rose-50 text-rose-600 border-rose-100'
                                             }`}>
-                                            {record.diff === 0 ? <CheckCircle size={12} /> : <AlertTriangle size={12} />}
+                                            {record.diff === 0 ? <CheckCircle size={10} /> : <AlertTriangle size={10} />}
                                             {record.diff > 0 ? `+${record.diff}` : record.diff}
                                         </span>
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-2 text-center bg-slate-50 p-2 rounded -mx-1">
+                                <div className="grid grid-cols-3 gap-2 text-center bg-[var(--bg-secondary)] p-2 rounded-lg">
                                     <div>
-                                        <div className="text-[10px] text-slate-400 uppercase">帳面</div>
-                                        <div className="font-mono font-medium text-slate-600">{record.bookQty}</div>
+                                        <div className="text-[9px] text-[var(--text-tertiary)] font-bold uppercase tracking-wider">帳面</div>
+                                        <div className="font-mono font-medium text-[var(--text-secondary)]">{record.bookQty}</div>
                                     </div>
                                     <div>
-                                        <div className="text-[10px] text-slate-400 uppercase">實盤</div>
-                                        <div className="font-mono font-bold text-blue-600">{record.physicalQty}</div>
+                                        <div className="text-[9px] text-[var(--text-tertiary)] font-bold uppercase tracking-wider">實盤</div>
+                                        <div className="font-mono font-bold text-blue-600 tracking-tighter">{record.physicalQty}</div>
                                     </div>
                                     <div>
-                                        <div className="text-[10px] text-slate-400 uppercase">差異</div>
+                                        <div className="text-[9px] text-[var(--text-tertiary)] font-bold uppercase tracking-wider">差異</div>
                                         <div className={`font-mono font-bold ${record.diff === 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                                             {record.diff}
                                         </div>
@@ -312,20 +290,21 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
                                 </div>
 
                                 {(record.reason || record.accountability) && (
-                                    <div className="text-sm bg-slate-50 p-2 rounded text-slate-600">
-                                        {record.reason && <div><span className="text-slate-400 text-xs mr-2">原因:</span>{record.reason}</div>}
-                                        {record.accountability && <div><span className="text-slate-400 text-xs mr-2">責任:</span>{record.accountability}</div>}
+                                    <div className="text-xs bg-[var(--bg-secondary)] p-2 rounded-lg text-[var(--text-secondary)] space-y-1 border border-[var(--border-primary)]">
+                                        {record.reason && <div><span className="text-[var(--text-tertiary)] font-bold mr-2 uppercase text-[9px]">原因:</span>{record.reason}</div>}
+                                        {record.accountability && <div><span className="text-[var(--text-tertiary)] font-bold mr-2 uppercase text-[9px]">歸屬:</span>{record.accountability}</div>}
                                     </div>
                                 )}
 
-                                <div className="flex justify-between items-center text-xs text-slate-400 pt-1">
-                                    <span>執行人: <span className="text-slate-600 font-medium">{record.operator || '-'}</span></span>
+                                <div className="flex justify-between items-center text-[10px] text-[var(--text-tertiary)] pt-1">
+                                    <span className="flex items-center gap-1 font-medium">執行人: <span className="text-[var(--text-secondary)] font-bold">{record.operator || '-'}</span></span>
                                 </div>
                             </div>
                         ))
                     ) : (
-                        <div className="text-center py-8 text-slate-500 bg-white rounded-xl border border-slate-200">
-                            <p>沒有找到盤點記錄</p>
+                        <div className="text-center py-10 text-[var(--text-tertiary)] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">
+                            <Filter size={24} className="mx-auto mb-2 opacity-30" />
+                            <p className="text-sm font-medium">沒有找到盤點記錄</p>
                         </div>
                     )}
                 </div>
