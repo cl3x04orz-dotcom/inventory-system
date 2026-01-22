@@ -520,7 +520,14 @@ function saveExpenditureService(payload) {
  */
 function getProductsService() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName("Products") || ss.getSheetByName("Inventory");
+    // 優先讀取 Products，次之 Inventory
+    var sheetName = "Products";
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+        sheetName = "Inventory";
+        sheet = ss.getSheetByName(sheetName);
+    }
+    
     if (!sheet) return { error: "找不到 'Products' 或 'Inventory' 分頁" };
   
     var data = sheet.getDataRange().getValues();
@@ -533,21 +540,23 @@ function getProductsService() {
         var row = data[i];
         if (!row[0] && !row[1]) continue; 
         
-        var p = {};
+        var p = { _fromSheet: sheetName };
         headers.forEach((h, idx) => {
             var header = String(h || '').trim().toLowerCase();
-            if (header.includes('id') || header.includes('序號') || header.includes('uuid')) p.id = row[idx];
-            if (header.includes('名稱') || header.includes('name')) p.name = row[idx];
-            if (header.includes('單價') || header.includes('price') || header.includes('售價')) p.price = row[idx];
+            var cellValue = row[idx];
+            
+            if (header.includes('id') || header.includes('序號') || header.includes('uuid')) p.id = String(cellValue || '').trim();
+            if (header.includes('名稱') || header.includes('name')) p.name = String(cellValue || '').trim();
+            if (header.includes('單價') || header.includes('price') || header.includes('售價')) p.price = cellValue;
             if (header.includes('庫存') || header.includes('stock')) {
                 if (header.includes('原始') || header.includes('original')) {
-                    p.originalStock = row[idx];
+                    p.originalStock = cellValue;
                 } else {
-                    p.stock = row[idx];
+                    p.stock = cellValue;
                 }
             }
-            if (header.includes('單位') || header.includes('unit')) p.unit = row[idx];
-            if (header.includes('權重') || header.includes('weight')) p.sortWeight = Number(row[idx]) || 0;
+            if (header.includes('單位') || header.includes('unit')) p.unit = String(cellValue || '').trim();
+            if (header.includes('權重') || header.includes('weight')) p.sortWeight = Number(cellValue) || 0;
         });
         
         if (p.name && !p.id) p.id = p.name;

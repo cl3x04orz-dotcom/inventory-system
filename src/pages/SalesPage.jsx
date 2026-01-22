@@ -65,7 +65,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                         sold: 0,
                         price: finalPrice,
                         subtotal: 0,
-                        sortWeight: Number(p.sortWeight) || 0
+                        sortWeight: Number(p.sortWeight) || 0,
+                        fromSheet: p._fromSheet || 'unknown'
                     };
                 }));
             } else {
@@ -407,7 +408,11 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                         <button
                             onClick={() => {
                                 console.log('Current Rows Data:', rows);
-                                alert(JSON.stringify(rows.slice(0, 3).map(r => ({ name: r.name, w: r.sortWeight })), null, 2));
+                                alert(JSON.stringify(rows.slice(0, 3).map(r => ({
+                                    name: `[${r.name}]`,
+                                    w: r.sortWeight,
+                                    sheet: r.fromSheet
+                                })), null, 2));
                             }}
                             className="px-2 py-1 text-[10px] bg-gray-200 text-gray-600 rounded opacity-50 hover:opacity-100"
                         >
