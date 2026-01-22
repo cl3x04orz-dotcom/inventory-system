@@ -207,30 +207,32 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         if (targetId) focusAndSelect(targetId);
     };
 
-    const handleSidebarKeyDown = (e, currentId, nextId, prevId) => {
+    const handleSidebarKeyDown = (e, targets = {}) => {
+        const { next, prev, up, down, left, right } = targets;
         const validKeys = ['Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
         if (!validKeys.includes(e.key)) return;
         if (e.key.startsWith('Arrow')) e.preventDefault();
 
-        if (e.key === 'Enter' || e.key === 'ArrowDown') {
+        let targetId = null;
+        if (e.key === 'Enter') {
             e.preventDefault();
-            if (nextId) focusAndSelect(nextId);
+            targetId = next;
+        } else if (e.key === 'ArrowDown') {
+            targetId = down || next;
         } else if (e.key === 'ArrowUp') {
-            if (prevId) focusAndSelect(prevId);
-            else {
-                // Top of sidebar -> Back to Table (Last row, last col)
-                if (rows.length > 0) {
-                    focusAndSelect(`input-${rows.length - 1}-price`);
-                }
-            }
+            targetId = up || prev;
         } else if (e.key === 'ArrowLeft') {
-            // Stay in sidebar: jump to previous field (same as ArrowUp)
-            if (prevId) focusAndSelect(prevId);
-            else {
-                // Top of sidebar -> Back to Table (Last row, last col)
-                if (rows.length > 0) {
-                    focusAndSelect(`input-${rows.length - 1}-price`);
-                }
+            targetId = left || prev;
+        } else if (e.key === 'ArrowRight') {
+            targetId = right || next;
+        }
+
+        if (targetId) {
+            focusAndSelect(targetId);
+        } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+            // Top of sidebar -> Back to Table (Last row, last col)
+            if (rows.length > 0) {
+                focusAndSelect(`input-${rows.length - 1}-price`);
             }
         }
     };
@@ -540,7 +542,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                             placeholder="0"
                                             value={cashCounts[denom] || ''}
                                             onChange={(e) => setCashCounts({ ...cashCounts, [denom]: Number(e.target.value) })}
-                                            onKeyDown={(e) => handleSidebarKeyDown(e, currentId, nextId, prevId)}
+                                            onKeyDown={(e) => handleSidebarKeyDown(e, {
+                                                next: nextId,
+                                                prev: prevId,
+                                                right: nextId,
+                                                left: prevId
+                                            })}
                                             disabled={isCredit}
                                         />
                                         <span className="w-20 text-right font-mono text-[var(--text-secondary)]">${(denom * cashCounts[denom]).toLocaleString()}</span>
@@ -556,7 +563,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     className="input-field flex-1 border-red-900/50 focus:ring-red-500"
                                     value={reserve}
                                     onChange={(e) => setReserve(Number(e.target.value))}
-                                    onKeyDown={(e) => handleSidebarKeyDown(e, 'input-reserve', 'input-expense-stall', 'input-cash-1')}
+                                    onKeyDown={(e) => handleSidebarKeyDown(e, {
+                                        next: 'input-expense-stall',
+                                        prev: 'input-cash-1',
+                                        right: 'input-expense-stall',
+                                        left: 'input-cash-1'
+                                    })}
                                     disabled={isCredit}
                                 />
                             </div>
@@ -575,17 +587,15 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             {['stall:攤位', 'cleaning:清潔', 'electricity:電費', 'gas:加油', 'parking:停車', 'goods:貨款', 'bags:塑膠袋', 'others:其他'].map((item, idx, arr) => {
                                 const [key, label] = item.split(':');
                                 const currentId = `input-expense-${key}`;
-                                // Logical flow: stall -> cleaning -> electricity ... 
-                                // Grid layout is 2 columns. 
-                                // Order in array: stall, cleaning, electricity, gas, parking, goods, bags, others.
-                                // Visual order might be row by row. But tabbing order follows DOM order.
-                                // Let's stick to array sequence for next/prev.
 
+                                // Sequential Navigation
                                 const nextKey = idx < arr.length - 1 ? arr[idx + 1].split(':')[0] : 'linePay';
-                                const nextId = idx < arr.length - 1 ? `input-expense-${nextKey}` : 'input-expense-linePay';
+                                const nextId = `input-expense-${nextKey}`;
+                                const prevId = idx > 0 ? `input-expense-${arr[idx - 1].split(':')[0]}` : 'input-reserve';
 
-                                const prevKey = idx > 0 ? arr[idx - 1].split(':')[0] : null;
-                                const prevId = idx > 0 ? `input-expense-${prevKey}` : 'input-reserve';
+                                // Grid Navigation (2 columns)
+                                const upKey = idx >= 2 ? arr[idx - 2].split(':')[0] : null;
+                                const downKey = idx < arr.length - 2 ? arr[idx + 2].split(':')[0] : 'linePay';
 
                                 return (
                                     <div key={key}>
@@ -596,7 +606,14 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                             className="input-field text-sm"
                                             value={expenses[key] || ''}
                                             onChange={(e) => setExpenses({ ...expenses, [key]: Number(e.target.value) })}
-                                            onKeyDown={(e) => handleSidebarKeyDown(e, currentId, nextId, prevId)}
+                                            onKeyDown={(e) => handleSidebarKeyDown(e, {
+                                                next: nextId,
+                                                prev: prevId,
+                                                right: nextId,
+                                                left: prevId,
+                                                up: upKey ? `input-expense-${upKey}` : 'input-reserve',
+                                                down: downKey.startsWith('input-') ? downKey : `input-expense-${downKey}`
+                                            })}
                                             disabled={isCredit}
                                         />
                                     </div>
@@ -612,7 +629,13 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     className="input-field border-green-200 text-green-600"
                                     value={expenses.linePay || ''}
                                     onChange={(e) => setExpenses({ ...expenses, linePay: Number(e.target.value) })}
-                                    onKeyDown={(e) => handleSidebarKeyDown(e, 'input-expense-linePay', 'input-expense-serviceFee', 'input-expense-others')}
+                                    onKeyDown={(e) => handleSidebarKeyDown(e, {
+                                        next: 'input-expense-serviceFee',
+                                        prev: 'input-expense-others',
+                                        right: 'input-expense-serviceFee',
+                                        left: 'input-expense-others',
+                                        up: 'input-expense-bags' // Index 6 is bags, index 7 is others. LinePay is below both. 
+                                    })}
                                     disabled={isCredit}
                                 />
                             </div>
@@ -625,7 +648,13 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     value={expenses.serviceFee || ''}
                                     onChange={(e) => setExpenses({ ...expenses, serviceFee: Number(e.target.value) })}
                                     disabled={isCredit}
-                                    onKeyDown={(e) => handleSidebarKeyDown(e, 'input-expense-serviceFee', 'btn-save-data', 'input-expense-linePay')}
+                                    onKeyDown={(e) => handleSidebarKeyDown(e, {
+                                        next: 'btn-save-data',
+                                        prev: 'input-expense-linePay',
+                                        right: 'btn-save-data',
+                                        left: 'input-expense-linePay',
+                                        up: 'input-expense-others'
+                                    })}
                                 />
                             </div>
                         </div>
