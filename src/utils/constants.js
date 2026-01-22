@@ -34,10 +34,13 @@ export const CASE_MAP = {
 export const sortProducts = (list, nameKey) => {
     return [...list].sort((a, b) => {
         // 1. Priority: sortWeight (from Google Sheet)
-        // Treat 0 (default) as very low priority so weighted items float to top
-        const weightA = a.sortWeight || 999999;
-        const weightB = b.sortWeight || 999999;
-        if (weightA !== weightB) return weightA - weightB;
+        // Treat 0, null, or undefined as 999999 (lowest priority)
+        const weightA = Number(a.sortWeight) || 999999;
+        const weightB = Number(b.sortWeight) || 999999;
+
+        if (weightA !== weightB) {
+            return weightA - weightB;
+        }
 
         // 2. Secondary: PRODUCT_ORDER (Legacy constant-based sorting)
         const nameA = String(a[nameKey] || '');

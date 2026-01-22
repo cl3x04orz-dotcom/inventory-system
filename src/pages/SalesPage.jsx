@@ -37,6 +37,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 // [User Request] Filter out only if BOTH stock and originalStock are 0
                 const content = data.filter(p => (Number(p.stock) || 0) > 0 || (Number(p.originalStock) || 0) > 0);
                 const sortedProducts = sortProducts(content, 'name');
+                console.log('Sales Page - Sorted Weights:', sortedProducts.slice(0, 5).map(p => ({ name: p.name, weight: p.sortWeight })));
                 console.log('Sales Page - Sorted Products (Stock or Original > 0):', sortedProducts);
 
                 setRows(sortedProducts.map(p => {
