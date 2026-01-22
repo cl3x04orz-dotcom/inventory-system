@@ -16,7 +16,6 @@ export const PRICE_MAP = {
     "即期優格500": 50, "即期優格1000": 60
 };
 
-export const PRODUCT_ORDER = Object.keys(PRICE_MAP);
 
 export const CASE_MAP = {
     "六甲1L": 20, "崙背1L": 20, "崙背2L": 12, "呈鮮奶1L": 20, "呈鮮奶2L": 12, "呈羊奶": 20,
@@ -33,30 +32,22 @@ export const CASE_MAP = {
 
 export const sortProducts = (list, nameKey) => {
     return [...list].sort((a, b) => {
-        // 1. Priority: sortWeight (from Google Sheet)
-        // Treat 0, null, or undefined as 999999 (lowest priority)
-        const weightA = Number(a.sortWeight) || 999999;
-        const weightB = Number(b.sortWeight) || 999999;
+        // 1. Primary: sortWeight (from Google Sheet)
+        const weightA = (a.sortWeight !== undefined && a.sortWeight !== null && Number(a.sortWeight) !== 0)
+            ? Number(a.sortWeight)
+            : 999999;
+        const weightB = (b.sortWeight !== undefined && b.sortWeight !== null && Number(b.sortWeight) !== 0)
+            ? Number(b.sortWeight)
+            : 999999;
 
         if (weightA !== weightB) {
             return weightA - weightB;
         }
 
-        // 2. Secondary: PRODUCT_ORDER (Legacy constant-based sorting)
+        // 2. Fallback: Alphabetical
         const nameA = String(a[nameKey] || '');
         const nameB = String(b[nameKey] || '');
-
-        const indexA = PRODUCT_ORDER.indexOf(nameA);
-        const indexB = PRODUCT_ORDER.indexOf(nameB);
-
-        if (indexA !== -1 || indexB !== -1) {
-            if (indexA === -1) return 1;
-            if (indexB === -1) return -1;
-            return indexA - indexB;
-        }
-
-        // 3. Fallback: Alphabetical
-        return nameA.localeCompare(nameB);
+        return nameA.localeCompare(nameB, 'zh-Hant');
     });
 };
 
