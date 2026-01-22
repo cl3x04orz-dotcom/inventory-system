@@ -182,7 +182,14 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             if (idx < rows.length - 1) targetId = `${prefix}${idx + 1}-${field}`;
             else targetId = 'input-cash-1000';
         } else if (e.key === 'ArrowLeft') {
-            if (colIdx > 0) targetId = `${prefix}${idx}-${sequence[colIdx - 1]}`;
+            if (colIdx > 0) {
+                targetId = `${prefix}${idx}-${sequence[colIdx - 1]}`;
+            } else {
+                // At the first column (picked), jump to PREVIOUS row's last column (price)
+                if (idx > 0) {
+                    targetId = `${prefix}${idx - 1}-price`;
+                }
+            }
         } else if (e.key === 'ArrowRight') {
             if (colIdx < sequence.length - 1) {
                 targetId = `${prefix}${idx}-${sequence[colIdx + 1]}`;
@@ -217,9 +224,13 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 }
             }
         } else if (e.key === 'ArrowLeft') {
-            // Back to Table (Last row, last col)
-            if (rows.length > 0) {
-                focusAndSelect(`input-${rows.length - 1}-price`);
+            // Stay in sidebar: jump to previous field (same as ArrowUp)
+            if (prevId) focusAndSelect(prevId);
+            else {
+                // Top of sidebar -> Back to Table (Last row, last col)
+                if (rows.length > 0) {
+                    focusAndSelect(`input-${rows.length - 1}-price`);
+                }
             }
         }
     };
@@ -424,7 +435,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     <div className="text-xs text-[var(--text-secondary)]">
                                         售出: <span className="font-bold text-blue-500 text-sm ml-1">{row.sold}</span>
                                     </div>
-                                    <div className="text-sm font-bold text-emerald-500 font-mono">
+                                    <div className="text-sm font-bold text-emerald-700 font-mono">
                                         <span className="text-xs text-[var(--text-tertiary)] font-normal mr-1">小計</span>
                                         ${row.subtotal?.toLocaleString()}
                                     </div>
@@ -488,7 +499,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     </td>
                                     <td className="p-3 text-center font-bold text-blue-500">{row.sold}</td>
                                     <td className="p-3"><input id={`input-${idx}-price`} type="number" className="input-field text-center p-1 w-20" value={row.price} onChange={(e) => handleRowChange(row.id, 'price', e.target.value)} onKeyDown={(e) => handleKeyDown(e, idx, 'price')} /></td>
-                                    <td className="p-3 text-right font-mono text-emerald-500">${row.subtotal?.toLocaleString()}</td>
+                                    <td className="p-3 text-right font-mono text-emerald-700">${row.subtotal?.toLocaleString()}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -496,7 +507,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 </div>
                 <div className="mt-4 pt-4 border-t border-[var(--border-primary)] flex justify-between items-center bg-[var(--bg-secondary)] p-4 rounded-lg">
                     <span className="text-[var(--text-secondary)]">總繳回金額 (商品計算)</span>
-                    <span className="text-2xl font-bold text-emerald-500">${totalSalesAmount.toLocaleString()}</span>
+                    <span className="text-2xl font-bold text-emerald-700">${totalSalesAmount.toLocaleString()}</span>
                 </div>
             </div>
 
