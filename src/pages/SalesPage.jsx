@@ -403,6 +403,16 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             <ListOrdered size={16} />
                             {isSorting ? '儲存排序' : '自定義排序'}
                         </button>
+
+                        <button
+                            onClick={() => {
+                                console.log('Current Rows Data:', rows);
+                                alert(JSON.stringify(rows.slice(0, 3).map(r => ({ name: r.name, w: r.sortWeight })), null, 2));
+                            }}
+                            className="px-2 py-1 text-[10px] bg-gray-200 text-gray-600 rounded opacity-50 hover:opacity-100"
+                        >
+                            DEBUG
+                        </button>
                     </div>
                 </div>
                 <div className="flex-1 overflow-auto">
