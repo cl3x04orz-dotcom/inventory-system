@@ -38,9 +38,18 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 console.log('Sales Page - Sorted Products (Stock or Original > 0):', sortedProducts);
 
                 setRows(sortedProducts.map(p => {
-                    // Use custom selling price if available, otherwise fallback to system price
+                    // 1. Get system default and PRICE_MAP override
                     const systemPrice = Number(p.price) || 0;
-                    const customPrice = PRICE_MAP[p.name] !== undefined ? PRICE_MAP[p.name] : systemPrice;
+                    const mapPrice = PRICE_MAP[p.name] !== undefined ? PRICE_MAP[p.name] : null;
+
+                    // 2. Local memory override
+                    const localPriceKey = `last_price_${p.id}`;
+                    const localPrice = localStorage.getItem(localPriceKey);
+
+                    // Priority: Local Memory > PRICE_MAP > System Price
+                    let finalPrice = systemPrice;
+                    if (mapPrice !== null) finalPrice = mapPrice;
+                    if (localPrice !== null) finalPrice = Number(localPrice);
 
                     return {
                         id: p.id,
@@ -51,7 +60,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                         original: 0,
                         returns: 0,
                         sold: 0,
-                        price: customPrice,
+                        price: finalPrice,
                         subtotal: 0
                     };
                 }));
@@ -87,19 +96,24 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             let newReturns = field === 'returns' ? val : (r.returns || 0);
             let newPrice = field === 'price' ? val : (r.price || 0);
 
-            // 2. Validate Stock Limits
+            // 2. Local Price Memory Persistence
+            if (field === 'price') {
+                localStorage.setItem(`last_price_${id}`, newPrice.toString());
+            }
+
+            // 3. Validate Stock Limits
             if (newPicked > r.stock) newPicked = r.stock;
             if (newPicked < 0) newPicked = 0;
 
             if (newOriginal > r.originalStock) newOriginal = r.originalStock;
             if (newOriginal < 0) newOriginal = 0;
 
-            // 3. Validate Returns Limit (Cannot return more than taken)
+            // 4. Validate Returns Limit (Cannot return more than taken)
             const totalInHand = newPicked + newOriginal;
             if (newReturns > totalInHand) newReturns = totalInHand;
             if (newReturns < 0) newReturns = 0;
 
-            // 4. Construct updated row
+            // 5. Construct updated row
             const updated = {
                 ...r,
                 picked: newPicked,
@@ -108,7 +122,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 price: newPrice
             };
 
-            // 5. Calculate Sold & Subtotal
+            // 6. Calculate Sold & Subtotal
             updated.sold = updated.picked + updated.original - updated.returns;
             updated.subtotal = updated.sold * (updated.price || 0);
 
@@ -140,8 +154,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         // Enter Logic
         if (e.key === 'Enter') {
             e.preventDefault();
-            // User requested sequence: picked -> original -> returns -> Next Row picked
-            const enterSequence = ['picked', 'original', 'returns'];
+            // User requested sequence: picked -> original -> returns -> price -> Next Row picked
+            const enterSequence = ['picked', 'original', 'returns', 'price'];
             const currentFieldIdx = enterSequence.indexOf(field);
 
             if (currentFieldIdx < enterSequence.length - 1 && currentFieldIdx !== -1) {
@@ -149,11 +163,11 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 const nextField = enterSequence[currentFieldIdx + 1];
                 focusAndSelect(`${prefix}${idx}-${nextField}`);
             } else {
-                // If it's returns (or price/other unexpected), move to next row
+                // If it's price (or beyond), move to next row first field
                 if (idx < rows.length - 1) {
                     focusAndSelect(`${prefix}${idx + 1}-picked`);
                 } else {
-                    // Last row -> Jump to Sidebar (1000 cash)
+                    // Last row last col -> Jump to Sidebar (1000 cash)
                     focusAndSelect('input-cash-1000');
                 }
             }
@@ -170,8 +184,17 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         } else if (e.key === 'ArrowLeft') {
             if (colIdx > 0) targetId = `${prefix}${idx}-${sequence[colIdx - 1]}`;
         } else if (e.key === 'ArrowRight') {
-            if (colIdx < sequence.length - 1) targetId = `${prefix}${idx}-${sequence[colIdx + 1]}`;
-            else targetId = 'input-cash-1000';
+            if (colIdx < sequence.length - 1) {
+                targetId = `${prefix}${idx}-${sequence[colIdx + 1]}`;
+            } else {
+                // At the last column (price), jump to the NEXT row's first column (picked)
+                if (idx < rows.length - 1) {
+                    targetId = `${prefix}${idx + 1}-picked`;
+                } else {
+                    // Last row last col -> Jump to Sidebar
+                    targetId = 'input-cash-1000';
+                }
+            }
         }
 
         if (targetId) focusAndSelect(targetId);
