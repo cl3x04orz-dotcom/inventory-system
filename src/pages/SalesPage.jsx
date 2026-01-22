@@ -65,8 +65,9 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                         sold: 0,
                         price: finalPrice,
                         subtotal: 0,
-                        sortWeight: Number(p.sortWeight) || 0,
-                        fromSheet: p._fromSheet || 'unknown'
+                        sortWeight: p.sortWeight,
+                        fromSheet: p._fromSheet,
+                        fromSS: p._ssName
                     };
                 }));
             } else {
@@ -407,16 +408,21 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                         <button
                             onClick={() => {
-                                console.log('Current Rows Data:', rows);
-                                alert(JSON.stringify(rows.slice(0, 3).map(r => ({
-                                    name: `[${r.name}]`,
-                                    w: r.sortWeight,
-                                    sheet: r.fromSheet
-                                })), null, 2));
+                                console.log('Current URL:', apiUrl);
+                                const info = {
+                                    api: apiUrl,
+                                    rows: rows.slice(0, 3).map(r => ({
+                                        n: `[${r.name}]`,
+                                        w: r.sortWeight ?? '?',
+                                        sheet: r.fromSheet ?? '?',
+                                        ss: r.fromSS ?? '?'
+                                    }))
+                                };
+                                alert(JSON.stringify(info, null, 2));
                             }}
-                            className="px-2 py-1 text-[10px] bg-gray-200 text-gray-600 rounded opacity-50 hover:opacity-100"
+                            className="px-2 py-1 text-[10px] bg-red-100 text-red-600 rounded border border-red-200"
                         >
-                            DEBUG
+                            檢查 API 網址與數據
                         </button>
                     </div>
                 </div>
