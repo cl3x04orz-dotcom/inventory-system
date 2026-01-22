@@ -33,18 +33,26 @@ export const CASE_MAP = {
 
 export const sortProducts = (list, nameKey) => {
     return [...list].sort((a, b) => {
+        // 1. Priority: sortWeight (from Google Sheet)
+        const weightA = a.sortWeight || 0;
+        const weightB = b.sortWeight || 0;
+        if (weightA !== weightB) return weightA - weightB;
+
+        // 2. Secondary: PRODUCT_ORDER (Legacy constant-based sorting)
         const nameA = String(a[nameKey] || '');
         const nameB = String(b[nameKey] || '');
 
         const indexA = PRODUCT_ORDER.indexOf(nameA);
         const indexB = PRODUCT_ORDER.indexOf(nameB);
 
-        if (indexA === -1 && indexB === -1) {
-            return nameA.localeCompare(nameB);
+        if (indexA !== -1 || indexB !== -1) {
+            if (indexA === -1) return 1;
+            if (indexB === -1) return -1;
+            return indexA - indexB;
         }
-        if (indexA === -1) return 1;
-        if (indexB === -1) return -1;
-        return indexA - indexB;
+
+        // 3. Fallback: Alphabetical
+        return nameA.localeCompare(nameB);
     });
 };
 

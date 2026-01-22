@@ -52,7 +52,8 @@ function apiHandler(request) {
         'getInventoryForStocktake': 'inventory_stocktake',
         'saveStocktake': 'inventory_stocktake',
         'getStocktakeHistory': 'inventory_history',
-        'getProducts': 'inventory_adjust', // 新增產品清單權限
+        'getProducts': 'inventory_adjust',
+        'updateProductSortOrder': 'system_config',
         
         // Finance (財務管理)
         'getExpenditures': 'finance_expenditure',
@@ -131,6 +132,7 @@ function apiHandler(request) {
 
             // Inventory & Purchase
             case 'getProducts': return typeof getProductsService !== 'undefined' ? getProductsService() : {error: '後端服務缺失: getProductsService'}; 
+            case 'updateProductSortOrder': return typeof updateProductSortOrderService !== 'undefined' ? updateProductSortOrderService(payload) : {error: '後端服務缺失: updateProductSortOrderService'};
             case 'getInventory': return typeof getInventoryService !== 'undefined' ? getInventoryService() : {error: '後端服務缺失: getInventoryService'}; 
             case 'getPurchaseSuggestions': return typeof getPurchaseSuggestionsService !== 'undefined' ? getPurchaseSuggestionsService() : {error: '後端服務缺失: getPurchaseSuggestionsService'}; 
             case 'addPurchase': return typeof addPurchaseService !== 'undefined' ? addPurchaseService(payload, user) : {error: '後端服務缺失: addPurchaseService (進貨功能)'}; 
@@ -540,12 +542,56 @@ function getProductsService() {
             if (header === '庫存' || header === 'Stock') p.stock = row[idx];
             if (header === '原始庫存' || header === 'OriginalStock') p.originalStock = row[idx];
             if (header === '單位' || header === 'Unit') p.unit = row[idx];
+            if (header === '排序權重' || header === 'SortWeight' || header === 'Weight') p.sortWeight = Number(row[idx]) || 0;
         });
         
         if (p.name && !p.id) p.id = p.name;
         if (p.name) products.push(p);
     }
     return products;
+}
+
+/**
+ * [Service] 更新產品排序權重 (Google Sheet 同步版)
+ */
+function updateProductSortOrderService(payload) {
+    if (!payload.productIds || !Array.isArray(payload.productIds)) {
+        return { error: 'Invalid productIds' };
+    }
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Products") || ss.getSheetByName("Inventory");
+    if (!sheet) return { error: "找不到 'Products' 或 'Inventory' 分頁" };
+
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var weightColIdx = headers.findIndex(h => h === '排序權重' || h === 'SortWeight' || h === 'Weight');
+    var idColIdx = headers.findIndex(h => h === 'ID' || h === '序號' || h === 'UUID' || h === '產品名稱' || h === '名稱' || h === 'Name');
+
+    if (idColIdx === -1) return { error: '找不到 ID 欄位' };
+
+    // 如果找不到排序權重欄位，自動在最後新增
+    if (weightColIdx === -1) {
+        weightColIdx = headers.length;
+        sheet.getRange(1, weightColIdx + 1).setValue('排序權重');
+    }
+
+    // 建立 ID 對應行號的 Map
+    var idToRowMap = {};
+    for (var i = 1; i < data.length; i++) {
+        var id = String(data[i][idColIdx]).trim();
+        if (id) idToRowMap[id] = i + 1;
+    }
+
+    // 更新權重 (以 10 為間隔：10, 20, 30...)
+    payload.productIds.forEach((id, idx) => {
+        var rowNum = idToRowMap[String(id).trim()];
+        if (rowNum) {
+            sheet.getRange(rowNum, weightColIdx + 1).setValue((idx + 1) * 10);
+        }
+    });
+
+    return { success: true };
 }
 
 

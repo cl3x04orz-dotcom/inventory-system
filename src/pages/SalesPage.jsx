@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Save, RefreshCw, Calculator, DollarSign } from 'lucide-react';
+import { Save, RefreshCw, Calculator, DollarSign, GripVertical, ListOrdered } from 'lucide-react';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { callGAS } from '../utils/api';
 import { PRICE_MAP, sortProducts } from '../utils/constants';
 
@@ -15,6 +16,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [location, setLocation] = useState(''); // This will be used as "Sales Target"
     const [paymentType, setPaymentType] = useState('CASH');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSorting, setIsSorting] = useState(false);
 
     // Handle Payment Type Effects
     useEffect(() => {
@@ -128,6 +130,27 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
             return updated;
         }));
+    };
+
+    const handleDragEnd = async (result) => {
+        if (!result.destination) return;
+
+        const items = Array.from(rows);
+        const [reorderedItem] = items.splice(result.source.index, 1);
+        items.splice(result.destination.index, 0, reorderedItem);
+
+        // Update local state immediately for responsiveness
+        setRows(items);
+
+        // Sync to Google Sheet
+        try {
+            const productIds = items.map(r => r.id);
+            await callGAS(apiUrl, 'updateProductSortOrder', { productIds }, user.token);
+            console.log('Sort order synced to Google Sheet');
+        } catch (error) {
+            console.error('Failed to sync sort order:', error);
+            // Optionally revert the state if sync fails
+        }
     };
 
     // Navigation Helpers
@@ -366,146 +389,216 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 }}
                             />
                         </div>
+
+                        {/* Drag and Drop Sort Toggle */}
+                        <button
+                            onClick={() => setIsSorting(!isSorting)}
+                            className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border transition-all ${isSorting
+                                ? 'bg-indigo-500 text-white border-indigo-500'
+                                : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
+                                }`}
+                        >
+                            <ListOrdered size={16} />
+                            {isSorting ? '儲存排序' : '自定義排序'}
+                        </button>
                     </div>
                 </div>
                 <div className="flex-1 overflow-auto">
                     {/* Mobile Card View (Visible on < md) */}
-                    <div className="md:hidden space-y-4">
-                        {rows.map((row, idx) => (
-                            <div key={row.id} className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)]">
-                                {/* Header: Name & Stock */}
-                                <div className="flex justify-between items-start mb-3">
-                                    <div className="font-bold text-[var(--text-primary)] text-lg">{row.name}</div>
-                                    <div className="text-xs font-mono bg-[var(--bg-tertiary)] px-2 py-1 rounded border border-[var(--border-primary)]">
-                                        <span className="text-[var(--text-tertiary)] mr-1">庫存</span>
-                                        <span className="text-blue-500 font-bold">{row.stock}</span>
-                                        <span className="text-[var(--text-tertiary)] mx-1">/</span>
-                                        <span className="text-orange-500 font-bold">{row.originalStock || 0}</span>
-                                    </div>
-                                </div>
+                    <DragDropContext onDragEnd={handleDragEnd}>
+                        <Droppable droppableId="mobile-rows" isDropDisabled={!isSorting}>
+                            {(provided) => (
+                                <div
+                                    {...provided.droppableProps}
+                                    ref={provided.innerRef}
+                                    className="md:hidden space-y-4"
+                                >
+                                    {rows.map((row, idx) => (
+                                        <Draggable key={row.id} draggableId={String(row.id)} index={idx} isDragDisabled={!isSorting}>
+                                            {(provided, snapshot) => (
+                                                <div
+                                                    ref={provided.innerRef}
+                                                    {...provided.draggableProps}
+                                                    className={`bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)] ${snapshot.isDragging ? 'shadow-2xl z-50 ring-2 ring-indigo-500' : ''}`}
+                                                >
+                                                    {/* Header: Name & Stock */}
+                                                    <div className="flex justify-between items-start mb-3">
+                                                        <div className="flex items-center gap-2">
+                                                            {isSorting && (
+                                                                <div {...provided.dragHandleProps} className="text-[var(--text-tertiary)] cursor-grab active:cursor-grabbing">
+                                                                    <GripVertical size={20} />
+                                                                </div>
+                                                            )}
+                                                            <div className="font-bold text-[var(--text-primary)] text-lg">{row.name}</div>
+                                                        </div>
+                                                        <div className="text-xs font-mono bg-[var(--bg-tertiary)] px-2 py-1 rounded border border-[var(--border-primary)]">
+                                                            <span className="text-[var(--text-tertiary)] mr-1">庫存</span>
+                                                            <span className="text-blue-500 font-bold">{row.stock}</span>
+                                                            <span className="text-[var(--text-tertiary)] mx-1">/</span>
+                                                            <span className="text-orange-500 font-bold">{row.originalStock || 0}</span>
+                                                        </div>
+                                                    </div>
 
-                                {/* Inputs Grid */}
-                                <div className="grid grid-cols-4 gap-2 mb-3">
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">領貨</label>
-                                        <input
-                                            id={`input-m-${idx}-picked`}
-                                            type="number"
-                                            className="input-field text-center p-2 text-base font-bold"
-                                            value={row.picked || ''}
-                                            onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
-                                            onKeyDown={(e) => handleKeyDown(e, idx, 'picked', 'input-m-')}
-                                        />
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">原貨</label>
-                                        <input
-                                            id={`input-m-${idx}-original`}
-                                            type="number"
-                                            className="input-field text-center p-2 text-base font-bold"
-                                            value={row.original || ''}
-                                            onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
-                                            onKeyDown={(e) => handleKeyDown(e, idx, 'original', 'input-m-')}
-                                        />
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">退貨</label>
-                                        <input
-                                            id={`input-m-${idx}-returns`}
-                                            type="number"
-                                            className="input-field text-center p-2 text-base font-bold text-red-600"
-                                            value={row.returns || ''}
-                                            onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
-                                            onKeyDown={(e) => handleKeyDown(e, idx, 'returns', 'input-m-')}
-                                        />
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">單價</label>
-                                        <input
-                                            id={`input-m-${idx}-price`}
-                                            type="number"
-                                            className="input-field text-center p-2 text-base font-bold"
-                                            value={row.price}
-                                            onChange={(e) => handleRowChange(row.id, 'price', e.target.value)}
-                                            onKeyDown={(e) => handleKeyDown(e, idx, 'price', 'input-m-')}
-                                        />
-                                    </div>
-                                </div>
+                                                    {/* Inputs Grid */}
+                                                    <div className="grid grid-cols-4 gap-2 mb-3">
+                                                        <div className="flex flex-col gap-1">
+                                                            <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">領貨</label>
+                                                            <input
+                                                                id={`input-m-${idx}-picked`}
+                                                                type="number"
+                                                                className="input-field text-center p-2 text-base font-bold"
+                                                                value={row.picked || ''}
+                                                                onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
+                                                                onKeyDown={(e) => handleKeyDown(e, idx, 'picked', 'input-m-')}
+                                                                disabled={isSorting}
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-1">
+                                                            <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">原貨</label>
+                                                            <input
+                                                                id={`input-m-${idx}-original`}
+                                                                type="number"
+                                                                className="input-field text-center p-2 text-base font-bold"
+                                                                value={row.original || ''}
+                                                                onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
+                                                                onKeyDown={(e) => handleKeyDown(e, idx, 'original', 'input-m-')}
+                                                                disabled={isSorting}
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-1">
+                                                            <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">退貨</label>
+                                                            <input
+                                                                id={`input-m-${idx}-returns`}
+                                                                type="number"
+                                                                className="input-field text-center p-2 text-base font-bold text-red-600"
+                                                                value={row.returns || ''}
+                                                                onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
+                                                                onKeyDown={(e) => handleKeyDown(e, idx, 'returns', 'input-m-')}
+                                                                disabled={isSorting}
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-1">
+                                                            <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">單價</label>
+                                                            <input
+                                                                id={`input-m-${idx}-price`}
+                                                                type="number"
+                                                                className="input-field text-center p-2 text-base font-bold"
+                                                                value={row.price}
+                                                                onChange={(e) => handleRowChange(row.id, 'price', e.target.value)}
+                                                                onKeyDown={(e) => handleKeyDown(e, idx, 'price', 'input-m-')}
+                                                                disabled={isSorting}
+                                                            />
+                                                        </div>
+                                                    </div>
 
-                                {/* Summary Footer */}
-                                <div className="flex justify-between items-center pt-2 border-t border-[var(--border-primary)]">
-                                    <div className="text-xs text-[var(--text-secondary)]">
-                                        售出: <span className="font-bold text-blue-500 text-sm ml-1">{row.sold}</span>
-                                    </div>
-                                    <div className="text-sm font-bold text-rose-600 font-mono">
-                                        <span className="text-xs text-[var(--text-tertiary)] font-normal mr-1">小計</span>
-                                        ${row.subtotal?.toLocaleString()}
-                                    </div>
+                                                    {/* Summary Footer */}
+                                                    <div className="flex justify-between items-center pt-2 border-t border-[var(--border-primary)]">
+                                                        <div className="text-xs text-[var(--text-secondary)]">
+                                                            售出: <span className="font-bold text-blue-500 text-sm ml-1">{row.sold}</span>
+                                                        </div>
+                                                        <div className="text-sm font-bold text-rose-600 font-mono">
+                                                            <span className="text-xs text-[var(--text-tertiary)] font-normal mr-1">小計</span>
+                                                            ${row.subtotal?.toLocaleString()}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </Draggable>
+                                    ))}
+                                    {provided.placeholder}
                                 </div>
-                            </div>
-                        ))}
-                    </div>
+                            )}
+                        </Droppable>
 
-                    {/* Desktop Table View (Hidden on < md) */}
-                    <table className="hidden md:table w-full text-left border-collapse">
-                        <thead className="sticky top-0 bg-[var(--bg-secondary)] z-10 text-[var(--text-secondary)] text-xs uppercase font-bold border-b border-[var(--border-primary)]">
-                            <tr>
-                                <th className="p-3">品項</th>
-                                <th className="p-3 w-20">庫存</th>
-                                <th className="p-3 w-24">領貨(+)</th>
-                                <th className="p-3 w-24">原貨(+)</th>
-                                <th className="p-3 w-24">退貨(-)</th>
-                                <th className="p-3 w-20 text-center">售出</th>
-                                <th className="p-3 w-24">單價</th>
-                                <th className="p-3 w-28 text-right">繳回金額</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[var(--border-primary)]">
-                            {rows.map((row, idx) => (
-                                <tr key={row.id} className="hover:bg-[var(--bg-hover)] transition-colors">
-                                    <td className="p-3 font-medium text-[var(--text-primary)]">{row.name}</td>
-                                    <td className="p-3 text-[var(--text-secondary)] font-mono tracking-wider">
-                                        <span className="text-blue-500">{row.stock}</span>
-                                        <span className="text-[var(--text-tertiary)] mx-1">/</span>
-                                        <span className="text-orange-500">{row.originalStock || 0}</span>
-                                    </td>
-                                    <td className="p-3">
-                                        <input
-                                            id={`input-${idx}-picked`}
-                                            type="number"
-                                            className="input-field text-center p-1"
-                                            value={row.picked || ''}
-                                            onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
-                                            onKeyDown={(e) => handleKeyDown(e, idx, 'picked')}
-                                        />
-                                    </td>
-                                    <td className="p-3">
-                                        <input
-                                            id={`input-${idx}-original`}
-                                            type="number"
-                                            className="input-field text-center p-1"
-                                            value={row.original || ''}
-                                            onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
-                                            onKeyDown={(e) => handleKeyDown(e, idx, 'original')}
-                                        />
-                                    </td>
-                                    <td className="p-3">
-                                        <input
-                                            id={`input-${idx}-returns`}
-                                            type="number"
-                                            className="input-field text-center p-1 text-red-600"
-                                            value={row.returns || ''}
-                                            onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
-                                            onKeyDown={(e) => handleKeyDown(e, idx, 'returns')}
-                                        />
-                                    </td>
-                                    <td className="p-3 text-center font-bold text-blue-500">{row.sold}</td>
-                                    <td className="p-3"><input id={`input-${idx}-price`} type="number" className="input-field text-center p-1 w-20" value={row.price} onChange={(e) => handleRowChange(row.id, 'price', e.target.value)} onKeyDown={(e) => handleKeyDown(e, idx, 'price')} /></td>
-                                    <td className="p-3 text-right font-mono text-rose-600">${row.subtotal?.toLocaleString()}</td>
+                        {/* Desktop Table View (Hidden on < md) */}
+                        <table className="hidden md:table w-full text-left border-collapse">
+                            <thead className="sticky top-0 bg-[var(--bg-secondary)] z-10 text-[var(--text-secondary)] text-xs uppercase font-bold border-b border-[var(--border-primary)]">
+                                <tr>
+                                    <th className="p-3 w-10"></th>
+                                    <th className="p-3">品項</th>
+                                    <th className="p-3 w-20">庫存</th>
+                                    <th className="p-3 w-24">領貨(+)</th>
+                                    <th className="p-3 w-24">原貨(+)</th>
+                                    <th className="p-3 w-24">退貨(-)</th>
+                                    <th className="p-3 w-20 text-center">售出</th>
+                                    <th className="p-3 w-24">單價</th>
+                                    <th className="p-3 w-28 text-right">繳回金額</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <Droppable droppableId="desktop-rows" isDropDisabled={!isSorting}>
+                                {(provided) => (
+                                    <tbody
+                                        {...provided.droppableProps}
+                                        ref={provided.innerRef}
+                                        className="divide-y divide-[var(--border-primary)]"
+                                    >
+                                        {rows.map((row, idx) => (
+                                            <Draggable key={row.id} draggableId={String(row.id)} index={idx} isDragDisabled={!isSorting}>
+                                                {(provided, snapshot) => (
+                                                    <tr
+                                                        ref={provided.innerRef}
+                                                        {...provided.draggableProps}
+                                                        className={`hover:bg-[var(--bg-hover)] transition-colors ${snapshot.isDragging ? 'bg-[var(--bg-tertiary)] shadow-xl z-50' : ''}`}
+                                                    >
+                                                        <td className="p-3">
+                                                            {isSorting && (
+                                                                <div {...provided.dragHandleProps} className="text-[var(--text-tertiary)] cursor-grab active:cursor-grabbing">
+                                                                    <GripVertical size={16} />
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-3 font-medium text-[var(--text-primary)]">{row.name}</td>
+                                                        <td className="p-3 text-[var(--text-secondary)] font-mono tracking-wider">
+                                                            <span className="text-blue-500">{row.stock}</span>
+                                                            <span className="text-[var(--text-tertiary)] mx-1">/</span>
+                                                            <span className="text-orange-500">{row.originalStock || 0}</span>
+                                                        </td>
+                                                        <td className="p-3">
+                                                            <input
+                                                                id={`input-${idx}-picked`}
+                                                                type="number"
+                                                                className="input-field text-center p-1"
+                                                                value={row.picked || ''}
+                                                                onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
+                                                                onKeyDown={(e) => handleKeyDown(e, idx, 'picked')}
+                                                                disabled={isSorting}
+                                                            />
+                                                        </td>
+                                                        <td className="p-3">
+                                                            <input
+                                                                id={`input-${idx}-original`}
+                                                                type="number"
+                                                                className="input-field text-center p-1"
+                                                                value={row.original || ''}
+                                                                onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
+                                                                onKeyDown={(e) => handleKeyDown(e, idx, 'original')}
+                                                                disabled={isSorting}
+                                                            />
+                                                        </td>
+                                                        <td className="p-3">
+                                                            <input
+                                                                id={`input-${idx}-returns`}
+                                                                type="number"
+                                                                className="input-field text-center p-1 text-red-600"
+                                                                value={row.returns || ''}
+                                                                onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
+                                                                onKeyDown={(e) => handleKeyDown(e, idx, 'returns')}
+                                                                disabled={isSorting}
+                                                            />
+                                                        </td>
+                                                        <td className="p-3 text-center font-bold text-blue-500">{row.sold}</td>
+                                                        <td className="p-3"><input id={`input-${idx}-price`} type="number" className="input-field text-center p-1 w-20" value={row.price} onChange={(e) => handleRowChange(row.id, 'price', e.target.value)} onKeyDown={(e) => handleKeyDown(e, idx, 'price')} disabled={isSorting} /></td>
+                                                        <td className="p-3 text-right font-mono text-rose-600">${row.subtotal?.toLocaleString()}</td>
+                                                    </tr>
+                                                )}
+                                            </Draggable>
+                                        ))}
+                                        {provided.placeholder}
+                                    </tbody>
+                                )}
+                            </Droppable>
+                        </table>
+                    </DragDropContext>
                 </div>
                 <div className="mt-4 pt-4 border-t border-[var(--border-primary)] flex justify-between items-center bg-[var(--bg-secondary)] p-4 rounded-lg">
                     <span className="text-[var(--text-secondary)]">總繳回金額 (商品計算)</span>
