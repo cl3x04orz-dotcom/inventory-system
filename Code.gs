@@ -535,14 +535,14 @@ function getProductsService() {
         
         var p = {};
         headers.forEach((h, idx) => {
-            var header = String(h || '').trim();
-            if (header === 'ID' || header === '序號' || header === 'UUID') p.id = row[idx];
-            if (header === '產品名稱' || header === '名稱' || header === 'Name') p.name = row[idx];
-            if (header === '單價' || header === 'Price' || header === '售價') p.price = row[idx];
-            if (header === '庫存' || header === 'Stock') p.stock = row[idx];
-            if (header === '原始庫存' || header === 'OriginalStock') p.originalStock = row[idx];
-            if (header === '單位' || header === 'Unit') p.unit = row[idx];
-            if (header === '排序權重' || header === 'SortWeight' || header === 'Weight') p.sortWeight = Number(row[idx]) || 0;
+            var header = String(h || '').trim().toLowerCase();
+            if (header === 'id' || header === '序號' || header === 'uuid') p.id = row[idx];
+            if (header === '產品名稱' || header === '名稱' || header === 'name') p.name = row[idx];
+            if (header === '單價' || header === 'price' || header === '售價') p.price = row[idx];
+            if (header === '庫存' || header === 'stock') p.stock = row[idx];
+            if (header === '原始庫存' || header === 'originalstock') p.originalStock = row[idx];
+            if (header === '單位' || header === 'unit') p.unit = row[idx];
+            if (header === '排序權重' || header === 'sortweight' || header === 'weight') p.sortWeight = Number(row[idx]) || 0;
         });
         
         if (p.name && !p.id) p.id = p.name;
@@ -564,11 +564,11 @@ function updateProductSortOrderService(payload) {
     if (!sheet) return { error: "找不到 'Products' 或 'Inventory' 分頁" };
 
     var data = sheet.getDataRange().getValues();
-    var headers = data[0];
-    var weightColIdx = headers.findIndex(h => h === '排序權重' || h === 'SortWeight' || h === 'Weight');
-    var idColIdx = headers.findIndex(h => h === 'ID' || h === '序號' || h === 'UUID' || h === '產品名稱' || h === '名稱' || h === 'Name');
-
-    if (idColIdx === -1) return { error: '找不到 ID 欄位' };
+    var headers = data[0].map(h => String(h || '').trim().toLowerCase());
+    var weightColIdx = headers.findIndex(h => h === '排序權重' || h === 'sortweight' || h === 'weight');
+    var idColIdx = headers.findIndex(h => h === 'id' || h === '序號' || h === 'uuid' || h === '產品名稱' || h === '名稱' || h === 'name');
+    
+    if (idColIdx === -1) return { error: '找不到 ID 或名稱欄位 (Headers: ' + headers.join(',') + ')' };
 
     // 如果找不到排序權重欄位，自動在最後新增
     if (weightColIdx === -1) {
