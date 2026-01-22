@@ -63,7 +63,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                         returns: 0,
                         sold: 0,
                         price: finalPrice,
-                        subtotal: 0
+                        subtotal: 0,
+                        sortWeight: Number(p.sortWeight) || 0
                     };
                 }));
             } else {
