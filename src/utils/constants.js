@@ -32,10 +32,9 @@ export const CASE_MAP = {
 
 export const sortProducts = (list, nameKey) => {
     return [...list].sort((a, b) => {
-        // 1. 純數值比較 (小到大)
-        // 後端預設為 999999 (未排序)
-        const wA = Number(a.sortWeight) || 999999;
-        const wB = Number(b.sortWeight) || 999999;
+        // 1. 優先權重排序 (僅對大於 0 的權重生效)
+        const wA = (a.sortWeight && Number(a.sortWeight) > 0) ? Number(a.sortWeight) : 999999;
+        const wB = (b.sortWeight && Number(b.sortWeight) > 0) ? Number(b.sortWeight) : 999999;
 
         if (wA !== wB) return wA - wB;
 
