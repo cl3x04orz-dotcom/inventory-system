@@ -37,6 +37,10 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 const content = data.filter(p => (Number(p.stock) || 0) > 0 || (Number(p.originalStock) || 0) > 0);
                 const sortedProducts = sortProducts(content, 'name');
 
+                // [Diagnostic] Print weights to console
+                console.log('--- 產品權重檢查 ---');
+                console.table(sortedProducts.slice(0, 10).map(p => ({ 品名: p.name, 權重: p.sortWeight })));
+
                 setRows(sortedProducts.map(p => {
                     const systemPrice = Number(p.price) || 0;
                     const mapPrice = PRICE_MAP[p.name] !== undefined ? PRICE_MAP[p.name] : null;

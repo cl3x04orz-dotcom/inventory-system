@@ -558,10 +558,10 @@ function getProductsService() {
             if (header.includes('單位') || header.includes('unit')) { if(!p.unit) p.unit = String(cellValue || '').trim(); }
             if (header.includes('權重') || header.includes('weight')) { 
                 var parsedWeight = parseFloat(cellValue);
-                if (!isNaN(parsedWeight)) p.sortWeight = parsedWeight; 
+                if (!isNaN(parsedWeight) && parsedWeight !== 0) p.sortWeight = parsedWeight; 
             }
         }
-        if (p.sortWeight === undefined) p.sortWeight = 0; // 確保前端一定收得到該欄位
+        if (p.sortWeight === undefined) p.sortWeight = 999999; // 預設權重設為極大值，排在最後
         
         if (p.name && !p.id) p.id = p.name;
         if (p.name) products.push(p);
