@@ -142,11 +142,15 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         // Sync to Google Sheet
         try {
             const productIds = items.map(r => r.id);
-            await callGAS(apiUrl, 'updateProductSortOrder', { productIds }, user.token);
-            console.log('Sort order synced to Google Sheet');
+            const res = await callGAS(apiUrl, 'updateProductSortOrder', { productIds }, user.token);
+            console.log('Sort order synced:', res);
+            if (res.success) {
+                // Show a brief message to the user that it's saved
+                console.log(`已成功同步 ${res.updateCount} 個商品的排序權重`);
+            }
         } catch (error) {
             console.error('Failed to sync sort order:', error);
-            // Optionally revert the state if sync fails
+            alert('排序儲存失敗：' + error.message);
         }
     };
 
