@@ -38,12 +38,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             }
 
             if (Array.isArray(data)) {
-                // 如果是調試模式或是後端驗證行，保留下來；其餘照舊過濾
-                const content = data.filter(p =>
-                    p.id === "DEBUG_VERIFY" ||
-                    (Number(p.stock) || 0) > 0 ||
-                    (Number(p.originalStock) || 0) > 0
-                );
+                // [DEBUG] 顯示所有抓到的產品，不論庫存
+                const content = data;
                 const sortedProducts = sortProducts(content, 'name');
                 console.log('Sales Page - Sorted Weights:', sortedProducts.slice(0, 5).map(p => ({ name: p.name, weight: p.sortWeight })));
                 console.log('Sales Page - Data Size:', sortedProducts.length);
@@ -76,7 +72,9 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                         sortWeight: p.sortWeight,
                         fromSheet: p._fromSheet,
                         fromSS: p._ssName,
-                        _version: p._version
+                        _version: p._version,
+                        _headers: p._headers,
+                        _rowCount: p._rowCount
                     };
                 }));
             } else {
@@ -428,7 +426,10 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                         ver: r._version ?? 'OLD'
                                     }))
                                 };
-                                alert(JSON.stringify(info, null, 2));
+                                alert(JSON.stringify({
+                                    ...info,
+                                    debug_from_row: rows.find(r => r.id === 'DEBUG_VERIFY')
+                                }, null, 2));
                             }}
                             className="px-2 py-1 text-[10px] bg-red-100 text-red-600 rounded border border-red-200"
                         >

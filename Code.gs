@@ -553,6 +553,8 @@ function getProductsServiceV2() {
         _fromSheet: sheetName,
         _ssName: ss.getName(),
         _allSheets: allSheets.join(', '),
+        _headers: JSON.stringify(headers),
+        _rowCount: data.length,
         _version: 'v_fixed_FINAL'
     });
 
