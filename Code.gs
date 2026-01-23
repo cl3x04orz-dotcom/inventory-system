@@ -516,126 +516,98 @@ function saveExpenditureService(payload) {
 }
 
 /**
- * [Service] 獲取產品清單 (生產版本)
+ * [Service] 獲取產品清單 (正式版 - 回歸 v_fixed_FINAL 邏輯)
  */
 function getProductsService() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheetName = "Products";
-    var sheet = ss.getSheetByName(sheetName);
-    if (!sheet) {
-        sheetName = "Inventory";
-        sheet = ss.getSheetByName(sheetName);
-    }
-    
+    var sheet = ss.getSheetByName("Products") || ss.getSheetByName("Inventory");
     if (!sheet) return { error: "找不到 'Products' 或 'Inventory' 分頁" };
   
     var data = sheet.getDataRange().getValues();
-    if (data.length < 2) return [];
-  
-    var headers = data[0];
+    var headers = data[0].map(h => String(h || '').trim().toLowerCase());
     var products = [];
     
-    for (var i = 1; i < data.length; i++) {
-        var row = data[i];
-        if (!row[0] && !row[1]) continue; 
-        
-        var p = { _fromSheet: sheetName, _version: 'v_fixed_FINAL' };
-        for (var idx = 0; idx < headers.length; idx++) {
-            var h = headers[idx];
-            var header = String(h || '').trim().toLowerCase();
-            var cellValue = row[idx];
+    // 增加驗證行，確保使用者知道有連上最新版
+    products.push({
+        id: "DEBUG_VERIFY",
+        name: "!!! 後端已連線 (v_fixed_FINAL) !!!",
+        stock: 999,
+        originalStock: 999,
+        price: 0,
+        sortWeight: -9999,
+        _fromSheet: sheet.getName(),
+        _version: 'v_fixed_FINAL'
+    });
+
+    if (data.length >= 2) {
+        for (var i = 1; i < data.length; i++) {
+            var row = data[i];
+            if (!row[0] && !row[1]) continue; 
             
-            if (header.includes('id') || header.includes('序號') || header.includes('uuid')) { if(!p.id) p.id = String(cellValue || '').trim(); }
-            if (header.includes('名稱') || header.includes('name')) { if(!p.name) p.name = String(cellValue || '').trim(); }
-            if (header.includes('單價') || header.includes('price') || header.includes('售價')) { if(p.price === undefined) p.price = cellValue; }
-            if (header.includes('庫存') || header.includes('stock')) {
-                if (header.includes('原始') || header.includes('original')) {
-                    if(p.originalStock === undefined) p.originalStock = cellValue;
-                } else {
-                    if(p.stock === undefined) p.stock = cellValue;
+            var p = { _fromSheet: sheet.getName(), _version: 'v_fixed_FINAL' };
+            headers.forEach((header, idx) => {
+                var cellValue = row[idx];
+                if (header.includes('id') || header.includes('序號')) p.id = String(cellValue || '').trim();
+                if (header.includes('名稱') || header.includes('name')) p.name = String(cellValue || '').trim();
+                if (header.includes('單價') || header.includes('price')) p.price = cellValue;
+                if (header.includes('庫存') || header.includes('stock')) {
+                    if (header.includes('原始') || header.includes('original')) p.originalStock = cellValue;
+                    else p.stock = cellValue;
                 }
-            }
-            if (header.includes('單位') || header.includes('unit')) { if(!p.unit) p.unit = String(cellValue || '').trim(); }
-            if (header.includes('權重') || header.includes('weight')) { 
-                var parsedWeight = parseFloat(cellValue);
-                if (!isNaN(parsedWeight) && parsedWeight !== 0) p.sortWeight = parsedWeight; 
-            }
+                if (header.includes('權重') || header.includes('weight')) p.sortWeight = Number(cellValue) || 0;
+            });
+            
+            if (p.name && !p.id) p.id = p.name;
+            if (p.name) products.push(p);
         }
-        if (p.sortWeight === undefined) p.sortWeight = 999999; // 預設權重設為極大值，排在最後
-        
-        if (p.name && !p.id) p.id = p.name;
-        if (p.name) products.push(p);
     }
     return products;
 }
 
 /**
- * [Service] 更新產品排序權重 (Google Sheet 同步版)
+ * [Service] 更新產品排序權重 (優化版)
  */
 function updateProductSortOrderService(payload) {
-    if (!payload.productIds || !Array.isArray(payload.productIds)) {
-        return { error: 'Invalid productIds' };
-    }
+    if (!payload.productIds || !Array.isArray(payload.productIds)) return { error: 'Invalid productIds' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName("Products") || ss.getSheetByName("Inventory");
-    if (!sheet) return { error: "找不到 'Products' 或 'Inventory' 分頁" };
+    if (!sheet) return { error: "找不到分頁" };
 
     var data = sheet.getDataRange().getValues();
     var headers = data[0].map(h => String(h || '').trim().toLowerCase());
     var weightColIdx = headers.findIndex(h => h.includes('權重') || h.includes('weight'));
+    var idColIdx = headers.findIndex(h => h.includes('id') || h.includes('序號') || h.includes('uuid'));
+    var nameColIdx = headers.findIndex(h => h.includes('名稱') || h.includes('name'));
 
-    // 如果找不到排序權重欄位，自動在最後新增
     if (weightColIdx === -1) {
         weightColIdx = headers.length;
         sheet.getRange(1, weightColIdx + 1).setValue('排序權重');
     }
 
-    // 建立索引，優先找 ID 欄，若無再找名稱欄
-    var idColIdx = headers.findIndex(h => h.includes('id') || h.includes('序號') || h.includes('uuid'));
-    var nameColIdx = headers.findIndex(h => h.includes('名稱') || h.includes('name'));
-    
     var idToRowMap = {};
     for (var i = 1; i < data.length; i++) {
-        var row = data[i];
-        var idVal = idColIdx !== -1 ? String(row[idColIdx] || '').trim() : "";
-        var nameVal = nameColIdx !== -1 ? String(row[nameColIdx] || '').trim() : "";
-        
-        // 優先使用 ID，其次使用名稱 (這與 getProductsService 邏輯必須一致)
+        var idVal = idColIdx !== -1 ? String(data[i][idColIdx] || '').trim() : "";
+        var nameVal = nameColIdx !== -1 ? String(data[i][nameColIdx] || '').trim() : "";
         var key = idVal || nameVal;
-        if (key) {
-            idToRowMap[key] = i + 1;
-        }
+        if (key) idToRowMap[key] = i + 1;
     }
 
-    var updateCount = 0;
-    // 使用批次讀寫 (Batch Write) 優化效能，避免過多 API 呼叫引發超時或失敗
-    // 取得權重欄位的所有資料
     var weightRange = sheet.getRange(2, weightColIdx + 1, data.length - 1, 1);
     var weightValues = weightRange.getValues();
+    var updateCount = 0;
 
-    // 更新權重 (以 10 為間隔：10, 20, 30...)
     payload.productIds.forEach((id, idx) => {
-        var targetId = String(id || '').trim();
-        var rowNum = idToRowMap[targetId];
-        if (rowNum) {
-            // rowNum 是 1-based (含表頭)，對應到 weightValues 的索引是 rowNum - 2
+        var rowNum = idToRowMap[String(id || '').trim()];
+        if (rowNum && rowNum >= 2) {
             weightValues[rowNum - 2][0] = (idx + 1) * 10;
             updateCount++;
         }
     });
 
-    // 一次性寫回試算表
     weightRange.setValues(weightValues);
     SpreadsheetApp.flush();
-
-    return { 
-        success: true, 
-        updateCount: updateCount, 
-        totalSent: payload.productIds.length,
-        debug_first_item: payload.productIds[0] + " -> 10",
-        msg: "成功同步 " + updateCount + " 筆商品的順序權重到試算表"
-    };
+    return { success: true, updateCount: updateCount };
 }
 
 
