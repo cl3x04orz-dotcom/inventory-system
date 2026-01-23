@@ -540,12 +540,21 @@ function getProductsService() {
         var row = data[i];
         if (!row[0] && !row[1]) continue; 
         
-        // [Version Check] Adding version tag
-        var p = { _fromSheet: sheetName, _version: 'v_fixed_2026_01_23' };
+        // [Version Check & Debug Info]
+        // _fromSheet: 來源分頁名稱
+        // _ssName: 試算表檔案名稱
+        // _version: 版本號 (用於驗證部署是否成功)
+        var p = { 
+            _fromSheet: sheetName, 
+            _ssName: ss.getName(),
+            _version: 'v_fixed_FINAL' 
+        };
+
         headers.forEach((h, idx) => {
             var header = String(h || '').trim().toLowerCase();
             var cellValue = row[idx];
             
+            // 使用 includes 做模糊比對，並強制 trim() 去除空格
             if (header.includes('id') || header.includes('序號') || header.includes('uuid')) p.id = String(cellValue || '').trim();
             if (header.includes('名稱') || header.includes('name')) p.name = String(cellValue || '').trim();
             if (header.includes('單價') || header.includes('price') || header.includes('售價')) p.price = cellValue;
