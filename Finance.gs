@@ -1,6 +1,6 @@
 /**
- * Service_Payables.gs
- * [Service] 應付帳款管理
+ * Finance.gs
+ * [Service] 財務管理 (應付帳款)
  */
 
 function getPayablesService(payload) {
@@ -62,33 +62,4 @@ function markPayableAsPaidService(payload) {
   if (statusIdx === 0) throw new Error('找不到狀態欄位');
   sheet.getRange(recordId, statusIdx).setValue('PAID');
   return { success: true };
-}
-/** [Service] 應付帳款管理 */
-function getPayablesService(payload) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Purchases');
-  if (!sheet) return [];
-  const data = sheet.getDataRange().getValues();
-  const productMap = typeof getProductMap === 'function' ? getProductMap() : {};
-  const groups = {};
-  
-  const start = payload.startDate ? new Date(payload.startDate) : null;
-  const end = payload.endDate ? new Date(payload.endDate) : null;
-  if (end) end.setHours(23, 59, 59);
-
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i], rowDate = new Date(row[1]);
-    // 必須是賒帳(CREDIT) 且 未付(UNPAID)
-    if (row[8] === 'CREDIT' && row[9] === 'UNPAID') {
-      if (start && rowDate < start) continue;
-      if (end && rowDate > end) continue;
-      
-      const key = `${row[2]}_${Utilities.formatDate(rowDate, "GMT+8", "yyyy-MM-dd")}`;
-      if (!groups[key]) groups[key] = { id: i + 1, date: rowDate, vendor: row[2], operator: row[7], amount: 0, items: [] };
-      const sub = Number(row[4] || 0) * Number(row[5] || 0);
-      groups[key].amount += sub;
-      groups[key].items.push({ productName: productMap[row[3]] || row[3], qty: row[4], price: row[5], subtotal: sub });
-    }
-  }
-  return Object.values(groups).reverse();
 }
