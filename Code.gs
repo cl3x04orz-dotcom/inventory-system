@@ -540,7 +540,8 @@ function getProductsService() {
         var row = data[i];
         if (!row[0] && !row[1]) continue; 
         
-        var p = { _fromSheet: sheetName };
+        // [Version Check] Adding version tag
+        var p = { _fromSheet: sheetName, _version: 'v_fixed_2026_01_23' };
         headers.forEach((h, idx) => {
             var header = String(h || '').trim().toLowerCase();
             var cellValue = row[idx];

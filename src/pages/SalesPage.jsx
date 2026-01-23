@@ -415,7 +415,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                         n: `[${r.name}]`,
                                         w: r.sortWeight ?? '?',
                                         sheet: r.fromSheet ?? '?',
-                                        ss: r.fromSS ?? '?'
+                                        ss: r.fromSS ?? '?',
+                                        ver: r._version ?? 'OLD'
                                     }))
                                 };
                                 alert(JSON.stringify(info, null, 2));
