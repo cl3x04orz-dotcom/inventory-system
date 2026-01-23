@@ -3,6 +3,20 @@ import { Search, Calendar, MapPin, User, FileText, TrendingUp, Package, DollarSi
 import { callGAS } from '../utils/api';
 import { getLocalDateString } from '../utils/constants';
 
+// 格式化數字：四捨五入到小數點第 1 位
+const formatNumberWithDecimal = (num) => {
+    return num.toFixed(1).replace(/\.0$/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+};
+
+// 根據數字長度動態調整字體大小
+const getDynamicFontSize = (num) => {
+    const str = formatNumberWithDecimal(num);
+    const len = str.length;
+    if (len <= 6) return 'text-xs md:text-xl';      // 短數字：正常大小
+    if (len <= 9) return 'text-[10px] md:text-lg';  // 中等數字：稍小
+    return 'text-[8px] md:text-base';               // 長數字：很小
+};
+
 export default function ReportPage({ user, apiUrl }) {
     const [startDate, setStartDate] = useState(getLocalDateString());
     const [endDate, setEndDate] = useState(getLocalDateString());
@@ -152,27 +166,27 @@ export default function ReportPage({ user, apiUrl }) {
                         <div className="grid grid-cols-3 md:grid-cols-6 gap-2 md:gap-3 w-full md:w-auto">
                             <div className="px-2 md:px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-200/20 shadow-sm">
                                 <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">應繳回</p>
-                                <p className="text-sm md:text-xl font-bold text-amber-700 text-center">${totalReturnAmount.toLocaleString()}</p>
+                                <p className={`${getDynamicFontSize(totalReturnAmount)} font-bold text-amber-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalReturnAmount)}</p>
                             </div>
                             <div className="px-2 md:px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-200/20 shadow-sm">
                                 <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總銷售</p>
-                                <p className="text-sm md:text-xl font-bold text-emerald-700 text-center">${totalSales.toLocaleString()}</p>
+                                <p className={`${getDynamicFontSize(totalSales)} font-bold text-emerald-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalSales)}</p>
                             </div>
                             <div className="px-2 md:px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-200/20 shadow-sm">
                                 <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總支出</p>
-                                <p className="text-sm md:text-xl font-bold text-rose-700 text-center">${totalExpenses.toLocaleString()}</p>
+                                <p className={`${getDynamicFontSize(totalExpenses)} font-bold text-rose-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalExpenses)}</p>
                             </div>
                             <div className="px-2 md:px-4 py-2 rounded-xl bg-cyan-500/10 border border-cyan-200/20 shadow-sm">
                                 <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">結算</p>
-                                <p className="text-sm md:text-xl font-bold text-cyan-700 text-center">${totalFinalTotal.toLocaleString()}</p>
+                                <p className={`${getDynamicFontSize(totalFinalTotal)} font-bold text-cyan-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalFinalTotal)}</p>
                             </div>
                             <div className="px-2 md:px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-200/20 shadow-sm">
                                 <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總數量</p>
-                                <p className="text-sm md:text-xl font-bold text-blue-700 text-center">{totalQty.toLocaleString()}</p>
+                                <p className={`${getDynamicFontSize(totalQty)} font-bold text-blue-700 text-center whitespace-nowrap`}>{formatNumberWithDecimal(totalQty)}</p>
                             </div>
                             <div className="px-2 md:px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-200/20 shadow-sm">
                                 <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總筆數</p>
-                                <p className="text-sm md:text-xl font-bold text-purple-700 text-center">{reportData.length}</p>
+                                <p className="text-xs md:text-xl font-bold text-purple-700 text-center whitespace-nowrap">{reportData.length}</p>
                             </div>
                         </div>
                     )}

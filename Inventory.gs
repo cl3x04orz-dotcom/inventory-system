@@ -191,50 +191,132 @@ function getAdjustmentHistory(filter) {
 // ==========================================
 function getInventoryValuation() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const iSheet = ss.getSheetByName('Inventory');
-  const inventory = iSheet.getDataRange().getValues().slice(1);
-  const productMap = typeof getProductMap !== 'undefined' ? getProductMap() : {};
-  const valuations = {};
+  let iSheet = ss.getSheetByName('Inventory') || ss.getSheetByName('inventory');
+  let pSheet = ss.getSheetByName('Products') || ss.getSheetByName('products');
+  if (!iSheet) return [];
 
-  // 讀取 Products 分頁的排序權重
-  const productsSheet = ss.getSheetByName('Products');
-  const sortWeightMap = {};
+  const invData = iSheet.getDataRange().getValues();
+  if (invData.length <= 1) return [];
+
+  const invHeaders = invData[0].map(h => String(h || '').trim().toLowerCase());
   
-  if (productsSheet) {
-    const productData = productsSheet.getDataRange().getValues();
+  // 找產品 ID 欄位 (關鍵：必須優先找包含 'product' 或 '產品' 的 ID，避免選到 A 欄的 Batch ID)
+  let idxPId = invHeaders.findIndex(h => (h.includes('product') || h.includes('產品') || h.includes('品項')) && h.includes('id'));
+  if (idxPId === -1) idxPId = invHeaders.findIndex(h => h.includes('product') || h.includes('產品') || h.includes('品項') || h.includes('商品'));
+  if (idxPId === -1) idxPId = invHeaders.findIndex(h => h.includes('id') || h.includes('序號') || h.includes('uuid'));
+  if (idxPId === -1) idxPId = 1; // 預設第 2 欄
+  
+  // 找數量 欄位
+  let idxQty = invHeaders.findIndex(h => h.includes('量') || h.includes('qty') || h.includes('quantity'));
+  if (idxQty === -1) idxQty = 2; // 預設第 3 欄
+  
+  // 找類型 欄位
+  let idxType = invHeaders.findIndex(h => h.includes('類') || h === 'type');
+  if (idxType === -1) idxType = 5; // 預設第 6 欄
+  
+  // 找價格 欄位
+  let idxPrice = invHeaders.findIndex(h => h.includes('價') || h.includes('cost') || h.includes('amount') || h.includes('金額'));
+  if (idxPrice === -1) idxPrice = 6; // 預設第 7 欄
+
+  // 讀取 Products 分頁以取得名稱、排序權重與備用單價
+  const dynamicProductMap = {};
+  const sortWeightMap = {};
+  const defaultPriceMap = {};
+  
+  if (pSheet) {
+    const productData = pSheet.getDataRange().getValues();
     if (productData.length > 1) {
-      const headers = productData[0].map(h => String(h || '').trim().toLowerCase());
-      const idxId = headers.findIndex(h => h.includes('id') || h.includes('序號') || h.includes('uuid'));
-      const idxWeight = headers.indexOf('排序權重') !== -1 ? headers.indexOf('排序權重') : 
-                       headers.indexOf('sortweight') !== -1 ? headers.indexOf('sortweight') :
-                       headers.findIndex(h => h.includes('權重') && !h.includes('單位'));
+      const pHeaders = productData[0].map(h => String(h || '').trim().toLowerCase());
       
-      if (idxId !== -1 && idxWeight !== -1) {
-        for (let i = 1; i < productData.length; i++) {
-          const productId = String(productData[i][idxId] || '').trim();
-          const weight = Number(productData[i][idxWeight]) || 999999;
-          if (productId) sortWeightMap[productId] = weight;
+      // 0. 優先嘗試精確匹配 (根據用戶截圖 id, name)
+      let pIdxId = pHeaders.indexOf('id');
+      let pIdxName = pHeaders.indexOf('name');
+      
+      // 1. 如果沒找到，才使用模糊搜尋
+      if (pIdxId === -1) {
+        pIdxId = pHeaders.findIndex(h => h.includes('id') || h.includes('序號') || h.includes('uuid') || h === '序');
+      }
+      
+      if (pIdxName === -1) {
+        pIdxName = pHeaders.findIndex(h => {
+            const isNameKeyword = h.includes('名稱') || h.includes('品項') || h.includes('品名') || h === 'name' || h.includes('product') || h.includes('商品');
+            const isIdKeyword = h.includes('id') || h.includes('uuid') || h.includes('編號') || h.includes('code');
+            return isNameKeyword && !isIdKeyword;
+        });
+      }
+
+      // Fallbacks if not found - 強制預設
+      if (pIdxId === -1) pIdxId = 0; // Default to column A (ID is usually first)
+      if (pIdxName === -1) pIdxName = 1; // Default to column B (Name is usually second)
+      
+      const pIdxWeight = pHeaders.indexOf('排序權重') !== -1 ? pHeaders.indexOf('排序權重') : 
+                         pHeaders.indexOf('sortweight') !== -1 ? pHeaders.indexOf('sortweight') :
+                         pHeaders.findIndex(h => h.includes('權重') && !h.includes('單位'));
+      const pIdxPrice = pHeaders.findIndex(h => h.includes('單價') || h.includes('價格') || h.includes('price') || h === '錢');
+      
+      for (let i = 1; i < productData.length; i++) {
+        const row = productData[i];
+        const productId = String(row[pIdxId] || '').trim();
+        const productName = String(row[pIdxName] || '').trim();
+        
+        if (!productId && !productName) continue;
+        const key = productId || productName;
+        
+        dynamicProductMap[key] = productName || productId;
+        
+        if (pIdxWeight !== -1) {
+          sortWeightMap[key] = Number(row[pIdxWeight]) || 999999;
+        }
+        if (pIdxPrice !== -1) {
+          defaultPriceMap[key] = Number(row[pIdxPrice]) || 0;
         }
       }
     }
   }
 
-  inventory.forEach(row => {
-    const pId = row[1], qty = Number(row[2]), price = Number(row[6] || 0); 
-    if (qty <= 0) return;
-    const pName = productMap[pId] || pId;
+  const valuations = {};
+  for (let i = 1; i < invData.length; i++) {
+    const row = invData[i];
+    const pId = String(row[idxPId] || '').trim();
+    const qty = Number(row[idxQty]) || 0;
+    const type = String(row[idxType] || '').trim().toUpperCase();
+    
+    // 優先使用庫存表內的價格，若無則使用產品表預設單價
+    let price = idxPrice !== -1 ? Number(row[idxPrice]) : 0;
+    if (!price || price === 0) {
+      price = defaultPriceMap[pId] || 0;
+    }
+
+    if (qty <= 0 || !pId) continue;
+    
+    const pName = dynamicProductMap[pId] || pId;
     if (!valuations[pName]) {
       valuations[pName] = { 
         name: pName, 
+        stockQty: 0,
+        stockValue: 0,
+        originalQty: 0,
+        originalValue: 0,
         totalQty: 0, 
         totalValue: 0,
         productId: pId,
         sortWeight: sortWeightMap[pId] || 999999
       };
     }
+    
+    // 根據類型分別累加
+    if (type === 'STOCK') {
+      valuations[pName].stockQty += qty;
+      valuations[pName].stockValue += (qty * price);
+    } else if (type === 'ORIGINAL') {
+      valuations[pName].originalQty += qty;
+      valuations[pName].originalValue += (qty * price);
+    }
+    
+    // 總計
     valuations[pName].totalQty += qty;
     valuations[pName].totalValue += (qty * price);
-  });
+  }
   
   // 按照排序權重排序
   return Object.values(valuations).sort((a, b) => a.sortWeight - b.sortWeight);
