@@ -32,13 +32,21 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             const data = await callGAS(apiUrl, 'getProductsV2', {}, user.token);
             console.log('Sales Page - Raw Products Data:', data);
 
+            // 如果後端回傳了除錯資訊（例如分頁找不到時），立刻彈窗
+            if (data && data.debug) {
+                alert(`【後端除錯資訊】\n檔案名稱: ${data.debug.ssName}\n所有分頁: ${data.debug.allSheets.join(', ')}`);
+            }
+
             if (Array.isArray(data)) {
-                // Show ALL products (removed stock filter for debugging)
-                // [User Request] Filter out only if BOTH stock and originalStock are 0
-                const content = data.filter(p => (Number(p.stock) || 0) > 0 || (Number(p.originalStock) || 0) > 0);
+                // 如果是調試模式或是後端驗證行，保留下來；其餘照舊過濾
+                const content = data.filter(p =>
+                    p.id === "DEBUG_VERIFY" ||
+                    (Number(p.stock) || 0) > 0 ||
+                    (Number(p.originalStock) || 0) > 0
+                );
                 const sortedProducts = sortProducts(content, 'name');
                 console.log('Sales Page - Sorted Weights:', sortedProducts.slice(0, 5).map(p => ({ name: p.name, weight: p.sortWeight })));
-                console.log('Sales Page - Sorted Products (Stock or Original > 0):', sortedProducts);
+                console.log('Sales Page - Data Size:', sortedProducts.length);
 
                 setRows(sortedProducts.map(p => {
                     // 1. Get system default and PRICE_MAP override

@@ -520,6 +520,8 @@ function saveExpenditureService(payload) {
  */
 function getProductsServiceV2() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var allSheets = ss.getSheets().map(s => s.getName());
+    
     // 優先讀取 Products，次之 Inventory
     var sheetName = "Products";
     var sheet = ss.getSheetByName(sheetName);
@@ -528,49 +530,64 @@ function getProductsServiceV2() {
         sheet = ss.getSheetByName(sheetName);
     }
     
-    if (!sheet) return { error: "找不到 'Products' 或 'Inventory' 分頁" };
+    if (!sheet) {
+        // 如果連 Inventory 都沒有，回傳自定義錯誤包
+        return { 
+            error: "找不到 'Products' 或 'Inventory' 分頁",
+            debug: { ssName: ss.getName(), allSheets: allSheets }
+        };
+    }
   
     var data = sheet.getDataRange().getValues();
-    if (data.length < 2) return [];
-  
     var headers = data[0];
     var products = [];
     
-    for (var i = 1; i < data.length; i++) {
-        var row = data[i];
-        if (!row[0] && !row[1]) continue; 
-        
-        // [Version Check & Debug Info]
-        // _fromSheet: 來源分頁名稱
-        // _ssName: 試算表檔案名稱
-        // _version: 版本號 (用於驗證部署是否成功)
-        var p = { 
-            _fromSheet: sheetName, 
-            _ssName: ss.getName(),
-            _version: 'v_fixed_FINAL' 
-        };
+    // 強制插入一條「後端驗證」商品，確保我們連到對的程式碼
+    products.push({
+        id: "DEBUG_VERIFY",
+        name: "!!! 後端已連線 (v_FINAL) !!!",
+        stock: 999,
+        originalStock: 999,
+        price: 0,
+        sortWeight: -9999,
+        _fromSheet: sheetName,
+        _ssName: ss.getName(),
+        _allSheets: allSheets.join(', '),
+        _version: 'v_fixed_FINAL'
+    });
 
-        headers.forEach((h, idx) => {
-            var header = String(h || '').trim().toLowerCase();
-            var cellValue = row[idx];
+    if (data.length >= 2) {
+        for (var i = 1; i < data.length; i++) {
+            var row = data[i];
+            if (!row[0] && !row[1]) continue; 
             
-            // 使用 includes 做模糊比對，並強制 trim() 去除空格
-            if (header.includes('id') || header.includes('序號') || header.includes('uuid')) p.id = String(cellValue || '').trim();
-            if (header.includes('名稱') || header.includes('name')) p.name = String(cellValue || '').trim();
-            if (header.includes('單價') || header.includes('price') || header.includes('售價')) p.price = cellValue;
-            if (header.includes('庫存') || header.includes('stock')) {
-                if (header.includes('原始') || header.includes('original')) {
-                    p.originalStock = cellValue;
-                } else {
-                    p.stock = cellValue;
+            var p = { 
+                _fromSheet: sheetName, 
+                _ssName: ss.getName(),
+                _version: 'v_fixed_FINAL' 
+            };
+
+            headers.forEach((h, idx) => {
+                var header = String(h || '').trim().toLowerCase();
+                var cellValue = row[idx];
+                
+                if (header.includes('id') || header.includes('序號') || header.includes('uuid')) p.id = String(cellValue || '').trim();
+                if (header.includes('名稱') || header.includes('name')) p.name = String(cellValue || '').trim();
+                if (header.includes('單價') || header.includes('price') || header.includes('售價')) p.price = cellValue;
+                if (header.includes('庫存') || header.includes('stock')) {
+                    if (header.includes('原始') || header.includes('original')) {
+                        p.originalStock = cellValue;
+                    } else {
+                        p.stock = cellValue;
+                    }
                 }
-            }
-            if (header.includes('單位') || header.includes('unit')) p.unit = String(cellValue || '').trim();
-            if (header.includes('權重') || header.includes('weight')) p.sortWeight = Number(cellValue) || 0;
-        });
-        
-        if (p.name && !p.id) p.id = p.name;
-        if (p.name) products.push(p);
+                if (header.includes('單位') || header.includes('unit')) p.unit = String(cellValue || '').trim();
+                if (header.includes('權重') || header.includes('weight')) p.sortWeight = Number(cellValue) || 0;
+            });
+            
+            if (p.name && !p.id) p.id = p.name;
+            if (p.name) products.push(p);
+        }
     }
     return products;
 }
