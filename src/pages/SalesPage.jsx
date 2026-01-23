@@ -29,31 +29,21 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
     const load = useCallback(async () => {
         try {
-            const data = await callGAS(apiUrl, 'getProductsV2', {}, user.token);
+            const data = await callGAS(apiUrl, 'getProducts', {}, user.token);
             console.log('Sales Page - Raw Products Data:', data);
 
-            // 如果後端回傳了除錯資訊（例如分頁找不到時），立刻彈窗
-            if (data && data.debug) {
-                alert(`【後端除錯資訊】\n檔案名稱: ${data.debug.ssName}\n所有分頁: ${data.debug.allSheets.join(', ')}`);
-            }
-
             if (Array.isArray(data)) {
-                // [DEBUG] 顯示所有抓到的產品，不論庫存
-                const content = data;
+                // Filter out products with 0 stock/originalStock
+                const content = data.filter(p => (Number(p.stock) || 0) > 0 || (Number(p.originalStock) || 0) > 0);
                 const sortedProducts = sortProducts(content, 'name');
-                console.log('Sales Page - Sorted Weights:', sortedProducts.slice(0, 5).map(p => ({ name: p.name, weight: p.sortWeight })));
-                console.log('Sales Page - Data Size:', sortedProducts.length);
 
                 setRows(sortedProducts.map(p => {
-                    // 1. Get system default and PRICE_MAP override
                     const systemPrice = Number(p.price) || 0;
                     const mapPrice = PRICE_MAP[p.name] !== undefined ? PRICE_MAP[p.name] : null;
 
-                    // 2. Local memory override
                     const localPriceKey = `last_price_${p.id}`;
                     const localPrice = localStorage.getItem(localPriceKey);
 
-                    // Priority: Local Memory > PRICE_MAP > System Price
                     let finalPrice = systemPrice;
                     if (mapPrice !== null) finalPrice = mapPrice;
                     if (localPrice !== null) finalPrice = Number(localPrice);
@@ -70,11 +60,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                         price: finalPrice,
                         subtotal: 0,
                         sortWeight: p.sortWeight,
-                        fromSheet: p._fromSheet,
-                        fromSS: p._ssName,
-                        _version: p._version,
-                        _headers: p._headers,
-                        _rowCount: p._rowCount
+                        fromSheet: p._fromSheet
                     };
                 }));
             } else {
@@ -413,28 +399,6 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             {isSorting ? '儲存排序' : '自定義排序'}
                         </button>
 
-                        <button
-                            onClick={() => {
-                                console.log('Current URL:', apiUrl);
-                                const info = {
-                                    api: apiUrl,
-                                    rows: rows.slice(0, 3).map(r => ({
-                                        n: `[${r.name}]`,
-                                        w: r.sortWeight ?? '?',
-                                        sheet: r.fromSheet ?? '?',
-                                        ss: r.fromSS ?? '?',
-                                        ver: r._version ?? 'OLD'
-                                    }))
-                                };
-                                alert(JSON.stringify({
-                                    ...info,
-                                    debug_from_row: rows.find(r => r.id === 'DEBUG_VERIFY')
-                                }, null, 2));
-                            }}
-                            className="px-2 py-1 text-[10px] bg-red-100 text-red-600 rounded border border-red-200"
-                        >
-                            檢查 API 網址與數據
-                        </button>
                     </div>
                 </div>
                 <div className="flex-1 overflow-auto">
