@@ -32,14 +32,14 @@ export const CASE_MAP = {
 
 export const sortProducts = (list, nameKey) => {
     return [...list].sort((a, b) => {
-        // 1. Primary: sortWeight (from Google Sheet)
-        // Ensure we treat 0, null, undefined as 'unranked' (999999)
+        // 1. 優先權重排序 (數值越小越前面)
+        // 確保非數值或 0 的權重排到最後面 (999999)
         const wA = (a.sortWeight && Number(a.sortWeight) > 0) ? Number(a.sortWeight) : 999999;
         const wB = (b.sortWeight && Number(b.sortWeight) > 0) ? Number(b.sortWeight) : 999999;
 
         if (wA !== wB) return wA - wB;
 
-        // 2. Fallback: Alphabetical
+        // 2. 次要：字母排序
         const nameA = String(a[nameKey] || '');
         const nameB = String(b[nameKey] || '');
         return nameA.localeCompare(nameB, 'zh-Hant');

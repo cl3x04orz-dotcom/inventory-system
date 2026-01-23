@@ -557,9 +557,11 @@ function getProductsService() {
             }
             if (header.includes('單位') || header.includes('unit')) { if(!p.unit) p.unit = String(cellValue || '').trim(); }
             if (header.includes('權重') || header.includes('weight')) { 
-                if(p.sortWeight === undefined || p.sortWeight === 0) p.sortWeight = Number(cellValue) || 0; 
+                var parsedWeight = parseFloat(cellValue);
+                if (!isNaN(parsedWeight)) p.sortWeight = parsedWeight; 
             }
         }
+        if (p.sortWeight === undefined) p.sortWeight = 0; // 確保前端一定收得到該欄位
         
         if (p.name && !p.id) p.id = p.name;
         if (p.name) products.push(p);
@@ -631,7 +633,8 @@ function updateProductSortOrderService(payload) {
         success: true, 
         updateCount: updateCount, 
         totalSent: payload.productIds.length,
-        msg: "成功更新 " + updateCount + " 筆資料的排序權重"
+        debug_first_item: payload.productIds[0] + " -> 10",
+        msg: "成功同步 " + updateCount + " 筆商品的順序權重到試算表"
     };
 }
 
