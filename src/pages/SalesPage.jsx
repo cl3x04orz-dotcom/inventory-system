@@ -145,8 +145,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             const res = await callGAS(apiUrl, 'updateProductSortOrder', { productIds }, user.token);
             console.log('Sort order synced:', res);
             if (res.success) {
-                // 明確通知使用者儲存成功，避免視覺上的「跳回」挫折
-                console.log(`成功儲存：${res.msg}`);
+                // 明確通知使用者儲存成功，給予信心
+                alert(`順序已永久儲存！(共更新 ${res.updateCount} 筆資料)`);
             }
         } catch (error) {
             console.error('Failed to sync sort order:', error);

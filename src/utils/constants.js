@@ -33,16 +33,11 @@ export const CASE_MAP = {
 export const sortProducts = (list, nameKey) => {
     return [...list].sort((a, b) => {
         // 1. Primary: sortWeight (from Google Sheet)
-        const weightA = (a.sortWeight !== undefined && a.sortWeight !== null && Number(a.sortWeight) !== 0)
-            ? Number(a.sortWeight)
-            : 999999;
-        const weightB = (b.sortWeight !== undefined && b.sortWeight !== null && Number(b.sortWeight) !== 0)
-            ? Number(b.sortWeight)
-            : 999999;
+        // Ensure we treat 0, null, undefined as 'unranked' (999999)
+        const wA = (a.sortWeight && Number(a.sortWeight) > 0) ? Number(a.sortWeight) : 999999;
+        const wB = (b.sortWeight && Number(b.sortWeight) > 0) ? Number(b.sortWeight) : 999999;
 
-        if (weightA !== weightB) {
-            return weightA - weightB;
-        }
+        if (wA !== wB) return wA - wB;
 
         // 2. Fallback: Alphabetical
         const nameA = String(a[nameKey] || '');

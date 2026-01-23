@@ -556,7 +556,9 @@ function getProductsService() {
                 }
             }
             if (header.includes('單位') || header.includes('unit')) { if(!p.unit) p.unit = String(cellValue || '').trim(); }
-            if (header.includes('權重') || header.includes('weight')) { if(p.sortWeight === undefined) p.sortWeight = Number(cellValue) || 0; }
+            if (header.includes('權重') || header.includes('weight')) { 
+                if(p.sortWeight === undefined || p.sortWeight === 0) p.sortWeight = Number(cellValue) || 0; 
+            }
         }
         
         if (p.name && !p.id) p.id = p.name;
