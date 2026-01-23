@@ -27,13 +27,13 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         }
     }, [paymentType]);
 
+
     const load = useCallback(async () => {
         try {
             const data = await callGAS(apiUrl, 'getProducts', {}, user.token);
             console.log('Sales Page - Raw Products Data:', data);
 
             if (Array.isArray(data)) {
-                // Filter out products with 0 stock/originalStock
                 const content = data.filter(p => (Number(p.stock) || 0) > 0 || (Number(p.originalStock) || 0) > 0);
                 const sortedProducts = sortProducts(content, 'name');
 
@@ -416,7 +416,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     className="md:hidden space-y-4"
                                 >
                                     {rows.map((row, idx) => (
-                                        <Draggable key={row.id} draggableId={String(row.id)} index={idx} isDragDisabled={!isSorting}>
+                                        <Draggable key={`${row.id}-${idx}`} draggableId={String(row.id)} index={idx} isDragDisabled={!isSorting}>
                                             {(provided, snapshot) => (
                                                 <div
                                                     ref={provided.innerRef}
@@ -535,7 +535,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                         className="divide-y divide-[var(--border-primary)]"
                                     >
                                         {rows.map((row, idx) => (
-                                            <Draggable key={row.id} draggableId={String(row.id)} index={idx} isDragDisabled={!isSorting}>
+                                            <Draggable key={`${row.id}-${idx}`} draggableId={String(row.id)} index={idx} isDragDisabled={!isSorting}>
                                                 {(provided, snapshot) => (
                                                     <tr
                                                         ref={provided.innerRef}

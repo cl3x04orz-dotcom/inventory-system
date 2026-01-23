@@ -32,13 +32,23 @@ export const CASE_MAP = {
 
 export const sortProducts = (list, nameKey) => {
     return [...list].sort((a, b) => {
-        // 1. 優先權重排序 (僅對大於 0 的權重生效)
-        const wA = (a.sortWeight && Number(a.sortWeight) > 0) ? Number(a.sortWeight) : 999999;
-        const wB = (b.sortWeight && Number(b.sortWeight) > 0) ? Number(b.sortWeight) : 999999;
+        // 1. 優先權重排序 (只要有設定有效的 sortWeight 就使用)
+        const wA = (a.sortWeight !== undefined && a.sortWeight !== null) ? Number(a.sortWeight) : NaN;
+        const wB = (b.sortWeight !== undefined && b.sortWeight !== null) ? Number(b.sortWeight) : NaN;
 
-        if (wA !== wB) return wA - wB;
+        const hasWeightA = !isNaN(wA);
+        const hasWeightB = !isNaN(wB);
 
-        // 2. 次要：字母排序
+        // 如果兩者都有權重，按權重排序（數字小的在前）
+        if (hasWeightA && hasWeightB) {
+            if (wA !== wB) return wA - wB;
+        }
+
+        // 如果只有一個有權重，有權重的排前面
+        if (hasWeightA && !hasWeightB) return -1;
+        if (!hasWeightA && hasWeightB) return 1;
+
+        // 2. 次要：字母/筆劃排序（兩者都沒權重，或權重相同時）
         return String(a[nameKey] || '').localeCompare(String(b[nameKey] || ''), 'zh-Hant');
     });
 };

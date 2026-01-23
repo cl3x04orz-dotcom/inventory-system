@@ -516,7 +516,10 @@ function saveExpenditureService(payload) {
 }
 
 /**
- * [Service] 獲取產品清單 (正式版 - 回歸 v_fixed_FINAL 邏輯)
+ * [Service] 獲取產品清單 (正式版 - v2 改名避開冒充)
+ */
+/**
+ * [Service] 獲取產品清單 (正式版 - 具備強大標頭偵測與排序權重讀取)
  */
 function getProductsService() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -524,42 +527,58 @@ function getProductsService() {
     if (!sheet) return { error: "找不到 'Products' 或 'Inventory' 分頁" };
   
     var data = sheet.getDataRange().getValues();
-    var headers = data[0].map(h => String(h || '').trim().toLowerCase());
-    var products = [];
+    if (data.length < 1) return [];
     
-    // 增加驗證行，確保使用者知道有連上最新版
-    products.push({
-        id: "DEBUG_VERIFY",
-        name: "!!! 後端已連線 (v_fixed_FINAL) !!!",
-        stock: 999,
-        originalStock: 999,
-        price: 0,
-        sortWeight: -9999,
-        _fromSheet: sheet.getName(),
-        _version: 'v_fixed_FINAL'
+    var headers = data[0].map(h => String(h || '').trim().toLowerCase());
+    
+    // 預先找出關鍵欄位索引 (改用更彈性的 fuzzy matching)
+    // 預先找出關鍵欄位索引 (改用更彈性的 fuzzy matching)
+    var idxId = headers.findIndex(h => h.includes('id') || h.includes('序號') || h.includes('uuid'));
+    var idxName = headers.findIndex(h => h.includes('名稱') || h.includes('name') || h.includes('品項') || h.includes('品名') || h.includes('product'));
+    var idxPrice = headers.findIndex(h => h.includes('單價') || h.includes('價格') || h.includes('price') || h.includes('unitprice'));
+    
+    // 庫存偵測：先找「原始」，再找剩下的當作目前庫存
+    var idxOriginalStock = headers.findIndex(h => h.includes('原始') && (h.includes('庫存') || h.includes('stock')));
+    var idxStock = headers.findIndex(function(h, i) {
+        return (h.includes('庫存') || h.includes('stock')) && i !== idxOriginalStock;
     });
-
-    if (data.length >= 2) {
-        for (var i = 1; i < data.length; i++) {
-            var row = data[i];
-            if (!row[0] && !row[1]) continue; 
-            
-            var p = { _fromSheet: sheet.getName(), _version: 'v_fixed_FINAL' };
-            headers.forEach((header, idx) => {
-                var cellValue = row[idx];
-                if (header.includes('id') || header.includes('序號')) p.id = String(cellValue || '').trim();
-                if (header.includes('名稱') || header.includes('name')) p.name = String(cellValue || '').trim();
-                if (header.includes('單價') || header.includes('price')) p.price = cellValue;
-                if (header.includes('庫存') || header.includes('stock')) {
-                    if (header.includes('原始') || header.includes('original')) p.originalStock = cellValue;
-                    else p.stock = cellValue;
-                }
-                if (header.includes('權重') || header.includes('weight')) p.sortWeight = Number(cellValue) || 0;
-            });
-            
-            if (p.name && !p.id) p.id = p.name;
-            if (p.name) products.push(p);
+    
+    // 如果還是找不到，用最直白的匹配
+    if (idxStock === -1) idxStock = headers.indexOf('庫存');
+    if (idxName === -1) idxName = 1; // Fallback to column 1 as name if all detection fails
+    
+    // 權重欄位：精確優先
+    var idxWeight = headers.indexOf('排序權重');
+    if (idxWeight === -1) idxWeight = headers.indexOf('sortweight');
+    if (idxWeight === -1) idxWeight = headers.findIndex(h => h.includes('權重') && !h.includes('單位'));
+    var products = [];
+    for (var i = 1; i < data.length; i++) {
+        var row = data[i];
+        // 如果連名稱和 ID 都抓不到，這行大概是無效資料
+        var nameCell = idxName !== -1 ? String(row[idxName] || '').trim() : "";
+        var idCell = idxId !== -1 ? String(row[idxId] || '').trim() : "";
+        if (!nameCell && !idCell) continue; 
+        
+        var p = { 
+            _fromSheet: sheet.getName() 
+        };
+        
+        if (idxId !== -1) p.id = String(row[idxId] || '').trim();
+        if (idxName !== -1) p.name = String(row[idxName] || '').trim();
+        if (idxPrice !== -1) p.price = row[idxPrice];
+        if (idxStock !== -1) p.stock = row[idxStock];
+        if (idxOriginalStock !== -1) p.originalStock = row[idxOriginalStock];
+        
+        if (idxWeight !== -1) {
+            var cellValue = row[idxWeight];
+            if (cellValue !== '' && cellValue !== null && cellValue !== undefined) {
+                var val = Number(cellValue);
+                if (!isNaN(val)) p.sortWeight = val;
+            }
         }
+        
+        if (p.name && !p.id) p.id = p.name;
+        if (p.name) products.push(p);
     }
     return products;
 }
@@ -576,9 +595,14 @@ function updateProductSortOrderService(payload) {
 
     var data = sheet.getDataRange().getValues();
     var headers = data[0].map(h => String(h || '').trim().toLowerCase());
-    var weightColIdx = headers.findIndex(h => h.includes('權重') || h.includes('weight'));
+    // 優先尋找精確匹配「排序權重」，找不到再找包含「權重」但排除「單位」的
+    var weightColIdx = headers.indexOf('排序權重');
+    if (weightColIdx === -1) weightColIdx = headers.indexOf('sortweight');
+    if (weightColIdx === -1) weightColIdx = headers.findIndex(h => h.includes('權重') && !h.includes('單位'));
+    if (weightColIdx === -1) weightColIdx = headers.findIndex(h => h.includes('weight'));
+
     var idColIdx = headers.findIndex(h => h.includes('id') || h.includes('序號') || h.includes('uuid'));
-    var nameColIdx = headers.findIndex(h => h.includes('名稱') || h.includes('name'));
+    var nameColIdx = headers.findIndex(h => h.includes('名稱') || h.includes('name') || h.includes('品項') || h.includes('品名') || h === 'product');
 
     if (weightColIdx === -1) {
         weightColIdx = headers.length;
