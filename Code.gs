@@ -605,16 +605,24 @@ function updateProductSortOrderService(payload) {
     }
 
     var updateCount = 0;
+    // 使用批次讀寫 (Batch Write) 優化效能，避免過多 API 呼叫引發超時或失敗
+    // 取得權重欄位的所有資料
+    var weightRange = sheet.getRange(2, weightColIdx + 1, data.length - 1, 1);
+    var weightValues = weightRange.getValues();
+
     // 更新權重 (以 10 為間隔：10, 20, 30...)
     payload.productIds.forEach((id, idx) => {
         var targetId = String(id || '').trim();
         var rowNum = idToRowMap[targetId];
         if (rowNum) {
-            sheet.getRange(rowNum, weightColIdx + 1).setValue((idx + 1) * 10);
+            // rowNum 是 1-based (含表頭)，對應到 weightValues 的索引是 rowNum - 2
+            weightValues[rowNum - 2][0] = (idx + 1) * 10;
             updateCount++;
         }
     });
-    // 強制排入手機端的同步佇列並立即執行寫入
+
+    // 一次性寫回試算表
+    weightRange.setValues(weightValues);
     SpreadsheetApp.flush();
 
     return { 
