@@ -29,7 +29,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
     const load = useCallback(async () => {
         try {
-            const data = await callGAS(apiUrl, 'getProducts', {}, user.token);
+            const data = await callGAS(apiUrl, 'getProductsV2', {}, user.token);
             console.log('Sales Page - Raw Products Data:', data);
 
             if (Array.isArray(data)) {

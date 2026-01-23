@@ -131,7 +131,7 @@ function apiHandler(request) {
             case 'updateUserStatus': return updateUserStatusService(payload);
 
             // Inventory & Purchase
-            case 'getProducts': return typeof getProductsService !== 'undefined' ? getProductsService() : {error: '後端服務缺失: getProductsService'}; 
+            case 'getProductsV2': return typeof getProductsServiceV2 !== 'undefined' ? getProductsServiceV2() : {error: '後端服務缺失: getProductsServiceV2'}; 
             case 'updateProductSortOrder': return typeof updateProductSortOrderService !== 'undefined' ? updateProductSortOrderService(payload) : {error: '後端服務缺失: updateProductSortOrderService'};
             case 'getInventory': return typeof getInventoryService !== 'undefined' ? getInventoryService() : {error: '後端服務缺失: getInventoryService'}; 
             case 'getPurchaseSuggestions': return typeof getPurchaseSuggestionsService !== 'undefined' ? getPurchaseSuggestionsService() : {error: '後端服務缺失: getPurchaseSuggestionsService'}; 
@@ -516,9 +516,9 @@ function saveExpenditureService(payload) {
 }
 
 /**
- * [Service] 獲取產品清單 (從 Products 或 Inventory 頁面)
+ * [Service] 獲取產品清單 (V2 強制更新版)
  */
-function getProductsService() {
+function getProductsServiceV2() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     // 優先讀取 Products，次之 Inventory
     var sheetName = "Products";
