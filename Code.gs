@@ -613,6 +613,7 @@ function updateProductSortOrderService(payload) {
             sheet.getRange(rowNum, weightColIdx + 1).setValue((idx + 1) * 10);
             updateCount++;
         }
+    });
     // 強制排入手機端的同步佇列並立即執行寫入
     SpreadsheetApp.flush();
 
