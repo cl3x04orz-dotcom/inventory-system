@@ -137,6 +137,7 @@ function apiHandler(request) {
             case 'getPurchaseSuggestions': return typeof getPurchaseSuggestionsService !== 'undefined' ? getPurchaseSuggestionsService() : {error: '後端服務缺失: getPurchaseSuggestionsService'}; 
             case 'addPurchase': return typeof addPurchaseService !== 'undefined' ? addPurchaseService(payload, user) : {error: '後端服務缺失: addPurchaseService (進貨功能)'}; 
             case 'getPurchaseHistory': return typeof getPurchaseHistory !== 'undefined' ? getPurchaseHistory(payload) : {error: '後端服務缺失: getPurchaseHistory'};
+            case 'saveVendorDefault': return typeof saveVendorDefaultService !== 'undefined' ? saveVendorDefaultService(payload) : {error: '後端服務缺失: saveVendorDefaultService'};
 
             // 估值與盤點
             case 'getInventoryWithSafety': return typeof getInventoryWithSafety !== 'undefined' ? getInventoryWithSafety() : {error: 'Service missing'};

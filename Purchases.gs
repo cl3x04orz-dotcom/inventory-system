@@ -10,8 +10,6 @@ function addPurchaseService(data, user) {
     const purSheet = ss.getSheetByName('Purchases');
     
     let items = Array.isArray(data.items) ? data.items : [data];
-    const paymentMethod = data.paymentMethod || 'CASH';
-    const status = (paymentMethod === 'CREDIT') ? 'UNPAID' : 'PAID';
     const entryDate = data.serverTimestamp ? new Date(data.serverTimestamp) : new Date();
     const operator = data.operator || user.username || user.userId || user.name || 'Unknown';
     
@@ -28,9 +26,12 @@ function addPurchaseService(data, user) {
         }
         
         if (productId) {
+            const itemPaymentMethod = item.paymentMethod || data.paymentMethod || 'CASH';
+            const itemStatus = (itemPaymentMethod === 'CREDIT') ? 'UNPAID' : 'PAID';
+            
             purSheet.appendRow([
               Utilities.getUuid(), entryDate, rowVendor, productId, item.quantity, 
-              item.price, item.expiry, operator, paymentMethod, status, operator
+              item.price, item.expiry, operator, itemPaymentMethod, itemStatus, operator
             ]);
             iSheet.appendRow([Utilities.getUuid(), productId, item.quantity, item.expiry, entryDate, 'STOCK', item.price]);
         }
@@ -84,7 +85,63 @@ function getPurchaseSuggestionsService() {
         }
     });
 
+    // 獲取預設支付方式
+    const vendorDefaults = getVendorsData_();
+
     const finalVpMap = {};
     for (let v in vpMap) finalVpMap[v] = Array.from(vpMap[v]);
-    return { vendors: Array.from(vendors), vendorProductMap: finalVpMap };
+    return { 
+      vendors: Array.from(vendors), 
+      vendorProductMap: finalVpMap,
+      vendorDefaults: vendorDefaults 
+    };
+}
+
+/**
+ * 保存廠商預設方式
+ */
+function saveVendorDefaultService(payload) {
+  const { vendor, method } = payload;
+  if (!vendor) return { error: "缺乏廠商名稱" };
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('Vendors');
+  if (!sheet) {
+    sheet = ss.insertSheet('Vendors');
+    sheet.appendRow(['廠商名稱', '預設支付方式']);
+  }
+
+  const data = sheet.getDataRange().getValues();
+  let found = false;
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === String(vendor).trim()) {
+      sheet.getRange(i + 1, 2).setValue(method);
+      found = true;
+      break;
+    }
+  }
+
+  if (!found) {
+    sheet.appendRow([vendor, method]);
+  }
+
+  return { success: true };
+}
+
+/**
+ * 獲取所有廠商的預設方式
+ */
+function getVendorsData_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('Vendors');
+  if (!sheet) return {};
+
+  const data = sheet.getDataRange().getValues();
+  const map = {};
+  for (let i = 1; i < data.length; i++) {
+    const v = String(data[i][0]).trim();
+    const m = String(data[i][1]).trim();
+    if (v) map[v] = m;
+  }
+  return map;
 }

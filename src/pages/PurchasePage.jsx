@@ -6,13 +6,11 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
     // Each item now includes its own vendor field
     const currentYear = new Date().getFullYear().toString();
     const [items, setItems] = useState([
-        { id: Date.now(), vendor: '', productName: '', quantity: '', unitPrice: '', expiryYear: currentYear, expiryMonth: '', expiryDay: '' }
+        { id: Date.now(), vendor: '', productName: '', quantity: '', unitPrice: '', expiryYear: currentYear, expiryMonth: '', expiryDay: '', paymentMethod: 'CASH' }
     ]);
     const [suggestions, setSuggestions] = useState({ vendors: [], vendorProductMap: {} });
     const [loading, setLoading] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState('CASH'); // 'CASH' or 'CREDIT'
 
-    // Fetch Suggestions
     useEffect(() => {
         const fetchSuggestions = async () => {
             try {
@@ -24,6 +22,32 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
         };
         if (user?.token) fetchSuggestions();
     }, [user.token, apiUrl]);
+
+    // Auto-switch payment method per item when vendor changes
+    useEffect(() => {
+        setItems(prev => prev.map(item => {
+            const defMethod = suggestions.vendorDefaults?.[item.vendor];
+            if (defMethod && item.paymentMethod !== defMethod) {
+                return { ...item, paymentMethod: defMethod };
+            }
+            return item;
+        }));
+    }, [suggestions.vendorDefaults, items.map(i => i.vendor).join(',')]);
+
+    const handleSaveDefault = async (item) => {
+        if (!item.vendor) return;
+
+        try {
+            await callGAS(apiUrl, 'saveVendorDefault', { vendor: item.vendor, method: item.paymentMethod }, user.token);
+            alert(`已將「${item.vendor}」的預設支付方式設為「${item.paymentMethod === 'CASH' ? '現金' : '賒帳'}」`);
+            setSuggestions(prev => ({
+                ...prev,
+                vendorDefaults: { ...prev.vendorDefaults, [item.vendor]: item.paymentMethod }
+            }));
+        } catch (e) {
+            alert("保存失敗: " + e.message);
+        }
+    };
 
     // Helper to get product list for a specific vendor
     const getProductSuggestions = (currentVendor) => {
@@ -49,7 +73,8 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
             unitPrice: '',
             expiryYear: currentYear,
             expiryMonth: '',
-            expiryDay: ''
+            expiryDay: '',
+            paymentMethod: 'CASH'
         }]);
     };
 
@@ -127,7 +152,8 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                 productName: item.productName,
                 quantity: Number(item.quantity),
                 price: Number(item.unitPrice),
-                expiry: `${item.expiryYear}-${m}-${d}`
+                expiry: `${item.expiryYear}-${m}-${d}`,
+                paymentMethod: item.paymentMethod
             };
         });
 
@@ -142,12 +168,12 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
         try {
             const result = await callGAS(apiUrl, 'addPurchase', {
                 items: payloadItems,
-                operator: user.username, // Explicitly pass operator name
-                paymentMethod: paymentMethod // 'CASH' or 'CREDIT'
+                operator: user.username
             }, user.token);
 
             // Log activity
             if (logActivity) {
+                const methods = Array.from(new Set(payloadItems.map(i => i.paymentMethod)));
                 logActivity({
                     actionType: 'DATA_EDIT',
                     page: '進貨作業',
@@ -155,15 +181,14 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                         vendorCount: new Set(payloadItems.map(i => i.vendor)).size,
                         productCount: payloadItems.length,
                         totalPrice: payloadItems.reduce((acc, i) => acc + (i.quantity * i.price), 0),
-                        paymentMethod: paymentMethod
+                        paymentMethods: methods.join(', ')
                     })
                 });
             }
 
             alert(`成功進貨 ${result.count} 筆商品！`);
             // Reset
-            setItems([{ id: Date.now(), vendor: '', productName: '', quantity: '', unitPrice: '', expiryYear: currentYear, expiryMonth: '', expiryDay: '' }]);
-            setPaymentMethod('CASH'); // Reset payment method
+            setItems([{ id: Date.now(), vendor: '', productName: '', quantity: '', unitPrice: '', expiryYear: currentYear, expiryMonth: '', expiryDay: '', paymentMethod: 'CASH' }]);
         } catch (err) {
             alert('進貨失敗: ' + err.message);
         } finally {
@@ -184,28 +209,6 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                     <h2 className="text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
                         進貨作業
                     </h2>
-
-                    {/* Payment Method Toggle */}
-                    <div className="flex bg-[var(--bg-tertiary)] p-1 rounded-lg border border-[var(--border-primary)]">
-                        <button
-                            onClick={() => setPaymentMethod('CASH')}
-                            className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${paymentMethod === 'CASH'
-                                ? 'bg-emerald-500 text-white shadow-sm'
-                                : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-                                }`}
-                        >
-                            現金進貨
-                        </button>
-                        <button
-                            onClick={() => setPaymentMethod('CREDIT')}
-                            className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${paymentMethod === 'CREDIT'
-                                ? 'bg-purple-600 text-white shadow-sm'
-                                : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-                                }`}
-                        >
-                            賒帳進貨
-                        </button>
-                    </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -226,11 +229,24 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                             return (
                                 <div key={item.id} className="group relative p-0 md:p-4 bg-transparent md:bg-[var(--bg-tertiary)] rounded-none md:rounded-xl border-b md:border border-[var(--border-primary)] hover:md:shadow-lg transition-all duration-200 mb-6 md:mb-0">
                                     {/* Number Badge */}
-                                    <div className="md:absolute md:-left-2 md:top-1/2 md:-translate-y-1/2 mb-2 md:mb-0 flex items-center gap-2 md:block">
-                                        <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
-                                            <span className="text-[10px] font-bold text-emerald-600"> {idx + 1}</span>
+                                    <div className="md:absolute md:-left-2 md:top-1/2 md:-translate-y-1/2 mb-2 md:mb-0 flex items-center justify-between md:block">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                                                <span className="text-[10px] font-bold text-emerald-600"> {idx + 1}</span>
+                                            </div>
+                                            <span className="md:hidden text-sm font-bold text-[var(--text-secondary)]">商品資料</span>
                                         </div>
-                                        <span className="md:hidden text-sm font-bold text-[var(--text-secondary)]">商品資料</span>
+
+                                        {/* Mobile Save Default */}
+                                        {item.vendor && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSaveDefault(item)}
+                                                className="md:hidden text-[10px] px-2 py-1 rounded-md bg-slate-100 text-slate-500 border border-slate-200"
+                                            >
+                                                📌 設為預設
+                                            </button>
+                                        )}
                                     </div>
 
                                     {/* MOBILE VIEW (Horizontal Layout) */}
@@ -294,6 +310,27 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                             />
                                         </div>
 
+                                        {/* Mobile Payment Toggle */}
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">支付方式:</label>
+                                            <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 flex-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleItemChange(item.id, 'paymentMethod', 'CASH')}
+                                                    className={`flex-1 py-1 text-[10px] font-bold rounded-md transition-all ${item.paymentMethod === 'CASH' ? 'bg-emerald-500 text-white' : 'text-slate-400'}`}
+                                                >
+                                                    現金
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleItemChange(item.id, 'paymentMethod', 'CREDIT')}
+                                                    className={`flex-1 py-1 text-[10px] font-bold rounded-md transition-all ${item.paymentMethod === 'CREDIT' ? 'bg-purple-600 text-white' : 'text-slate-400'}`}
+                                                >
+                                                    賒帳
+                                                </button>
+                                            </div>
+                                        </div>
+
                                         {/* Expiry */}
                                         <div className="flex items-center gap-3">
                                             <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">有效期限:</label>
@@ -345,49 +382,48 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                     {/* DESKTOP VIEW (Original Grid Layout) */}
                                     <div className="hidden md:grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
 
-                                        {/* Vendor (3 cols) */}
+                                        {/* Vendor (2 cols) */}
                                         <div className="col-span-12 md:col-span-2">
-                                            <label className="text-xs font-semibold text-[var(--text-secondary)] mb-1.5 flex items-center gap-1 uppercase">
+                                            <label className="text-[10px] font-bold text-[var(--text-secondary)] mb-1 uppercase">
                                                 廠商
                                             </label>
                                             <input
                                                 id={`item-${idx}-vendor`}
                                                 list="vendors-list"
-                                                className="input-field w-full"
-                                                placeholder="廠商名稱"
+                                                className="input-field w-full py-1.5 px-2 text-sm"
+                                                placeholder="廠商"
                                                 value={item.vendor}
                                                 onChange={e => handleItemChange(item.id, 'vendor', e.target.value)}
                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'vendor')}
-                                                autoFocus={idx === items.length - 1} // Auto focus on new row vendor
+                                                autoFocus={idx === items.length - 1}
                                             />
                                         </div>
 
-                                        {/* Product (3 cols) */}
-                                        <div className="col-span-12 md:col-span-3">
-                                            <label className="text-xs font-semibold text-[var(--text-secondary)] mb-1.5 flex items-center gap-1 uppercase">
+                                        {/* Product (2 cols) */}
+                                        <div className="col-span-12 md:col-span-2">
+                                            <label className="text-[10px] font-bold text-[var(--text-secondary)] mb-1 uppercase">
                                                 產品名稱
                                             </label>
                                             <input
                                                 id={`item-${idx}-product`}
                                                 list={`products-list-${idx}`}
-                                                className="input-field w-full"
+                                                className="input-field w-full py-1.5 px-2 text-sm"
                                                 placeholder="產品名稱"
                                                 value={item.productName}
                                                 onChange={e => handleItemChange(item.id, 'productName', e.target.value)}
                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'product')}
                                             />
-                                            {/* (datalist is reused from mobile block or just define again? datalist id is shared so it's fine) */}
                                         </div>
 
-                                        {/* Qty (2 cols) */}
-                                        <div className="col-span-6 md:col-span-2">
-                                            <label className="text-xs font-semibold text-[var(--text-secondary)] mb-1.5 flex items-center gap-1 uppercase">
+                                        {/* Qty (1 col) */}
+                                        <div className="col-span-6 md:col-span-1">
+                                            <label className="text-[10px] font-bold text-[var(--text-secondary)] mb-1 text-center block uppercase">
                                                 數量
                                             </label>
                                             <input
                                                 id={`item-${idx}-qty`}
                                                 type="number"
-                                                className="input-field w-full text-center"
+                                                className="input-field w-full py-1.5 px-1 text-center text-sm"
                                                 placeholder="0"
                                                 value={item.quantity}
                                                 onChange={e => handleItemChange(item.id, 'quantity', e.target.value)}
@@ -395,15 +431,15 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                             />
                                         </div>
 
-                                        {/* Price (2 cols) */}
-                                        <div className="col-span-6 md:col-span-2">
-                                            <label className="text-xs font-semibold text-[var(--text-secondary)] mb-1.5 flex items-center gap-1 uppercase">
+                                        {/* Price (1 col) */}
+                                        <div className="col-span-6 md:col-span-1">
+                                            <label className="text-[10px] font-bold text-[var(--text-secondary)] mb-1 text-center block uppercase">
                                                 單價
                                             </label>
                                             <input
                                                 id={`item-${idx}-price`}
                                                 type="number"
-                                                className="input-field w-full text-center"
+                                                className="input-field w-full py-1.5 px-1 text-center text-sm"
                                                 placeholder="0"
                                                 value={item.unitPrice}
                                                 onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)}
@@ -411,47 +447,85 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                             />
                                         </div>
 
-                                        {/* Expiry (2 cols + delete btn space) */}
-                                        <div className="col-span-12 md:col-span-3 grid grid-cols-[1fr_auto_1fr_auto_1fr_auto] gap-1 relative">
-                                            <label className="absolute -top-6 left-0 text-xs font-semibold text-[var(--text-secondary)] mb-1.5 flex items-center gap-1 uppercase">
-                                                有效期限
-                                            </label>
+                                        {/* Expiry (3 cols) */}
+                                        <div className="col-span-12 md:col-span-3 flex items-end gap-1">
+                                            <div className="flex-1">
+                                                <label className="text-[10px] font-bold text-[var(--text-secondary)] mb-1 uppercase">
+                                                    有效期限
+                                                </label>
+                                                <div className="grid grid-cols-[1.5fr_auto_1fr_auto_1fr] gap-1 items-center">
+                                                    <input
+                                                        id={`item-${idx}-year`}
+                                                        className="input-field py-1.5 px-0.5 text-center text-sm font-mono"
+                                                        placeholder="YYYY"
+                                                        value={item.expiryYear}
+                                                        onChange={e => handleItemChange(item.id, 'expiryYear', e.target.value)}
+                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'year')}
+                                                    />
+                                                    <span className="text-[var(--text-tertiary)] text-[10px]">/</span>
+                                                    <input
+                                                        id={`item-${idx}-month`}
+                                                        className="input-field py-1.5 px-0.5 text-center text-sm font-mono"
+                                                        placeholder="MM"
+                                                        value={item.expiryMonth}
+                                                        onChange={e => handleItemChange(item.id, 'expiryMonth', e.target.value)}
+                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'month')}
+                                                    />
+                                                    <span className="text-[var(--text-tertiary)] text-[10px]">/</span>
+                                                    <input
+                                                        id={`item-${idx}-day`}
+                                                        className="input-field py-1.5 px-0.5 text-center text-sm font-mono"
+                                                        placeholder="DD"
+                                                        value={item.expiryDay}
+                                                        onChange={e => handleItemChange(item.id, 'expiryDay', e.target.value)}
+                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'day')}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
 
-                                            <input
-                                                id={`item-${idx}-year`}
-                                                className="input-field w-full text-center font-mono px-1"
-                                                placeholder="YYYY"
-                                                value={item.expiryYear}
-                                                onChange={e => handleItemChange(item.id, 'expiryYear', e.target.value)}
-                                                onKeyDown={(e) => handleKeyDown(e, idx, 'year')}
-                                            />
-                                            <span className="text-[var(--text-tertiary)] self-center">/</span>
-                                            <input
-                                                id={`item-${idx}-month`}
-                                                className="input-field w-full text-center font-mono px-1"
-                                                placeholder="MM"
-                                                value={item.expiryMonth}
-                                                onChange={e => handleItemChange(item.id, 'expiryMonth', e.target.value)}
-                                                onKeyDown={(e) => handleKeyDown(e, idx, 'month')}
-                                            />
-                                            <span className="text-[var(--text-tertiary)] self-center">/</span>
-                                            <input
-                                                id={`item-${idx}-day`}
-                                                type="number"
-                                                className="input-field w-full text-center font-mono px-1"
-                                                placeholder="DD"
-                                                value={item.expiryDay}
-                                                onChange={e => handleItemChange(item.id, 'expiryDay', e.target.value)}
-                                                onKeyDown={(e) => handleKeyDown(e, idx, 'day')}
-                                            />
+                                        {/* Payment (3 cols) */}
+                                        <div className="col-span-12 md:col-span-3">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">
+                                                    支付方式
+                                                </label>
+                                                {item.vendor && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSaveDefault(item)}
+                                                        className="text-[9px] text-emerald-600 hover:text-emerald-700 font-bold transition-colors flex items-center gap-0.5"
+                                                    >
+                                                        📌 設為預設
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="flex bg-[var(--bg-primary)] p-0.5 rounded-lg border border-[var(--border-primary)] shadow-sm h-8">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleItemChange(item.id, 'paymentMethod', 'CASH')}
+                                                    className={`flex-1 py-0.5 text-[10px] font-bold rounded-md transition-all ${item.paymentMethod === 'CASH' ? 'bg-emerald-500 text-white' : 'text-[var(--text-tertiary)] hover:bg-slate-50'}`}
+                                                >
+                                                    現金
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleItemChange(item.id, 'paymentMethod', 'CREDIT')}
+                                                    className={`flex-1 py-0.5 text-[10px] font-bold rounded-md transition-all ${item.paymentMethod === 'CREDIT' ? 'bg-purple-600 text-white' : 'text-[var(--text-tertiary)] hover:bg-slate-50'}`}
+                                                >
+                                                    賒帳
+                                                </button>
+                                            </div>
+                                        </div>
 
-                                            {/* Delete Button (inline) */}
+                                        {/* Action (Delete) */}
+                                        <div className="col-span-12 md:col-span-1 flex items-end justify-center">
                                             {items.length > 1 && (
                                                 <button
                                                     type="button"
                                                     onClick={() => removeItem(item.id)}
-                                                    className="w-8 h-8 ml-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all flex items-center justify-center self-center"
-                                                    title="刪除此列"
+                                                    className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all flex items-center justify-center mb-[2px]"
+                                                    title="刪除"
                                                 >
                                                     ✕
                                                 </button>
