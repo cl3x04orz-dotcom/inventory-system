@@ -36,6 +36,8 @@ function apiHandler(request) {
         // Sales (銷售管理)
         'saveSales': 'sales_entry', 
         'getSalesHistory': 'sales_report',
+        'getTemplatesList': 'sales_entry', // Allow sales entry to list templates
+        'generatePdf': 'sales_entry', // Allow sales entry to generate PDF
         
         // Purchase (進貨管理)
         'addPurchase': 'purchase_entry', 
@@ -150,6 +152,8 @@ function apiHandler(request) {
             // Sales & Analytics
             case 'saveSales': return typeof saveSalesService !== 'undefined' ? saveSalesService(payload, user) : {error: 'Service missing'}; 
             case 'getSalesHistory': return typeof getSalesHistory !== 'undefined' ? getSalesHistory(payload) : {error: 'Service missing'}; 
+            case 'getTemplatesList': return typeof getTemplatesListService !== 'undefined' ? getTemplatesListService() : {error: 'Service missing'};
+            case 'generatePdf': return typeof generatePdfService !== 'undefined' ? generatePdfService(payload) : {error: 'Service missing'}; 
             case 'getSalesRanking': return typeof getSalesRanking !== 'undefined' ? getSalesRanking(payload) : {error: 'Service missing'};
             case 'getCustomerRanking': return typeof getCustomerRanking !== 'undefined' ? getCustomerRanking(payload) : {error: 'Service missing'};
             case 'getProfitAnalysis': return typeof getProfitAnalysis !== 'undefined' ? getProfitAnalysis(payload) : {error: 'Service missing'};

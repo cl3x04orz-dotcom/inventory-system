@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Save, RefreshCw, Calculator, DollarSign, GripVertical, ListOrdered } from 'lucide-react';
+import { Save, RefreshCw, Calculator, DollarSign, GripVertical, ListOrdered, Printer } from 'lucide-react';
+
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { callGAS } from '../utils/api';
 import { PRICE_MAP, sortProducts } from '../utils/constants';
@@ -16,6 +17,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [location, setLocation] = useState(''); // This will be used as "Sales Target"
     const [paymentType, setPaymentType] = useState('CASH');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const [isPrinting, setIsPrinting] = useState(false);
     const [isSorting, setIsSorting] = useState(false);
 
     // Handle Payment Type Effects
@@ -334,6 +337,65 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         }
     };
 
+
+
+    const handlePrint = async () => {
+        if (rows.length === 0) {
+            alert('沒有商品資料，無法列印');
+            return;
+        }
+
+        setIsPrinting(true);
+        try {
+            const printPayload = {
+                templateId: 'Template_領貨單',
+                data: {
+                    date: new Date().toISOString(),
+                    location: location,
+                    salesRep: user.username,
+                    totalSalesAmount: isCredit ? totalSalesAmount : finalTotal,
+                    totalCashCalc: totalCashNet,
+                    finalTotal: finalTotal,
+                    reserve: reserve,
+                    expenses: expenses,
+                    expenses: expenses,
+                    rows: rows.map(r => ({
+                        name: r.name,
+                        stock: r.stock,
+                        originalStock: r.originalStock,
+                        picked: r.picked,
+                        original: r.original,
+                        returns: r.returns,
+                        sold: r.sold,
+                        price: r.price,
+                        subtotal: r.subtotal
+                    }))
+                }
+            };
+
+            const response = await callGAS(apiUrl, 'generatePdf', printPayload, user.token);
+            if (response.success && response.pdfBase64) {
+                // Convert Base64 to Blob and open in new tab
+                const byteCharacters = atob(response.pdfBase64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: 'application/pdf' });
+                const blobUrl = URL.createObjectURL(blob);
+                window.open(blobUrl, '_blank');
+            } else {
+                throw new Error(response.error || 'Unknown error');
+            }
+        } catch (e) {
+            console.error('Print failed:', e);
+            alert('列印失敗: ' + e.message);
+        } finally {
+            setIsPrinting(false);
+        }
+    };
+
     return (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 h-full overflow-y-auto xl:overflow-hidden">
             {isSubmitting && (
@@ -401,6 +463,19 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                         >
                             <ListOrdered size={16} />
                             {isSorting ? '儲存排序' : '自定義排序'}
+                        </button>
+
+                        {/* Print Button */}
+                        <button
+                            onClick={handlePrint}
+                            disabled={isPrinting}
+                            className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border transition-all ${isPrinting
+                                ? 'bg-gray-400 text-white cursor-not-allowed'
+                                : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
+                                }`}
+                        >
+                            <Printer size={16} />
+                            {isPrinting ? '列印中...' : '列印領貨單'}
                         </button>
 
                     </div>
