@@ -644,7 +644,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                         <div className="bg-[#fdf6e3] rounded-lg p-2 mb-3 border border-amber-100 min-h-[120px]">
                                                             <MathHelperButtons />
                                                             <div className="grid grid-cols-4 gap-2">
-                                                                <div className="flex flex-col gap-1">
+                                                                <div className="flex flex-col gap-1 min-h-[56px]">
                                                                     <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">領貨</label>
                                                                     <input
                                                                         id={`input-m-${idx}-picked`}
@@ -659,7 +659,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                         disabled={isSorting}
                                                                     />
                                                                 </div>
-                                                                <div className="flex flex-col gap-1">
+                                                                <div className="flex flex-col gap-1 min-h-[56px]">
                                                                     <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">原貨</label>
                                                                     <input
                                                                         id={`input-m-${idx}-original`}
@@ -674,7 +674,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                         disabled={isSorting}
                                                                     />
                                                                 </div>
-                                                                <div className="flex flex-col gap-1">
+                                                                <div className="flex flex-col gap-1 min-h-[56px]">
                                                                     <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">退貨</label>
                                                                     <input
                                                                         id={`input-m-${idx}-returns`}
@@ -689,7 +689,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                         disabled={isSorting}
                                                                     />
                                                                 </div>
-                                                                <div className="flex flex-col gap-1">
+                                                                <div className="flex flex-col gap-1 min-h-[56px]">
                                                                     <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">單價</label>
                                                                     <input
                                                                         id={`input-m-${idx}-price`}
