@@ -151,24 +151,42 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         }
     };
 
+    const handleCashChange = (denom, value) => {
+        setCashCounts(prev => ({
+            ...prev,
+            [denom]: (typeof value === 'string' && value.trim().startsWith('=')) ? value : (Number(value) || 0)
+        }));
+    };
+
     const handleCashBlur = (denom, value) => {
         if (typeof value === 'string' && value.trim().startsWith('=')) {
             const result = evaluateFormula(value);
-            setCashCounts(prev => ({ ...prev, [denom]: Number(result) || 0 }));
+            handleCashChange(denom, result);
         }
+    };
+
+    const handleReserveChange = (value) => {
+        setReserve((typeof value === 'string' && value.trim().startsWith('=')) ? value : (Number(value) || 0));
     };
 
     const handleReserveBlur = (value) => {
         if (typeof value === 'string' && value.trim().startsWith('=')) {
             const result = evaluateFormula(value);
-            setReserve(Number(result) || 0);
+            handleReserveChange(result);
         }
+    };
+
+    const handleExpenseChange = (key, value) => {
+        setExpenses(prev => ({
+            ...prev,
+            [key]: (typeof value === 'string' && value.trim().startsWith('=')) ? value : (Number(value) || 0)
+        }));
     };
 
     const handleExpenseBlur = (key, value) => {
         if (typeof value === 'string' && value.trim().startsWith('=')) {
             const result = evaluateFormula(value);
-            setExpenses(prev => ({ ...prev, [key]: Number(result) || 0 }));
+            handleExpenseChange(key, result);
         }
     };
 
@@ -765,7 +783,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                             className="input-field flex-1"
                                             placeholder="0"
                                             value={cashCounts[denom] || ''}
-                                            onChange={(e) => setCashCounts({ ...cashCounts, [denom]: e.target.value })}
+                                            onChange={(e) => handleCashChange(denom, e.target.value)}
                                             onBlur={(e) => handleCashBlur(denom, e.target.value)}
                                             onKeyDown={(e) => handleSidebarKeyDown(e, {
                                                 next: nextId,
@@ -788,7 +806,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     inputMode="decimal"
                                     className="input-field flex-1 border-red-900/50 focus:ring-red-500"
                                     value={reserve}
-                                    onChange={(e) => setReserve(e.target.value)}
+                                    onChange={(e) => handleReserveChange(e.target.value)}
                                     onBlur={(e) => handleReserveBlur(e.target.value)}
                                     onKeyDown={(e) => handleSidebarKeyDown(e, {
                                         next: 'input-expense-stall',
@@ -833,7 +851,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                             inputMode="decimal"
                                             className="input-field text-sm"
                                             value={expenses[key] || ''}
-                                            onChange={(e) => setExpenses({ ...expenses, [key]: e.target.value })}
+                                            onChange={(e) => handleExpenseChange(key, e.target.value)}
                                             onBlur={(e) => handleExpenseBlur(key, e.target.value)}
                                             onKeyDown={(e) => handleSidebarKeyDown(e, {
                                                 next: nextId,
@@ -858,7 +876,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     inputMode="decimal"
                                     className="input-field border-green-200 text-green-600"
                                     value={expenses.linePay || ''}
-                                    onChange={(e) => setExpenses({ ...expenses, linePay: e.target.value })}
+                                    onChange={(e) => handleExpenseChange('linePay', e.target.value)}
                                     onBlur={(e) => handleExpenseBlur('linePay', e.target.value)}
                                     onKeyDown={(e) => handleSidebarKeyDown(e, {
                                         next: 'input-expense-serviceFee',
@@ -878,7 +896,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     inputMode="decimal"
                                     className="input-field border-red-200 text-red-600"
                                     value={expenses.serviceFee || ''}
-                                    onChange={(e) => setExpenses({ ...expenses, serviceFee: e.target.value })}
+                                    onChange={(e) => handleExpenseChange('serviceFee', e.target.value)}
                                     onBlur={(e) => handleExpenseBlur('serviceFee', e.target.value)}
                                     disabled={isCredit}
                                     onKeyDown={(e) => handleSidebarKeyDown(e, {
