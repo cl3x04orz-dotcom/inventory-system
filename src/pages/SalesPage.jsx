@@ -641,7 +641,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                         </div>
 
                                                         {/* Inline Math Helper (Beige Background) */}
-                                                        <div className="bg-[#fdf6e3] rounded-lg p-2 mb-3 border border-amber-100">
+                                                        <div className="bg-[#fdf6e3] rounded-lg p-2 mb-3 border border-amber-100 min-h-[120px]">
                                                             <MathHelperButtons />
                                                             <div className="grid grid-cols-4 gap-2">
                                                                 <div className="flex flex-col gap-1">
