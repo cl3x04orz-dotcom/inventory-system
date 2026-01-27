@@ -150,6 +150,13 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             const result = evaluateFormula(value);
             handleRowChange(id, field, result);
         }
+        // Delay hiding focus to allow toolbar clicks
+        setTimeout(() => {
+            if (!document.activeElement ||
+                (document.activeElement.tagName !== 'INPUT' && !document.activeElement.closest('.math-toolbar'))) {
+                setIsInputFocused(false);
+            }
+        }, 200);
     };
 
     const handleCashChange = (denom, value) => {
@@ -613,10 +620,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                 className="input-field text-center p-2 text-base font-bold"
                                                                 value={row.picked || ''}
                                                                 onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
-                                                                onBlur={(e) => {
-                                                                    handleBlur(row.id, 'picked', e.target.value);
-                                                                    setIsInputFocused(false);
-                                                                }}
+                                                                onBlur={(e) => handleBlur(row.id, 'picked', e.target.value)}
                                                                 onFocus={() => setIsInputFocused(true)}
                                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'picked', 'input-m-')}
                                                                 disabled={isSorting}
@@ -631,10 +635,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                 className="input-field text-center p-2 text-base font-bold"
                                                                 value={row.original || ''}
                                                                 onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
-                                                                onBlur={(e) => {
-                                                                    handleBlur(row.id, 'original', e.target.value);
-                                                                    setIsInputFocused(false);
-                                                                }}
+                                                                onBlur={(e) => handleBlur(row.id, 'original', e.target.value)}
                                                                 onFocus={() => setIsInputFocused(true)}
                                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'original', 'input-m-')}
                                                                 disabled={isSorting}
@@ -649,10 +650,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                 className="input-field text-center p-2 text-base font-bold text-red-600"
                                                                 value={row.returns || ''}
                                                                 onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
-                                                                onBlur={(e) => {
-                                                                    handleBlur(row.id, 'returns', e.target.value);
-                                                                    setIsInputFocused(false);
-                                                                }}
+                                                                onBlur={(e) => handleBlur(row.id, 'returns', e.target.value)}
                                                                 onFocus={() => setIsInputFocused(true)}
                                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'returns', 'input-m-')}
                                                                 disabled={isSorting}
@@ -667,10 +665,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                 className="input-field text-center p-2 text-base font-bold"
                                                                 value={row.price}
                                                                 onChange={(e) => handleRowChange(row.id, 'price', e.target.value)}
-                                                                onBlur={(e) => {
-                                                                    handleBlur(row.id, 'price', e.target.value);
-                                                                    setIsInputFocused(false);
-                                                                }}
+                                                                onBlur={(e) => handleBlur(row.id, 'price', e.target.value)}
                                                                 onFocus={() => setIsInputFocused(true)}
                                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'price', 'input-m-')}
                                                                 disabled={isSorting}
@@ -826,10 +821,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                             placeholder="0"
                                             value={cashCounts[denom] || ''}
                                             onChange={(e) => handleCashChange(denom, e.target.value)}
-                                            onBlur={(e) => {
-                                                handleCashBlur(denom, e.target.value);
-                                                setIsInputFocused(false);
-                                            }}
+                                            onBlur={(e) => handleCashBlur(denom, e.target.value)}
                                             onFocus={() => setIsInputFocused(true)}
                                             onKeyDown={(e) => handleSidebarKeyDown(e, {
                                                 next: nextId,
@@ -853,10 +845,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     className="input-field flex-1 border-red-900/50 focus:ring-red-500"
                                     value={reserve}
                                     onChange={(e) => handleReserveChange(e.target.value)}
-                                    onBlur={(e) => {
-                                        handleReserveBlur(e.target.value);
-                                        setIsInputFocused(false);
-                                    }}
+                                    onBlur={(e) => handleReserveBlur(e.target.value)}
                                     onFocus={() => setIsInputFocused(true)}
                                     onKeyDown={(e) => handleSidebarKeyDown(e, {
                                         next: 'input-expense-stall',
@@ -902,10 +891,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                             className="input-field text-sm"
                                             value={expenses[key] || ''}
                                             onChange={(e) => handleExpenseChange(key, e.target.value)}
-                                            onBlur={(e) => {
-                                                handleExpenseBlur(key, e.target.value);
-                                                setIsInputFocused(false);
-                                            }}
+                                            onBlur={(e) => handleExpenseBlur(key, e.target.value)}
                                             onFocus={() => setIsInputFocused(true)}
                                             onKeyDown={(e) => handleSidebarKeyDown(e, {
                                                 next: nextId,
@@ -931,10 +917,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     className="input-field border-green-200 text-green-600"
                                     value={expenses.linePay || ''}
                                     onChange={(e) => handleExpenseChange('linePay', e.target.value)}
-                                    onBlur={(e) => {
-                                        handleExpenseBlur('linePay', e.target.value);
-                                        setIsInputFocused(false);
-                                    }}
+                                    onBlur={(e) => handleExpenseBlur('linePay', e.target.value)}
                                     onFocus={() => setIsInputFocused(true)}
                                     onKeyDown={(e) => handleSidebarKeyDown(e, {
                                         next: 'input-expense-serviceFee',
@@ -955,10 +938,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     className="input-field border-red-200 text-red-600"
                                     value={expenses.serviceFee || ''}
                                     onChange={(e) => handleExpenseChange('serviceFee', e.target.value)}
-                                    onBlur={(e) => {
-                                        handleExpenseBlur('serviceFee', e.target.value);
-                                        setIsInputFocused(false);
-                                    }}
+                                    onBlur={(e) => handleExpenseBlur('serviceFee', e.target.value)}
                                     onFocus={() => setIsInputFocused(true)}
                                     disabled={isCredit}
                                     onKeyDown={(e) => handleSidebarKeyDown(e, {
@@ -988,18 +968,38 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             </div>
             {isInputFocused && (
                 <div
-                    className="md:hidden fixed bottom-0 left-0 right-0 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] p-2 grid grid-cols-7 gap-1 z-[999] shadow-[0_-4px_10px_rgba(0,0,0,0.1)]"
+                    className="md:hidden fixed top-16 left-0 right-0 bg-[var(--bg-secondary)] border-b-2 border-blue-500 p-2 flex gap-1 z-[9999] shadow-lg math-toolbar overflow-x-auto"
                     onMouseDown={(e) => e.preventDefault()}
                 >
+                    <button
+                        onClick={() => {
+                            const el = document.activeElement;
+                            if (el && el.tagName === 'INPUT') {
+                                // Trigger native value change to clearing isn't blocked by math state logic
+                                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                                nativeInputValueSetter.call(el, '');
+                                el.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                        }}
+                        className="h-10 px-4 rounded-lg bg-red-100 text-red-600 font-bold border border-red-200 active:scale-95 transition-all"
+                    >
+                        C
+                    </button>
                     {['=', '+', '-', '*', '/', '(', ')'].map(sym => (
                         <button
                             key={sym}
                             onClick={() => insertMathSymbol(sym)}
-                            className="h-12 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-primary)] text-[var(--text-primary)] font-bold text-xl active:bg-[var(--accent-blue)] active:text-white transition-all transform active:scale-90"
+                            className="h-10 flex-1 min-w-[40px] rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-primary)] text-[var(--text-primary)] font-bold text-xl active:bg-[var(--accent-blue)] active:text-white transition-all active:scale-90"
                         >
                             {sym}
                         </button>
                     ))}
+                    <button
+                        onClick={() => setIsInputFocused(false)}
+                        className="h-10 px-4 rounded-lg bg-blue-600 text-white font-bold active:scale-95 transition-all"
+                    >
+                        OK
+                    </button>
                 </div>
             )}
         </div>
