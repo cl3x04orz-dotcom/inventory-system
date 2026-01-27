@@ -6,6 +6,12 @@ import { callGAS } from '../utils/api';
 import { PRICE_MAP, sortProducts } from '../utils/constants';
 import { evaluateFormula } from '../utils/mathUtils';
 
+const getSafeNum = (v) => {
+    if (typeof v === 'string' && v.trim().startsWith('=')) return 0;
+    const n = Number(v);
+    return isNaN(n) ? 0 : n;
+};
+
 export default function SalesPage({ user, apiUrl, logActivity }) {
     const [rows, setRows] = useState([]);
     const [cashCounts, setCashCounts] = useState({ 1000: 0, 500: 0, 100: 0, 50: 0, 10: 0, 5: 0, 1: 0 });
@@ -99,10 +105,10 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             if (isNaN(val)) val = 0;
 
             // 1. Propose new values based on input
-            let newPicked = field === 'picked' ? val : (typeof r.picked === 'string' ? 0 : r.picked || 0);
-            let newOriginal = field === 'original' ? val : (typeof r.original === 'string' ? 0 : r.original || 0);
-            let newReturns = field === 'returns' ? val : (typeof r.returns === 'string' ? 0 : r.returns || 0);
-            let newPrice = field === 'price' ? val : (typeof r.price === 'string' ? 0 : r.price || 0);
+            let newPicked = field === 'picked' ? val : getSafeNum(r.picked);
+            let newOriginal = field === 'original' ? val : getSafeNum(r.original);
+            let newReturns = field === 'returns' ? val : getSafeNum(r.returns);
+            let newPrice = field === 'price' ? val : getSafeNum(r.price);
 
             // 2. Local Price Memory Persistence
             if (field === 'price') {
@@ -300,18 +306,15 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
     const totalSalesAmount = rows.reduce((acc, r) => acc + (r.subtotal || 0), 0);
     const totalCashCalc = Object.entries(cashCounts).reduce((acc, [denom, count]) => {
-        const c = typeof count === 'string' ? 0 : (Number(count) || 0);
-        return acc + (Number(denom) * c);
+        return acc + (Number(denom) * getSafeNum(count));
     }, 0);
     // If Credit, reserve is 0 effectively, and totalCashNet might not be relevant for balancing but let's keep calc
-    const cleanReserve = typeof reserve === 'string' ? 0 : (Number(reserve) || 0);
-    const totalCashNet = totalCashCalc - cleanReserve;
+    const totalCashNet = totalCashCalc - getSafeNum(reserve);
 
-    const getVal = (v) => typeof v === 'string' ? 0 : (Number(v) || 0);
     const totalExpensesPlusLinePay =
-        getVal(expenses.stall) + getVal(expenses.cleaning) + getVal(expenses.electricity) +
-        getVal(expenses.gas) + getVal(expenses.parking) + getVal(expenses.goods) +
-        getVal(expenses.bags) + getVal(expenses.others) + getVal(expenses.linePay);
+        getSafeNum(expenses.stall) + getSafeNum(expenses.cleaning) + getSafeNum(expenses.electricity) +
+        getSafeNum(expenses.gas) + getSafeNum(expenses.parking) + getSafeNum(expenses.goods) +
+        getSafeNum(expenses.bags) + getSafeNum(expenses.others) + getSafeNum(expenses.linePay);
 
     const isCredit = paymentType === 'CREDIT';
 
@@ -321,7 +324,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     // IF CREDIT: Just the Total Sales Amount (Product Subtotals)
     const finalTotal = isCredit
         ? totalSalesAmount
-        : (totalCashNet + totalExpensesPlusLinePay + getVal(expenses.serviceFee) - totalSalesAmount);
+        : (totalCashNet + totalExpensesPlusLinePay + getSafeNum(expenses.serviceFee) - totalSalesAmount);
 
     const handleSubmit = async () => {
         if (!location.trim()) {
@@ -772,7 +775,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                             })}
                                             disabled={isCredit}
                                         />
-                                        <span className="w-20 text-right font-mono text-[var(--text-secondary)]">${(denom * (typeof cashCounts[denom] === 'string' ? 0 : cashCounts[denom])).toLocaleString()}</span>
+                                        <span className="w-20 text-right font-mono text-[var(--text-secondary)]">${(denom * getSafeNum(cashCounts[denom])).toLocaleString()}</span>
                                     </div>
                                 );
                             })}
