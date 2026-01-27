@@ -261,32 +261,16 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
     const MathHelperButtons = ({ inputId }) => (
         <div className="flex gap-1 mb-2 overflow-x-auto pb-1 no-scrollbar">
-            {['=', '+', '-', '*', '/'].map(sym => (
+            {['=', '+', '-', '*', '÷'].map(sym => (
                 <button
                     key={sym}
                     onMouseDown={(e) => e.preventDefault()} // Prevent blur
-                    onClick={() => insertMathSymbol(sym)}
-                    className="flex-1 h-10 min-w-[44px] rounded-lg bg-white border border-amber-200 text-blue-600 font-bold text-xl active:bg-amber-100 shadow-sm transition-all"
+                    onClick={() => insertMathSymbol(sym === '÷' ? '/' : sym)}
+                    className="flex-1 h-10 min-w-[44px] rounded-lg bg-white border border-gray-200 text-black font-bold text-2xl active:bg-gray-100 shadow-sm transition-all flex items-center justify-center pt-0.5"
                 >
                     {sym}
                 </button>
             ))}
-            <button
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                    const el = document.getElementById(activeInput?.id);
-                    if (el) {
-                        if (activeInput.type === 'row') handleRowChange(activeInput.rowId, activeInput.field, '');
-                        else if (activeInput.type === 'cash') handleCashChange(activeInput.denom, '');
-                        else if (activeInput.type === 'expense') handleExpenseChange(activeInput.key, '');
-                        else if (activeInput.type === 'reserve') handleReserveChange('');
-                        el.focus();
-                    }
-                }}
-                className="flex-1 h-10 min-w-[44px] rounded-lg bg-red-50 border border-red-100 text-red-500 font-bold text-sm active:bg-red-100 shadow-sm transition-all"
-            >
-                C
-            </button>
         </div>
     );
 
@@ -640,8 +624,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                             </div>
                                                         </div>
 
-                                                        {/* Inline Math Helper (Beige Background) */}
-                                                        <div className="bg-[#fdf6e3] rounded-lg p-2 mb-3 border border-amber-100 min-h-[120px]">
+                                                        {/* Inline Math Helper (Gray Background) */}
+                                                        <div className="bg-gray-50 rounded-lg p-2 mb-3 border border-gray-100 min-h-[120px]">
                                                             <MathHelperButtons />
                                                             <div className="grid grid-cols-4 gap-2">
                                                                 <div className="flex flex-col gap-1 min-h-[56px]">
