@@ -266,7 +266,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     key={sym}
                     onMouseDown={(e) => e.preventDefault()} // Prevent blur
                     onClick={() => insertMathSymbol(sym === '÷' ? '/' : sym)}
-                    className="flex-1 h-10 min-w-[44px] rounded-lg bg-white border border-gray-200 text-black font-bold text-2xl active:bg-gray-100 shadow-sm transition-all flex items-center justify-center pt-0.5"
+                    className="flex-1 h-10 min-w-[44px] rounded-lg bg-white border border-gray-200 text-[#800020] font-bold text-2xl active:bg-gray-100 shadow-sm transition-all flex items-center justify-center pt-0.5"
                 >
                     {sym}
                 </button>
