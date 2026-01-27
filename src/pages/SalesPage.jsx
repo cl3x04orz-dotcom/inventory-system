@@ -27,6 +27,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
     const [isPrinting, setIsPrinting] = useState(false);
     const [isSorting, setIsSorting] = useState(false);
+    const [activeInput, setActiveInput] = useState(null); // { id: string, type: 'row'|'cash'|'expense', field?: string, denom?: number, key?: string }
 
     // Handle Payment Type Effects
     useEffect(() => {
@@ -225,6 +226,69 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
     };
+
+    const insertMathSymbol = (sym) => {
+        if (!activeInput) return;
+        const el = document.getElementById(activeInput.id);
+        if (el) {
+            const start = el.selectionStart;
+            const end = el.selectionEnd;
+            const text = el.value;
+            const before = text.substring(0, start);
+            const after = text.substring(end, text.length);
+
+            const newValue = before + sym + after;
+
+            // Programmatically update based on type
+            if (activeInput.type === 'row') {
+                handleRowChange(activeInput.rowId, activeInput.field, newValue);
+            } else if (activeInput.type === 'cash') {
+                handleCashChange(activeInput.denom, newValue);
+            } else if (activeInput.type === 'expense') {
+                handleExpenseChange(activeInput.key, newValue);
+            } else if (activeInput.type === 'reserve') {
+                handleReserveChange(newValue);
+            }
+
+            // Reposition cursor
+            const newPos = start + sym.length;
+            setTimeout(() => {
+                el.selectionStart = el.selectionEnd = newPos;
+                el.focus();
+            }, 0);
+        }
+    };
+
+    const MathHelperButtons = ({ inputId }) => (
+        <div className="flex gap-1 mb-2 overflow-x-auto pb-1 no-scrollbar">
+            {['=', '+', '-', '*', '/'].map(sym => (
+                <button
+                    key={sym}
+                    onMouseDown={(e) => e.preventDefault()} // Prevent blur
+                    onClick={() => insertMathSymbol(sym)}
+                    className="flex-1 h-10 min-w-[44px] rounded-lg bg-white border border-amber-200 text-blue-600 font-bold text-xl active:bg-amber-100 shadow-sm transition-all"
+                >
+                    {sym}
+                </button>
+            ))}
+            <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                    const el = document.getElementById(activeInput?.id);
+                    if (el) {
+                        if (activeInput.type === 'row') handleRowChange(activeInput.rowId, activeInput.field, '');
+                        else if (activeInput.type === 'cash') handleCashChange(activeInput.denom, '');
+                        else if (activeInput.type === 'expense') handleExpenseChange(activeInput.key, '');
+                        else if (activeInput.type === 'reserve') handleReserveChange('');
+                        el.focus();
+                    }
+                }}
+                className="flex-1 h-10 min-w-[44px] rounded-lg bg-red-50 border border-red-100 text-red-500 font-bold text-sm active:bg-red-100 shadow-sm transition-all"
+            >
+                C
+            </button>
+        </div>
+    );
 
     const handleKeyDown = (e, idx, field, prefix = 'input-') => {
         const validKeys = ['Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
@@ -560,76 +624,86 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                         className={`bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)] ${snapshot.isDragging ? 'shadow-2xl z-50 ring-2 ring-indigo-500' : ''}`}
                                                     >
                                                         {/* Header: Name & Stock */}
-                                                        <div className="flex justify-between items-start mb-3">
+                                                        <div className="flex justify-between items-start mb-2">
                                                             <div className="flex items-center gap-2">
                                                                 {isSorting && (
                                                                     <div {...provided.dragHandleProps} className="text-[var(--text-tertiary)] cursor-grab active:cursor-grabbing">
                                                                         <GripVertical size={20} />
                                                                     </div>
                                                                 )}
-                                                                <div className="font-bold text-[var(--text-primary)] text-lg">{row.name}</div>
+                                                                <div className="font-bold text-[var(--text-primary)] text-lg leading-tight">{row.name}</div>
                                                             </div>
-                                                            <div className="text-xs font-mono bg-[var(--bg-tertiary)] px-2 py-1 rounded border border-[var(--border-primary)]">
-                                                                <span className="text-[var(--text-tertiary)] mr-1">庫存</span>
+                                                            <div className="text-[10px] font-mono bg-[var(--bg-tertiary)] px-2 py-1 rounded border border-[var(--border-primary)] whitespace-nowrap">
                                                                 <span className="text-blue-500 font-bold">{row.stock}</span>
-                                                                <span className="text-[var(--text-tertiary)] mx-1">/</span>
+                                                                <span className="text-[var(--text-tertiary)] mx-0.5">/</span>
                                                                 <span className="text-orange-500 font-bold">{row.originalStock || 0}</span>
                                                             </div>
                                                         </div>
 
-                                                        {/* Inputs Grid */}
-                                                        <div className="grid grid-cols-4 gap-2 mb-3">
-                                                            <div className="flex flex-col gap-1">
-                                                                <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">領貨</label>
-                                                                <input
-                                                                    id={`input-m-${idx}-picked`}
-                                                                    type="text"
-                                                                    className="input-field text-center p-2 text-base font-bold"
-                                                                    value={row.picked || ''}
-                                                                    onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
-                                                                    onBlur={(e) => handleBlur(row.id, 'picked', e.target.value)}
-                                                                    onKeyDown={(e) => handleKeyDown(e, idx, 'picked', 'input-m-')}
-                                                                    disabled={isSorting}
-                                                                />
-                                                            </div>
-                                                            <div className="flex flex-col gap-1">
-                                                                <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">原貨</label>
-                                                                <input
-                                                                    id={`input-m-${idx}-original`}
-                                                                    type="text"
-                                                                    className="input-field text-center p-2 text-base font-bold"
-                                                                    value={row.original || ''}
-                                                                    onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
-                                                                    onBlur={(e) => handleBlur(row.id, 'original', e.target.value)}
-                                                                    onKeyDown={(e) => handleKeyDown(e, idx, 'original', 'input-m-')}
-                                                                    disabled={isSorting}
-                                                                />
-                                                            </div>
-                                                            <div className="flex flex-col gap-1">
-                                                                <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">退貨</label>
-                                                                <input
-                                                                    id={`input-m-${idx}-returns`}
-                                                                    type="text"
-                                                                    className="input-field text-center p-2 text-base font-bold text-red-600"
-                                                                    value={row.returns || ''}
-                                                                    onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
-                                                                    onBlur={(e) => handleBlur(row.id, 'returns', e.target.value)}
-                                                                    onKeyDown={(e) => handleKeyDown(e, idx, 'returns', 'input-m-')}
-                                                                    disabled={isSorting}
-                                                                />
-                                                            </div>
-                                                            <div className="flex flex-col gap-1">
-                                                                <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">單價</label>
-                                                                <input
-                                                                    id={`input-m-${idx}-price`}
-                                                                    type="text"
-                                                                    className="input-field text-center p-2 text-base font-bold"
-                                                                    value={row.price}
-                                                                    onChange={(e) => handleRowChange(row.id, 'price', e.target.value)}
-                                                                    onBlur={(e) => handleBlur(row.id, 'price', e.target.value)}
-                                                                    onKeyDown={(e) => handleKeyDown(e, idx, 'price', 'input-m-')}
-                                                                    disabled={isSorting}
-                                                                />
+                                                        {/* Inline Math Helper (Beige Background) */}
+                                                        <div className="bg-[#fdf6e3] rounded-lg p-2 mb-3 border border-amber-100">
+                                                            <MathHelperButtons />
+                                                            <div className="grid grid-cols-4 gap-2">
+                                                                <div className="flex flex-col gap-1">
+                                                                    <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">領貨</label>
+                                                                    <input
+                                                                        id={`input-m-${idx}-picked`}
+                                                                        type="text"
+                                                                        inputMode="decimal"
+                                                                        className="input-field text-center p-2 text-base font-bold bg-white"
+                                                                        value={row.picked || ''}
+                                                                        onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
+                                                                        onBlur={(e) => handleBlur(row.id, 'picked', e.target.value)}
+                                                                        onFocus={() => setActiveInput({ id: `input-m-${idx}-picked`, type: 'row', rowId: row.id, field: 'picked' })}
+                                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'picked', 'input-m-')}
+                                                                        disabled={isSorting}
+                                                                    />
+                                                                </div>
+                                                                <div className="flex flex-col gap-1">
+                                                                    <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">原貨</label>
+                                                                    <input
+                                                                        id={`input-m-${idx}-original`}
+                                                                        type="text"
+                                                                        inputMode="decimal"
+                                                                        className="input-field text-center p-2 text-base font-bold bg-white"
+                                                                        value={row.original || ''}
+                                                                        onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
+                                                                        onBlur={(e) => handleBlur(row.id, 'original', e.target.value)}
+                                                                        onFocus={() => setActiveInput({ id: `input-m-${idx}-original`, type: 'row', rowId: row.id, field: 'original' })}
+                                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'original', 'input-m-')}
+                                                                        disabled={isSorting}
+                                                                    />
+                                                                </div>
+                                                                <div className="flex flex-col gap-1">
+                                                                    <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">退貨</label>
+                                                                    <input
+                                                                        id={`input-m-${idx}-returns`}
+                                                                        type="text"
+                                                                        inputMode="decimal"
+                                                                        className="input-field text-center p-2 text-base font-bold text-red-600 bg-white"
+                                                                        value={row.returns || ''}
+                                                                        onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
+                                                                        onBlur={(e) => handleBlur(row.id, 'returns', e.target.value)}
+                                                                        onFocus={() => setActiveInput({ id: `input-m-${idx}-returns`, type: 'row', rowId: row.id, field: 'returns' })}
+                                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'returns', 'input-m-')}
+                                                                        disabled={isSorting}
+                                                                    />
+                                                                </div>
+                                                                <div className="flex flex-col gap-1">
+                                                                    <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">單價</label>
+                                                                    <input
+                                                                        id={`input-m-${idx}-price`}
+                                                                        type="text"
+                                                                        inputMode="decimal"
+                                                                        className="input-field text-center p-2 text-base font-bold bg-white"
+                                                                        value={row.price}
+                                                                        onChange={(e) => handleRowChange(row.id, 'price', e.target.value)}
+                                                                        onBlur={(e) => handleBlur(row.id, 'price', e.target.value)}
+                                                                        onFocus={() => setActiveInput({ id: `input-m-${idx}-price`, type: 'row', rowId: row.id, field: 'price' })}
+                                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'price', 'input-m-')}
+                                                                        disabled={isSorting}
+                                                                    />
+                                                                </div>
                                                             </div>
                                                         </div>
 
@@ -775,11 +849,14 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                             <span className="text-[var(--text-tertiary)]">x</span>
                                             <input
                                                 id={currentId}
+                                                type="text"
+                                                inputMode="decimal"
                                                 className="input-field flex-1"
                                                 placeholder="0"
                                                 value={cashCounts[denom] || ''}
                                                 onChange={(e) => handleCashChange(denom, e.target.value)}
                                                 onBlur={(e) => handleCashBlur(denom, e.target.value)}
+                                                onFocus={() => setActiveInput({ id: currentId, type: 'cash', denom: denom })}
                                                 onKeyDown={(e) => handleSidebarKeyDown(e, {
                                                     next: nextId,
                                                     prev: prevId,
@@ -797,10 +874,13 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     <span className="text-[var(--text-tertiary)]">-</span>
                                     <input
                                         id="input-reserve"
+                                        type="text"
+                                        inputMode="decimal"
                                         className="input-field flex-1 border-red-900/50 focus:ring-red-500"
                                         value={reserve}
                                         onChange={(e) => handleReserveChange(e.target.value)}
                                         onBlur={(e) => handleReserveBlur(e.target.value)}
+                                        onFocus={() => setActiveInput({ id: 'input-reserve', type: 'reserve' })}
                                         onKeyDown={(e) => handleSidebarKeyDown(e, {
                                             next: 'input-expense-stall',
                                             prev: 'input-cash-1',
@@ -840,10 +920,13 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                             <label className="text-xs text-[var(--text-secondary)] block mb-1">{label}</label>
                                             <input
                                                 id={currentId}
+                                                type="text"
+                                                inputMode="decimal"
                                                 className="input-field text-sm"
                                                 value={expenses[key] || ''}
                                                 onChange={(e) => handleExpenseChange(key, e.target.value)}
                                                 onBlur={(e) => handleExpenseBlur(key, e.target.value)}
+                                                onFocus={() => setActiveInput({ id: currentId, type: 'expense', key: key })}
                                                 onKeyDown={(e) => handleSidebarKeyDown(e, {
                                                     next: nextId,
                                                     prev: prevId,
@@ -863,10 +946,13 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     <label className="text-xs text-[var(--text-secondary)] block mb-1">Line Pay (收款)</label>
                                     <input
                                         id="input-expense-linePay"
+                                        type="text"
+                                        inputMode="decimal"
                                         className="input-field border-green-200 text-green-600"
                                         value={expenses.linePay || ''}
                                         onChange={(e) => handleExpenseChange('linePay', e.target.value)}
                                         onBlur={(e) => handleExpenseBlur('linePay', e.target.value)}
+                                        onFocus={() => setActiveInput({ id: 'input-expense-linePay', type: 'expense', key: 'linePay' })}
                                         onKeyDown={(e) => handleSidebarKeyDown(e, {
                                             next: 'input-expense-serviceFee',
                                             prev: 'input-expense-others',
@@ -881,10 +967,13 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     <label className="text-xs text-[var(--text-secondary)] block mb-1">服務費 (扣除)</label>
                                     <input
                                         id="input-expense-serviceFee"
+                                        type="text"
+                                        inputMode="decimal"
                                         className="input-field border-red-200 text-red-600"
                                         value={expenses.serviceFee || ''}
                                         onChange={(e) => handleExpenseChange('serviceFee', e.target.value)}
                                         onBlur={(e) => handleExpenseBlur('serviceFee', e.target.value)}
+                                        onFocus={() => setActiveInput({ id: 'input-expense-serviceFee', type: 'expense', key: 'serviceFee' })}
                                         disabled={isCredit}
                                         onKeyDown={(e) => handleSidebarKeyDown(e, {
                                             next: 'btn-save-data',
