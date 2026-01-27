@@ -583,7 +583,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                             <input
                                                                 id={`input-m-${idx}-picked`}
                                                                 type="text"
-                                                                inputMode="decimal"
+                                                                inputMode="text"
                                                                 className="input-field text-center p-2 text-base font-bold"
                                                                 value={row.picked || ''}
                                                                 onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
@@ -597,7 +597,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                             <input
                                                                 id={`input-m-${idx}-original`}
                                                                 type="text"
-                                                                inputMode="decimal"
+                                                                inputMode="text"
                                                                 className="input-field text-center p-2 text-base font-bold"
                                                                 value={row.original || ''}
                                                                 onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
@@ -611,7 +611,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                             <input
                                                                 id={`input-m-${idx}-returns`}
                                                                 type="text"
-                                                                inputMode="decimal"
+                                                                inputMode="text"
                                                                 className="input-field text-center p-2 text-base font-bold text-red-600"
                                                                 value={row.returns || ''}
                                                                 onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
@@ -625,7 +625,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                             <input
                                                                 id={`input-m-${idx}-price`}
                                                                 type="text"
-                                                                inputMode="decimal"
+                                                                inputMode="text"
                                                                 className="input-field text-center p-2 text-base font-bold"
                                                                 value={row.price}
                                                                 onChange={(e) => handleRowChange(row.id, 'price', e.target.value)}
@@ -779,7 +779,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                         <input
                                             id={currentId}
                                             type="text"
-                                            inputMode="decimal"
+                                            inputMode="text"
                                             className="input-field flex-1"
                                             placeholder="0"
                                             value={cashCounts[denom] || ''}
@@ -803,7 +803,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 <input
                                     id="input-reserve"
                                     type="text"
-                                    inputMode="decimal"
+                                    inputMode="text"
                                     className="input-field flex-1 border-red-900/50 focus:ring-red-500"
                                     value={reserve}
                                     onChange={(e) => handleReserveChange(e.target.value)}
@@ -848,7 +848,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                         <input
                                             id={currentId}
                                             type="text"
-                                            inputMode="decimal"
+                                            inputMode="text"
                                             className="input-field text-sm"
                                             value={expenses[key] || ''}
                                             onChange={(e) => handleExpenseChange(key, e.target.value)}
@@ -873,7 +873,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 <input
                                     id="input-expense-linePay"
                                     type="text"
-                                    inputMode="decimal"
+                                    inputMode="text"
                                     className="input-field border-green-200 text-green-600"
                                     value={expenses.linePay || ''}
                                     onChange={(e) => handleExpenseChange('linePay', e.target.value)}
@@ -893,7 +893,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 <input
                                     id="input-expense-serviceFee"
                                     type="text"
-                                    inputMode="decimal"
+                                    inputMode="text"
                                     className="input-field border-red-200 text-red-600"
                                     value={expenses.serviceFee || ''}
                                     onChange={(e) => handleExpenseChange('serviceFee', e.target.value)}
