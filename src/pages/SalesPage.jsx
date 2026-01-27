@@ -4,6 +4,7 @@ import { Save, RefreshCw, Calculator, DollarSign, GripVertical, ListOrdered, Pri
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { callGAS } from '../utils/api';
 import { PRICE_MAP, sortProducts } from '../utils/constants';
+import { evaluateFormula } from '../utils/mathUtils';
 
 export default function SalesPage({ user, apiUrl, logActivity }) {
     const [rows, setRows] = useState([]);
@@ -86,17 +87,22 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
     // Recalculate row
     const handleRowChange = (id, field, value) => {
-        let val = Number(value);
-        if (isNaN(val)) val = 0;
-
         setRows(prev => prev.map(r => {
             if (r.id !== id) return r;
 
+            // 如果值是公式（以 = 開頭），我們暫存字串不計算數字
+            if (typeof value === 'string' && value.trim().startsWith('=')) {
+                return { ...r, [field]: value };
+            }
+
+            let val = Number(value);
+            if (isNaN(val)) val = 0;
+
             // 1. Propose new values based on input
-            let newPicked = field === 'picked' ? val : (r.picked || 0);
-            let newOriginal = field === 'original' ? val : (r.original || 0);
-            let newReturns = field === 'returns' ? val : (r.returns || 0);
-            let newPrice = field === 'price' ? val : (r.price || 0);
+            let newPicked = field === 'picked' ? val : (typeof r.picked === 'string' ? 0 : r.picked || 0);
+            let newOriginal = field === 'original' ? val : (typeof r.original === 'string' ? 0 : r.original || 0);
+            let newReturns = field === 'returns' ? val : (typeof r.returns === 'string' ? 0 : r.returns || 0);
+            let newPrice = field === 'price' ? val : (typeof r.price === 'string' ? 0 : r.price || 0);
 
             // 2. Local Price Memory Persistence
             if (field === 'price') {
@@ -130,6 +136,34 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
             return updated;
         }));
+    };
+
+    const handleBlur = (id, field, value) => {
+        if (typeof value === 'string' && value.trim().startsWith('=')) {
+            const result = evaluateFormula(value);
+            handleRowChange(id, field, result);
+        }
+    };
+
+    const handleCashBlur = (denom, value) => {
+        if (typeof value === 'string' && value.trim().startsWith('=')) {
+            const result = evaluateFormula(value);
+            setCashCounts(prev => ({ ...prev, [denom]: Number(result) || 0 }));
+        }
+    };
+
+    const handleReserveBlur = (value) => {
+        if (typeof value === 'string' && value.trim().startsWith('=')) {
+            const result = evaluateFormula(value);
+            setReserve(Number(result) || 0);
+        }
+    };
+
+    const handleExpenseBlur = (key, value) => {
+        if (typeof value === 'string' && value.trim().startsWith('=')) {
+            const result = evaluateFormula(value);
+            setExpenses(prev => ({ ...prev, [key]: Number(result) || 0 }));
+        }
     };
 
     const handleDragEnd = async (result) => {
@@ -265,14 +299,19 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     };
 
     const totalSalesAmount = rows.reduce((acc, r) => acc + (r.subtotal || 0), 0);
-    const totalCashCalc = Object.entries(cashCounts).reduce((acc, [denom, count]) => acc + (Number(denom) * count), 0);
+    const totalCashCalc = Object.entries(cashCounts).reduce((acc, [denom, count]) => {
+        const c = typeof count === 'string' ? 0 : (Number(count) || 0);
+        return acc + (Number(denom) * c);
+    }, 0);
     // If Credit, reserve is 0 effectively, and totalCashNet might not be relevant for balancing but let's keep calc
-    const totalCashNet = totalCashCalc - reserve;
+    const cleanReserve = typeof reserve === 'string' ? 0 : (Number(reserve) || 0);
+    const totalCashNet = totalCashCalc - cleanReserve;
 
+    const getVal = (v) => typeof v === 'string' ? 0 : (Number(v) || 0);
     const totalExpensesPlusLinePay =
-        Number(expenses.stall) + Number(expenses.cleaning) + Number(expenses.electricity) +
-        Number(expenses.gas) + Number(expenses.parking) + Number(expenses.goods) +
-        Number(expenses.bags) + Number(expenses.others) + Number(expenses.linePay);
+        getVal(expenses.stall) + getVal(expenses.cleaning) + getVal(expenses.electricity) +
+        getVal(expenses.gas) + getVal(expenses.parking) + getVal(expenses.goods) +
+        getVal(expenses.bags) + getVal(expenses.others) + getVal(expenses.linePay);
 
     const isCredit = paymentType === 'CREDIT';
 
@@ -282,7 +321,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     // IF CREDIT: Just the Total Sales Amount (Product Subtotals)
     const finalTotal = isCredit
         ? totalSalesAmount
-        : (totalCashNet + totalExpensesPlusLinePay + Number(expenses.serviceFee) - totalSalesAmount);
+        : (totalCashNet + totalExpensesPlusLinePay + getVal(expenses.serviceFee) - totalSalesAmount);
 
     const handleSubmit = async () => {
         if (!location.trim()) {
@@ -522,10 +561,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                             <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">領貨</label>
                                                             <input
                                                                 id={`input-m-${idx}-picked`}
-                                                                type="number"
+                                                                type="text"
+                                                                inputMode="decimal"
                                                                 className="input-field text-center p-2 text-base font-bold"
                                                                 value={row.picked || ''}
                                                                 onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
+                                                                onBlur={(e) => handleBlur(row.id, 'picked', e.target.value)}
                                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'picked', 'input-m-')}
                                                                 disabled={isSorting}
                                                             />
@@ -534,10 +575,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                             <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">原貨</label>
                                                             <input
                                                                 id={`input-m-${idx}-original`}
-                                                                type="number"
+                                                                type="text"
+                                                                inputMode="decimal"
                                                                 className="input-field text-center p-2 text-base font-bold"
                                                                 value={row.original || ''}
                                                                 onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
+                                                                onBlur={(e) => handleBlur(row.id, 'original', e.target.value)}
                                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'original', 'input-m-')}
                                                                 disabled={isSorting}
                                                             />
@@ -546,10 +589,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                             <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">退貨</label>
                                                             <input
                                                                 id={`input-m-${idx}-returns`}
-                                                                type="number"
+                                                                type="text"
+                                                                inputMode="decimal"
                                                                 className="input-field text-center p-2 text-base font-bold text-red-600"
                                                                 value={row.returns || ''}
                                                                 onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
+                                                                onBlur={(e) => handleBlur(row.id, 'returns', e.target.value)}
                                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'returns', 'input-m-')}
                                                                 disabled={isSorting}
                                                             />
@@ -558,10 +603,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                             <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">單價</label>
                                                             <input
                                                                 id={`input-m-${idx}-price`}
-                                                                type="number"
+                                                                type="text"
+                                                                inputMode="decimal"
                                                                 className="input-field text-center p-2 text-base font-bold"
                                                                 value={row.price}
                                                                 onChange={(e) => handleRowChange(row.id, 'price', e.target.value)}
+                                                                onBlur={(e) => handleBlur(row.id, 'price', e.target.value)}
                                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'price', 'input-m-')}
                                                                 disabled={isSorting}
                                                             />
@@ -633,10 +680,11 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                         <td className="p-3">
                                                             <input
                                                                 id={`input-${idx}-picked`}
-                                                                type="number"
+                                                                type="text"
                                                                 className="input-field text-center p-1"
                                                                 value={row.picked || ''}
                                                                 onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
+                                                                onBlur={(e) => handleBlur(row.id, 'picked', e.target.value)}
                                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'picked')}
                                                                 disabled={isSorting}
                                                             />
@@ -644,10 +692,11 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                         <td className="p-3">
                                                             <input
                                                                 id={`input-${idx}-original`}
-                                                                type="number"
+                                                                type="text"
                                                                 className="input-field text-center p-1"
                                                                 value={row.original || ''}
                                                                 onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
+                                                                onBlur={(e) => handleBlur(row.id, 'original', e.target.value)}
                                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'original')}
                                                                 disabled={isSorting}
                                                             />
@@ -655,16 +704,17 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                         <td className="p-3">
                                                             <input
                                                                 id={`input-${idx}-returns`}
-                                                                type="number"
+                                                                type="text"
                                                                 className="input-field text-center p-1 text-red-600"
                                                                 value={row.returns || ''}
                                                                 onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
+                                                                onBlur={(e) => handleBlur(row.id, 'returns', e.target.value)}
                                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'returns')}
                                                                 disabled={isSorting}
                                                             />
                                                         </td>
                                                         <td className="p-3 text-center font-bold text-blue-500">{row.sold}</td>
-                                                        <td className="p-3"><input id={`input-${idx}-price`} type="number" className="input-field text-center p-1 w-20" value={row.price} onChange={(e) => handleRowChange(row.id, 'price', e.target.value)} onKeyDown={(e) => handleKeyDown(e, idx, 'price')} disabled={isSorting} /></td>
+                                                        <td className="p-3"><input id={`input-${idx}-price`} type="text" className="input-field text-center p-1 w-20" value={row.price} onChange={(e) => handleRowChange(row.id, 'price', e.target.value)} onBlur={(e) => handleBlur(row.id, 'price', e.target.value)} onKeyDown={(e) => handleKeyDown(e, idx, 'price')} disabled={isSorting} /></td>
                                                         <td className="p-3 text-right font-mono text-rose-600">${row.subtotal?.toLocaleString()}</td>
                                                     </tr>
                                                 )}
@@ -707,11 +757,13 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                         <span className="text-[var(--text-tertiary)]">x</span>
                                         <input
                                             id={currentId}
-                                            type="number"
+                                            type="text"
+                                            inputMode="decimal"
                                             className="input-field flex-1"
                                             placeholder="0"
                                             value={cashCounts[denom] || ''}
-                                            onChange={(e) => setCashCounts({ ...cashCounts, [denom]: Number(e.target.value) })}
+                                            onChange={(e) => setCashCounts({ ...cashCounts, [denom]: e.target.value })}
+                                            onBlur={(e) => handleCashBlur(denom, e.target.value)}
                                             onKeyDown={(e) => handleSidebarKeyDown(e, {
                                                 next: nextId,
                                                 prev: prevId,
@@ -720,7 +772,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                             })}
                                             disabled={isCredit}
                                         />
-                                        <span className="w-20 text-right font-mono text-[var(--text-secondary)]">${(denom * cashCounts[denom]).toLocaleString()}</span>
+                                        <span className="w-20 text-right font-mono text-[var(--text-secondary)]">${(denom * (typeof cashCounts[denom] === 'string' ? 0 : cashCounts[denom])).toLocaleString()}</span>
                                     </div>
                                 );
                             })}
@@ -729,10 +781,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 <span className="text-[var(--text-tertiary)]">-</span>
                                 <input
                                     id="input-reserve"
-                                    type="number"
+                                    type="text"
+                                    inputMode="decimal"
                                     className="input-field flex-1 border-red-900/50 focus:ring-red-500"
                                     value={reserve}
-                                    onChange={(e) => setReserve(Number(e.target.value))}
+                                    onChange={(e) => setReserve(e.target.value)}
+                                    onBlur={(e) => handleReserveBlur(e.target.value)}
                                     onKeyDown={(e) => handleSidebarKeyDown(e, {
                                         next: 'input-expense-stall',
                                         prev: 'input-cash-1',
@@ -772,10 +826,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                         <label className="text-xs text-[var(--text-secondary)] block mb-1">{label}</label>
                                         <input
                                             id={currentId}
-                                            type="number"
+                                            type="text"
+                                            inputMode="decimal"
                                             className="input-field text-sm"
                                             value={expenses[key] || ''}
-                                            onChange={(e) => setExpenses({ ...expenses, [key]: Number(e.target.value) })}
+                                            onChange={(e) => setExpenses({ ...expenses, [key]: e.target.value })}
+                                            onBlur={(e) => handleExpenseBlur(key, e.target.value)}
                                             onKeyDown={(e) => handleSidebarKeyDown(e, {
                                                 next: nextId,
                                                 prev: prevId,
@@ -795,10 +851,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 <label className="text-xs text-[var(--text-secondary)] block mb-1">Line Pay (收款)</label>
                                 <input
                                     id="input-expense-linePay"
-                                    type="number"
+                                    type="text"
+                                    inputMode="decimal"
                                     className="input-field border-green-200 text-green-600"
                                     value={expenses.linePay || ''}
-                                    onChange={(e) => setExpenses({ ...expenses, linePay: Number(e.target.value) })}
+                                    onChange={(e) => setExpenses({ ...expenses, linePay: e.target.value })}
+                                    onBlur={(e) => handleExpenseBlur('linePay', e.target.value)}
                                     onKeyDown={(e) => handleSidebarKeyDown(e, {
                                         next: 'input-expense-serviceFee',
                                         prev: 'input-expense-others',
@@ -813,10 +871,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 <label className="text-xs text-[var(--text-secondary)] block mb-1">服務費 (扣除)</label>
                                 <input
                                     id="input-expense-serviceFee"
-                                    type="number"
+                                    type="text"
+                                    inputMode="decimal"
                                     className="input-field border-red-200 text-red-600"
                                     value={expenses.serviceFee || ''}
-                                    onChange={(e) => setExpenses({ ...expenses, serviceFee: Number(e.target.value) })}
+                                    onChange={(e) => setExpenses({ ...expenses, serviceFee: e.target.value })}
+                                    onBlur={(e) => handleExpenseBlur('serviceFee', e.target.value)}
                                     disabled={isCredit}
                                     onKeyDown={(e) => handleSidebarKeyDown(e, {
                                         next: 'btn-save-data',
