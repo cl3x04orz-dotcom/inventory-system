@@ -970,18 +970,27 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             </div>
             {isInputFocused && (
                 <div
-                    className="md:hidden fixed bottom-0 left-0 right-0 bg-[#fdf6e3] border-t-2 border-amber-200 p-2 flex gap-2 z-[9999] shadow-[0_-8px_30px_rgba(0,0,0,0.2)] math-toolbar pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+                    className="md:hidden fixed bottom-0 left-0 right-0 bg-[#fdf6e3] border-t-2 border-amber-200 p-2 flex gap-2 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.3)] math-toolbar pb-[max(1rem,env(safe-area-inset-bottom))]"
+                    style={{ transform: 'translateZ(0)' }}
                     onMouseDown={(e) => e.preventDefault()}
                 >
                     {['=', '+', '-', '*', '/'].map(sym => (
                         <button
                             key={sym}
+                            type="button"
                             onClick={() => insertMathSymbol(sym)}
-                            className="h-16 flex-1 rounded-2xl bg-white border border-amber-100 text-blue-600 font-bold text-3xl active:bg-amber-100 transition-all active:scale-90 shadow-md transform active:translate-y-1"
+                            className="h-14 flex-1 rounded-xl bg-white border border-amber-100 text-blue-600 font-bold text-3xl active:bg-amber-100 transition-all active:scale-90 shadow-md transform active:translate-y-1"
                         >
                             {sym}
                         </button>
                     ))}
+                    <button
+                        type="button"
+                        onClick={() => setIsInputFocused(false)}
+                        className="h-14 px-6 rounded-xl bg-blue-600 text-white font-bold text-lg active:bg-blue-700 active:scale-95 shadow-lg"
+                    >
+                        OK
+                    </button>
                 </div>
             )}
         </>
