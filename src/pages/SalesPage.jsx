@@ -968,37 +968,18 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             </div>
             {isInputFocused && (
                 <div
-                    className="md:hidden fixed bottom-0 left-0 right-0 bg-[#fdf6e3] border-t-2 border-amber-200 p-2 flex gap-1 z-[9999] shadow-[0_-4px_10px_rgba(0,0,0,0.1)] math-toolbar overflow-x-auto"
+                    className="md:hidden fixed bottom-0 left-0 right-0 bg-[#fdf6e3] border-t-2 border-amber-200 p-2 flex gap-2 z-[9999] shadow-[0_-8px_20px_rgba(0,0,0,0.15)] math-toolbar"
                     onMouseDown={(e) => e.preventDefault()}
                 >
-                    <button
-                        onClick={() => {
-                            const el = document.activeElement;
-                            if (el && el.tagName === 'INPUT') {
-                                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                                nativeInputValueSetter.call(el, '');
-                                el.dispatchEvent(new Event('input', { bubbles: true }));
-                            }
-                        }}
-                        className="h-12 px-4 rounded-lg bg-red-100 text-red-600 font-bold border border-red-200 active:scale-95 transition-all"
-                    >
-                        C
-                    </button>
-                    {['=', '+', '-', '*', '/', '(', ')'].map(sym => (
+                    {['=', '+', '-', '*', '/'].map(sym => (
                         <button
                             key={sym}
                             onClick={() => insertMathSymbol(sym)}
-                            className="h-12 flex-1 min-w-[44px] rounded-lg bg-white border border-amber-100 text-[var(--text-primary)] font-bold text-xl active:bg-amber-200 transition-all active:scale-90 shadow-sm"
+                            className="h-14 flex-1 rounded-xl bg-white border border-amber-100 text-blue-600 font-bold text-2xl active:bg-amber-100 transition-all active:scale-95 shadow-sm"
                         >
                             {sym}
                         </button>
                     ))}
-                    <button
-                        onClick={() => setIsInputFocused(false)}
-                        className="h-12 px-4 rounded-lg bg-blue-600 text-white font-bold active:scale-95 transition-all shadow-md"
-                    >
-                        OK
-                    </button>
                 </div>
             )}
         </div>
