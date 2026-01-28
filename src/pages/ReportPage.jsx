@@ -512,7 +512,11 @@ export default function ReportPage({ user, apiUrl }) {
                                                                     hour: '2-digit', minute: '2-digit', hour12: false
                                                                 })}
                                                             </td>
-                                                            <td className="p-3 font-bold text-[var(--text-primary)]">{item.customer || item.note || '-'}</td>
+                                                            <td className="p-3 font-bold text-[var(--text-primary)]">
+                                                                {item.customer || ''}
+                                                                {item.note && <span className="text-xs text-[var(--text-tertiary)] font-normal block">{item.note}</span>}
+                                                                {(!item.customer && !item.note) && '-'}
+                                                            </td>
                                                             <td className="p-3">{item.salesRep}</td>
                                                             <td className="p-3 text-xs text-[var(--text-tertiary)]">{cats.join(', ')}</td>
                                                             <td className="p-3 text-right font-mono text-rose-600">
