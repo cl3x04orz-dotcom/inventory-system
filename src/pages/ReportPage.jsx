@@ -105,6 +105,11 @@ export default function ReportPage({ user, apiUrl }) {
                 // 讀取值並確保是數字，如果找不到或為 0，則給予 fallback
                 const extractedValue = finalTotalKey ? Number(item[finalTotalKey]) : Number(item.finalTotal || 0);
                 item.displayFinalTotal = extractedValue;
+
+                // [Fix] 僅在前端相容讀取原始中文鍵值 (不依賴後端 Mapping)
+                item.normCustomer = item.customer || item['對象/備註'] || item['對象'] || '';
+                item.normSalesRep = item.salesRep || item['業務'] || '';
+                item.normNote = item.note || item['備註'] || '';
             });
 
             setExpenseData(filteredExpenses);
@@ -455,11 +460,15 @@ export default function ReportPage({ user, apiUrl }) {
                                                             </div>
                                                         </div>
                                                         <div className="flex flex-wrap gap-2 text-sm">
-                                                            <div className="flex items-center gap-1 bg-amber-500/10 text-amber-700 px-2 py-0.5 rounded-md">
-                                                                <MapPin size={12} /> <span className="font-medium">{item.customer || item.note || '-'}</span>
+                                                            <div className="flex flex-col gap-0.5 bg-amber-500/10 text-amber-700 px-2 py-0.5 rounded-md">
+                                                                <div className="flex items-center gap-1">
+                                                                    <MapPin size={10} />
+                                                                    <span className="font-bold text-xs">{item.normCustomer || '-'}</span>
+                                                                </div>
+                                                                {item.normNote && <div className="text-[10px] opacity-70 ml-3.5 italic">{item.normNote}</div>}
                                                             </div>
-                                                            <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-md">
-                                                                <User size={12} /> <span>{item.salesRep}</span>
+                                                            <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-md border border-[var(--border-primary)]">
+                                                                <User size={10} /> <span className="text-xs font-bold">{item.normSalesRep}</span>
                                                             </div>
                                                         </div>
                                                         <div className="pt-2 border-t border-[var(--border-primary)]">
@@ -512,8 +521,11 @@ export default function ReportPage({ user, apiUrl }) {
                                                                     hour: '2-digit', minute: '2-digit', hour12: false
                                                                 })}
                                                             </td>
-                                                            <td className="p-3 font-bold text-[var(--text-primary)]">{item.customer || item.note || '-'}</td>
-                                                            <td className="p-3">{item.salesRep}</td>
+                                                            <td className="p-3">
+                                                                <div className="font-bold text-[var(--text-primary)]">{item.normCustomer || '-'}</div>
+                                                                {item.normNote && <div className="text-[10px] text-[var(--text-tertiary)] italic">{item.normNote}</div>}
+                                                            </td>
+                                                            <td className="p-3 text-[var(--text-secondary)] font-bold">{item.normSalesRep}</td>
                                                             <td className="p-3 text-xs text-[var(--text-tertiary)]">{cats.join(', ')}</td>
                                                             <td className="p-3 text-right font-mono text-rose-600">
                                                                 ${(item.rowTotal || 0).toLocaleString()}
