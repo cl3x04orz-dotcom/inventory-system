@@ -1,6 +1,6 @@
 /**
- * Templates.gs
- * 動態模板系統後端服務
+ * Service_Print.gs
+ * 動態模板與列印系統服務
  */
 
 /**
@@ -120,7 +120,7 @@ function getTemplateLayoutService(payload) {
 
 /**
  * [Service] 生成 PDF (Backend Generation)
- * @param {Object} payload { templateId, data: { ... } }
+ * 支援雙欄位邏輯 + 自動填入 (不破壞版面)
  */
 function generatePdfService(payload) {
   const { templateId, data } = payload;
@@ -137,7 +137,7 @@ function generatePdfService(payload) {
   tempSheet.setName("Temp_Print_" + timestamp);
 
   try {
-    // 2. Write Data
+    // 2. Write Basic Data (Headers/Footers)
     const replacements = {
       '{{date}}': data.date ? new Date(data.date).toLocaleDateString('zh-TW') : new Date().toLocaleDateString('zh-TW'),
       '{{location}}': data.location || '',
@@ -152,99 +152,186 @@ function generatePdfService(payload) {
       '{{exp_others}}': data.expenses?.others || ''
     };
 
-    // A. Scalar Replacement (Search & Replace text in the whole sheet)
-    // This is inefficient for large sheets but fine for print templates
     const range = tempSheet.getDataRange();
-    const values = range.getValues();
+    const values = range.getValues(); // raw values
     const rangeHeight = values.length;
     const rangeWidth = values[0].length;
     
-    // Determine Product Row (Strategy: Find '{{product_name}}')
-    let productRowIndex = -1;
+    // --- Strategy: Locate Product Row and Split Config ---
+    let templateRowIndex = -1;
+    let splitKey = null; // 可以是數字索引或產品名稱
+    let colLeftIndex = -1;
+    let colRightIndex = -1;
+
+    const cleanTag = (str) => String(str || '').replace(/\s+/g, '').replace(/：/g, ':');
+    const normalizeStr = (str) => String(str || '').normalize('NFC').trim();
+
+    // Scan for tags
     for(let r=0; r<rangeHeight; r++) {
       for(let c=0; c<rangeWidth; c++) {
-        if(String(values[r][c]).includes('{{product_name}}')) {
-          productRowIndex = r;
-          break;
+        const rawVal = String(values[r][c]);
+        const val = cleanTag(rawVal);
+        
+        if (val.includes('products_until:') || val.includes('product_until:')) {
+            templateRowIndex = r;
+            colLeftIndex = c;
+            const parts = val.split(/products?_until:/);
+            if (parts[1]) splitKey = parts[1].trim();
+        } else if (val.includes('{{products_left}}')) {
+             templateRowIndex = r;
+             colLeftIndex = c;
+        }
+
+        if (val.includes('products_after:') || val.includes('product_after:')) {
+            templateRowIndex = r;
+            colRightIndex = c;
+            if (!splitKey) {
+                const parts = val.split(/products?_after:/);
+                if (parts[1]) splitKey = parts[1].trim();
+            }
+        } else if (val.includes('{{products_right}}')) {
+             templateRowIndex = r;
+             colRightIndex = c;
         }
       }
-      if(productRowIndex !== -1) break;
+      if(templateRowIndex !== -1 && (colLeftIndex !== -1 || colRightIndex !== -1)) break;
     }
 
-    // B. Fill Product Rows
-    if (productRowIndex !== -1 && data.rows && data.rows.length > 0) {
-      const productList = data.rows;
-      // If we need more rows than available in the "template zone" (assuming 1 row template), insert them
-      // But usually templates have empty rows. Let's simplify: 
-      // We will overwrite the template row and subsequent rows. 
-      // If list > distinct empty rows, we might need insert.
-      // For Safety: We INSERT rows after the template row to match data length - 1
-      
-      if (productList.length > 1) {
-        tempSheet.insertRowsAfter(productRowIndex + 1, productList.length - 1);
-      }
+    // --- Product List Processing ---
+    if (templateRowIndex !== -1 && data.rows && data.rows.length > 0) {
+        
+        let leftProducts = [];
+        let rightProducts = [];
 
-      // Prepare 2D array for write
-      // We need to know which column maps to which field. 
-      // Reuse the "Strategy" logic or just hardcoded mapping if known? 
-      // Since it's generic, we scan the template row again to match columns.
-      const templateRow = values[productRowIndex];
-      const outputGrid = [];
-
-      productList.forEach(prod => {
-        const rowData = [];
-        for (let c = 0; c < rangeWidth; c++) {
-          const cellVal = String(templateRow[c] || '');
-          let newVal = cellVal;
-          
-          if (cellVal.includes('{{')) {
-             newVal = newVal
-              .replace(/\{\{product_name\}\}/g, prod.name || '')
-              .replace(/\{\{products_left\}\}/g, prod.name || '') // Legacy support
-              .replace(/\{\{products_right\}\}/g, prod.name || '') // Legacy support
-              .replace(/\{\{stock\}\}/g, `${prod.stock}/${prod.originalStock || 0}`)
-              .replace(/\{\{picked\}\}/g, prod.picked || '')
-              .replace(/\{\{original\}\}/g, prod.original || '')
-              .replace(/\{\{returns\}\}/g, prod.returns || '')
-              .replace(/\{\{sold\}\}/g, prod.sold || '')
-              .replace(/\{\{price\}\}/g, prod.price || '')
-              .replace(/\{\{subtotal\}\}/g, typeof prod.subtotal === 'number' ? prod.subtotal.toLocaleString() : (prod.subtotal || ''));
-          } else if (productRowIndex > 0) {
-             // Copy styles/formulas from previous row if needed? 
-             // For now, simpler to just assume empty cells stay empty
-          }
-          rowData.push(newVal);
+        if (splitKey) {
+            // 檢查是否為數字索引
+            const splitIndex = parseInt(splitKey, 10);
+            
+            if (!isNaN(splitIndex)) {
+                // 方案 1: 使用索引分割
+                leftProducts = data.rows.slice(0, splitIndex);
+                rightProducts = data.rows.slice(splitIndex);
+            } else {
+                // 備用方案: 使用名稱分割(嚴格匹配)
+                const normKey = normalizeStr(splitKey).replace(/\s+/g, '');
+                let didSplit = false;
+                
+                for (const p of data.rows) {
+                    if (didSplit) {
+                        rightProducts.push(p);
+                    } else {
+                        leftProducts.push(p);
+                        const pName = normalizeStr(p.name).replace(/\s+/g, '');
+                        if (pName === normKey) {  // 改用嚴格匹配
+                            didSplit = true;
+                        }
+                    }
+                }
+            }
+        } else {
+             leftProducts = data.rows;
         }
-        outputGrid.push(rowData);
-      });
 
-      // Write Products
-      if (outputGrid.length > 0) {
-        tempSheet.getRange(productRowIndex + 1, 1, outputGrid.length, outputGrid[0].length).setValues(outputGrid);
-      }
-      
-      // Clear the "original" template tags if we inserted rows? 
-      // Actually we overwrote the first raw and inserted others. 
-      // BUT `insertRowsAfter` copies the formatting of the previous row (the template row), which is good.
-    } else if (productRowIndex !== -1) {
-        // No products? Clear the template row tags
-        tempSheet.getRange(productRowIndex + 1, 1, 1, rangeWidth).clearContent();
+        // --- Auto-Balance Fallback ---
+        if (colLeftIndex !== -1 && colRightIndex !== -1 && rightProducts.length === 0 && leftProducts.length > 5) {
+            const total = leftProducts.length;
+            const mid = Math.ceil(total / 2);
+            const secondHalf = leftProducts.splice(mid); 
+            rightProducts = secondHalf;
+        }
+
+        // --- 直接填入,不做空間計算 ---
+        const maxRows = Math.max(leftProducts.length, rightProducts.length);
+
+
+
+        // Prepare Data Grid
+        const templateRowValues = range.getValues()[templateRowIndex];
+        // 直接逐行逐格寫入,不建立 outputGrid
+        for (let i = 0; i < maxRows; i++) {
+            const rowNum = templateRowIndex + 1 + i;
+            const targetRowIndex = templateRowIndex + i; // 0-based for values array
+            
+            const leftItem = leftProducts[i] || null;
+            const rightItem = rightProducts[i] || null;
+
+            for (let c = 0; c < rangeWidth; c++) {
+                // Check if target cell has existing content (Footer/Fixed)
+                let originalCellValue = '';
+                if (targetRowIndex < values.length) {
+                    originalCellValue = String(values[targetRowIndex][c]);
+                }
+                
+                const isWritable = originalCellValue.trim() === '' || 
+                                   originalCellValue.includes('{{') || 
+                                   originalCellValue.toLowerCase().includes('product');
+
+                if (!isWritable) {
+                    continue; // Skip writing, preserve footer content
+                }
+
+                const cellTemplate = String(templateRowValues[c] || '');
+                const cleanTemplate = cleanTag(cellTemplate);
+                
+                let activeItem = null;
+                if (colRightIndex !== -1 && c >= colRightIndex) {
+                    activeItem = rightItem;
+                } else if (colLeftIndex !== -1 && c >= colLeftIndex) {
+                     activeItem = leftItem;
+                }
+                
+                let cellVal = null; // null 表示不寫入
+                
+                if (activeItem) {
+                     if (cleanTemplate.includes('products_until:') || cleanTemplate.includes('product_until:') || cleanTemplate.includes('{{products_left}}') ||
+                         cleanTemplate.includes('products_after:') || cleanTemplate.includes('product_after:') || cleanTemplate.includes('{{products_right}}')) {
+                        cellVal = activeItem.name;
+                     } else if (cellTemplate.includes('{{stock}}')) {
+                         cellVal = `${activeItem.stock}/${activeItem.originalStock || 0}`;
+                     } else if (cellTemplate.includes('{{picked}}')) {
+                         cellVal = activeItem.picked || '';
+                     } else if (cellTemplate.includes('{{original}}')) {
+                         cellVal = activeItem.original || '';
+                     } else if (cellTemplate.includes('{{returns}}')) {
+                         cellVal = activeItem.returns || '';
+                     } else if (cellTemplate.includes('{{sold}}')) {
+                         cellVal = activeItem.sold || '';
+                     } else if (cellTemplate.includes('{{price}}')) {
+                         cellVal = activeItem.price || '';
+                     } else if (cellTemplate.includes('{{subtotal}}')) {
+                         cellVal = typeof activeItem.subtotal === 'number' ? activeItem.subtotal.toLocaleString() : (activeItem.subtotal || '');
+                     }
+                } else {
+                    // Empty slot logic: 清空產品相關標記
+                    if (cleanTemplate.includes('products_until:') || cleanTemplate.includes('product_until:') || 
+                        cleanTemplate.includes('products_after:') || cleanTemplate.includes('product_after:') ||
+                        cleanTemplate.includes('{{products_left}}') || cleanTemplate.includes('{{products_right}}') ||
+                        cleanTemplate.includes('{{stock}}') || cleanTemplate.includes('{{picked}}') ||
+                        cleanTemplate.includes('{{original}}') || cleanTemplate.includes('{{returns}}') ||
+                        cleanTemplate.includes('{{sold}}') || cleanTemplate.includes('{{price}}') ||
+                        cleanTemplate.includes('{{subtotal}}')) {
+                        cellVal = '';
+                    }
+                }
+                
+                // 只寫入有值的欄位
+                if (cellVal !== null) {
+                    tempSheet.getRange(rowNum, c + 1).setValue(cellVal);
+                }
+            }
+        }
     }
-    
-    // C. Replace Global Tags (Headers/Footers)
-    // We do this AFTER product insertion because products pushed rows down
-    // Re-fetch data range as it might have changed size
+
+    // --- Global Replacement ---
+    SpreadsheetApp.flush();
     const finalRange = tempSheet.getDataRange();
-    const textFinder = finalRange.createTextFinder('{{');
-    textFinder.useRegularExpression(false);
-    // Note: createTextFinder is globally fast but simple replace logic in GAS is tricky for partial matches.
-    // Let's do a simple getValues traverse for remaining tags.
     const finalValues = finalRange.getValues();
-    const finalUpdates = [];
     
     for(let r=0; r<finalValues.length; r++) {
       for(let c=0; c<finalValues[r].length; c++) {
         let val = String(finalValues[r][c]);
+        if (!val.includes('{{')) continue;
+        
         let changed = false;
         Object.keys(replacements).forEach(tag => {
            if (val.includes(tag)) {
@@ -253,25 +340,31 @@ function generatePdfService(payload) {
            }
         });
         if (changed) {
-           // batch update not easy here, just set immediately or track
            tempSheet.getRange(r+1, c+1).setValue(val);
         }
       }
     }
 
-    SpreadsheetApp.flush(); // Commit all changes
+    SpreadsheetApp.flush(); 
 
     // 3. Export to PDF
     const ssId = ss.getId();
     const sheetId = tempSheet.getSheetId();
-    
     // Export URL Construction
+    // Margins converted to inches: 
+    // Top 0.473cm ~ 0.186in
+    // Left/Right 0.43cm ~ 0.169in
+    // Bottom 1.524cm ~ 0.600in
     const url = 'https://docs.google.com/spreadsheets/d/' + ssId + '/export?' +
       'exportFormat=pdf&format=pdf' +
       '&size=7' + // A4
-      '&portrait=true' +
+      '&portrait=true' + 
       '&fitw=true' + // Fit to width
       '&gridlines=false' + 
+      '&top_margin=0.186' + 
+      '&bottom_margin=0.5' + 
+      '&left_margin=0.169' + 
+      '&right_margin=0.169' +
       '&gid=' + sheetId;
 
     const params = {
@@ -288,7 +381,6 @@ function generatePdfService(payload) {
     const blob = response.getBlob();
     const base64 = Utilities.base64Encode(blob.getBytes());
 
-    // 4. Cleanup
     ss.deleteSheet(tempSheet);
 
     return { 
@@ -298,7 +390,6 @@ function generatePdfService(payload) {
     };
 
   } catch (e) {
-    // Cleanup on error
     try { ss.deleteSheet(tempSheet); } catch(ex) {}
     throw new Error('PDF Error: ' + e.message);
   }
