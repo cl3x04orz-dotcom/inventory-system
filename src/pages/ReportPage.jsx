@@ -455,19 +455,11 @@ export default function ReportPage({ user, apiUrl }) {
                                                             </div>
                                                         </div>
                                                         <div className="flex flex-wrap gap-2 text-sm">
-                                                            <div className="flex flex-col gap-1">
-                                                                <div className="flex items-center gap-1 bg-amber-500/10 text-amber-700 px-2 py-0.5 rounded-md">
-                                                                    <MapPin size={12} /> <span className="font-medium text-xs">{item.customer || ''}</span>
-                                                                </div>
-                                                                {item.note && (
-                                                                    <div className="text-[10px] text-[var(--text-tertiary)] bg-gray-50 px-2 py-0.5 rounded border border-gray-100">
-                                                                        {item.note}
-                                                                    </div>
-                                                                )}
-                                                                {(!item.customer && !item.note) && '-'}
+                                                            <div className="flex items-center gap-1 bg-amber-500/10 text-amber-700 px-2 py-0.5 rounded-md">
+                                                                <MapPin size={12} /> <span className="font-medium">{item.customer || item.note || '-'}</span>
                                                             </div>
                                                             <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-md">
-                                                                <User size={12} /> <span className="text-xs">{item.salesRep}</span>
+                                                                <User size={12} /> <span>{item.salesRep}</span>
                                                             </div>
                                                         </div>
                                                         <div className="pt-2 border-t border-[var(--border-primary)]">
@@ -488,11 +480,11 @@ export default function ReportPage({ user, apiUrl }) {
                                             <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] sticky top-0 z-10">
                                                 <tr>
                                                     <th className="p-3 font-medium w-48">日期</th>
-                                                    <th className="p-3 font-medium w-48">對象/備註</th>
+                                                    <th className="p-3 font-medium w-32">對象/備註</th>
                                                     <th className="p-3 font-medium w-32">業務</th>
                                                     <th className="p-3 font-medium">支出細項</th>
-                                                    <th className="p-3 font-medium text-right w-24">總支出</th>
-                                                    <th className="p-3 font-medium text-right w-24 text-emerald-600">結算金額</th>
+                                                    <th className="p-3 font-medium text-right w-28">總支出</th>
+                                                    <th className="p-3 font-medium text-right w-28 text-emerald-600">結算金額</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-[var(--border-primary)] text-[var(--text-secondary)] bg-[var(--bg-secondary)]">
@@ -520,12 +512,8 @@ export default function ReportPage({ user, apiUrl }) {
                                                                     hour: '2-digit', minute: '2-digit', hour12: false
                                                                 })}
                                                             </td>
-                                                            <td className="p-3">
-                                                                <div className="font-bold text-[var(--text-primary)]">{item.customer || ''}</div>
-                                                                {item.note && <div className="text-[10px] text-[var(--text-tertiary)] font-normal">{item.note}</div>}
-                                                                {(!item.customer && !item.note) && '-'}
-                                                            </td>
-                                                            <td className="p-3 text-[var(--text-secondary)]">{item.salesRep}</td>
+                                                            <td className="p-3 font-bold text-[var(--text-primary)]">{item.customer || item.note || '-'}</td>
+                                                            <td className="p-3">{item.salesRep}</td>
                                                             <td className="p-3 text-xs text-[var(--text-tertiary)]">{cats.join(', ')}</td>
                                                             <td className="p-3 text-right font-mono text-rose-600">
                                                                 ${(item.rowTotal || 0).toLocaleString()}
