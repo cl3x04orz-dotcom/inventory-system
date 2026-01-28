@@ -191,7 +191,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         }
     };
 
-    const handleDragEnd = async (result) => {
+    const handleDragEnd = (result) => {
         if (!result.destination) return;
 
         const items = Array.from(rows);
@@ -200,19 +200,28 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
         // Update local state immediately for responsiveness
         setRows(items);
+    };
 
-        // Sync to Google Sheet
-        try {
-            const productIds = items.map(r => r.id);
-            const res = await callGAS(apiUrl, 'updateProductSortOrder', { productIds }, user.token);
-            console.log('Sort order synced:', res);
-            if (res.success) {
-                // 明確通知使用者儲存成功，給予信心
-                alert(`順序已永久儲存！(共更新 ${res.updateCount} 筆資料)`);
+    const toggleSorting = async () => {
+        if (isSorting) {
+            // Ending sorting mode -> Perform sync
+            setIsSubmitting(true); // Reuse submitting overlay if needed, or just silent
+            try {
+                const productIds = rows.map(r => r.id);
+                const res = await callGAS(apiUrl, 'updateProductSortOrder', { productIds }, user.token);
+                if (res.success) {
+                    alert('順序已儲存！');
+                }
+            } catch (error) {
+                console.error('Failed to sync sort order:', error);
+                alert('排序儲存失敗：' + error.message);
+            } finally {
+                setIsSubmitting(false);
+                setIsSorting(false);
             }
-        } catch (error) {
-            console.error('Failed to sync sort order:', error);
-            alert('排序儲存失敗：' + error.message);
+        } else {
+            // Entering sorting mode
+            setIsSorting(true);
         }
     };
 
@@ -564,7 +573,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                             {/* Drag and Drop Sort Toggle */}
                             <button
-                                onClick={() => setIsSorting(!isSorting)}
+                                onClick={toggleSorting}
                                 className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border transition-all ${isSorting
                                     ? 'bg-indigo-500 text-white border-indigo-500'
                                     : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'

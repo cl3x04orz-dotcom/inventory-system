@@ -10,14 +10,32 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
     const [submitting, setSubmitting] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [showZeroStock, setShowZeroStock] = useState(false); // Manual toggle for zero stock items
-    const getRowKey = useCallback((item) => `${item.id}-${item.batchId || 'no-batch'}`, []);
+    const getRowKey = useCallback((item) => `${item.productName}-${item.type}`, []);
 
     const fetchInventory = useCallback(async () => {
         setLoading(true);
         try {
             const data = await callGAS(apiUrl, 'getInventory', {}, user.token);
             if (Array.isArray(data)) {
-                const sorted = sortProducts(data, 'productName');
+                // [Aggregation Logic] Merge items with same name and type
+                const aggregatedMap = {};
+                data.forEach(item => {
+                    const key = `${item.productName}-${item.type}`;
+                    if (!aggregatedMap[key]) {
+                        aggregatedMap[key] = {
+                            ...item,
+                            quantity: Number(item.quantity) || 0,
+                            // Clear batch info as it's merged
+                            batchId: 'aggregated',
+                            id: item.productId || item.id
+                        };
+                    } else {
+                        aggregatedMap[key].quantity += Number(item.quantity) || 0;
+                    }
+                });
+
+                const aggregatedList = Object.values(aggregatedMap);
+                const sorted = sortProducts(aggregatedList, 'productName');
                 setInventory(sorted);
 
                 // Initialize stocktake data only for STOCK items
