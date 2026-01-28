@@ -18,7 +18,8 @@ function getExpendituresService(payload) {
         "攤位": "stall", "清潔": "cleaning", "電費": "electricity", "加油": "gas",
         "停車": "parking", "貨款": "goods", "塑膠袋": "bags", "其他": "others",
         "Line Pay (收款)": "linePay", "服務費 (扣除)": "serviceFee", "本筆總支出金額": "finalTotal",
-        "時間": "date", "日期": "date", "serverTimestamp": "serverTimestamp"
+        "時間": "date", "日期": "date", "serverTimestamp": "serverTimestamp",
+        "對象": "customer", "業務": "salesRep", "備註": "note", "對象/備註": "customer"
     };
 
     const start = payload.startDate ? new Date(payload.startDate + 'T00:00:00') : null;
@@ -62,9 +63,13 @@ function saveExpenditureService(payload) {
             Number(payload.parking) || 0, Number(payload.goods) || 0,
             Number(payload.bags) || 0, Number(payload.others) || 0,
             Number(payload.linePay) || 0, Number(payload.serviceFee) || 0,
-            payload.customer || '', payload.salesRep || payload.operator || '',
-            '', '', Number(payload.vehicleMaintenance) || 0,
-            Number(payload.salary) || 0, Number(payload.reserve) || 0,
+            payload.customer || '', 
+            payload.salesRep || payload.operator || '',
+            payload.note || '', 
+            '', 
+            Number(payload.vehicleMaintenance) || 0,
+            Number(payload.salary) || 0, 
+            Number(payload.reserve) || 0,
             Number(payload.finalTotal) || 0
         ];
         sheet.appendRow(row);
