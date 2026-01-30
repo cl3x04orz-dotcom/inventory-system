@@ -71,33 +71,45 @@ function getPurchaseHistory(filter) {
 function getPurchaseSuggestionsService() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const purSheet = ss.getSheetByName('Purchases');
-    if (!purSheet) return { vendors: [], vendorProductMap: {} };
+    if (!purSheet) return { vendors: [], vendorProductMap: {}, vendorProductPriceMap: {} };
+    
     const purData = purSheet.getDataRange().getValues().slice(1);
-    const vendors = new Set(), vpMap = {}, vppMap = {};
+    const productMap = typeof getProductMap !== 'undefined' ? getProductMap() : {};
+    
+    const vendors = new Set();
+    const vpMap = {};   // Vendor -> Set of Product Names
+    const vppMap = {};  // Vendor -> { ProductName -> Latest Price }
 
+    // 依照進貨紀錄順序遍歷，後面的紀錄（最新的）會覆蓋前面的價格
     purData.forEach(r => {
-        const v = r[2], pId = r[3], pName = productMap[pId], price = r[5];
-        if (v) {
+        const v = String(r[2] || '').trim();
+        const pId = String(r[3] || '').trim();
+        const pName = productMap[pId] || pId;
+        const price = Number(r[5]) || 0;
+        
+        if (v && pName) {
             vendors.add(v);
             if (!vpMap[v]) vpMap[v] = new Set();
-            if (pName) {
-              vpMap[v].add(pName);
-              if (!vppMap[v]) vppMap[v] = {};
-              vppMap[v][pName] = price;
-            }
+            vpMap[v].add(pName);
+            
+            if (!vppMap[v]) vppMap[v] = {};
+            vppMap[v][pName] = price;
         }
     });
 
     // 獲取預設支付方式
-    const vendorDefaults = getVendorsData_();
+    const vendorDefaults = typeof getVendorsData_ !== 'undefined' ? getVendorsData_() : {};
 
     const finalVpMap = {};
-    for (let v in vpMap) finalVpMap[v] = Array.from(vpMap[v]);
+    for (let v in vpMap) {
+        finalVpMap[v] = Array.from(vpMap[v]);
+    }
+
     return { 
-      vendors: Array.from(vendors), 
-      vendorProductMap: finalVpMap,
-      vendorProductPriceMap: vppMap,
-      vendorDefaults: vendorDefaults 
+        vendors: Array.from(vendors).sort(), 
+        vendorProductMap: finalVpMap,
+        vendorProductPriceMap: vppMap,
+        vendorDefaults: vendorDefaults 
     };
 }
 
