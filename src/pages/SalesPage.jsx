@@ -102,31 +102,28 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 return { ...r, [field]: value };
             }
 
-            let val = Number(value);
-            if (isNaN(val)) val = 0;
-
-            // 1. Propose new values based on input
-            let newPicked = field === 'picked' ? val : getSafeNum(r.picked);
-            let newOriginal = field === 'original' ? val : getSafeNum(r.original);
-            let newReturns = field === 'returns' ? val : getSafeNum(r.returns);
-            let newPrice = field === 'price' ? val : getSafeNum(r.price);
+            // 1. Propose new values (Keep raw value for current field to allow decimals while typing)
+            let newPicked = field === 'picked' ? value : r.picked;
+            let newOriginal = field === 'original' ? value : r.original;
+            let newReturns = field === 'returns' ? value : r.returns;
+            let newPrice = field === 'price' ? value : r.price;
 
             // 2. Local Price Memory Persistence
             if (field === 'price') {
-                localStorage.setItem(`last_price_${id}`, newPrice.toString());
+                localStorage.setItem(`last_price_${id}`, getSafeNum(newPrice).toString());
             }
 
-            // 3. Validate Stock Limits
-            if (newPicked > r.stock) newPicked = r.stock;
-            if (newPicked < 0) newPicked = 0;
+            // 3. Validate Stock Limits (Use getSafeNum for subtraction/comparison)
+            if (getSafeNum(newPicked) > r.stock) newPicked = r.stock;
+            if (getSafeNum(newPicked) < 0) newPicked = 0;
 
-            if (newOriginal > r.originalStock) newOriginal = r.originalStock;
-            if (newOriginal < 0) newOriginal = 0;
+            if (getSafeNum(newOriginal) > r.originalStock) newOriginal = r.originalStock;
+            if (getSafeNum(newOriginal) < 0) newOriginal = 0;
 
             // 4. Validate Returns Limit (Cannot return more than taken)
-            const totalInHand = newPicked + newOriginal;
-            if (newReturns > totalInHand) newReturns = totalInHand;
-            if (newReturns < 0) newReturns = 0;
+            const totalInHand = getSafeNum(newPicked) + getSafeNum(newOriginal);
+            if (getSafeNum(newReturns) > totalInHand) newReturns = totalInHand;
+            if (getSafeNum(newReturns) < 0) newReturns = 0;
 
             // 5. Construct updated row
             const updated = {
@@ -137,9 +134,9 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 price: newPrice
             };
 
-            // 6. Calculate Sold & Subtotal
-            updated.sold = updated.picked + updated.original - updated.returns;
-            updated.subtotal = updated.sold * (updated.price || 0);
+            // 6. Calculate Sold & Subtotal (Crucial: Use getSafeNum to avoid string concatenation)
+            updated.sold = getSafeNum(updated.picked) + getSafeNum(updated.original) - getSafeNum(updated.returns);
+            updated.subtotal = updated.sold * (getSafeNum(updated.price) || 0);
 
             return updated;
         }));
@@ -149,13 +146,16 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         if (typeof value === 'string' && value.trim().startsWith('=')) {
             const result = evaluateFormula(value);
             handleRowChange(id, field, result);
+        } else {
+            // Force numeric cleanup on blur (e.g., "10." becomes 10)
+            handleRowChange(id, field, getSafeNum(value));
         }
     };
 
     const handleCashChange = (denom, value) => {
         setCashCounts(prev => ({
             ...prev,
-            [denom]: (typeof value === 'string' && value.trim().startsWith('=')) ? value : (Number(value) || 0)
+            [denom]: (typeof value === 'string' && value.trim().startsWith('=')) ? value : value
         }));
     };
 
@@ -163,24 +163,28 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         if (typeof value === 'string' && value.trim().startsWith('=')) {
             const result = evaluateFormula(value);
             handleCashChange(denom, result);
+        } else {
+            handleCashChange(denom, getSafeNum(value));
         }
     };
 
     const handleReserveChange = (value) => {
-        setReserve((typeof value === 'string' && value.trim().startsWith('=')) ? value : (Number(value) || 0));
+        setReserve((typeof value === 'string' && value.trim().startsWith('=')) ? value : value);
     };
 
     const handleReserveBlur = (value) => {
         if (typeof value === 'string' && value.trim().startsWith('=')) {
             const result = evaluateFormula(value);
             handleReserveChange(result);
+        } else {
+            handleReserveChange(getSafeNum(value));
         }
     };
 
     const handleExpenseChange = (key, value) => {
         setExpenses(prev => ({
             ...prev,
-            [key]: (typeof value === 'string' && value.trim().startsWith('=')) ? value : (Number(value) || 0)
+            [key]: (typeof value === 'string' && value.trim().startsWith('=')) ? value : value
         }));
     };
 
@@ -188,6 +192,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         if (typeof value === 'string' && value.trim().startsWith('=')) {
             const result = evaluateFormula(value);
             handleExpenseChange(key, result);
+        } else {
+            handleExpenseChange(key, getSafeNum(value));
         }
     };
 
