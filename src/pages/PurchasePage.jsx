@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { PlusCircle } from 'lucide-react';
 import { callGAS } from '../utils/api';
+import { evaluateFormula } from '../utils/mathUtils';
+
+const getSafeNum = (v) => {
+    if (typeof v === 'string' && v.trim().startsWith('=')) return 0;
+    const n = Number(v);
+    return isNaN(n) ? 0 : n;
+};
 
 export default function PurchasePage({ user, apiUrl, logActivity }) {
     // Each item now includes its own vendor field
@@ -61,7 +68,30 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
     };
 
     const handleItemChange = (id, field, value) => {
-        setItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
+        setItems(prev => prev.map(item => {
+            if (item.id !== id) return item;
+
+            // 如果值是公式（以 = 開頭），我們暫存字串不計算數字
+            if (field === 'quantity' || field === 'unitPrice') {
+                if (typeof value === 'string' && value.trim().startsWith('=')) {
+                    return { ...item, [field]: value };
+                }
+            }
+
+            return { ...item, [field]: value };
+        }));
+    };
+
+    const handleBlur = (id, field, value) => {
+        if (field === 'quantity' || field === 'unitPrice') {
+            if (typeof value === 'string' && value.trim().startsWith('=')) {
+                const result = evaluateFormula(value);
+                handleItemChange(id, field, result);
+            } else {
+                // Force numeric cleanup on blur
+                handleItemChange(id, field, getSafeNum(value));
+            }
+        }
     };
 
     const addItem = () => {
@@ -287,11 +317,13 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                             <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">數量:</label>
                                             <input
                                                 id={`item-m-${idx}-qty`}
-                                                type="number"
+                                                type="text"
+                                                inputMode="decimal"
                                                 className="input-field flex-1 py-1.5 px-3"
                                                 placeholder="0"
                                                 value={item.quantity}
                                                 onChange={e => handleItemChange(item.id, 'quantity', e.target.value)}
+                                                onBlur={e => handleBlur(item.id, 'quantity', e.target.value)}
                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'qty')}
                                             />
                                         </div>
@@ -301,11 +333,13 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                             <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">單價:</label>
                                             <input
                                                 id={`item-m-${idx}-price`}
-                                                type="number"
+                                                type="text"
+                                                inputMode="decimal"
                                                 className="input-field flex-1 py-1.5 px-3"
                                                 placeholder="0"
                                                 value={item.unitPrice}
                                                 onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)}
+                                                onBlur={e => handleBlur(item.id, 'unitPrice', e.target.value)}
                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'price')}
                                             />
                                         </div>
@@ -422,11 +456,13 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                             </label>
                                             <input
                                                 id={`item-${idx}-qty`}
-                                                type="number"
+                                                type="text"
+                                                inputMode="decimal"
                                                 className="input-field w-full py-1.5 px-1 text-center text-sm"
                                                 placeholder="0"
                                                 value={item.quantity}
                                                 onChange={e => handleItemChange(item.id, 'quantity', e.target.value)}
+                                                onBlur={e => handleBlur(item.id, 'quantity', e.target.value)}
                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'qty')}
                                             />
                                         </div>
@@ -438,11 +474,13 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                             </label>
                                             <input
                                                 id={`item-${idx}-price`}
-                                                type="number"
+                                                type="text"
+                                                inputMode="decimal"
                                                 className="input-field w-full py-1.5 px-1 text-center text-sm"
                                                 placeholder="0"
                                                 value={item.unitPrice}
                                                 onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)}
+                                                onBlur={e => handleBlur(item.id, 'unitPrice', e.target.value)}
                                                 onKeyDown={(e) => handleKeyDown(e, idx, 'price')}
                                             />
                                         </div>
