@@ -71,14 +71,24 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
         setItems(prev => prev.map(item => {
             if (item.id !== id) return item;
 
-            // 如果值是公式（以 = 開頭），我們暫存字串不計算數字
-            if (field === 'quantity' || field === 'unitPrice') {
-                if (typeof value === 'string' && value.trim().startsWith('=')) {
-                    return { ...item, [field]: value };
+            let newItem = { ...item, [field]: value };
+
+            // [新增] 當產品名稱變更時，自動嘗試帶出該廠商的歷史進貨單價
+            if (field === 'productName' && value) {
+                const historyPrice = suggestions.vendorProductPriceMap?.[item.vendor]?.[value];
+                if (historyPrice !== undefined) {
+                    newItem.unitPrice = historyPrice;
                 }
             }
 
-            return { ...item, [field]: value };
+            // 如果值是公式（以 = 開頭），我們暫存字串不計算數字
+            if (field === 'quantity' || field === 'unitPrice') {
+                if (typeof value === 'string' && value.trim().startsWith('=')) {
+                    return newItem;
+                }
+            }
+
+            return newItem;
         }));
     };
 

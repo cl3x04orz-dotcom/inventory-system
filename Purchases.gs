@@ -73,15 +73,18 @@ function getPurchaseSuggestionsService() {
     const purSheet = ss.getSheetByName('Purchases');
     if (!purSheet) return { vendors: [], vendorProductMap: {} };
     const purData = purSheet.getDataRange().getValues().slice(1);
-    const productMap = typeof getProductMap !== 'undefined' ? getProductMap() : {};
-    const vendors = new Set(), vpMap = {};
+    const vendors = new Set(), vpMap = {}, vppMap = {};
 
     purData.forEach(r => {
-        const v = r[2], pId = r[3], pName = productMap[pId];
+        const v = r[2], pId = r[3], pName = productMap[pId], price = r[5];
         if (v) {
             vendors.add(v);
             if (!vpMap[v]) vpMap[v] = new Set();
-            if (pName) vpMap[v].add(pName);
+            if (pName) {
+              vpMap[v].add(pName);
+              if (!vppMap[v]) vppMap[v] = {};
+              vppMap[v][pName] = price;
+            }
         }
     });
 
@@ -93,6 +96,7 @@ function getPurchaseSuggestionsService() {
     return { 
       vendors: Array.from(vendors), 
       vendorProductMap: finalVpMap,
+      vendorProductPriceMap: vppMap,
       vendorDefaults: vendorDefaults 
     };
 }
