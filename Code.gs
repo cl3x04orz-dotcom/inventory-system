@@ -450,8 +450,12 @@ function getExpendituresService(payload) {
         "Line Pay (收款)": "linePay",
         "服務費 (扣除)": "serviceFee",
         "本筆總支出金額": "finalTotal",
+        "結算總額": "finalTotal",
         "時間": "date",
         "日期": "date",
+        "對象": "customer",
+        "業務": "salesRep",
+        "備註": "note",
         "serverTimestamp": "serverTimestamp"
     };
 
@@ -465,6 +469,17 @@ function getExpendituresService(payload) {
             const key = mapping[cleanHeader] || cleanHeader;
             obj[key] = row[i];
         });
+        
+        // [Fix] 強制指定欄位索引，不依賴標題名稱 (解決標題與內容不符問題)
+        // M欄 (Index 12) = 對象 (customer)
+        // N欄 (Index 13) = 業務 (salesRep)
+        // S欄 (Index 18) = 備註 (note)
+        // T欄 (Index 19) = 結算總額 (finalTotal) -> 覆寫防止錯位
+        if (row.length > 12) obj['customer'] = row[12];
+        if (row.length > 13) obj['salesRep'] = row[13];
+        if (row.length > 18) obj['note'] = row[18];
+        if (row.length > 19) obj['finalTotal'] = row[19];
+        
         return obj;
     }).filter(item => {
         const itemDate = new Date(item.date || item.serverTimestamp);
@@ -472,7 +487,7 @@ function getExpendituresService(payload) {
         if (start && itemDate < start) return false;
         if (end && itemDate > end) return false;
         return true;
-    });
+    }).reverse();
 }
 
 function saveExpenditureService(payload) {
@@ -492,25 +507,26 @@ function saveExpenditureService(payload) {
         
         const timestamp = payload.serverTimestamp || new Date();
         const row = [
-            timestamp,
-            Number(payload.stall) || 0,
-            Number(payload.cleaning) || 0,
-            Number(payload.electricity) || 0,
-            Number(payload.gas) || 0,
-            Number(payload.parking) || 0,
-            Number(payload.goods) || 0,
-            Number(payload.bags) || 0,
-            Number(payload.others) || 0,
-            Number(payload.linePay) || 0,
-            Number(payload.serviceFee) || 0,
-            payload.customer || '',
-            payload.salesRep || payload.operator || '',
-            '',
-            '',
-            Number(payload.vehicleMaintenance) || 0,
-            Number(payload.salary) || 0,
-            Number(payload.reserve) || 0,
-            Number(payload.finalTotal) || 0
+            timestamp,                          // A (0)
+            Number(payload.stall) || 0,         // B (1)
+            Number(payload.cleaning) || 0,      // C (2)
+            Number(payload.electricity) || 0,   // D (3)
+            Number(payload.gas) || 0,           // E (4)
+            Number(payload.parking) || 0,       // F (5)
+            Number(payload.goods) || 0,         // G (6)
+            Number(payload.bags) || 0,          // H (7)
+            Number(payload.others) || 0,        // I (8)
+            Number(payload.linePay) || 0,       // J (9)
+            Number(payload.serviceFee) || 0,    // K (10)
+            '',                                 // L (11)
+            payload.customer || '',             // M (12)
+            payload.salesRep || payload.operator || '', // N (13)
+            '',                                 // O (14)
+            Number(payload.vehicleMaintenance) || 0, // P (15)
+            Number(payload.salary) || 0,        // Q (16)
+            Number(payload.reserve) || 0,       // R (17)
+            payload.note || '',                 // S (18)
+            Number(payload.finalTotal) || 0     // T (19)
         ];
         
         sheet.appendRow(row);
