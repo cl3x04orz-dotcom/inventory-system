@@ -135,6 +135,7 @@ function getSalesHistory(payload) {
   const IDX_REP1 = 2; // C欄 (主要業務)
   const IDX_CUST = 6; // G欄 (客戶/地點)
   const IDX_REP2 = 7; // H欄 (備用業務)
+  const IDX_METHOD = 8; // I欄 (交易方式)
 
   const matchedSales = {}; // SaleID -> Info
 
@@ -173,7 +174,8 @@ function getSalesHistory(payload) {
     matchedSales[sId] = {
       date: sDate,
       customer: rowCust,
-      salesRep: rowRep
+      salesRep: rowRep,
+      paymentMethod: String(row[IDX_METHOD] || "CASH")
     };
   }
 
@@ -203,7 +205,8 @@ function getSalesHistory(payload) {
         salesRep: info.salesRep,
         productName: pName,
         soldQty: soldQty,
-        totalAmount: Number(row[D_IDX_AMT] || 0)
+        totalAmount: Number(row[D_IDX_AMT] || 0),
+        paymentMethod: info.paymentMethod
       });
     }
   }

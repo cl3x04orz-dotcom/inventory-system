@@ -136,10 +136,17 @@ export default function ReportPage({ user, apiUrl }) {
     // Calculate summaries
     const totalSales = reportData?.reduce((acc, item) => acc + (Number(item.totalAmount) || 0), 0) || 0;
     const totalQty = reportData?.reduce((acc, item) => acc + (Number(item.soldQty) || 0), 0) || 0;
+
+    // [Fix] 計算「應繳回金額」時，需排除賒帳 (CREDIT) 的銷售額
+    const totalCashSales = reportData?.reduce((acc, item) => {
+        if (item.paymentMethod === 'CREDIT') return acc;
+        return acc + (Number(item.totalAmount) || 0);
+    }, 0) || 0;
+
     // [Fix] 總支出扣除薪資 (因為薪資是匯款，不從現金帳扣除)
     const totalExpenses = expenseData?.reduce((acc, item) => acc + (item.rowTotal || 0) - (item.salaryAmount || 0), 0) || 0;
     const totalFinalTotal = expenseData?.reduce((acc, item) => acc + (Number(item.displayFinalTotal) || 0), 0) || 0;
-    const totalReturnAmount = totalSales - totalExpenses + totalFinalTotal;
+    const totalReturnAmount = totalCashSales - totalExpenses + totalFinalTotal;
 
     // Group by Product for summary table
     const productSummary = reportData?.reduce((acc, item) => {
