@@ -474,31 +474,15 @@ function getExpendituresService(payload) {
             obj[key] = row[i];
         });
         
-        // [Fix] 強制指定欄位索引，不依賴標題名稱 (解決標題與內容不符問題)
+        // [Fix] 強制指定欄位索引 (User已確認 L 欄位為結算金額)
+        // L欄 (Index 11) = 結算總額 (FinalTotal)
         // M欄 (Index 12) = 對象 (customer)
-        // N欄 (Index 13) = 業務 (salesRep)
-        // S欄 (Index 18) = 備註 (note)
-        // T欄 (Index 19) = 結算總額 (finalTotal) -> 覆寫防止錯位
+        // S欄 (Index 18) = 備註 (note) - 根據之前觀察
+        
+        if (row.length > 11) obj['finalTotal'] = row[11];
         if (row.length > 12) obj['customer'] = row[12];
         if (row.length > 13) obj['salesRep'] = row[13];
         if (row.length > 18) obj['note'] = row[18];
-        if (row.length > 19) {
-            // [Fix] Smart finalTotal Check:
-            // T欄 (Index 19) 是 saveExpenditureService 寫入的真實 FinalTotal
-            // S欄 (Index 18) 標題是 '結算總額' 但內容常被寫入 Note (錯位)
-            // 如果 T欄 有值 (非0)，則使用 T欄。
-            // 如果 T欄 為 0 或 空，但 S欄 看起來像數字 (Legacy 數據可能存在 S)，則優先取 S。
-            let valT = Number(row[19]);
-            let valS = Number(row[18]);
-            
-            if (valT && valT !== 0) {
-                obj['finalTotal'] = valT;
-            } else if (!isNaN(valS) && valS !== 0) {
-                obj['finalTotal'] = valS;
-            } else {
-                 obj['finalTotal'] = valT || 0;
-            }
-        }
         
         return obj;
     }).filter(item => {
@@ -523,8 +507,8 @@ function saveExpenditureService(payload) {
             sheet.appendRow([
                 '時間戳記', '攤位', '清潔', '電費', '加油', '停車',
                 '貨款', '塑膠袋', '其他', 'Line Pay', '服務費',
-                '對象', '業務', '備註', '(預留)', '車輛保養',
-                '薪資發放', '公積金', '結算總額'
+                '結算總額', '對象', '業務', '(預留)', '車輛保養',
+                '薪資發放', '公積金', '備註'
             ]);
         }
         
@@ -541,15 +525,15 @@ function saveExpenditureService(payload) {
             Number(payload.others) || 0,        // I (8)
             Number(payload.linePay) || 0,       // J (9)
             Number(payload.serviceFee) || 0,    // K (10)
-            '',                                 // L (11)
+            Number(payload.finalTotal) || 0,    // L (11) [Fix: Write Final Total here]
             payload.customer || '',             // M (12)
             payload.salesRep || payload.operator || '', // N (13)
             '',                                 // O (14)
             Number(payload.vehicleMaintenance) || 0, // P (15)
             Number(payload.salary) || 0,        // Q (16)
             Number(payload.reserve) || 0,       // R (17)
-            payload.note || '',                 // S (18)
-            Number(payload.finalTotal) || 0     // T (19)
+            payload.note || ''                  // S (18)
+            // Removed T (19) duplications
         ];
         
         sheet.appendRow(row);
