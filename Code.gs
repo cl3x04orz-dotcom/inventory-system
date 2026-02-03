@@ -482,7 +482,23 @@ function getExpendituresService(payload) {
         if (row.length > 12) obj['customer'] = row[12];
         if (row.length > 13) obj['salesRep'] = row[13];
         if (row.length > 18) obj['note'] = row[18];
-        if (row.length > 19) obj['finalTotal'] = row[19];
+        if (row.length > 19) {
+            // [Fix] Smart finalTotal Check:
+            // T欄 (Index 19) 是 saveExpenditureService 寫入的真實 FinalTotal
+            // S欄 (Index 18) 標題是 '結算總額' 但內容常被寫入 Note (錯位)
+            // 如果 T欄 有值 (非0)，則使用 T欄。
+            // 如果 T欄 為 0 或 空，但 S欄 看起來像數字 (Legacy 數據可能存在 S)，則優先取 S。
+            let valT = Number(row[19]);
+            let valS = Number(row[18]);
+            
+            if (valT && valT !== 0) {
+                obj['finalTotal'] = valT;
+            } else if (!isNaN(valS) && valS !== 0) {
+                obj['finalTotal'] = valS;
+            } else {
+                 obj['finalTotal'] = valT || 0;
+            }
+        }
         
         return obj;
     }).filter(item => {
