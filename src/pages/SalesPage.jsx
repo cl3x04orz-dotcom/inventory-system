@@ -29,14 +29,40 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [isSorting, setIsSorting] = useState(false);
     const [activeInput, setActiveInput] = useState(null); // { id: string, type: 'row'|'cash'|'expense', field?: string, denom?: number, key?: string }
 
-    // Handle Payment Type Effects
-    useEffect(() => {
-        if (paymentType === 'CASH') {
-            setReserve(5000);
-        } else {
-            setReserve(0);
-        }
-    }, [paymentType]);
+    // [Modified] Removed useEffect for paymentType to prevent overwriting cloned data. 
+    // Logic moved to manual toggle handlers.
+
+    // ... (load function remains here)
+
+    // ...
+
+    {/* Toggle on Left */ }
+    <div className="flex bg-[var(--bg-tertiary)] rounded-lg p-1 border border-[var(--border-primary)] self-start md:self-auto">
+        <button
+            onClick={() => {
+                setPaymentType('CASH');
+                setReserve(5000); // Manual reset
+            }}
+            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${paymentType === 'CASH'
+                ? 'bg-emerald-500 text-white shadow-sm'
+                : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                }`}
+        >
+            現金
+        </button>
+        <button
+            onClick={() => {
+                setPaymentType('CREDIT');
+                setReserve(0); // Manual reset
+            }}
+            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${paymentType === 'CREDIT'
+                ? 'bg-amber-500 text-white shadow-sm'
+                : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                }`}
+        >
+            賒銷
+        </button>
+    </div>
 
 
     const load = useCallback(async () => {
@@ -48,7 +74,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 const content = data.filter(p => (Number(p.stock) || 0) > 0 || (Number(p.originalStock) || 0) > 0);
                 const sortedProducts = sortProducts(content, 'name');
 
-                setRows(sortedProducts.map(p => {
+                // 1. Generate Base Rows
+                let finalRows = sortedProducts.map(p => {
                     const systemPrice = Number(p.price) || 0;
                     const mapPrice = PRICE_MAP[p.name] !== undefined ? PRICE_MAP[p.name] : null;
 
@@ -73,7 +100,57 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                         sortWeight: p.sortWeight,
                         fromSheet: p._fromSheet
                     };
-                }));
+                });
+
+                // 2. Check & Merge Cloned Data immediately
+                const clonedRaw = sessionStorage.getItem('clonedSale');
+                if (clonedRaw) {
+                    try {
+                        const cloned = JSON.parse(clonedRaw);
+                        console.log('Sales Page - Applying Cloned Data:', cloned);
+
+                        // Set Form State
+                        if (cloned.customer) setLocation(cloned.customer);
+                        if (cloned.paymentMethod) setPaymentType(cloned.paymentMethod);
+                        if (cloned.reserve !== undefined) setReserve(Number(cloned.reserve));
+                        // Restoring Cash Counts
+                        if (cloned.cashCounts) {
+                            setCashCounts(prev => ({ ...prev, ...cloned.cashCounts }));
+                        }
+                        if (cloned.expenses) {
+                            setExpenses(prev => ({
+                                ...prev,
+                                ...cloned.expenses
+                            }));
+                        }
+
+                        // Merge Rows
+                        finalRows = finalRows.map(row => {
+                            const match = cloned.salesData.find(d => String(d.productId) === String(row.id));
+                            if (match) {
+                                const updated = {
+                                    ...row,
+                                    picked: match.picked,
+                                    original: match.original,
+                                    returns: match.returns,
+                                    price: match.unitPrice
+                                };
+                                updated.sold = getSafeNum(updated.picked) + getSafeNum(updated.original) - getSafeNum(updated.returns);
+                                updated.subtotal = updated.sold * getSafeNum(updated.price);
+                                return updated;
+                            }
+                            return row;
+                        });
+
+                        // alert('已載入舊單資料 (包含支出與備用金)，請修改後儲存。'); // [Modified] Removed alert for smoother transition
+                    } catch (e) {
+                        console.error('Failed to parse cloned data', e);
+                    }
+                }
+
+                // 3. Single State Update
+                setRows(finalRows);
+
             } else {
                 console.error('Sales Page - Data is not an array:', data);
             }
@@ -408,34 +485,45 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         : (totalCashNet + totalExpensesPlusLinePay + getSafeNum(expenses.serviceFee) - totalSalesAmount);
 
     const handleSubmit = async () => {
-        if (!location.trim()) {
-            alert('請輸入銷售對象！');
-            const locationInput = document.getElementById('input-location');
-            if (locationInput) locationInput.focus();
-            return;
-        }
-
-        const payload = {
-            salesRep: user.username,
-            customer: location, // Changed key to match backend 'customer'
-            paymentMethod: paymentType, // Changed key to match backend 'paymentMethod'
-            salesData: rows.map(r => ({
-                productId: r.id,
-                picked: r.picked,
-                original: r.original,
-                returns: r.returns,
-                sold: r.sold,
-                unitPrice: r.price
-            })),
-            // In Credit mode, maybe we don't want to send cashData? 
-            // Or sending 0s is fine. User said "Lock", so values stay 0 or whatever.
-            cashData: { totalCash: paymentType === 'CREDIT' ? 0 : totalCashNet, reserve },
-            expenseData: { ...expenses, finalTotal }
-        };
-
-        setIsSubmitting(true);
+        console.log('Save button clicked');
         try {
-            await callGAS(apiUrl, 'saveSales', payload, user.token);
+            const loc = String(location || '').trim();
+            if (!loc) {
+                alert('請輸入銷售對象！');
+                const locationInput = document.getElementById('input-location');
+                if (locationInput) locationInput.focus();
+                return;
+            }
+
+            if (!user || !user.username) {
+                console.error('User info missing:', user);
+                alert('使用者資訊遺失，請重新登入');
+                return;
+            }
+
+            const payload = {
+                salesRep: user.username,
+                customer: location,
+                paymentMethod: paymentType,
+                salesData: rows.map(r => ({
+                    productId: r.id,
+                    picked: r.picked,
+                    original: r.original,
+                    returns: r.returns,
+                    sold: r.sold,
+                    unitPrice: r.price
+                })),
+                cashData: { totalCash: paymentType === 'CREDIT' ? 0 : totalCashNet, reserve },
+                expenseData: { ...expenses, finalTotal },
+                cashCounts: cashCounts // [New] Pass detailed cash counts
+            };
+
+            setIsSubmitting(true);
+
+            const res = await callGAS(apiUrl, 'saveSales', payload, user.token);
+            if (!res.success) {
+                throw new Error(res.error || 'Unknown error from backend');
+            }
 
             // Log activity
             if (logActivity) {
@@ -452,9 +540,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             }
 
             alert('保存成功！資料已寫入 Google Sheet。');
+            sessionStorage.removeItem('clonedSale');
             window.location.reload();
+
         } catch (e) {
-            alert('保存失敗: ' + e.message);
+            console.error('handleSubmit error:', e);
+            alert('保存失敗: ' + (e.message || e.toString()));
         } finally {
             setIsSubmitting(false);
         }

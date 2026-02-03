@@ -48,7 +48,8 @@ function saveSalesService(data, user) {
     customer || '',    
     finalSalesRep,
     method,            
-    status             
+    status,
+    JSON.stringify(data.cashCounts || {}) // [New] Col 10: Cash Breakdown Details
   ]);
   
   // 寫入 Expenditures 表
@@ -175,7 +176,8 @@ function getSalesHistory(payload) {
       date: sDate,
       customer: rowCust,
       salesRep: rowRep,
-      paymentMethod: String(row[IDX_METHOD] || "CASH")
+      paymentMethod: String(row[IDX_METHOD] || "CASH"),
+      status: String(row[9] || "").toUpperCase()
     };
   }
 
@@ -192,10 +194,13 @@ function getSalesHistory(payload) {
     const dSaleId = String(row[D_IDX_SID] || "").trim();
     
     if (dSaleId && matchedSales[dSaleId]) {
+      const info = matchedSales[dSaleId];
+      // [關鍵]：過濾掉已作廢的紀錄
+      if (info.status === 'VOID') continue;
+
       const soldQty = Number(row[D_IDX_SOLD] || 0);
       if (soldQty <= 0) continue;
 
-      const info = matchedSales[dSaleId];
       const pId = String(row[D_IDX_PID] || "").trim();
       const pName = productMap[pId] || pId || '未知商品';
       
@@ -206,7 +211,8 @@ function getSalesHistory(payload) {
         productName: pName,
         soldQty: soldQty,
         totalAmount: Number(row[D_IDX_AMT] || 0),
-        paymentMethod: info.paymentMethod
+        paymentMethod: info.paymentMethod,
+        saleId: dSaleId
       });
     }
   }
@@ -370,4 +376,114 @@ function handleReturns_(sheet, sheetData, item, consumedBatches, today) {
         Utilities.getUuid(), item.productId, remainingReturn, fallbackExpiry, today, 'ORIGINAL'
       ]);
   }
+}
+// ===========================================
+// 5. 銷售作廢與修正 (Void & Fetch for Correction)
+// ===========================================
+function voidAndFetchSaleService(payload) {
+  const { saleId } = payload;
+  if (!saleId) throw new Error("缺少銷售編號 (Missing SaleId)");
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const salesSheet = ss.getSheetByName('Sales');
+  const detailsSheet = ss.getSheetByName('SalesDetails');
+  const expSheet = ss.getSheetByName('Expenditures');
+  const invSheet = ss.getSheetByName('Inventory');
+
+  // 1. 標記 Sales 表為 VOID
+  const salesData = salesSheet.getDataRange().getValues();
+  let saleRowIndex = -1;
+  let originalSaleData = null;
+  for (let i = 1; i < salesData.length; i++) {
+    if (String(salesData[i][0]) === saleId) {
+      saleRowIndex = i + 1;
+      originalSaleData = salesData[i];
+      break;
+    }
+  }
+  if (saleRowIndex === -1) throw new Error("找不到該筆銷售紀錄");
+  salesSheet.getRange(saleRowIndex, 10).setValue('VOID'); // J欄: Status
+
+  // 2. 標記 Expenditures 表為 VOID 並獲取資料
+  let fetchedExpenses = null;
+  const expData = expSheet.getDataRange().getValues();
+  for (let i = 1; i < expData.length; i++) {
+    if (String(expData[i][0]) === saleId) {
+      const expRow = i + 1;
+      
+      // 讀取原始支出資料
+      fetchedExpenses = {
+          stall: Number(expData[i][1] || 0),
+          cleaning: Number(expData[i][2] || 0),
+          electricity: Number(expData[i][3] || 0),
+          gas: Number(expData[i][4] || 0),
+          parking: Number(expData[i][5] || 0),
+          goods: Number(expData[i][6] || 0),
+          bags: Number(expData[i][7] || 0),
+          others: Number(expData[i][8] || 0),
+          linePay: Number(expData[i][9] || 0),
+          serviceFee: Number(expData[i][10] || 0)
+      };
+
+      const oldNote = String(expData[i][18] || "");
+      expSheet.getRange(expRow, 19).setValue("[VOID] " + (oldNote || "")); 
+      expSheet.getRange(expRow, 20).setValue(0);
+      for (let col = 2; col <= 11; col++) {
+        expSheet.getRange(expRow, col).setValue(0);
+      }
+      break;
+    }
+  }
+
+  // 3. 處理銷售明細與庫存回補
+  const detailsData = detailsSheet.getDataRange().getValues();
+  const fetchedDetails = [];
+  const today = new Date();
+
+  for (let i = 1; i < detailsData.length; i++) {
+    if (String(detailsData[i][0]) === saleId) {
+      const productId = String(detailsData[i][1]);
+      const picked = Number(detailsData[i][2] || 0);
+      const original = Number(detailsData[i][3] || 0);
+      const returns = Number(detailsData[i][4] || 0);
+      const sold = Number(detailsData[i][5] || 0);
+      const unitPrice = Number(detailsData[i][6] || 0);
+
+      fetchedDetails.push({ productId, picked, original, returns, sold, unitPrice });
+
+      // 庫存回補
+      if (picked > 0) {
+        let expiry = new Date();
+        expiry.setDate(expiry.getDate() + 30);
+        const invRows = invSheet.getDataRange().getValues();
+        for (let j = invRows.length - 1; j >= 1; j--) {
+          if (invRows[j][1] === productId && invRows[j][5] === 'STOCK') {
+            expiry = invRows[j][3];
+            break;
+          }
+        }
+        invSheet.appendRow([Utilities.getUuid(), productId, picked, expiry, today, 'STOCK', 'VOID_REFUND: ' + saleId]);
+      }
+      if (original > 0) {
+        invSheet.appendRow([Utilities.getUuid(), productId, original, today, today, 'ORIGINAL', 'VOID_REFUND: ' + saleId]);
+      }
+      if (returns > 0) {
+        invSheet.appendRow([Utilities.getUuid(), productId, -returns, today, today, 'ORIGINAL', 'VOID_CANCEL_RETURN: ' + saleId]);
+      }
+    }
+  }
+
+  // 4. 重整回傳資料
+  return {
+    success: true,
+    cloneData: {
+      customer: originalSaleData[6],
+      paymentMethod: originalSaleData[8],
+      salesData: fetchedDetails,
+      reserve: Number(originalSaleData[4] || 0),
+      reserve: Number(originalSaleData[4] || 0),
+      expenses: fetchedExpenses,
+      cashCounts: (originalSaleData[10] && String(originalSaleData[10]).startsWith('{')) ? JSON.parse(originalSaleData[10]) : {}
+    }
+  };
 }

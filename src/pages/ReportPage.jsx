@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Search, Calendar, MapPin, User, FileText, TrendingUp, Package, DollarSign } from 'lucide-react';
+import { Search, Calendar, MapPin, User, FileText, TrendingUp, Package, DollarSign, RotateCcw } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import { getLocalDateString } from '../utils/constants';
 
@@ -17,7 +17,7 @@ const getDynamicFontSize = (num) => {
     return 'text-[8px] md:text-base';               // 長數字：很小
 };
 
-export default function ReportPage({ user, apiUrl }) {
+export default function ReportPage({ user, apiUrl, setPage }) {
     const [startDate, setStartDate] = useState(getLocalDateString());
     const [endDate, setEndDate] = useState(getLocalDateString());
     const [location, setLocation] = useState('');
@@ -26,6 +26,7 @@ export default function ReportPage({ user, apiUrl }) {
     const [reportData, setReportData] = useState([]);
     const [expenseData, setExpenseData] = useState([]);
     const [viewMode, setViewMode] = useState('SALES'); // 'SALES' or 'EXPENSES'
+    const [isVoiding, setIsVoiding] = useState(false); // [New] Loading state for voiding
 
     const fetchData = useCallback(async () => {
         if (!startDate || !endDate) return;
@@ -127,6 +128,27 @@ export default function ReportPage({ user, apiUrl }) {
         fetchData();
     }, [fetchData]);
 
+    const handleCorrection = async (saleId) => {
+        if (!window.confirm('確定要「作廢並修正」此筆紀錄嗎？\n系統將會：\n1. 作廢舊單並回補庫存\n2. 自動跳轉到錄入頁面填入舊資料\n3. 讓您修改後重新存檔')) return;
+
+        setIsVoiding(true); // Start frosted overlay
+        try {
+            const res = await callGAS(apiUrl, 'voidAndFetchSale', { saleId }, user.token);
+            if (res.success && res.cloneData) {
+                // 暫存資料到 sessionStorage
+                sessionStorage.setItem('clonedSale', JSON.stringify(res.cloneData));
+                // alert('舊單已作廢，正在導向錄入頁面...'); // [Modified] Removed alert for smoother transition
+                setPage('sales'); // 跳轉到銷售錄入頁
+            } else {
+                throw new Error(res.error || '未知錯誤');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('修正功能執行失敗: ' + error.message);
+            setIsVoiding(false); // Only stop loading on error (success will redirect)
+        }
+    };
+
     const handleSearch = (e) => {
         e.preventDefault();
         fetchData();
@@ -162,7 +184,15 @@ export default function ReportPage({ user, apiUrl }) {
     const summaryList = productSummary ? Object.values(productSummary).sort((a, b) => b.qty - a.qty) : [];
 
     return (
-        <div className="max-w-[90rem] mx-auto p-4">
+        <div className="max-w-[90rem] mx-auto p-4 relative">
+            {/* Frosted Loading Overlay */}
+            {isVoiding && (
+                <div className="fixed inset-0 bg-white/30 backdrop-blur-md z-50 flex flex-col items-center justify-center animate-in fade-in duration-300">
+                    <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4 shadow-lg"></div>
+                    <p className="text-xl font-bold text-blue-900 drop-shadow-sm">舊單作廢處理中，請稍候...</p>
+                </div>
+            )}
+
             <div className="glass-panel p-6">
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-6 border-b border-[var(--border-primary)] pb-6">
@@ -383,7 +413,16 @@ export default function ReportPage({ user, apiUrl }) {
                                                                 hour: '2-digit', minute: '2-digit', hour12: false
                                                             })}
                                                         </div>
-                                                        <div className="text-emerald-600 font-bold font-mono text-lg">${item.totalAmount}</div>
+                                                        <div className="flex flex-col items-end gap-2">
+                                                            <div className="text-emerald-600 font-bold font-mono text-lg">${item.totalAmount}</div>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleCorrection(item.saleId); }}
+                                                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-amber-600 border border-amber-200 hover:bg-amber-100 transition-colors text-xs font-bold"
+                                                                title="修正此單"
+                                                            >
+                                                                <RotateCcw size={12} /> 修正
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                     <div className="flex flex-wrap gap-2 text-sm">
                                                         <div className="flex items-center gap-1 bg-blue-500/10 text-blue-700 px-2 py-0.5 rounded-md">
@@ -411,6 +450,7 @@ export default function ReportPage({ user, apiUrl }) {
                                                     <th className="p-3 font-medium">商品</th>
                                                     <th className="p-3 font-medium text-right w-24">數量</th>
                                                     <th className="p-3 font-medium text-right w-32">金額</th>
+                                                    <th className="p-3 font-medium text-center w-24">操作</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-[var(--border-primary)] text-[var(--text-secondary)] bg-[var(--bg-secondary)]">
@@ -427,6 +467,15 @@ export default function ReportPage({ user, apiUrl }) {
                                                         <td className="p-3 text-[var(--text-primary)]">{item.productName}</td>
                                                         <td className="p-3 text-right">{item.soldQty}</td>
                                                         <td className="p-3 text-right">${item.totalAmount}</td>
+                                                        <td className="p-3 text-center">
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleCorrection(item.saleId); }}
+                                                                className="p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors"
+                                                                title="修正此單"
+                                                            >
+                                                                <RotateCcw size={16} />
+                                                            </button>
+                                                        </td>
                                                     </tr>
                                                 ))}
                                             </tbody>

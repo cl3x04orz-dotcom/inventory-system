@@ -68,6 +68,10 @@ function getValidSalesMap_(startDateStr, endDateStr) {
   for (let i = 1; i < values.length; i++) {
     const dVal = parseSheetDate_(values[i][1]); 
     const sid = String(values[i][0]).trim();
+    // [Fix] Check Status (Col J, index 9)
+    const status = String(values[i][9] || "").toUpperCase(); 
+    if (status === 'VOID') continue;
+
     if (dVal && sid && dVal >= start && dVal <= end) map[sid] = true;
   }
   return map;

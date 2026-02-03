@@ -78,6 +78,9 @@ function apiHandler(request) {
         'getCustomerRanking': 'analytics_customer',
         'getTurnoverRate': 'analytics_turnover',
         
+        // Sales Adjustment (作廢/修正)
+        'voidAndFetchSale': 'sales_report',
+        
         // System (系統管理)
         'getUsers': 'system_config',
         'addUser': 'system_config',
@@ -152,6 +155,7 @@ function apiHandler(request) {
             // Sales & Analytics
             case 'saveSales': return typeof saveSalesService !== 'undefined' ? saveSalesService(payload, user) : {error: 'Service missing'}; 
             case 'getSalesHistory': return typeof getSalesHistory !== 'undefined' ? getSalesHistory(payload) : {error: 'Service missing'}; 
+            case 'voidAndFetchSale': return typeof voidAndFetchSaleService !== 'undefined' ? voidAndFetchSaleService(payload) : {error: 'Service missing'};
             case 'getTemplatesList': return typeof getTemplatesListService !== 'undefined' ? getTemplatesListService() : {error: 'Service missing'};
             case 'generatePdf': return typeof generatePdfService !== 'undefined' ? generatePdfService(payload) : {error: 'Service missing'}; 
             case 'getSalesRanking': return typeof getSalesRanking !== 'undefined' ? getSalesRanking(payload) : {error: 'Service missing'};
@@ -482,6 +486,9 @@ function getExpendituresService(payload) {
         
         return obj;
     }).filter(item => {
+        // [Fix] Filter out VOID content
+        if (item.note && String(item.note).includes('[VOID]')) return false;
+
         const itemDate = new Date(item.date || item.serverTimestamp);
         if (isNaN(itemDate.getTime())) return true;
         if (start && itemDate < start) return false;
