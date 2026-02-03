@@ -137,10 +137,17 @@ function getCustomerRanking(payload) {
   const stats = {};
 
   salesData.forEach(row => {
+    // [Fix] Check Status
+    const status = String(row['status'] || row[9] || "").toUpperCase();
+    if (status === 'VOID') return;
+
     const dVal = parseSheetDate_(row['date'] || row[1]);
     if (!dVal || dVal < start || dVal > end) return;
     let customer = String(row['location'] || row['customer'] || row[6] || '未指定').trim();
-    const amount = Number(row['finaltotal'] || row[5] || 0);
+    // [Fix] User requested to use Column D (TotalCash) instead of FinalTotal
+    // Column D = Index 3 (TotalCash)
+    // Column F = Index 5 (FinalTotal)
+    const amount = Number(row['totalcash'] || row[3] || 0);
     if (!stats[customer]) stats[customer] = { customerName: customer, transactionCount: 0, totalAmount: 0 };
     stats[customer].transactionCount += 1;
     stats[customer].totalAmount += amount;
