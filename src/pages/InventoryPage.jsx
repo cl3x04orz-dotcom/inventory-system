@@ -496,11 +496,11 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
             </div>
 
             <div className="flex-1 overflow-y-auto flex flex-col gap-6 pb-6">
-                {renderInventoryTable(stockItems, "現貨進貨", Package, "text-blue-600")}
-                {renderInventoryCards(stockItems, "現貨進貨", Package, "text-blue-600")}
+                {renderInventoryTable(groupedStockItems, "現貨進貨", Package, "text-blue-600")}
+                {renderInventoryCards(groupedStockItems, "現貨進貨", Package, "text-blue-600")}
 
-                {renderInventoryTable(originalItems, "原貨/退貨", AlertCircle, "text-orange-600")}
-                {renderInventoryCards(originalItems, "原貨/退貨", AlertCircle, "text-orange-600")}
+                {renderInventoryTable(groupedOriginalItems, "原貨/退貨", AlertCircle, "text-orange-600")}
+                {renderInventoryCards(groupedOriginalItems, "原貨/退貨", AlertCircle, "text-orange-600")}
             </div>
 
             {showAdjustModal && (
