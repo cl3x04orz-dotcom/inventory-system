@@ -231,7 +231,17 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
 
             group.forEach(item => {
                 // Normalize date to string YYYY-MM-DD to group exact days
-                const dateKey = item.expiry ? new Date(item.expiry).toISOString().split('T')[0] : 'NO_DATE';
+                let dateKey = 'NO_DATE';
+                try {
+                    if (item.expiry) {
+                        const d = new Date(item.expiry);
+                        if (!isNaN(d.getTime())) {
+                            dateKey = d.toISOString().split('T')[0];
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Invalid date:', item.expiry);
+                }
 
                 if (expiryMap[dateKey]) {
                     expiryMap[dateKey].quantity = Number(expiryMap[dateKey].quantity) + Number(item.quantity);
