@@ -26,7 +26,8 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
             if (Array.isArray(data)) {
                 const activeBatches = data.filter(item => {
                     const qty = Number(item.quantity);
-                    return !isNaN(qty) && qty > 0;
+                    // [Adjustment] Show negative quantities so the total matches Stocktake view
+                    return !isNaN(qty) && qty !== 0;
                 });
                 console.log('Filtered Inventory:', activeBatches);
 

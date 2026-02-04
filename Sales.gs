@@ -468,7 +468,17 @@ function voidAndFetchSaleService(payload) {
         invSheet.appendRow([Utilities.getUuid(), productId, original, today, today, 'ORIGINAL', 'VOID_REFUND: ' + saleId]);
       }
       if (returns > 0) {
-        invSheet.appendRow([Utilities.getUuid(), productId, -returns, today, today, 'ORIGINAL', 'VOID_CANCEL_RETURN: ' + saleId]);
+        // [Fix] Try to deduct from existing ORIGINAL rows first to avoid negative row fragmentation
+        const invValues = invSheet.getDataRange().getValues(); // Refresh data
+        const deductResult = deductInventory_(invSheet, invValues, productId, returns, 'ORIGINAL');
+        const totalDeducted = deductResult.consumed.reduce((sum, item) => sum + item.deductedQty, 0);
+        
+        const remainingToDeduct = returns - totalDeducted;
+        
+        if (remainingToDeduct > 0) {
+           // Only append negative row if we couldn't find enough positive rows to deduct
+           invSheet.appendRow([Utilities.getUuid(), productId, -remainingToDeduct, today, today, 'ORIGINAL', 'VOID_CANCEL_RETURN: ' + saleId]);
+        }
       }
     }
   }
