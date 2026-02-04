@@ -83,12 +83,17 @@ export default function ReportPage({ user, apiUrl, setPage }) {
 
             // Calculate row totals for expenses
             filteredExpenses.forEach(item => {
+                // [Fix] Line Pay 不計入「總支出」顯示，但需計入「應繳回」扣除
+                item.linePayAmount = Number(item.linePay || 0);
+
                 const rowTotal =
                     Number(item.stall || 0) + Number(item.cleaning || 0) + Number(item.electricity || 0) +
                     Number(item.gas || 0) + Number(item.parking || 0) + Number(item.goods || 0) +
                     Number(item.bags || 0) + Number(item.others || 0) + Number(item.vehicleMaintenance || 0) +
-                    Number(item.salary || 0) + Number(item.linePay || 0) + Number(item.serviceFee || 0) +
+                    Number(item.salary || 0) + Number(item.serviceFee || 0) +
                     Number(item.reserve || 0);
+                // Removed: Number(item.linePay || 0)
+
                 item.rowTotal = rowTotal;
                 // [Fix] 標記薪資金額 (匯款)，不計入「應繳回金額」的現金支出扣除
                 item.salaryAmount = Number(item.salary || 0);
@@ -166,9 +171,16 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     }, 0) || 0;
 
     // [Fix] 總支出扣除薪資 (因為薪資是匯款，不從現金帳扣除)
+    // Note: Line Pay 已從 rowTotal 移除，因此這裡的總支出不含 Line Pay
     const totalExpenses = expenseData?.reduce((acc, item) => acc + (item.rowTotal || 0) - (item.salaryAmount || 0), 0) || 0;
+
+    // 計算總 Line Pay 金額 (用於應繳回扣除)
+    const totalLinePay = expenseData?.reduce((acc, item) => acc + (item.linePayAmount || 0), 0) || 0;
+
     const totalFinalTotal = expenseData?.reduce((acc, item) => acc + (Number(item.displayFinalTotal) || 0), 0) || 0;
-    const totalReturnAmount = totalCashSales - totalExpenses + totalFinalTotal;
+
+    // 應繳回 = 現金銷售 - 現金支出 - Line Pay(非現金收入/已入帳) + 結算(找零/補錢)
+    const totalReturnAmount = totalCashSales - totalExpenses - totalLinePay + totalFinalTotal;
 
     // Group by Product for summary table
     const productSummary = reportData?.reduce((acc, item) => {
