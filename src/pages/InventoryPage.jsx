@@ -230,13 +230,17 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
             const aggregatedGroup = [];
 
             group.forEach(item => {
-                // Normalize date to string YYYY-MM-DD to group exact days
+                // Feature: Group by Local Date (fix UTC mismatch)
                 let dateKey = 'NO_DATE';
                 try {
                     if (item.expiry) {
                         const d = new Date(item.expiry);
                         if (!isNaN(d.getTime())) {
-                            dateKey = d.toISOString().split('T')[0];
+                            // Use local time components to match what user sees
+                            const year = d.getFullYear();
+                            const month = String(d.getMonth() + 1).padStart(2, '0');
+                            const day = String(d.getDate()).padStart(2, '0');
+                            dateKey = `${year}-${month}-${day}`;
                         }
                     }
                 } catch (e) {
@@ -247,22 +251,25 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
                     expiryMap[dateKey].quantity = Number(expiryMap[dateKey].quantity) + Number(item.quantity);
                     // We keep the first batchId for adjustment purposes
                 } else {
-                    // Clone item to avoid mutating original state if needed (though here we just create new obj)
+                    // Clone item to avoid mutating original state
                     expiryMap[dateKey] = { ...item, quantity: Number(item.quantity) };
                     aggregatedGroup.push(expiryMap[dateKey]);
                 }
             });
 
-            // Sort by expiry (optional but good for display) - Oldest first
-            aggregatedGroup.sort((a, b) => {
+            // Feature: Filter out rows that sum to 0 (e.g., +2 and -2 for same date)
+            const nonZeroRows = aggregatedGroup.filter(item => item.quantity !== 0);
+
+            // Sort: Oldest first, No-Date last
+            nonZeroRows.sort((a, b) => {
                 if (a.expiry === b.expiry) return 0;
                 if (!a.expiry) return 1;
                 if (!b.expiry) return -1;
                 return new Date(a.expiry) - new Date(b.expiry);
             });
 
-            return aggregatedGroup;
-        });
+            return nonZeroRows;
+        }).filter(group => group.length > 0); // Feature: Remove empty groups (products with Total 0)
     };
 
     const groupedStockItems = groupItems(stockItems);
