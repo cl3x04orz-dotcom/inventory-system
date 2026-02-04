@@ -214,7 +214,22 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
         productTotals[item.productName] += Number(item.quantity);
     });
 
-    const renderInventoryTable = (items, title, Icon, colorClass) => (
+    // [New] Grouping Logic
+    const groupItems = (items) => {
+        const groups = {};
+        items.forEach(item => {
+            if (!groups[item.productName]) {
+                groups[item.productName] = [];
+            }
+            groups[item.productName].push(item);
+        });
+        return Object.values(groups); // Returns array of arrays [[item1, item2], [item3]]
+    };
+
+    const groupedStockItems = groupItems(stockItems);
+    const groupedOriginalItems = groupItems(originalItems);
+
+    const renderInventoryTable = (groupedItems, title, Icon, colorClass) => (
         <div className="hidden md:flex bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] p-6 flex-col shadow-sm">
             <h3 className={`text-lg font-bold mb-4 flex items-center gap-2 ${colorClass}`}>
                 <Icon size={20} /> {title}
@@ -223,105 +238,133 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
                 <table className="w-full text-left border-collapse">
                     <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-sm uppercase">
                         <tr>
-                            <th className="p-4">產品名稱</th>
-                            <th className="p-4 text-center">數量 / 箱數</th>
-                            <th className="p-4">效期</th>
-                            <th className="p-4 text-center">每箱規格</th>
-                            <th className="p-4 text-center">安全庫存</th>
-                            <th className="p-4 text-center">操作</th>
+                            <th className="p-4 w-1/4">產品名稱</th>
+                            <th className="p-4 text-center w-24">數量</th>
+                            <th className="p-4 w-32">效期</th>
+                            <th className="p-4 text-center w-24">每箱規格</th>
+                            <th className="p-4 text-center w-24">安全庫存</th>
+                            <th className="p-4 text-center w-20">操作</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border-primary)]">
                         {loading ? (
                             <tr><td colSpan="6" className="p-6 text-center text-[var(--text-secondary)]">載入中...</td></tr>
-                        ) : items.length === 0 ? (
+                        ) : groupedItems.length === 0 ? (
                             <tr><td colSpan="6" className="p-6 text-center text-[var(--text-secondary)]">無資料</td></tr>
                         ) : (
-                            items.map((item, idx) => {
-                                const safetyLevel = safetyStocks[item.productName] || 0;
-                                const customCaseSize = customCaseSizes[item.productName];
-                                const currentCaseSize = customCaseSize !== undefined && customCaseSize !== 0 ? customCaseSize : (CASE_MAP[item.productName] || 0);
-
-                                const totalQty = productTotals[item.productName] || 0;
+                            groupedItems.map((group, groupIdx) => {
+                                const firstItem = group[0];
+                                const productName = firstItem.productName;
+                                const safetyLevel = safetyStocks[productName] || 0;
+                                const customCaseSize = customCaseSizes[productName];
+                                const currentCaseSize = customCaseSize !== undefined && customCaseSize !== 0 ? customCaseSize : (CASE_MAP[productName] || 0);
+                                const totalQty = productTotals[productName] || 0;
                                 const isLowStock = safetyLevel > 0 && totalQty <= safetyLevel;
 
-                                // 效期判斷邏輯 (大約抓三天)
-                                const expiryDate = item.expiry ? new Date(item.expiry) : null;
-                                const today = new Date();
-                                today.setHours(0, 0, 0, 0);
-                                const threeDaysLater = new Date(today);
-                                threeDaysLater.setDate(today.getDate() + 3);
-
-                                const isExpiringSoon = expiryDate && expiryDate >= today && expiryDate <= threeDaysLater;
-                                const isExpired = expiryDate && expiryDate < today;
-
                                 return (
-                                    <tr key={idx} className={`hover:bg-[var(--bg-hover)] transition-colors ${isLowStock ? 'bg-red-50/10' : ''} ${isExpired ? 'bg-rose-50/10' : isExpiringSoon ? 'bg-amber-50/10' : ''}`}>
-                                        <td className="p-4 font-medium text-[var(--text-primary)]">
-                                            <div className="flex items-center gap-2">
-                                                {isLowStock && <AlertTriangle size={16} className="text-red-400" />}
-                                                {item.productName}
-                                            </div>
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            <div className="flex flex-col items-center">
-                                                <span className="font-mono text-emerald-600 font-bold text-lg">{item.quantity}</span>
-                                                {currentCaseSize > 0 && (
-                                                    <span className="text-blue-600 font-mono text-sm">
-                                                        箱：{(item.quantity / currentCaseSize).toFixed(1)}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="p-4 text-sm whitespace-nowrap">
-                                            <div className="flex flex-col gap-1">
-                                                <span className={isExpired ? 'text-rose-500 line-through' : isExpiringSoon ? 'text-amber-500 font-bold' : 'text-[var(--text-secondary)]'}>
-                                                    {formatDate(item.expiry)}
-                                                </span>
-                                                {isExpiringSoon && (
-                                                    <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded self-start flex items-center gap-1 font-bold">
-                                                        <Clock size={10} /> 即將過期
-                                                    </span>
-                                                )}
-                                                {isExpired && (
-                                                    <span className="text-[10px] bg-rose-100 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded self-start flex items-center gap-1 font-bold">
-                                                        <AlertTriangle size={10} /> 已過期
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            <input
-                                                id={`case-input-${item.productName}-${item.batchId}`}
-                                                type="number"
-                                                className="input-field w-16 text-center text-xs p-1 border-blue-200/30"
-                                                value={customCaseSize !== undefined ? customCaseSize : (CASE_MAP[item.productName] || '')}
-                                                onChange={(e) => updateCustomCaseSize(item.productName, e.target.value)}
-                                                onKeyDown={(e) => handleSafetyKeyDown(e, idx, 'case', items)}
-                                                placeholder="箱規"
-                                            />
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            <input
-                                                id={`safety-input-${item.productName}-${item.batchId}`}
-                                                type="number"
-                                                className="input-field w-16 text-center text-xs p-1 border-amber-200/30"
-                                                value={tempSafetyInput[item.productName] !== undefined ? tempSafetyInput[item.productName] : (safetyStocks[item.productName] || '')}
-                                                onChange={(e) => handleSafetyInputChange(item.productName, e.target.value)}
-                                                onBlur={() => handleSafetyInputBlur(item.productName)}
-                                                onKeyDown={(e) => handleSafetyKeyDown(e, idx, 'safety', items)}
-                                                placeholder="低標"
-                                            />
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            <button
-                                                onClick={() => handleAdjustment(item)}
-                                                className="btn-secondary text-xs px-3 py-1 flex items-center gap-1 mx-auto"
-                                            >
-                                                <Trash2 size={14} /> 異動
-                                            </button>
-                                        </td>
-                                    </tr>
+                                    <React.Fragment key={productName}>
+                                        {group.map((item, idx) => {
+                                            const isLast = idx === group.length - 1;
+
+                                            // Expiry Logic
+                                            const expiryDate = item.expiry ? new Date(item.expiry) : null;
+                                            const today = new Date();
+                                            today.setHours(0, 0, 0, 0);
+                                            const threeDaysLater = new Date(today);
+                                            threeDaysLater.setDate(today.getDate() + 3);
+                                            const isExpiringSoon = expiryDate && expiryDate >= today && expiryDate <= threeDaysLater;
+                                            const isExpired = expiryDate && expiryDate < today;
+
+                                            return (
+                                                <tr key={item.batchId} className={`hover:bg-[var(--bg-hover)] transition-colors ${isLowStock ? 'bg-red-50/10' : ''} ${!isLast ? 'border-b border-dashed border-slate-200' : ''}`}>
+                                                    {/* Product Name - Merged Cell */}
+                                                    {idx === 0 && (
+                                                        <td className="p-4 font-medium text-[var(--text-primary)] align-top pt-6 border-r border-[var(--border-primary)]/50" rowSpan={group.length}>
+                                                            <div className="flex flex-col gap-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    {isLowStock && <AlertTriangle size={16} className="text-red-400" />}
+                                                                    <span className="font-bold text-lg">{productName}</span>
+                                                                </div>
+                                                                <span className="text-xs text-[var(--text-secondary)]">
+                                                                    總庫存: <span className="font-mono font-bold text-emerald-600 text-sm">{totalQty}</span>
+                                                                    {currentCaseSize > 0 && (
+                                                                        <span className="ml-2 text-blue-600">({(totalQty / currentCaseSize).toFixed(1)}箱)</span>
+                                                                    )}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                    )}
+
+                                                    {/* Quantity */}
+                                                    <td className="p-4 text-center">
+                                                        <span className={`font-mono font-bold text-lg ${Number(item.quantity) < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                                                            {item.quantity}
+                                                        </span>
+                                                    </td>
+
+                                                    {/* Expiry */}
+                                                    <td className="p-4 text-sm whitespace-nowrap">
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className={isExpired ? 'text-rose-500 line-through' : isExpiringSoon ? 'text-amber-500 font-bold' : 'text-[var(--text-secondary)]'}>
+                                                                {formatDate(item.expiry)}
+                                                            </span>
+                                                            {isExpiringSoon && (
+                                                                <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded self-start flex items-center gap-1 font-bold">
+                                                                    <Clock size={10} /> 即將過期
+                                                                </span>
+                                                            )}
+                                                            {isExpired && (
+                                                                <span className="text-[10px] bg-rose-100 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded self-start flex items-center gap-1 font-bold">
+                                                                    <AlertTriangle size={10} /> 已過期
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Case Size - Merged Cell */}
+                                                    {idx === 0 && (
+                                                        <td className="p-4 text-center align-top pt-5 border-l border-[var(--border-primary)]/50" rowSpan={group.length}>
+                                                            <input
+                                                                id={`case-input-${productName}`}
+                                                                type="number"
+                                                                className="input-field w-16 text-center text-xs p-1 border-blue-200/30"
+                                                                value={customCaseSize !== undefined ? customCaseSize : (CASE_MAP[productName] || '')}
+                                                                onChange={(e) => updateCustomCaseSize(productName, e.target.value)}
+                                                                placeholder="箱規"
+                                                            />
+                                                            {currentCaseSize > 0 && <div className="text-[10px] text-slate-400 mt-1">預設: {CASE_MAP[productName] || '-'}</div>}
+                                                        </td>
+                                                    )}
+
+                                                    {/* Safety Stock - Merged Cell */}
+                                                    {idx === 0 && (
+                                                        <td className="p-4 text-center align-top pt-5 border-l border-[var(--border-primary)]/50" rowSpan={group.length}>
+                                                            <input
+                                                                id={`safety-input-${productName}`}
+                                                                type="number"
+                                                                className="input-field w-16 text-center text-xs p-1 border-amber-200/30"
+                                                                value={tempSafetyInput[productName] !== undefined ? tempSafetyInput[productName] : (safetyStocks[productName] || '')}
+                                                                onChange={(e) => handleSafetyInputChange(productName, e.target.value)}
+                                                                onBlur={() => handleSafetyInputBlur(productName)}
+                                                                placeholder="低標"
+                                                            />
+                                                        </td>
+                                                    )}
+
+                                                    {/* Action */}
+                                                    <td className="p-4 text-center">
+                                                        <button
+                                                            onClick={() => handleAdjustment(item)}
+                                                            className="btn-secondary text-xs px-3 py-1 flex items-center gap-1 mx-auto"
+                                                            title="單批次異動"
+                                                        >
+                                                            <Trash2 size={14} /> 異動
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </React.Fragment>
                                 );
                             })
                         )}
@@ -331,7 +374,7 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
         </div>
     );
 
-    const renderInventoryCards = (items, title, Icon, colorClass) => (
+    const renderInventoryCards = (groupedItems, title, Icon, colorClass) => (
         <div className="md:hidden flex flex-col gap-4">
             <h3 className={`text-lg font-bold flex items-center gap-2 ${colorClass} px-1`}>
                 <Icon size={20} /> {title}
@@ -339,98 +382,87 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
             <div className="space-y-4">
                 {loading ? (
                     <div className="text-center py-8 text-[var(--text-secondary)]">載入中...</div>
-                ) : items.length === 0 ? (
+                ) : groupedItems.length === 0 ? (
                     <div className="text-center py-8 text-[var(--text-secondary)] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">無資料</div>
                 ) : (
-                    items.map((item, idx) => {
-                        const safetyLevel = safetyStocks[item.productName] || 0;
-                        const customCaseSize = customCaseSizes[item.productName];
-                        const currentCaseSize = customCaseSize !== undefined && customCaseSize !== 0 ? customCaseSize : (CASE_MAP[item.productName] || 0);
-
-                        const totalQty = productTotals[item.productName] || 0;
+                    groupedItems.map((group, idx) => {
+                        const firstItem = group[0];
+                        const productName = firstItem.productName;
+                        const safetyLevel = safetyStocks[productName] || 0;
+                        const customCaseSize = customCaseSizes[productName];
+                        const currentCaseSize = customCaseSize !== undefined && customCaseSize !== 0 ? customCaseSize : (CASE_MAP[productName] || 0);
+                        const totalQty = productTotals[productName] || 0;
                         const isLowStock = safetyLevel > 0 && totalQty <= safetyLevel;
-
-                        const expiryDate = item.expiry ? new Date(item.expiry) : null;
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        const threeDaysLater = new Date(today);
-                        threeDaysLater.setDate(today.getDate() + 3);
-
-                        const isExpiringSoon = expiryDate && expiryDate >= today && expiryDate <= threeDaysLater;
-                        const isExpired = expiryDate && expiryDate < today;
 
                         return (
                             <div key={idx} className={`bg-[var(--bg-secondary)] rounded-xl p-4 border shadow-sm ${isLowStock ? 'border-red-500/30 bg-red-500/5' : 'border-[var(--border-primary)]'}`}>
-                                {/* Header: Product Name & Stock */}
+                                {/* Header: Product Name & Total Stock */}
                                 <div className="flex justify-between items-start mb-3 border-b border-[var(--border-primary)] pb-2">
                                     <div className="flex items-center gap-2">
                                         {isLowStock && <AlertTriangle size={18} className="text-red-500" />}
-                                        <span className="font-bold text-[var(--text-primary)] text-lg">{item.productName}</span>
+                                        <span className="font-bold text-[var(--text-primary)] text-lg">{productName}</span>
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-2xl font-bold text-emerald-600 font-mono">{item.quantity}</div>
+                                        <div className="text-2xl font-bold text-emerald-600 font-mono">{totalQty}</div>
                                         {currentCaseSize > 0 && (
                                             <div className="text-xs text-blue-600 font-mono">
-                                                箱：{(item.quantity / currentCaseSize).toFixed(1)}
+                                                箱：{(totalQty / currentCaseSize).toFixed(1)}
                                             </div>
                                         )}
                                     </div>
                                 </div>
 
-                                {/* Details Grid */}
-                                <div className="grid grid-cols-2 gap-3 mb-3">
-                                    <div className="bg-[var(--bg-tertiary)] p-2 rounded-lg">
-                                        <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-bold block mb-1">效期</span>
-                                        <div className="flex flex-col">
-                                            <span className={`text-sm font-medium ${isExpired ? 'text-rose-600 line-through' : isExpiringSoon ? 'text-amber-600 font-bold' : 'text-slate-600'}`}>
-                                                {formatDate(item.expiry)}
-                                            </span>
-                                            {isExpiringSoon && (
-                                                <span className="text-[10px] text-amber-600 flex items-center gap-1 mt-0.5">
-                                                    <Clock size={10} /> 即將過期
-                                                </span>
-                                            )}
-                                            {isExpired && (
-                                                <span className="text-[10px] text-rose-600 flex items-center gap-1 mt-0.5">
-                                                    <AlertTriangle size={10} /> 已過期
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="bg-[var(--bg-tertiary)] p-2 rounded-lg flex flex-col justify-between">
-                                        <div className="flex items-center justify-between gap-1 mb-1">
-                                            <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-bold">箱規</span>
-                                            <input
-                                                id={`m-case-input-${item.productName}-${item.batchId}`}
-                                                type="number"
-                                                className="w-12 text-center text-xs p-0.5 rounded border border-[var(--border-primary)] bg-[var(--bg-primary)] text-[var(--text-primary)]"
-                                                value={customCaseSize !== undefined ? customCaseSize : (CASE_MAP[item.productName] || '')}
-                                                onChange={(e) => updateCustomCaseSize(item.productName, e.target.value)}
-                                                onKeyDown={(e) => handleSafetyKeyDown(e, idx, 'case', items, true)}
-                                            />
-                                        </div>
-                                        <div className="flex items-center justify-between gap-1">
-                                            <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-bold">低標</span>
-                                            <input
-                                                id={`m-safety-input-${item.productName}-${item.batchId}`}
-                                                type="number"
-                                                className="w-12 text-center text-xs p-0.5 rounded border border-[var(--border-primary)] bg-[var(--bg-primary)] text-[var(--text-primary)]"
-                                                value={tempSafetyInput[item.productName] !== undefined ? tempSafetyInput[item.productName] : (safetyStocks[item.productName] || '')}
-                                                onChange={(e) => handleSafetyInputChange(item.productName, e.target.value)}
-                                                onBlur={() => handleSafetyInputBlur(item.productName)}
-                                                onKeyDown={(e) => handleSafetyKeyDown(e, idx, 'safety', items, true)}
-                                            />
-                                        </div>
-                                    </div>
+                                {/* Batches List */}
+                                <div className="space-y-2 mb-3">
+                                    {group.map((item, bIdx) => {
+                                        const expiryDate = item.expiry ? new Date(item.expiry) : null;
+                                        const today = new Date();
+                                        today.setHours(0, 0, 0, 0);
+                                        const isExpired = expiryDate && expiryDate < today;
+
+                                        return (
+                                            <div key={bIdx} className="flex justify-between items-center bg-[var(--bg-tertiary)] p-2 rounded text-sm">
+                                                <div className="flex flex-col">
+                                                    <span className={`font-mono ${isExpired ? 'text-rose-600 line-through' : 'text-[var(--text-secondary)]'}`}>
+                                                        {formatDate(item.expiry)}
+                                                    </span>
+                                                    {isExpired && <span className="text-[10px] text-rose-500 font-bold">已過期</span>}
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <span className={`font-mono font-bold ${Number(item.quantity) < 0 ? 'text-red-500' : 'text-emerald-700'}`}>
+                                                        {item.quantity}
+                                                    </span>
+                                                    <button onClick={() => handleAdjustment(item)} className="text-[var(--text-tertiary)] hover:text-red-500 p-1">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
 
-                                {/* Footer: Action */}
-                                <button
-                                    onClick={() => handleAdjustment(item)}
-                                    className="w-full btn-secondary py-2 flex items-center justify-center gap-2 text-sm"
-                                >
-                                    <Trash2 size={16} /> 庫存異動
-                                </button>
+                                {/* Controls: Case Size & Low Stock */}
+                                <div className="grid grid-cols-2 gap-3 mt-3 border-t border-[var(--border-primary)] pt-3">
+                                    <div className="flex items-center justify-between gap-1">
+                                        <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-bold">箱規</span>
+                                        <input
+                                            type="number"
+                                            className="w-12 text-center text-xs p-0.5 rounded border border-[var(--border-primary)] bg-[var(--bg-primary)]"
+                                            value={customCaseSize !== undefined ? customCaseSize : (CASE_MAP[productName] || '')}
+                                            onChange={(e) => updateCustomCaseSize(productName, e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-between gap-1">
+                                        <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-bold">低標</span>
+                                        <input
+                                            type="number"
+                                            className="w-12 text-center text-xs p-0.5 rounded border border-[var(--border-primary)] bg-[var(--bg-primary)]"
+                                            value={tempSafetyInput[productName] !== undefined ? tempSafetyInput[productName] : (safetyStocks[productName] || '')}
+                                            onChange={(e) => handleSafetyInputChange(productName, e.target.value)}
+                                            onBlur={() => handleSafetyInputBlur(productName)}
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         );
                     })
