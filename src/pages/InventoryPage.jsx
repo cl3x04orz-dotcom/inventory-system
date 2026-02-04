@@ -65,7 +65,8 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
     const formatDate = (dateVal) => {
         if (!dateVal) return '-';
         const date = new Date(dateVal);
-        if (isNaN(date.getTime())) return String(dateVal);
+        // [Fix] Even if date is invalid (e.g. 2026-02-30), format it consistently with slashes
+        if (isNaN(date.getTime())) return String(dateVal).replace(/-/g, '/');
         return date.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
     };
 
@@ -269,7 +270,12 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
             });
 
             return nonZeroRows;
-        }).filter(group => group.length > 0); // Feature: Remove empty groups (products with Total 0)
+        }).filter(group => {
+            if (group.length === 0) return false;
+            // Feature: Hide product if total quantity is 0 (even if it has + and - rows)
+            const groupTotal = group.reduce((sum, item) => sum + Number(item.quantity), 0);
+            return groupTotal !== 0;
+        });
     };
 
     const groupedStockItems = groupItems(stockItems);
