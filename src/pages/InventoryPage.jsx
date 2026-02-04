@@ -223,7 +223,36 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
             }
             groups[item.productName].push(item);
         });
-        return Object.values(groups); // Returns array of arrays [[item1, item2], [item3]]
+
+        // [Adjustment] Aggregate by Expiry Date
+        return Object.values(groups).map(group => {
+            const expiryMap = {};
+            const aggregatedGroup = [];
+
+            group.forEach(item => {
+                // Normalize date to string YYYY-MM-DD to group exact days
+                const dateKey = item.expiry ? new Date(item.expiry).toISOString().split('T')[0] : 'NO_DATE';
+
+                if (expiryMap[dateKey]) {
+                    expiryMap[dateKey].quantity = Number(expiryMap[dateKey].quantity) + Number(item.quantity);
+                    // We keep the first batchId for adjustment purposes
+                } else {
+                    // Clone item to avoid mutating original state if needed (though here we just create new obj)
+                    expiryMap[dateKey] = { ...item, quantity: Number(item.quantity) };
+                    aggregatedGroup.push(expiryMap[dateKey]);
+                }
+            });
+
+            // Sort by expiry (optional but good for display) - Oldest first
+            aggregatedGroup.sort((a, b) => {
+                if (a.expiry === b.expiry) return 0;
+                if (!a.expiry) return 1;
+                if (!b.expiry) return -1;
+                return new Date(a.expiry) - new Date(b.expiry);
+            });
+
+            return aggregatedGroup;
+        });
     };
 
     const groupedStockItems = groupItems(stockItems);
