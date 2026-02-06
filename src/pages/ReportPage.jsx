@@ -164,10 +164,10 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     const totalSales = reportData?.reduce((acc, item) => acc + (Number(item.totalAmount) || 0), 0) || 0;
     const totalQty = reportData?.reduce((acc, item) => acc + (Number(item.soldQty) || 0), 0) || 0;
 
-    // [Fix] 計算「總賒帳金額」 (包含 'CREDIT' 和 '賒帳')
+    // [Fix] 計算「總賒帳金額」 (包含 'CREDIT', '賒帳', '賒銷')
     const totalCreditSales = reportData?.reduce((acc, item) => {
         const method = (item.paymentMethod || '').trim().toUpperCase();
-        if (method === 'CREDIT' || method === '賒帳') {
+        if (method === 'CREDIT' || method === '賒帳' || method === '賒銷') {
             return acc + (Number(item.totalAmount) || 0);
         }
         return acc;
