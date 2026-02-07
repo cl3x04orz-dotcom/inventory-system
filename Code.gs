@@ -36,6 +36,7 @@ function apiHandler(request) {
         // Sales (銷售管理)
         'saveSales': 'sales_entry', 
         'getSalesHistory': 'sales_report',
+        'getRecentSalesToday': 'sales_entry', // Today's records for merge printing
         'getTemplatesList': 'sales_entry', // Allow sales entry to list templates
         'generatePdf': 'sales_entry', // Allow sales entry to generate PDF
         
@@ -155,6 +156,7 @@ function apiHandler(request) {
             // Sales & Analytics
             case 'saveSales': return typeof saveSalesService !== 'undefined' ? saveSalesService(payload, user) : {error: 'Service missing'}; 
             case 'getSalesHistory': return typeof getSalesHistory !== 'undefined' ? getSalesHistory(payload) : {error: 'Service missing'}; 
+            case 'getRecentSalesToday': return typeof getRecentSalesToday !== 'undefined' ? getRecentSalesToday(payload) : {error: 'Service missing'};
             case 'voidAndFetchSale': return typeof voidAndFetchSaleService !== 'undefined' ? voidAndFetchSaleService(payload) : {error: 'Service missing'};
             case 'getTemplatesList': return typeof getTemplatesListService !== 'undefined' ? getTemplatesListService() : {error: 'Service missing'};
             case 'generatePdf': return typeof generatePdfService !== 'undefined' ? generatePdfService(payload) : {error: 'Service missing'}; 

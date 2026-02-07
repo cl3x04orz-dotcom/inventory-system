@@ -497,3 +497,125 @@ function voidAndFetchSaleService(payload) {
     }
   };
 }
+
+// ===========================================
+// 6. 當日紀錄查詢 (Get Recent Sales Today)
+// ===========================================
+/**
+ * 獲取當前使用者當天的銷售紀錄（非作廢）
+ * 用於合併列印功能
+ */
+function getRecentSalesToday(payload) {
+  const { token } = payload;
+  
+  // 驗證使用者
+  let currentUser = null;
+  if (token && typeof verifyToken !== 'undefined') {
+    currentUser = verifyToken(token);
+  }
+  // Fallback: 如果 token 無法解析，但 payload 有注入 userRole
+  if (!currentUser && payload.userRole) {
+    currentUser = { 
+      role: payload.userRole, 
+      username: payload.operator || '' 
+    };
+  }
+  
+  if (!currentUser || !currentUser.username) {
+    throw new Error('使用者驗證失敗');
+  }
+  
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const salesSheet = ss.getSheetByName('Sales');
+  const detailsSheet = ss.getSheetByName('SalesDetails');
+  
+  if (!salesSheet || !detailsSheet) {
+    return [];
+  }
+  
+  // 取得今天的日期範圍（使用 GMT+8）
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  const salesData = salesSheet.getDataRange().getValues();
+  const detailsData = detailsSheet.getDataRange().getValues();
+  const productMap = getProductMap_();
+  
+  const currentUsername = String(currentUser.username || '').trim().toLowerCase();
+  const results = [];
+  
+  // 固定欄位索引（與 getSalesHistory 一致）
+  const IDX_ID = 0;
+  const IDX_DATE = 1;
+  const IDX_REP1 = 2;
+  const IDX_TOTAL = 5;
+  const IDX_CUST = 6;
+  const IDX_REP2 = 7;
+  const IDX_METHOD = 8;
+  const IDX_STATUS = 9;
+  
+  // 遍歷 Sales 表
+  for (let i = 1; i < salesData.length; i++) {
+    const row = salesData[i];
+    const saleId = String(row[IDX_ID] || '').trim();
+    if (!saleId) continue;
+    
+    const saleDate = new Date(row[IDX_DATE]);
+    const salesRep1 = String(row[IDX_REP1] || '').trim();
+    const salesRep2 = String(row[IDX_REP2] || '').trim();
+    const customer = String(row[IDX_CUST] || '').trim();
+    const paymentMethod = String(row[IDX_METHOD] || 'CASH');
+    const status = String(row[IDX_STATUS] || '').toUpperCase();
+    const totalAmount = Number(row[IDX_TOTAL] || 0);
+    
+    // 過濾條件：當天、非作廢、當前使用者
+    if (isNaN(saleDate.getTime()) || saleDate < today || saleDate >= tomorrow) continue;
+    if (status === 'VOID') continue;
+    
+    // 業務員匹配（優先使用 REP2，fallback 到 REP1）
+    let rowRep = salesRep2 || salesRep1;
+    if (rowRep.toLowerCase() !== currentUsername) continue;
+    
+    // 提取該筆銷售的明細
+    const salesDetails = [];
+    for (let j = 1; j < detailsData.length; j++) {
+      if (String(detailsData[j][0]) === saleId) {
+        const productId = String(detailsData[j][1]);
+        const picked = Number(detailsData[j][2] || 0);
+        const original = Number(detailsData[j][3] || 0);
+        const returns = Number(detailsData[j][4] || 0);
+        const sold = Number(detailsData[j][5] || 0);
+        const unitPrice = Number(detailsData[j][6] || 0);
+        
+        // 只包含有實際銷售的產品
+        if (sold > 0 || picked > 0 || original > 0) {
+          salesDetails.push({
+            productId: productId,
+            productName: productMap[productId] || productId,
+            picked: picked,
+            original: original,
+            returns: returns,
+            sold: sold,
+            unitPrice: unitPrice
+          });
+        }
+      }
+    }
+    
+    results.push({
+      saleId: saleId,
+      date: saleDate.toISOString(),
+      customer: customer,
+      salesRep: rowRep,
+      paymentMethod: paymentMethod,
+      totalAmount: totalAmount,
+      salesData: salesDetails
+    });
+  }
+  
+  // 按時間倒序排列（最新的在前）
+  return results.sort((a, b) => new Date(b.date) - new Date(a.date));
+}
+

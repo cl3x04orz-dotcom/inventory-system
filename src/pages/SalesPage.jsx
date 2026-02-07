@@ -5,6 +5,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { callGAS } from '../utils/api';
 import { PRICE_MAP, sortProducts } from '../utils/constants';
 import { evaluateFormula } from '../utils/mathUtils';
+import MergePrintModal from '../components/MergePrintModal';
 
 const getSafeNum = (v) => {
     if (typeof v === 'string' && v.trim().startsWith('=')) return 0;
@@ -28,6 +29,13 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [isPrinting, setIsPrinting] = useState(false);
     const [isSorting, setIsSorting] = useState(false);
     const [activeInput, setActiveInput] = useState(null); // { id: string, type: 'row'|'cash'|'expense', field?: string, denom?: number, key?: string }
+
+    // Today Records States (for merge printing)
+    const [showTodayRecords, setShowTodayRecords] = useState(false);
+    const [todayRecords, setTodayRecords] = useState([]);
+    const [selectedSaleIds, setSelectedSaleIds] = useState([]);
+    const [isMergePrinting, setIsMergePrinting] = useState(false);
+
 
     // [Modified] Removed useEffect for paymentType to prevent overwriting cloned data. 
     // Logic moved to manual toggle handlers.
@@ -610,6 +618,105 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         }
     };
 
+    // Load Today's Sales Records
+    const loadTodayRecords = async () => {
+        try {
+            const records = await callGAS(apiUrl, 'getRecentSalesToday', {}, user.token);
+            setTodayRecords(records);
+        } catch (error) {
+            console.error('載入今日紀錄失敗:', error);
+            alert('載入今日紀錄失敗: ' + error.message);
+        }
+    };
+
+    // Merge Print Handler
+    const handleMergePrint = async () => {
+        if (selectedSaleIds.length === 0) {
+            alert('請至少選擇一筆單據');
+            return;
+        }
+
+        setIsMergePrinting(true);
+        try {
+            // 1. 提取選中的單據
+            const selectedRecords = todayRecords.filter(r => selectedSaleIds.includes(r.saleId));
+
+            // 2. 建立產品 Map（productId -> 各單據的數值陣列）
+            const productDataMap = {};
+
+            selectedRecords.forEach(record => {
+                record.salesData.forEach(item => {
+                    if (!productDataMap[item.productId]) {
+                        productDataMap[item.productId] = {
+                            productId: item.productId,
+                            productName: item.productName,
+                            picked: [],
+                            original: [],
+                            returns: [],
+                            sold: [],
+                            price: []
+                        };
+                    }
+                    productDataMap[item.productId].picked.push(item.picked);
+                    productDataMap[item.productId].original.push(item.original);
+                    productDataMap[item.productId].returns.push(item.returns);
+                    productDataMap[item.productId].sold.push(item.sold);
+                    productDataMap[item.productId].price.push(item.unitPrice);
+                });
+            });
+
+            // 3. 格式化為斜線分隔字串
+            const mergedRows = Object.values(productDataMap).map(p => ({
+                name: p.productName,
+                stock: 0, // 合併列印時不顯示庫存
+                originalStock: 0,
+                picked: p.picked.join(' / '),
+                original: p.original.join(' / '),
+                returns: p.returns.join(' / '),
+                sold: p.sold.join(' / '),
+                price: p.price.join(' / '),
+                subtotal: '' // 合併時不計算小計
+            }));
+
+            // 4. 調用 PDF 生成
+            const printPayload = {
+                templateId: 'Template_領貨單',
+                data: {
+                    date: new Date().toISOString(),
+                    location: `合併列印 (${selectedRecords.length} 筆)`,
+                    salesRep: user.username,
+                    totalSalesAmount: '',
+                    totalCashCalc: '',
+                    finalTotal: '',
+                    reserve: '',
+                    expenses: {},
+                    rows: mergedRows
+                }
+            };
+
+            const response = await callGAS(apiUrl, 'generatePdf', printPayload, user.token);
+            if (response.success && response.pdfBase64) {
+                const byteCharacters = atob(response.pdfBase64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: 'application/pdf' });
+                const blobUrl = URL.createObjectURL(blob);
+                window.open(blobUrl, '_blank');
+            } else {
+                throw new Error(response.error || 'Unknown error');
+            }
+        } catch (e) {
+            console.error('合併列印失敗:', e);
+            alert('合併列印失敗: ' + e.message);
+        } finally {
+            setIsMergePrinting(false);
+        }
+    };
+
+
     return (
         <>
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 h-full overflow-y-auto xl:overflow-hidden">
@@ -671,7 +778,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             {/* Drag and Drop Sort Toggle */}
                             <button
                                 onClick={toggleSorting}
-                                className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border transition-all ${isSorting
+                                className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${isSorting
                                     ? 'bg-indigo-500 text-white border-indigo-500'
                                     : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
                                     }`}
@@ -684,13 +791,28 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             <button
                                 onClick={handlePrint}
                                 disabled={isPrinting}
-                                className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border transition-all ${isPrinting
+                                className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${isPrinting
                                     ? 'bg-gray-400 text-white cursor-not-allowed'
                                     : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
                                     }`}
                             >
                                 <Printer size={16} />
                                 {isPrinting ? '列印中...' : '列印領貨單'}
+                            </button>
+
+                            {/* Merge Print Button */}
+                            <button
+                                onClick={() => {
+                                    setShowTodayRecords(!showTodayRecords);
+                                    if (!showTodayRecords) loadTodayRecords();
+                                }}
+                                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-black rounded-lg border whitespace-nowrap transition-all duration-300 shadow-sm active:scale-95 ${showTodayRecords
+                                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-transparent shadow-blue-500/20 shadow-lg'
+                                    : 'bg-white text-gray-500 border-gray-200 hover:border-blue-400 hover:text-blue-600'
+                                    }`}
+                            >
+                                <ListOrdered size={16} strokeWidth={2.5} />
+                                合併列印
                             </button>
 
                         </div>
@@ -1091,6 +1213,29 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     </div>
                 </div>
             </div>
+
+
+            {/* Merge Print Modal */}
+            <MergePrintModal
+                show={showTodayRecords}
+                onClose={() => {
+                    setSelectedSaleIds([]);
+                    setShowTodayRecords(false);
+                }}
+                records={todayRecords}
+                selectedIds={selectedSaleIds}
+                onToggleSelect={(saleId) => {
+                    if (saleId === null) {
+                        setSelectedSaleIds([]);
+                    } else if (selectedSaleIds.includes(saleId)) {
+                        setSelectedSaleIds(selectedSaleIds.filter(id => id !== saleId));
+                    } else {
+                        setSelectedSaleIds([...selectedSaleIds, saleId]);
+                    }
+                }}
+                onMergePrint={handleMergePrint}
+                isPrinting={isMergePrinting}
+            />
         </>
     );
 }
