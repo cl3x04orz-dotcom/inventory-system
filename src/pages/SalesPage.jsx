@@ -35,6 +35,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [todayRecords, setTodayRecords] = useState([]);
     const [selectedSaleIds, setSelectedSaleIds] = useState([]);
     const [isMergePrinting, setIsMergePrinting] = useState(false);
+    const [allProductWeights, setAllProductWeights] = useState({}); // productId -> sortWeight
 
 
     // [Modified] Removed useEffect for paymentType to prevent overwriting cloned data. 
@@ -81,6 +82,13 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             if (Array.isArray(data)) {
                 const content = data.filter(p => (Number(p.stock) || 0) > 0 || (Number(p.originalStock) || 0) > 0);
                 const sortedProducts = sortProducts(content, 'name');
+
+                // 0. Store all weights for sorting elsewhere (like merge print)
+                const weightMap = {};
+                data.forEach(p => {
+                    weightMap[String(p.id)] = p.sortWeight;
+                });
+                setAllProductWeights(weightMap);
 
                 // 1. Generate Base Rows
                 let finalRows = sortedProducts.map(p => {
@@ -665,16 +673,28 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 });
             });
 
-            // 3. 格式化為斜線分隔字串
-            const mergedRows = Object.values(productDataMap).map(p => ({
+            // 3. 轉換為陣列並進行排序 (依照 sortWeight)
+            const productList = Object.values(productDataMap).map(p => {
+                return {
+                    ...p,
+                    name: p.productName, // 為了讓 sortProducts 能運作
+                    sortWeight: allProductWeights[String(p.productId)]
+                };
+            });
+
+            // 使用與主表格相同的排序邏輯
+            const sortedProductList = sortProducts(productList, 'name');
+
+            // 4. 格式化為斜線分隔字串
+            const mergedRows = sortedProductList.map(p => ({
                 name: p.productName,
                 stock: 0, // 合併列印時不顯示庫存
                 originalStock: 0,
-                picked: p.picked.join(' / '),
-                original: p.original.join(' / '),
-                returns: p.returns.join(' / '),
-                sold: p.sold.join(' / '),
-                price: p.price.join(' / '),
+                picked: p.picked.filter(v => v !== 0 && v !== '0' && v !== '').join(' / '),
+                original: p.original.filter(v => v !== 0 && v !== '0' && v !== '').join(' / '),
+                returns: p.returns.filter(v => v !== 0 && v !== '0' && v !== '').join(' / '),
+                sold: p.sold.filter(v => v !== 0 && v !== '0' && v !== '').join(' / '),
+                price: p.price.length > 0 ? p.price[0] : '', // 只取第一筆有效單價
                 subtotal: '' // 合併時不計算小計
             }));
 

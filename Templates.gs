@@ -232,13 +232,7 @@ function generatePdfService(payload) {
              leftProducts = data.rows;
         }
 
-        // --- Auto-Balance Fallback ---
-        if (colLeftIndex !== -1 && colRightIndex !== -1 && rightProducts.length === 0 && leftProducts.length > 5) {
-            const total = leftProducts.length;
-            const mid = Math.ceil(total / 2);
-            const secondHalf = leftProducts.splice(mid); 
-            rightProducts = secondHalf;
-        }
+        // --- Auto-Balance Removed: Follow Template tags strictly ---
 
         // --- 直接填入,不做空間計算 ---
         const maxRows = Math.max(leftProducts.length, rightProducts.length);
