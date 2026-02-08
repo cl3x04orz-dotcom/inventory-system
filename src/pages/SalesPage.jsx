@@ -42,10 +42,19 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
     // [New] Input Mode State for exclusive highlighting
     const [inputMode, setInputMode] = useState('mouse'); // 'mouse' | 'keyboard'
+    const mousePos = React.useRef({ x: 0, y: 0 });
 
     useEffect(() => {
-        const handleMouseMove = () => {
-            if (inputMode !== 'mouse') setInputMode('mouse');
+        const handleMouseMove = (e) => {
+            // Calculate distance to filter out micro-movements or browser-synthesized events
+            const dx = Math.abs(e.clientX - mousePos.current.x);
+            const dy = Math.abs(e.clientY - mousePos.current.y);
+
+            // Only switch to mouse mode if moved significantly (> 5px)
+            if (dx > 5 || dy > 5) {
+                mousePos.current = { x: e.clientX, y: e.clientY };
+                if (inputMode !== 'mouse') setInputMode('mouse');
+            }
         };
         const handleKeyDown = () => {
             if (inputMode !== 'keyboard') setInputMode('keyboard');
