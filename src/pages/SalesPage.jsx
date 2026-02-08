@@ -38,7 +38,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [allAvailableProducts, setAllAvailableProducts] = useState([]); // All sorted products for merge print reference
 
 
-    const [allAvailableProducts, setAllAvailableProducts] = useState([]); // All sorted products for merge print reference
+
 
     // [New] Input Mode State for exclusive highlighting
     const [inputMode, setInputMode] = useState('mouse'); // 'mouse' | 'keyboard'
