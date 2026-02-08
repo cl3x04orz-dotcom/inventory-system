@@ -868,12 +868,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     setShowTodayRecords(!showTodayRecords);
                                     if (!showTodayRecords) loadTodayRecords();
                                 }}
-                                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-black rounded-lg border whitespace-nowrap transition-all duration-300 shadow-sm active:scale-95 ${showTodayRecords
-                                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-transparent shadow-blue-500/20 shadow-lg'
-                                    : 'bg-white text-gray-500 border-gray-200 hover:border-blue-400 hover:text-blue-600'
+                                className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${showTodayRecords
+                                    ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                    : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
                                     }`}
                             >
-                                <ListOrdered size={16} strokeWidth={2.5} />
+                                <Printer size={16} />
                                 合併列印
                             </button>
 
