@@ -38,6 +38,28 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [allAvailableProducts, setAllAvailableProducts] = useState([]); // All sorted products for merge print reference
 
 
+    const [allAvailableProducts, setAllAvailableProducts] = useState([]); // All sorted products for merge print reference
+
+    // [New] Input Mode State for exclusive highlighting
+    const [inputMode, setInputMode] = useState('mouse'); // 'mouse' | 'keyboard'
+
+    useEffect(() => {
+        const handleMouseMove = () => {
+            if (inputMode !== 'mouse') setInputMode('mouse');
+        };
+        const handleKeyDown = () => {
+            if (inputMode !== 'keyboard') setInputMode('keyboard');
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [inputMode]);
+
     // [Modified] Removed useEffect for paymentType to prevent overwriting cloned data. 
     // Logic moved to manual toggle handlers.
 
@@ -987,7 +1009,10 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                         <tr
                                                             ref={provided.innerRef}
                                                             {...provided.draggableProps}
-                                                            className={`hover:bg-[var(--bg-hover)] transition-colors ${snapshot.isDragging ? 'bg-[var(--bg-tertiary)] shadow-xl z-50' : ''}`}
+                                                            className={`transition-colors ${snapshot.isDragging ? 'bg-[var(--bg-tertiary)] shadow-xl z-50' : ''
+                                                                } ${inputMode === 'mouse' ? 'hover:bg-[var(--bg-hover)]' : ''
+                                                                } ${inputMode === 'keyboard' && activeInput?.rowId === row.id ? 'bg-[var(--bg-hover)]' : ''
+                                                                }`}
                                                         >
                                                             <td className="p-3">
                                                                 {isSorting && (
@@ -1010,6 +1035,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                     value={row.picked || ''}
                                                                     onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
                                                                     onBlur={(e) => handleBlur(row.id, 'picked', e.target.value)}
+                                                                    onFocus={() => setActiveInput({ id: `input-${idx}-picked`, type: 'row', rowId: row.id, field: 'picked' })}
                                                                     onKeyDown={(e) => handleKeyDown(e, idx, 'picked')}
                                                                     disabled={isSorting}
                                                                 />
@@ -1022,6 +1048,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                     value={row.original || ''}
                                                                     onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
                                                                     onBlur={(e) => handleBlur(row.id, 'original', e.target.value)}
+                                                                    onFocus={() => setActiveInput({ id: `input-${idx}-original`, type: 'row', rowId: row.id, field: 'original' })}
                                                                     onKeyDown={(e) => handleKeyDown(e, idx, 'original')}
                                                                     disabled={isSorting}
                                                                 />
@@ -1034,12 +1061,13 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                     value={row.returns || ''}
                                                                     onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
                                                                     onBlur={(e) => handleBlur(row.id, 'returns', e.target.value)}
+                                                                    onFocus={() => setActiveInput({ id: `input-${idx}-returns`, type: 'row', rowId: row.id, field: 'returns' })}
                                                                     onKeyDown={(e) => handleKeyDown(e, idx, 'returns')}
                                                                     disabled={isSorting}
                                                                 />
                                                             </td>
                                                             <td className="p-3 text-center font-bold text-blue-500">{row.sold}</td>
-                                                            <td className="p-3"><input id={`input-${idx}-price`} type="text" className="input-field text-center p-1 w-20" value={row.price} onChange={(e) => handleRowChange(row.id, 'price', e.target.value)} onBlur={(e) => handleBlur(row.id, 'price', e.target.value)} onKeyDown={(e) => handleKeyDown(e, idx, 'price')} disabled={isSorting} /></td>
+                                                            <td className="p-3"><input id={`input-${idx}-price`} type="text" className="input-field text-center p-1 w-20" value={row.price} onChange={(e) => handleRowChange(row.id, 'price', e.target.value)} onBlur={(e) => handleBlur(row.id, 'price', e.target.value)} onFocus={() => setActiveInput({ id: `input-${idx}-price`, type: 'row', rowId: row.id, field: 'price' })} onKeyDown={(e) => handleKeyDown(e, idx, 'price')} disabled={isSorting} /></td>
                                                             <td className="p-3 text-right font-mono text-rose-600">${row.subtotal?.toLocaleString()}</td>
                                                         </tr>
                                                     )}
