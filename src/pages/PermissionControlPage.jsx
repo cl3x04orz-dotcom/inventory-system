@@ -63,7 +63,8 @@ export default function PermissionControlPage({ user, apiUrl }) {
         {
             group: '系統管理',
             items: [
-                { key: 'system_config', label: '權限控管表' }
+                { key: 'system_config', label: '權限控管表' },
+                { key: 'system_activity_logs', label: '操作紀錄查詢' }
             ]
         }
     ];
