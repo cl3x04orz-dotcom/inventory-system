@@ -576,7 +576,8 @@ function getRecentSalesToday(payload) {
     
     // 業務員匹配（優先使用 REP2，fallback 到 REP1）
     let rowRep = salesRep2 || salesRep1;
-    if (rowRep.toLowerCase() !== currentUsername) continue;
+    // [Removed] 移除過濾，讓所有帳號都能進行合併列印操作
+    // if (rowRep.toLowerCase() !== currentUsername) continue;
     
     // 提取該筆銷售的明細
     const salesDetails = [];

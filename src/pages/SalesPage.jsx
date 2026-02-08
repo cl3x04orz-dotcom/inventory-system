@@ -641,7 +641,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             return;
         }
 
-        setIsMergePrinting(true);
+        setIsSubmitting(true);
         try {
             // 1. 提取選中的單據
             const selectedRecords = todayRecords.filter(r => selectedSaleIds.includes(r.saleId));
@@ -730,6 +730,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             console.error('合併列印失敗:', e);
             alert('合併列印失敗: ' + e.message);
         } finally {
+            setIsSubmitting(false);
             setIsMergePrinting(false);
         }
     };
@@ -741,7 +742,9 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 {isSubmitting && (
                     <div className="loading-overlay">
                         <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                        <p className="text-lg font-bold text-[var(--text-primary)]">資料存盤中，請稍後...</p>
+                        <p className="text-lg font-bold text-[var(--text-primary)]">
+                            {isMergePrinting ? "資料合併中，請稍後..." : "資料合併中，請稍後..."}
+                        </p>
                     </div>
                 )}
                 {/* Product Table */}

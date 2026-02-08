@@ -232,7 +232,13 @@ function generatePdfService(payload) {
              leftProducts = data.rows;
         }
 
-        // --- Auto-Balance Removed: Follow Template tags strictly ---
+        // --- Auto-Balance Fallback ---
+        if (colLeftIndex !== -1 && colRightIndex !== -1 && rightProducts.length === 0 && leftProducts.length > 5) {
+            const total = leftProducts.length;
+            const mid = Math.ceil(total / 2);
+            const secondHalf = leftProducts.splice(mid); 
+            rightProducts = secondHalf;
+        }
 
         // --- 直接填入,不做空間計算 ---
         const maxRows = Math.max(leftProducts.length, rightProducts.length);
@@ -291,7 +297,8 @@ function generatePdfService(payload) {
                      } else if (cellTemplate.includes('{{sold}}')) {
                          cellVal = activeItem.sold || '';
                      } else if (cellTemplate.includes('{{price}}')) {
-                         cellVal = activeItem.price || '';
+                         const p = parseFloat(activeItem.price);
+                         cellVal = isNaN(p) ? (activeItem.price || '') : String(p);
                      } else if (cellTemplate.includes('{{subtotal}}')) {
                          cellVal = typeof activeItem.subtotal === 'number' ? activeItem.subtotal.toLocaleString() : (activeItem.subtotal || '');
                      }
@@ -310,7 +317,13 @@ function generatePdfService(payload) {
                 
                 // 只寫入有值的欄位
                 if (cellVal !== null) {
-                    tempSheet.getRange(rowNum, c + 1).setValue(cellVal);
+                    const cell = tempSheet.getRange(rowNum, c + 1);
+                    cell.setValue(cellVal);
+                    // [Fix] 強制覆蓋單價欄位的數字格式，避免模板預設的 0.00
+                    // 設定為 0.## (最多兩位小數，整數不顯示小數點)
+                    if (cleanTemplate.includes('{{price}}')) {
+                        cell.setNumberFormat('0.##'); 
+                    }
                 }
             }
         }
