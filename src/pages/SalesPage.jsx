@@ -69,6 +69,17 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         };
     }, [inputMode]);
 
+    // [New] Auto-scroll to center when active input changes
+    useEffect(() => {
+        if (activeInput?.id) {
+            const el = document.getElementById(activeInput.id);
+            if (el) {
+                // Scroll to center with smooth behavior
+                el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
+        }
+    }, [activeInput]);
+
     // [Modified] Removed useEffect for paymentType to prevent overwriting cloned data. 
     // Logic moved to manual toggle handlers.
 
@@ -358,8 +369,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         if (el) {
             el.focus();
             el.select?.();
-            // Ensure the element is scrolled into view smoothly
-            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            // Scroll is handled by activeInput useEffect
         }
     };
 
