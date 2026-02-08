@@ -49,7 +49,7 @@ export default function LoginPage({ onLogin, apiUrl }) {
                                 required
                                 type="text"
                                 placeholder="使用者名稱"
-                                className="input-field pl-10 bg-slate-50 border-slate-200 focus:bg-white transition-all"
+                                className="input-field pl-10 bg-slate-50 border-slate-200 focus:bg-white transition-all text-slate-900 placeholder:text-slate-400"
                                 value={username}
                                 onChange={e => setUsername(e.target.value)}
                             />
@@ -62,7 +62,7 @@ export default function LoginPage({ onLogin, apiUrl }) {
                                 required
                                 type="password"
                                 placeholder="密碼"
-                                className="input-field pl-10 bg-slate-50 border-slate-200 focus:bg-white transition-all"
+                                className="input-field pl-10 bg-slate-50 border-slate-200 focus:bg-white transition-all text-slate-900 placeholder:text-slate-400"
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}
                             />
