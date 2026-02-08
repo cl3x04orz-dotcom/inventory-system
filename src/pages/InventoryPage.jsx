@@ -293,16 +293,20 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
                             <th className="p-4 w-1/4">產品名稱</th>
                             <th className="p-4 text-center w-24">數量</th>
                             <th className="p-4 w-32">效期</th>
-                            <th className="p-4 text-center w-24">每箱規格</th>
-                            <th className="p-4 text-center w-24">安全庫存</th>
-                            <th className="p-4 text-center w-20">操作</th>
+                            {user.role !== 'EMPLOYEE' && (
+                                <>
+                                    <th className="p-4 text-center w-24">每箱規格</th>
+                                    <th className="p-4 text-center w-24">安全庫存</th>
+                                    <th className="p-4 text-center w-20">操作</th>
+                                </>
+                            )}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border-primary)]">
                         {loading ? (
-                            <tr><td colSpan="6" className="p-6 text-center text-[var(--text-secondary)]">載入中...</td></tr>
+                            <tr><td colSpan={user.role === 'EMPLOYEE' ? "3" : "6"} className="p-6 text-center text-[var(--text-secondary)]">載入中...</td></tr>
                         ) : groupedItems.length === 0 ? (
-                            <tr><td colSpan="6" className="p-6 text-center text-[var(--text-secondary)]">無資料</td></tr>
+                            <tr><td colSpan={user.role === 'EMPLOYEE' ? "3" : "6"} className="p-6 text-center text-[var(--text-secondary)]">無資料</td></tr>
                         ) : (
                             groupedItems.map((group, groupIdx) => {
                                 const firstItem = group[0];
@@ -374,7 +378,7 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
                                                     </td>
 
                                                     {/* Case Size - Merged Cell */}
-                                                    {idx === 0 && (
+                                                    {user.role !== 'EMPLOYEE' && idx === 0 && (
                                                         <td className="p-4 text-center align-top pt-5 border-l border-[var(--border-primary)]/50" rowSpan={group.length}>
                                                             <input
                                                                 id={`case-input-${productName}`}
@@ -389,7 +393,7 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
                                                     )}
 
                                                     {/* Safety Stock - Merged Cell */}
-                                                    {idx === 0 && (
+                                                    {user.role !== 'EMPLOYEE' && idx === 0 && (
                                                         <td className="p-4 text-center align-top pt-5 border-l border-[var(--border-primary)]/50" rowSpan={group.length}>
                                                             <input
                                                                 id={`safety-input-${productName}`}
@@ -404,15 +408,17 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
                                                     )}
 
                                                     {/* Action */}
-                                                    <td className="p-4 text-center">
-                                                        <button
-                                                            onClick={() => handleAdjustment(item)}
-                                                            className="btn-secondary text-xs px-3 py-1 flex items-center gap-1 mx-auto"
-                                                            title="單批次異動"
-                                                        >
-                                                            <Trash2 size={14} /> 異動
-                                                        </button>
-                                                    </td>
+                                                    {user.role !== 'EMPLOYEE' && (
+                                                        <td className="p-4 text-center">
+                                                            <button
+                                                                onClick={() => handleAdjustment(item)}
+                                                                className="btn-secondary text-xs px-3 py-1 flex items-center gap-1 mx-auto"
+                                                                title="單批次異動"
+                                                            >
+                                                                <Trash2 size={14} /> 異動
+                                                            </button>
+                                                        </td>
+                                                    )}
                                                 </tr>
                                             );
                                         })}
@@ -484,9 +490,11 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
                                                     <span className={`font-mono font-bold ${Number(item.quantity) < 0 ? 'text-red-500' : 'text-emerald-700'}`}>
                                                         {item.quantity}
                                                     </span>
-                                                    <button onClick={() => handleAdjustment(item)} className="text-[var(--text-tertiary)] hover:text-red-500 p-1">
-                                                        <Trash2 size={14} />
-                                                    </button>
+                                                    {user.role !== 'EMPLOYEE' && (
+                                                        <button onClick={() => handleAdjustment(item)} className="text-[var(--text-tertiary)] hover:text-red-500 p-1">
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
@@ -494,27 +502,29 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
                                 </div>
 
                                 {/* Controls: Case Size & Low Stock */}
-                                <div className="grid grid-cols-2 gap-3 mt-3 border-t border-[var(--border-primary)] pt-3">
-                                    <div className="flex items-center justify-between gap-1">
-                                        <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-bold">箱規</span>
-                                        <input
-                                            type="number"
-                                            className="w-12 text-center text-xs p-0.5 rounded border border-[var(--border-primary)] bg-[var(--bg-primary)]"
-                                            value={customCaseSize !== undefined ? customCaseSize : (CASE_MAP[productName] || '')}
-                                            onChange={(e) => updateCustomCaseSize(productName, e.target.value)}
-                                        />
+                                {user.role !== 'EMPLOYEE' && (
+                                    <div className="grid grid-cols-2 gap-3 mt-3 border-t border-[var(--border-primary)] pt-3">
+                                        <div className="flex items-center justify-between gap-1">
+                                            <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-bold">箱規</span>
+                                            <input
+                                                type="number"
+                                                className="w-12 text-center text-xs p-0.5 rounded border border-[var(--border-primary)] bg-[var(--bg-primary)]"
+                                                value={customCaseSize !== undefined ? customCaseSize : (CASE_MAP[productName] || '')}
+                                                onChange={(e) => updateCustomCaseSize(productName, e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="flex items-center justify-between gap-1">
+                                            <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-bold">低標</span>
+                                            <input
+                                                type="number"
+                                                className="w-12 text-center text-xs p-0.5 rounded border border-[var(--border-primary)] bg-[var(--bg-primary)]"
+                                                value={tempSafetyInput[productName] !== undefined ? tempSafetyInput[productName] : (safetyStocks[productName] || '')}
+                                                onChange={(e) => handleSafetyInputChange(productName, e.target.value)}
+                                                onBlur={() => handleSafetyInputBlur(productName)}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="flex items-center justify-between gap-1">
-                                        <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-bold">低標</span>
-                                        <input
-                                            type="number"
-                                            className="w-12 text-center text-xs p-0.5 rounded border border-[var(--border-primary)] bg-[var(--bg-primary)]"
-                                            value={tempSafetyInput[productName] !== undefined ? tempSafetyInput[productName] : (safetyStocks[productName] || '')}
-                                            onChange={(e) => handleSafetyInputChange(productName, e.target.value)}
-                                            onBlur={() => handleSafetyInputBlur(productName)}
-                                        />
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         );
                     })
