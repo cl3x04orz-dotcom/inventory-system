@@ -34,7 +34,7 @@ export default function LoginPage({ onLogin, apiUrl }) {
             <div className="bg-white border border-slate-200 p-8 w-full max-w-md rounded-2xl shadow-2xl">
                 <div className="text-center mb-8">
                     <div className="flex justify-center mb-6">
-                        <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-20 w-auto object-contain dark:invert" />
+                        <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-20 w-auto object-contain brightness-0 dark:invert" />
                     </div>
                     <p className="text-slate-500">
                         {isRegister ? '建立您的帳戶' : '請登入系統以開始使用'}

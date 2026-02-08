@@ -329,7 +329,7 @@ function AppContent() {
             <header className="h-16 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)] backdrop-blur-md flex justify-between items-center px-6 sticky top-0 z-[60]">
                 {/* ... Navbar content ... */}
                 <div className="flex items-center gap-2">
-                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-10 w-auto object-contain dark:invert" />
+                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-10 w-auto object-contain brightness-0 dark:invert" />
                 </div>
 
                 {/* Mobile Menu Trigger & Dropdown */}
