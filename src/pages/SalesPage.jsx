@@ -25,6 +25,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [location, setLocation] = useState(''); // This will be used as "Sales Target"
     const [paymentType, setPaymentType] = useState('CASH');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    // [New] 防止重複提交的 ID
+    const [submissionId, setSubmissionId] = useState(() => `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
 
     const [isPrinting, setIsPrinting] = useState(false);
     const [isSorting, setIsSorting] = useState(false);
@@ -569,7 +571,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 })),
                 cashData: { totalCash: paymentType === 'CREDIT' ? 0 : totalCashNet, reserve },
                 expenseData: { ...expenses, finalTotal },
-                cashCounts: cashCounts // [New] Pass detailed cash counts
+                cashCounts: cashCounts, // [New] Pass detailed cash counts
+                submissionId: submissionId // [New] 防止重複存檔的唯一辨識碼
             };
 
             setIsSubmitting(true);
@@ -683,6 +686,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         }
 
         setIsSubmitting(true);
+        setIsMergePrinting(true);
         try {
             // 1. 提取選中的單據
             const selectedRecords = todayRecords.filter(r => selectedSaleIds.includes(r.saleId));
@@ -784,7 +788,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     <div className="loading-overlay">
                         <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                         <p className="text-lg font-bold text-[var(--text-primary)]">
-                            {isMergePrinting ? "資料合併中，請稍後..." : "資料合併中，請稍後..."}
+                            {isMergePrinting ? "資料合併中，請稍後..." : "資料存檔中，請稍後..."}
                         </p>
                     </div>
                 )}
@@ -1276,7 +1280,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             ${(isCredit ? totalSalesAmount : finalTotal).toLocaleString()}
                         </div>
                         <button id="btn-save-data" onClick={handleSubmit} className="btn-primary w-full mt-6 flex justify-center items-center gap-2 py-4 text-lg">
-                            <Save size={20} /> 保存今日資料
+                            <Save size={20} /> 儲存資料
                         </button>
                     </div>
                 </div>

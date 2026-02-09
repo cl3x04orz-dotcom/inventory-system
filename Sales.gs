@@ -8,7 +8,19 @@
 // 1. 銷售存檔 (Save Sales)
 // ===========================================
 function saveSalesService(data, user) {
-  const { salesData, cashData, expenseData, customer, paymentMethod, salesRep, operator } = data; 
+  const { salesData, cashData, expenseData, customer, paymentMethod, salesRep, operator, submissionId } = data; 
+  
+  // [防重複存檔] 檢查 submissionId
+  if (submissionId) {
+    const cache = CacheService.getScriptCache();
+    const cached = cache.get(submissionId);
+    if (cached) {
+      console.warn("重複的提交請求，跳過處理: " + submissionId);
+      return { success: true, duplicate: true, message: "已偵測到重複請求，系統已自動跳過。" };
+    }
+    // 鎖定 ID 10 分鐘 (600秒)
+    cache.put(submissionId, "PROCESSED", 600);
+  }
   
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const salesSheet = ss.getSheetByName('Sales');
