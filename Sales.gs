@@ -71,7 +71,8 @@ function saveSalesService(data, user) {
     customer || '',    
     finalSalesRep,
     today,
-    finalOperator  // Col 15 (P 欄): 實際操作者
+    "", "", "", "", "", // 空出 Q, R, S, T 欄位
+    finalOperator       // Col 21 (U 欄): 實際操作者
   ]);
   
   // 處理庫存扣除
