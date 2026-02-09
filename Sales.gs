@@ -75,13 +75,17 @@ function saveSalesService(data, user) {
     finalOperator       // Col 21 (U 欄): 實際操作者
   ]);
   
-  // 處理庫存扣除
+  // 處理庫存扣除與明細收集
   const invData = invSheet.getDataRange().getValues();
+  const allDetailRows = [];
+  const allInvLogRows = [];
+
   salesData.forEach(item => {
     const hasActivity = (Number(item.sold) > 0) || (Number(item.picked) > 0) || (Number(item.original) > 0) || (Number(item.returns) > 0);
     if (!hasActivity) return; 
 
-    detailsSheet.appendRow([
+    // 收集明細
+    allDetailRows.push([
       saleId, item.productId, item.picked, item.original, item.returns, item.sold, item.unitPrice, (item.sold * item.unitPrice)
     ]);
     
@@ -94,9 +98,19 @@ function saveSalesService(data, user) {
       deductInventory_(invSheet, invData, item.productId, item.original, 'ORIGINAL');
     }
     if (item.returns > 0) {
-      handleReturns_(invSheet, invData, item, consumedBatches, today);
+      const returnRows = getReturnRows_(invData, item, consumedBatches, today);
+      allInvLogRows.push(...returnRows);
     }
   });
+
+  // 4. 執行批次寫入 (提升效能)
+  if (allDetailRows.length > 0) {
+    batchAppend_(detailsSheet, allDetailRows);
+  }
+  if (allInvLogRows.length > 0) {
+    batchAppend_(invSheet, allInvLogRows);
+  }
+
   return { success: true };
 }
 
@@ -368,27 +382,34 @@ function deductInventory_(sheet, sheetData, productId, qtyToDeduct, targetType) 
   return { consumed: consumedStats };
 }
 
-function handleReturns_(sheet, sheetData, item, consumedBatches, today) {
+/**
+ * 計算退貨紀錄 (回傳待寫入的二維陣列)
+ */
+function getReturnRows_(sheetData, item, consumedBatches, today) {
+  let rows = [];
   let remainingReturn = item.returns;
+  
   for (let batch of consumedBatches) {
     if (remainingReturn <= 0) break;
     const returnQty = Math.min(remainingReturn, batch.deductedQty);
-    sheet.appendRow([
-      Utilities.getUuid(), item.productId, returnQty, batch.expiry, today, 'ORIGINAL'
+    rows.push([
+      Utilities.getUuid(), item.productId, returnQty, batch.expiry, today, 'ORIGINAL', ''
     ]);
     remainingReturn -= returnQty;
   }
+  
   if (remainingReturn > 0) {
-      let fallbackExpiry = new Date('2099-12-31');
-      const stockBatches = sheetData.slice(1).filter(r => r[1] === item.productId && r[5] === 'STOCK');
-      if (stockBatches.length > 0) {
-         stockBatches.sort((a, b) => new Date(a[3]) - new Date(b[3]));
-         fallbackExpiry = stockBatches[0][3]; 
-      }
-      sheet.appendRow([
-        Utilities.getUuid(), item.productId, remainingReturn, fallbackExpiry, today, 'ORIGINAL'
-      ]);
+    let fallbackExpiry = new Date('2099-12-31');
+    const stockBatches = sheetData.slice(1).filter(r => r[1] === item.productId && r[5] === 'STOCK');
+    if (stockBatches.length > 0) {
+      stockBatches.sort((a, b) => new Date(a[3]) - new Date(b[3]));
+      fallbackExpiry = stockBatches[0][3]; 
+    }
+    rows.push([
+      Utilities.getUuid(), item.productId, remainingReturn, fallbackExpiry, today, 'ORIGINAL', ''
+    ]);
   }
+  return rows;
 }
 /**
  * 獲取銷售資料用於「複製/修正」(單純讀取，速度快)
@@ -511,10 +532,6 @@ function voidAndFetchSaleService(payload) {
 
       const oldNote = String(expData[i][18] || "");
       expSheet.getRange(expRow, 19).setValue("[VOID] " + (oldNote || "")); 
-      expSheet.getRange(expRow, 20).setValue(0);
-      for (let col = 2; col <= 11; col++) {
-        expSheet.getRange(expRow, col).setValue(0);
-      }
       break;
     }
   }
@@ -524,6 +541,7 @@ function voidAndFetchSaleService(payload) {
   const invValues = invSheet.getDataRange().getValues(); // 移出迴圈，減少讀取
   const fetchedDetails = [];
   const today = new Date();
+  const voidRefundInvRows = [];
 
   for (let i = 1; i < detailsData.length; i++) {
     if (String(detailsData[i][0]) === saleId) {
@@ -546,20 +564,25 @@ function voidAndFetchSaleService(payload) {
             break;
           }
         }
-        invSheet.appendRow([Utilities.getUuid(), productId, picked, expiry, today, 'STOCK', 'VOID_REFUND: ' + saleId]);
+        voidRefundInvRows.push([Utilities.getUuid(), productId, picked, expiry, today, 'STOCK', 'VOID_REFUND: ' + saleId]);
       }
       if (original > 0) {
-        invSheet.appendRow([Utilities.getUuid(), productId, original, today, today, 'ORIGINAL', 'VOID_REFUND: ' + saleId]);
+        voidRefundInvRows.push([Utilities.getUuid(), productId, original, today, today, 'ORIGINAL', 'VOID_REFUND: ' + saleId]);
       }
       if (returns > 0) {
         const deductResult = deductInventory_(invSheet, invValues, productId, returns, 'ORIGINAL');
         const totalDeducted = deductResult.consumed.reduce((sum, item) => sum + item.deductedQty, 0);
         const remainingToDeduct = returns - totalDeducted;
         if (remainingToDeduct > 0) {
-           invSheet.appendRow([Utilities.getUuid(), productId, -remainingToDeduct, today, today, 'ORIGINAL', 'VOID_CANCEL_RETURN: ' + saleId]);
+           voidRefundInvRows.push([Utilities.getUuid(), productId, -remainingToDeduct, today, today, 'ORIGINAL', 'VOID_CANCEL_RETURN: ' + saleId]);
         }
       }
     }
+  }
+
+  // 批次寫入庫存日誌
+  if (voidRefundInvRows.length > 0) {
+    batchAppend_(invSheet, voidRefundInvRows);
   }
 
   return {

@@ -545,8 +545,30 @@ function saveExpenditureService(payload) {
     } catch (error) {
         throw new Error('保存支出資料失敗: ' + error.message);
     }
+}/**
+ * 通用批次寫入工具 (Batch Append with Lock)
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet 目標分頁
+ * @param {Array<Array>} rowsData 二維陣列資料
+ */
+function batchAppend_(sheet, rowsData) {
+  if (!rowsData || rowsData.length === 0) return;
+  
+  // 1. 領取號碼牌 (Lock) - 最多等待 30 秒
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+    
+    // 2. 找到最後一行並寫入
+    const lastRow = sheet.getLastRow();
+    const range = sheet.getRange(lastRow + 1, 1, rowsData.length, rowsData[0].length);
+    range.setValues(rowsData);
+    
+    // 3. 強制同步 (確保資料寫入伺服器後才解鎖)
+    SpreadsheetApp.flush();
+  } catch (e) {
+    throw new Error('伺服器忙碌中 (Lock Timeout)，請稍後再試：' + e.message);
+  } finally {
+    // 4. 解鎖
+    lock.releaseLock();
+  }
 }
-
-
-
-
