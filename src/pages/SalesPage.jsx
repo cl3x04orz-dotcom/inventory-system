@@ -23,6 +23,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         goods: 0, bags: 0, others: 0, linePay: 0, serviceFee: 0
     });
     const [location, setLocation] = useState(''); // This will be used as "Sales Target"
+    const [targetSalesRep, setTargetSalesRep] = useState(''); // [New] 業績歸屬業務員 (修正時保留原始人名)
     const [paymentType, setPaymentType] = useState('CASH');
     const [isSubmitting, setIsSubmitting] = useState(false);
     // [New] 防止重複提交的 ID
@@ -168,6 +169,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                         // Set Form State
                         if (cloned.customer) setLocation(cloned.customer);
+                        if (cloned.salesRep) setTargetSalesRep(cloned.salesRep); // [New] 載入原始業務
                         if (cloned.paymentMethod) setPaymentType(cloned.paymentMethod);
                         if (cloned.reserve !== undefined) setReserve(Number(cloned.reserve));
                         // Restoring Cash Counts
@@ -225,6 +227,13 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         };
         init();
     }, [user.token, load]);
+
+    // [New] Ensure targetSalesRep is initialized to the current user
+    useEffect(() => {
+        if (!targetSalesRep && user?.username) {
+            setTargetSalesRep(user.username);
+        }
+    }, [user, targetSalesRep]);
 
     // Recalculate row
     const handleRowChange = (id, field, value) => {
@@ -558,7 +567,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             }
 
             const payload = {
-                salesRep: user.username,
+                salesRep: targetSalesRep || user.username, // 業績歸屬人 (優先使用載入的業務)
+                operator: user.username,                   // 實際操作人 (當前登入者)
                 customer: location,
                 paymentMethod: paymentType,
                 salesData: rows.map(r => ({

@@ -485,6 +485,7 @@ function getExpendituresService(payload) {
         if (row.length > 11) obj['finalTotal'] = row[11];
         if (row.length > 12) obj['customer'] = row[12];
         if (row.length > 13) obj['salesRep'] = row[13];
+        if (row.length > 15) obj['operator'] = row[15];
         if (row.length > 18) obj['note'] = row[18];
         
         return obj;

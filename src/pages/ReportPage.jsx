@@ -470,6 +470,9 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                         </div>
                                                         <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-md">
                                                             <User size={12} /> <span>{item.salesRep}</span>
+                                                            {item.operator && item.operator !== item.salesRep && (
+                                                                <span className="text-[10px] text-amber-600 ml-1">(修: {item.operator})</span>
+                                                            )}
                                                         </div>
                                                     </div>
                                                     <div className="flex justify-between items-center pt-1 border-t border-[var(--border-primary)]">
@@ -503,7 +506,12 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                             })}
                                                         </td>
                                                         <td className="p-3">{item.location}</td>
-                                                        <td className="p-3">{item.salesRep}</td>
+                                                        <td className="p-3 text-[var(--text-secondary)] font-bold">
+                                                            {item.salesRep}
+                                                            {item.operator && item.operator !== item.salesRep && (
+                                                                <div className="text-[10px] text-amber-600 font-normal">修: {item.operator}</div>
+                                                            )}
+                                                        </td>
                                                         <td className="p-3 text-[var(--text-primary)]">{item.productName}</td>
                                                         <td className="p-3 text-right">{item.soldQty}</td>
                                                         <td className="p-3 text-right">${item.totalAmount}</td>
@@ -565,6 +573,9 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                             </div>
                                                             <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-md border border-[var(--border-primary)]">
                                                                 <User size={10} /> <span className="text-xs font-bold">{item.normSalesRep}</span>
+                                                                {item.operator && item.operator !== item.normSalesRep && (
+                                                                    <span className="text-[10px] text-amber-600 ml-1">(修: {item.operator})</span>
+                                                                )}
                                                             </div>
                                                         </div>
                                                         <div className="pt-2 border-t border-[var(--border-primary)]">
@@ -621,7 +632,12 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                                 <div className="font-bold text-[var(--text-primary)]">{item.normCustomer || '-'}</div>
                                                                 {item.normNote && <div className="text-[10px] text-[var(--text-tertiary)] italic">{item.normNote}</div>}
                                                             </td>
-                                                            <td className="p-3 text-[var(--text-secondary)] font-bold">{item.normSalesRep}</td>
+                                                            <td className="p-3 text-[var(--text-secondary)] font-bold">
+                                                                {item.normSalesRep}
+                                                                {item.operator && item.operator !== item.normSalesRep && (
+                                                                    <div className="text-[10px] text-amber-600 font-normal">修: {item.operator}</div>
+                                                                )}
+                                                            </td>
                                                             <td className="p-3 text-xs text-[var(--text-tertiary)]">{cats.join(', ')}</td>
                                                             <td className="p-3 text-right font-mono text-rose-600">
                                                                 ${(item.rowTotal || 0).toLocaleString()}

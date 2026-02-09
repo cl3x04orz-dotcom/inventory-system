@@ -38,15 +38,11 @@ function saveSalesService(data, user) {
   const status = (paymentMethod === 'CREDIT') ? 'UNPAID' : 'PAID';
   const method = paymentMethod || 'CASH';
 
-  // 【名稱修正】：確保抓到 User 名稱
-  let finalSalesRep = operator;
-  if (!finalSalesRep || finalSalesRep === '???') finalSalesRep = salesRep;
-  if (user) {
-    if (!finalSalesRep || finalSalesRep === '???') finalSalesRep = user.displayName;
-    if (!finalSalesRep || finalSalesRep === '???') finalSalesRep = user.name;
-    if (!finalSalesRep || finalSalesRep === '???') finalSalesRep = user.username;
-  }
-  if (!finalSalesRep) finalSalesRep = 'Unknown';
+  // 【名稱邏輯】：
+  // salesRep 是由前端傳入的「業績歸屬人」(修正時會帶入舊單業務)
+  // operator 是「實際操作者」(當前登入者)
+  const finalSalesRep = salesRep || (user ? (user.displayName || user.name || user.username) : 'Unknown');
+  const finalOperator = operator || (user ? (user.displayName || user.name || user.username) : 'Unknown');
   
   // 寫入 Sales 表 (維持固定順序，確保與讀取一致)
   // Col 0: ID, 1: Date, 2: SalesRep (Main), 3: Cash, 4: Reserve, 5: Total, 6: Customer, 7: SalesRep (Backup), 8: Method, 9: Status
@@ -61,7 +57,8 @@ function saveSalesService(data, user) {
     finalSalesRep,
     method,            
     status,
-    JSON.stringify(data.cashCounts || {}) // [New] Col 10: Cash Breakdown Details
+    JSON.stringify(data.cashCounts || {}), // Col 10: Cash Breakdown Details
+    finalOperator                          // Col 11 (L 欄): 實際操作者
   ]);
   
   // 寫入 Expenditures 表
@@ -73,7 +70,8 @@ function saveSalesService(data, user) {
     expenseData.serviceFee, expenseData.finalTotal,
     customer || '',    
     finalSalesRep,
-    today             
+    today,
+    finalOperator  // Col 15 (P 欄): 實際操作者
   ]);
   
   // 處理庫存扣除
@@ -189,7 +187,8 @@ function getSalesHistory(payload) {
       customer: rowCust,
       salesRep: rowRep,
       paymentMethod: String(row[IDX_METHOD] || "CASH"),
-      status: String(row[9] || "").toUpperCase()
+      status: String(row[9] || "").toUpperCase(),
+      operator: String(row[11] || "") // Col 11 (L 欄): 實際操作者
     };
   }
 
@@ -224,7 +223,8 @@ function getSalesHistory(payload) {
         soldQty: soldQty,
         totalAmount: Number(row[D_IDX_AMT] || 0),
         paymentMethod: info.paymentMethod,
-        saleId: dSaleId
+        saleId: dSaleId,
+        operator: info.operator // 新增回傳操作者
       });
     }
   }
@@ -452,6 +452,7 @@ function getSaleToCloneService(payload) {
     success: true,
     cloneData: {
       customer: originalSaleData[6],
+      salesRep: originalSaleData[2], // 新增：保留原始業務員
       paymentMethod: originalSaleData[8],
       salesData: fetchedDetails,
       reserve: Number(originalSaleData[4] || 0),
