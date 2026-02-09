@@ -377,6 +377,78 @@ function handleReturns_(sheet, sheetData, item, consumedBatches, today) {
       ]);
   }
 }
+/**
+ * 獲取銷售資料用於「複製/修正」(單純讀取，速度快)
+ */
+function getSaleToCloneService(payload) {
+  const { saleId } = payload;
+  if (!saleId) throw new Error("缺少銷售編號");
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const salesSheet = ss.getSheetByName('Sales');
+  const detailsSheet = ss.getSheetByName('SalesDetails');
+  const expSheet = ss.getSheetByName('Expenditures');
+
+  const salesData = salesSheet.getDataRange().getValues();
+  let originalSaleData = null;
+  for (let i = 1; i < salesData.length; i++) {
+    if (String(salesData[i][0]) === saleId) {
+      originalSaleData = salesData[i];
+      break;
+    }
+  }
+  if (!originalSaleData) throw new Error("找不到銷售紀錄");
+
+  const detailsData = detailsSheet.getDataRange().getValues();
+  const fetchedDetails = [];
+  const productMap = getProductMap_();
+  for (let i = 1; i < detailsData.length; i++) {
+    if (String(detailsData[i][0]) === saleId) {
+      fetchedDetails.push({
+        productId: String(detailsData[i][1]),
+        productName: productMap[String(detailsData[i][1])] || String(detailsData[i][1]),
+        picked: Number(detailsData[i][2] || 0),
+        original: Number(detailsData[i][3] || 0),
+        returns: Number(detailsData[i][4] || 0),
+        sold: Number(detailsData[i][5] || 0),
+        unitPrice: Number(detailsData[i][6] || 0)
+      });
+    }
+  }
+
+  let fetchedExpenses = null;
+  const expData = expSheet.getDataRange().getValues();
+  for (let i = 1; i < expData.length; i++) {
+    if (String(expData[i][0]) === saleId) {
+      fetchedExpenses = {
+        stall: Number(expData[i][1] || 0),
+        cleaning: Number(expData[i][2] || 0),
+        electricity: Number(expData[i][3] || 0),
+        gas: Number(expData[i][4] || 0),
+        parking: Number(expData[i][5] || 0),
+        goods: Number(expData[i][6] || 0),
+        bags: Number(expData[i][7] || 0),
+        others: Number(expData[i][8] || 0),
+        linePay: Number(expData[i][9] || 0),
+        serviceFee: Number(expData[i][10] || 0)
+      };
+      break;
+    }
+  }
+
+  return {
+    success: true,
+    cloneData: {
+      customer: originalSaleData[6],
+      paymentMethod: originalSaleData[8],
+      salesData: fetchedDetails,
+      reserve: Number(originalSaleData[4] || 0),
+      expenses: fetchedExpenses,
+      cashCounts: (originalSaleData[10] && String(originalSaleData[10]).startsWith('{')) ? JSON.parse(originalSaleData[10]) : {}
+    }
+  };
+}
+
 // ===========================================
 // 5. 銷售作廢與修正 (Void & Fetch for Correction)
 // ===========================================
@@ -410,8 +482,6 @@ function voidAndFetchSaleService(payload) {
   for (let i = 1; i < expData.length; i++) {
     if (String(expData[i][0]) === saleId) {
       const expRow = i + 1;
-      
-      // 讀取原始支出資料
       fetchedExpenses = {
           stall: Number(expData[i][1] || 0),
           cleaning: Number(expData[i][2] || 0),
@@ -437,6 +507,7 @@ function voidAndFetchSaleService(payload) {
 
   // 3. 處理銷售明細與庫存回補
   const detailsData = detailsSheet.getDataRange().getValues();
+  const invValues = invSheet.getDataRange().getValues(); // 移出迴圈，減少讀取
   const fetchedDetails = [];
   const today = new Date();
 
@@ -455,10 +526,9 @@ function voidAndFetchSaleService(payload) {
       if (picked > 0) {
         let expiry = new Date();
         expiry.setDate(expiry.getDate() + 30);
-        const invRows = invSheet.getDataRange().getValues();
-        for (let j = invRows.length - 1; j >= 1; j--) {
-          if (invRows[j][1] === productId && invRows[j][5] === 'STOCK') {
-            expiry = invRows[j][3];
+        for (let j = invValues.length - 1; j >= 1; j--) {
+          if (invValues[j][1] === productId && invValues[j][5] === 'STOCK') {
+            expiry = invValues[j][3];
             break;
           }
         }
@@ -468,29 +538,22 @@ function voidAndFetchSaleService(payload) {
         invSheet.appendRow([Utilities.getUuid(), productId, original, today, today, 'ORIGINAL', 'VOID_REFUND: ' + saleId]);
       }
       if (returns > 0) {
-        // [Fix] Try to deduct from existing ORIGINAL rows first to avoid negative row fragmentation
-        const invValues = invSheet.getDataRange().getValues(); // Refresh data
         const deductResult = deductInventory_(invSheet, invValues, productId, returns, 'ORIGINAL');
         const totalDeducted = deductResult.consumed.reduce((sum, item) => sum + item.deductedQty, 0);
-        
         const remainingToDeduct = returns - totalDeducted;
-        
         if (remainingToDeduct > 0) {
-           // Only append negative row if we couldn't find enough positive rows to deduct
            invSheet.appendRow([Utilities.getUuid(), productId, -remainingToDeduct, today, today, 'ORIGINAL', 'VOID_CANCEL_RETURN: ' + saleId]);
         }
       }
     }
   }
 
-  // 4. 重整回傳資料
   return {
     success: true,
     cloneData: {
       customer: originalSaleData[6],
       paymentMethod: originalSaleData[8],
       salesData: fetchedDetails,
-      reserve: Number(originalSaleData[4] || 0),
       reserve: Number(originalSaleData[4] || 0),
       expenses: fetchedExpenses,
       cashCounts: (originalSaleData[10] && String(originalSaleData[10]).startsWith('{')) ? JSON.parse(originalSaleData[10]) : {}

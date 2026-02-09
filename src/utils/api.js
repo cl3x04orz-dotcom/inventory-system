@@ -4,7 +4,7 @@
 export const callGAS = async (apiUrl, action, payload, token = null) => {
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
 
         const response = await fetch(apiUrl, {
             method: 'POST',

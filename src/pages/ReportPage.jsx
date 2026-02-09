@@ -136,21 +136,38 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     const handleCorrection = async (saleId) => {
         if (!window.confirm('確定要「作廢並修正」此筆紀錄嗎？\n系統將會：\n1. 作廢舊單並回補庫存\n2. 自動跳轉到錄入頁面填入舊資料\n3. 讓您修改後重新存檔')) return;
 
-        setIsVoiding(true); // Start frosted overlay
+        setIsVoiding(true);
         try {
-            const res = await callGAS(apiUrl, 'voidAndFetchSale', { saleId }, user.token);
-            if (res.success && res.cloneData) {
-                // 暫存資料到 sessionStorage
-                sessionStorage.setItem('clonedSale', JSON.stringify(res.cloneData));
-                // alert('舊單已作廢，正在導向錄入頁面...'); // [Modified] Removed alert for smoother transition
-                setPage('sales'); // 跳轉到銷售錄入頁
+            // [優化] 第一步：先抓取資料（純讀取，極快），即便後續作廢超時，資料也已經在快取裡了
+            const fetchRes = await callGAS(apiUrl, 'getSaleToClone', { saleId }, user.token);
+            if (fetchRes.success && fetchRes.cloneData) {
+                sessionStorage.setItem('clonedSale', JSON.stringify(fetchRes.cloneData));
             } else {
-                throw new Error(res.error || '未知錯誤');
+                throw new Error(fetchRes.error || '無法獲取原始資料');
+            }
+
+            // 第二步：執行作廢（涉及多表寫入，較慢）
+            try {
+                const voidRes = await callGAS(apiUrl, 'voidAndFetchSale', { saleId }, user.token);
+                if (voidRes.success) {
+                    setPage('sales'); // 成功跳轉
+                } else {
+                    throw new Error(voidRes.error || '作廢失敗');
+                }
+            } catch (voidError) {
+                // 如果是超時，但我們已經拿到 cloneData 了，依然可以讓使用者去修正
+                if (voidError.message.includes('超時')) {
+                    console.warn('作廢操作超時，但資料已快取，嘗試繼續導向...');
+                    alert('系統回應較慢，但舊單已進入作廢流程中。正在為您開啟修正頁面...');
+                    setPage('sales');
+                } else {
+                    throw voidError;
+                }
             }
         } catch (error) {
             console.error(error);
             alert('修正功能執行失敗: ' + error.message);
-            setIsVoiding(false); // Only stop loading on error (success will redirect)
+            setIsVoiding(false);
         }
     };
 

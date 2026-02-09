@@ -157,6 +157,7 @@ function apiHandler(request) {
             case 'saveSales': return typeof saveSalesService !== 'undefined' ? saveSalesService(payload, user) : {error: 'Service missing'}; 
             case 'getSalesHistory': return typeof getSalesHistory !== 'undefined' ? getSalesHistory(payload) : {error: 'Service missing'}; 
             case 'getRecentSalesToday': return typeof getRecentSalesToday !== 'undefined' ? getRecentSalesToday(payload) : {error: 'Service missing'};
+            case 'getSaleToClone': return typeof getSaleToCloneService !== 'undefined' ? getSaleToCloneService(payload) : {error: 'Service missing'};
             case 'voidAndFetchSale': return typeof voidAndFetchSaleService !== 'undefined' ? voidAndFetchSaleService(payload) : {error: 'Service missing'};
             case 'getTemplatesList': return typeof getTemplatesListService !== 'undefined' ? getTemplatesListService() : {error: 'Service missing'};
             case 'generatePdf': return typeof generatePdfService !== 'undefined' ? generatePdfService(payload) : {error: 'Service missing'}; 
