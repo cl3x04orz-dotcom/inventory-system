@@ -98,6 +98,9 @@ function saveSalesService(data, user) {
     if (item.original > 0) {
       deductInventory_(invSheet, invData, item.productId, item.original, 'ORIGINAL');
     }
+    if (item.returns > 0) {
+      const returnRows = getReturnRows_(invData, item, consumedBatches, today);
+      allInvLogRows.push(...returnRows);
     }
   });
 
@@ -581,6 +584,9 @@ function getSaleToCloneService(payload) {
            voidRefundInvRows.push([Utilities.getUuid(), productId, -remainingToDeduct, today, today, 'ORIGINAL', 'VOID_CANCEL_RETURN: ' + saleId]);
         }
       }
+    }
+  }
+
   // 批次寫入庫存日誌
   if (voidRefundInvRows.length > 0) {
     batchAppendNoLock_(invSheet, voidRefundInvRows);
