@@ -545,30 +545,29 @@ function saveExpenditureService(payload) {
     } catch (error) {
         throw new Error('保存支出資料失敗: ' + error.message);
     }
-}/**
- * 通用批次寫入工具 (Batch Append with Lock)
- * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet 目標分頁
- * @param {Array<Array>} rowsData 二維陣列資料
+/**
+ * 通用批次寫入工具 (含鎖定，對外使用)
  */
 function batchAppend_(sheet, rowsData) {
   if (!rowsData || rowsData.length === 0) return;
-  
-  // 1. 領取號碼牌 (Lock) - 最多等待 30 秒
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(30000);
-    
-    // 2. 找到最後一行並寫入
-    const lastRow = sheet.getLastRow();
-    const range = sheet.getRange(lastRow + 1, 1, rowsData.length, rowsData[0].length);
-    range.setValues(rowsData);
-    
-    // 3. 強制同步 (確保資料寫入伺服器後才解鎖)
+    batchAppendNoLock_(sheet, rowsData);
     SpreadsheetApp.flush();
   } catch (e) {
-    throw new Error('伺服器忙碌中 (Lock Timeout)，請稍後再試：' + e.message);
+    throw new Error('伺服器忙碌中 (Lock)，請稍後再試：' + e.message);
   } finally {
-    // 4. 解鎖
     lock.releaseLock();
   }
+}
+
+/**
+ * 內部批次寫入 (不單獨領鎖，適用於已有全局鎖的場景)
+ */
+function batchAppendNoLock_(sheet, rowsData) {
+  if (!rowsData || rowsData.length === 0) return;
+  const lastRow = sheet.getLastRow();
+  const range = sheet.getRange(lastRow + 1, 1, rowsData.length, rowsData[0].length);
+  range.setValues(rowsData);
 }

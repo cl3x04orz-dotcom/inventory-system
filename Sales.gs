@@ -14,19 +14,20 @@ function saveSalesService(data, user) {
   if (submissionId) {
     const cache = CacheService.getScriptCache();
     const cached = cache.get(submissionId);
-    if (cached) {
-      console.warn("重複的提交請求，跳過處理: " + submissionId);
-      return { success: true, duplicate: true, message: "已偵測到重複請求，系統已自動跳過。" };
-    }
-    // 鎖定 ID 10 分鐘 (600秒)
+    if (cached) return { success: true, duplicate: true, message: "已偵測到重複請求" };
     cache.put(submissionId, "PROCESSED", 600);
   }
-  
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const salesSheet = ss.getSheetByName('Sales');
-  const detailsSheet = ss.getSheetByName('SalesDetails');
-  const expSheet = ss.getSheetByName('Expenditures');
-  const invSheet = ss.getSheetByName('Inventory');
+
+  // 1. 全局鎖定 (從這裡開始領號碼牌，確保計算期間沒人插隊)
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000); // 等待最多 30 秒
+    
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const salesSheet = ss.getSheetByName('Sales');
+    const detailsSheet = ss.getSheetByName('SalesDetails');
+    const expSheet = ss.getSheetByName('Expenditures');
+    const invSheet = ss.getSheetByName('Inventory');
   
   if (!salesSheet || !detailsSheet || !expSheet || !invSheet) {
     throw new Error('資料庫結構缺失 (Missing Sheets)');
@@ -97,21 +98,19 @@ function saveSalesService(data, user) {
     if (item.original > 0) {
       deductInventory_(invSheet, invData, item.productId, item.original, 'ORIGINAL');
     }
-    if (item.returns > 0) {
-      const returnRows = getReturnRows_(invData, item, consumedBatches, today);
-      allInvLogRows.push(...returnRows);
     }
   });
 
-  // 4. 執行批次寫入 (提升效能)
-  if (allDetailRows.length > 0) {
-    batchAppend_(detailsSheet, allDetailRows);
-  }
-  if (allInvLogRows.length > 0) {
-    batchAppend_(invSheet, allInvLogRows);
-  }
+  // 4. 執行批次寫入
+  if (allDetailRows.length > 0) batchAppendNoLock_(detailsSheet, allDetailRows);
+  if (allInvLogRows.length > 0) batchAppendNoLock_(invSheet, allInvLogRows);
 
+  SpreadsheetApp.flush(); // 強制寫入
   return { success: true };
+
+  } finally {
+    lock.releaseLock(); // 5. 釋放號碼牌
+  }
 }
 
 // ===========================================
@@ -487,29 +486,34 @@ function getSaleToCloneService(payload) {
 // ===========================================
 // 5. 銷售作廢與修正 (Void & Fetch for Correction)
 // ===========================================
-function voidAndFetchSaleService(payload) {
-  const { saleId } = payload;
-  if (!saleId) throw new Error("缺少銷售編號 (Missing SaleId)");
+  // 1. 全局鎖定
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
 
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const salesSheet = ss.getSheetByName('Sales');
-  const detailsSheet = ss.getSheetByName('SalesDetails');
-  const expSheet = ss.getSheetByName('Expenditures');
-  const invSheet = ss.getSheetByName('Inventory');
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const salesSheet = ss.getSheetByName('Sales');
+    const detailsSheet = ss.getSheetByName('SalesDetails');
+    const expSheet = ss.getSheetByName('Expenditures');
+    const invSheet = ss.getSheetByName('Inventory');
 
-  // 1. 標記 Sales 表為 VOID
-  const salesData = salesSheet.getDataRange().getValues();
-  let saleRowIndex = -1;
-  let originalSaleData = null;
-  for (let i = 1; i < salesData.length; i++) {
-    if (String(salesData[i][0]) === saleId) {
-      saleRowIndex = i + 1;
-      originalSaleData = salesData[i];
-      break;
+    // 2. 標記 Sales 表並檢查狀態
+    const salesData = salesSheet.getDataRange().getValues();
+    let saleRowIndex = -1;
+    let originalSaleData = null;
+    for (let i = 1; i < salesData.length; i++) {
+        if (String(salesData[i][0]) === saleId) {
+            // [Fix] 如果已經是 VOID，拒絕重複執行回補
+            if (String(salesData[i][9]).toUpperCase() === 'VOID') {
+                throw new Error("此單據已經作廢，不可重複操作。");
+            }
+            saleRowIndex = i + 1;
+            originalSaleData = salesData[i];
+            break;
+        }
     }
-  }
-  if (saleRowIndex === -1) throw new Error("找不到該筆銷售紀錄");
-  salesSheet.getRange(saleRowIndex, 10).setValue('VOID'); // J欄: Status
+    if (saleRowIndex === -1) throw new Error("找不到該筆銷售紀錄");
+    salesSheet.getRange(saleRowIndex, 10).setValue('VOID');
 
   // 2. 標記 Expenditures 表為 VOID 並獲取資料
   let fetchedExpenses = null;
@@ -577,14 +581,12 @@ function voidAndFetchSaleService(payload) {
            voidRefundInvRows.push([Utilities.getUuid(), productId, -remainingToDeduct, today, today, 'ORIGINAL', 'VOID_CANCEL_RETURN: ' + saleId]);
         }
       }
-    }
-  }
-
   // 批次寫入庫存日誌
   if (voidRefundInvRows.length > 0) {
-    batchAppend_(invSheet, voidRefundInvRows);
+    batchAppendNoLock_(invSheet, voidRefundInvRows);
   }
 
+  SpreadsheetApp.flush(); // 強制同步
   return {
     success: true,
     cloneData: {
@@ -596,6 +598,10 @@ function voidAndFetchSaleService(payload) {
       cashCounts: (originalSaleData[10] && String(originalSaleData[10]).startsWith('{')) ? JSON.parse(originalSaleData[10]) : {}
     }
   };
+
+  } finally {
+    lock.releaseLock(); 
+  }
 }
 
 // ===========================================
