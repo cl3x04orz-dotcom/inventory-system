@@ -206,9 +206,13 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
         // So it supports per-item vendor! Perfect.
 
         try {
+            // [新增] 產生唯一 ID 防止重複提交
+            const submissionId = `purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
             const result = await callGAS(apiUrl, 'addPurchase', {
                 items: payloadItems,
-                operator: user.username
+                operator: user.username,
+                submissionId: submissionId
             }, user.token);
 
             // Log activity

@@ -3,40 +3,113 @@
  * [Service] 進貨管理與建議
  */
 
+// ===========================================
+// 1. 進貨存檔 (Transaction Safe)
+// ===========================================
 function addPurchaseService(data, user) {
+  const { submissionId, items: rawItems, vendor, paymentMethod, serverTimestamp } = data;
+  
+  // [防重複存檔]
+  if (submissionId) {
+    const cache = CacheService.getScriptCache();
+    if (cache.get(submissionId)) return { success: true, duplicate: true, message: "已偵測到重複請求" };
+    cache.put(submissionId, "PROCESSED", 600);
+  }
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000); // Wait up to 30 sec
+
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const pSheet = ss.getSheetByName('Products');
     const iSheet = ss.getSheetByName('Inventory');
     const purSheet = ss.getSheetByName('Purchases');
     
-    let items = Array.isArray(data.items) ? data.items : [data];
-    const entryDate = data.serverTimestamp ? new Date(data.serverTimestamp) : new Date();
-    const operator = data.operator || user.username || user.userId || user.name || 'Unknown';
+    if (!pSheet || !iSheet || !purSheet) throw new Error("資料表缺失");
+
+    let items = Array.isArray(rawItems) ? rawItems : [data];
+    const entryDate = serverTimestamp ? new Date(serverTimestamp) : new Date();
+    const operator = data.operator || (user ? (user.username || user.userId || user.name) : 'Unknown');
     
+    // Pre-fetch product map to minimize reads
     const productMap = {}; 
-    pSheet.getDataRange().getValues().slice(1).forEach(r => { productMap[r[1]] = r[0]; });
+    const pData = pSheet.getDataRange().getValues();
+    // Start from row 1 (header is 0)
+    for (let i = 1; i < pData.length; i++) {
+        productMap[pData[i][1]] = pData[i][0]; // Name -> UUID
+    }
+
+    const newProducts = [];
+    const purchaseRows = [];
+    const inventoryRows = [];
 
     items.forEach(item => {
-        const rowVendor = item.vendor || data.vendor;
+        const rowVendor = item.vendor || vendor;
         let productId = productMap[item.productName];
+        
+        // Auto-create product if missing (and track it to avoid duplicates in same batch)
         if (!productId && item.productName) {
             productId = Utilities.getUuid();
-            pSheet.appendRow([productId, item.productName, 'General', item.price, "", 0]);
+            // Add to map immediately for subsequent items in this batch
             productMap[item.productName] = productId;
+            // Add to new products list
+            newProducts.push([productId, item.productName, 'General', item.price, "", 0]);
         }
         
         if (productId) {
-            const itemPaymentMethod = item.paymentMethod || data.paymentMethod || 'CASH';
-            const itemStatus = (itemPaymentMethod === 'CREDIT') ? 'UNPAID' : 'PAID';
+            const currPaymentMethod = item.paymentMethod || paymentMethod || 'CASH';
+            const status = (currPaymentMethod === 'CREDIT') ? 'UNPAID' : 'PAID';
+            const uuid = Utilities.getUuid();
             
-            purSheet.appendRow([
-              Utilities.getUuid(), entryDate, rowVendor, productId, item.quantity, 
-              item.price, item.expiry, operator, itemPaymentMethod, itemStatus, operator
+            // Collect Purchase Row
+            // Col 0: UUID, 1: Date, 2: Vendor, 3: ProductID, 4: Qty, 5: Price, 6: Expiry, 7: Operator, 8: Method, 9: Status, 10: SubmissionID(Note)
+            purchaseRows.push([
+              uuid, entryDate, rowVendor, productId, item.quantity, 
+              item.price, item.expiry, operator, currPaymentMethod, status, submissionId || operator
             ]);
-            iSheet.appendRow([Utilities.getUuid(), productId, item.quantity, item.expiry, entryDate, 'STOCK', item.price]);
+            
+            // Collect Inventory Row
+            // Col 0: UUID, 1: ProductID, 2: Qty, 3: Expiry, 4: Date, 5: Type, 6: Price/Note
+            inventoryRows.push([
+              Utilities.getUuid(), productId, item.quantity, item.expiry, entryDate, 'STOCK', item.price
+            ]);
         }
     });
+
+    // --- Batch Write Section (Atomic-like) ---
+    
+    // 1. Add new products first
+    if (newProducts.length > 0) {
+        pSheet.getRange(pSheet.getLastRow() + 1, 1, newProducts.length, newProducts[0].length).setValues(newProducts);
+    }
+    
+    // 2. Add purchases
+    if (purchaseRows.length > 0) {
+        // Use helper if available, or direct write
+        if (typeof batchAppendNoLock_ !== 'undefined') {
+            batchAppendNoLock_(purSheet, purchaseRows);
+        } else {
+            purSheet.getRange(purSheet.getLastRow() + 1, 1, purchaseRows.length, purchaseRows[0].length).setValues(purchaseRows);
+        }
+    }
+    
+    // 3. Add inventory
+    if (inventoryRows.length > 0) {
+        if (typeof batchAppendNoLock_ !== 'undefined') {
+            batchAppendNoLock_(iSheet, inventoryRows);
+        } else {
+            iSheet.getRange(iSheet.getLastRow() + 1, 1, inventoryRows.length, inventoryRows[0].length).setValues(inventoryRows);
+        }
+    }
+
+    SpreadsheetApp.flush(); // Force write
     return { success: true, count: items.length };
+
+  } catch (e) {
+    throw new Error("進貨存檔失敗: " + e.message);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function getPurchaseHistory(filter) {
