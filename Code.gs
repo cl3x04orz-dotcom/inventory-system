@@ -545,6 +545,7 @@ function saveExpenditureService(payload) {
     } catch (error) {
         throw new Error('保存支出資料失敗: ' + error.message);
     }
+}
 /**
  * 通用批次寫入工具 (含鎖定，對外使用)
  */

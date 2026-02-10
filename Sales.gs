@@ -489,6 +489,10 @@ function getSaleToCloneService(payload) {
 // ===========================================
 // 5. 銷售作廢與修正 (Void & Fetch for Correction)
 // ===========================================
+function voidAndFetchSaleService(payload) {
+  const { saleId } = payload;
+  if (!saleId) throw new Error("缺少銷售編號");
+
   // 1. 全局鎖定
   const lock = LockService.getScriptLock();
   try {
