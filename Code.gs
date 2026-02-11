@@ -455,14 +455,20 @@ function getExpendituresService(payload) {
         "塑膠袋": "bags",
         "其他": "others",
         "Line Pay (收款)": "linePay",
+        "Line Pay": "linePay",
         "服務費 (扣除)": "serviceFee",
+        "服務費": "serviceFee",
         "本筆總支出金額": "finalTotal",
         "結算總額": "finalTotal",
         "時間": "date",
         "日期": "date",
+        "時間戳記": "date",
         "對象": "customer",
         "業務": "salesRep",
         "備註": "note",
+        "車輛保養": "vehicleMaintenance",
+        "薪資發放": "salary",
+        "公積金": "reserve",
         "serverTimestamp": "serverTimestamp"
     };
 
@@ -477,16 +483,28 @@ function getExpendituresService(payload) {
             obj[key] = row[i];
         });
         
-        // [Fix] 強制指定欄位索引 (User已確認 L 欄位為結算金額)
-        // L欄 (Index 11) = 結算總額 (FinalTotal)
-        // M欄 (Index 12) = 對象 (customer)
-        // S欄 (Index 18) = 備註 (note) - 根據之前觀察
+        // [Fix] 強制指定欄位索引 (確保正確讀取所有欄位)
+        // 根據最新的欄位結構：
+        // A (0) = 空白 (支出登錄) 或 SaleID (銷售登錄)
+        // L (11) = 結算總額
+        // M (12) = 對象
+        // N (13) = 業務
+        // O (14) = 時間戳記
+        // P (15) = 車輛保養 ✅
+        // Q (16) = 薪資發放 ✅
+        // R (17) = 公積金 ✅
+        // S (18) = 備註
+        // U (20) = 操作者 (銷售登錄才有)
         
         if (row.length > 11) obj['finalTotal'] = row[11];
         if (row.length > 12) obj['customer'] = row[12];
         if (row.length > 13) obj['salesRep'] = row[13];
-        if (row.length > 20) obj['operator'] = row[20];
-        if (row.length > 18) obj['note'] = row[18];
+        if (row.length > 14) obj['date'] = row[14]; // O 欄 = 時間戳記
+        if (row.length > 15) obj['vehicleMaintenance'] = row[15]; // P 欄 ✅
+        if (row.length > 16) obj['salary'] = row[16]; // Q 欄 ✅
+        if (row.length > 17) obj['reserve'] = row[17]; // R 欄 ✅
+        if (row.length > 18) obj['note'] = row[18]; // S 欄
+        if (row.length > 20) obj['operator'] = row[20]; // U 欄
         
         return obj;
     }).filter(item => {
@@ -509,35 +527,34 @@ function saveExpenditureService(payload) {
         if (!sheet) {
             sheet = ss.insertSheet('Expenditures');
             sheet.appendRow([
-                '時間戳記', '攤位', '清潔', '電費', '加油', '停車',
+                '(空白)', '攤位', '清潔', '電費', '加油', '停車',
                 '貨款', '塑膠袋', '其他', 'Line Pay', '服務費',
-                '結算總額', '對象', '業務', '(預留)', '車輛保養',
+                '結算總額', '對象', '業務', '時間戳記', '車輛保養',
                 '薪資發放', '公積金', '備註'
             ]);
         }
         
         const timestamp = payload.serverTimestamp || new Date();
         const row = [
-            timestamp,                          // A (0)
-            Number(payload.stall) || 0,         // B (1)
-            Number(payload.cleaning) || 0,      // C (2)
-            Number(payload.electricity) || 0,   // D (3)
-            Number(payload.gas) || 0,           // E (4)
-            Number(payload.parking) || 0,       // F (5)
-            Number(payload.goods) || 0,         // G (6)
-            Number(payload.bags) || 0,          // H (7)
-            Number(payload.others) || 0,        // I (8)
-            Number(payload.linePay) || 0,       // J (9)
-            Number(payload.serviceFee) || 0,    // K (10)
-            Number(payload.finalTotal) || 0,    // L (11) [Fix: Write Final Total here]
-            payload.customer || '',             // M (12)
-            payload.salesRep || payload.operator || '', // N (13)
-            '',                                 // O (14)
-            Number(payload.vehicleMaintenance) || 0, // P (15)
-            Number(payload.salary) || 0,        // Q (16)
-            Number(payload.reserve) || 0,       // R (17)
-            payload.note || ''                  // S (18)
-            // Removed T (19) duplications
+            '',                                 // A (0) - 空白
+            Number(payload.stall) || 0,         // B (1) - 攤位
+            Number(payload.cleaning) || 0,      // C (2) - 清潔
+            Number(payload.electricity) || 0,   // D (3) - 電費
+            Number(payload.gas) || 0,           // E (4) - 加油
+            Number(payload.parking) || 0,       // F (5) - 停車
+            Number(payload.goods) || 0,         // G (6) - 貨款
+            Number(payload.bags) || 0,          // H (7) - 塑膠袋
+            Number(payload.others) || 0,        // I (8) - 其他
+            Number(payload.linePay) || 0,       // J (9) - Line Pay
+            Number(payload.serviceFee) || 0,    // K (10) - 服務費
+            0,                                  // L (11) - 結算總額 (固定為 0) ✅
+            payload.customer || '',             // M (12) - 對象
+            payload.salesRep || payload.operator || '', // N (13) - 業務
+            timestamp,                          // O (14) - 時間戳記 ✅
+            Number(payload.vehicleMaintenance) || 0, // P (15) - 車輛保養
+            Number(payload.salary) || 0,        // Q (16) - 薪資發放
+            Number(payload.reserve) || 0,       // R (17) - 公積金
+            payload.note || ''                  // S (18) - 備註 ✅
         ];
         
         sheet.appendRow(row);

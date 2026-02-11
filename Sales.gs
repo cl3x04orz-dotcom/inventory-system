@@ -70,12 +70,12 @@ function saveSalesService(data, user) {
         expenseData.stall, expenseData.cleaning, expenseData.electricity, 
         expenseData.gas, expenseData.parking, expenseData.goods, 
         expenseData.bags, expenseData.others || 0, expenseData.linePay, 
-        expenseData.serviceFee, expenseData.finalTotal,
+        expenseData.serviceFee, expenseData.finalTotal, // L (11): 銷售產生維持 finalTotal (正常顯示)
         customer || '',    
         finalSalesRep,
-        today,
-        "", "", "", "", "", // 空出 Q, R, S, T 欄位
-        finalOperator       // Col 21 (U 欄): 實際操作者
+        today,               // O (14): 時間戳記 ✅
+        "", "", "",          // P, Q, R (15-17): 空白 (銷售無車輛保養等)
+        ""                   // S (18): 備註 (空白)
     ];
     
     // 3.3 處理庫存邏輯 (只修改記憶體 invData)
