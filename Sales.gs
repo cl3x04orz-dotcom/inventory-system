@@ -5,7 +5,7 @@
  */
 
 // ===========================================
-// 1. 銷售存檔 (Save Sales)
+// 1. 銷售存檔 (Save Sales) - [Transaction Safe]
 // ===========================================
 function saveSalesService(data, user) {
   const { salesData, cashData, expenseData, customer, paymentMethod, salesRep, operator, submissionId } = data; 
@@ -29,87 +29,114 @@ function saveSalesService(data, user) {
     const expSheet = ss.getSheetByName('Expenditures');
     const invSheet = ss.getSheetByName('Inventory');
   
-  if (!salesSheet || !detailsSheet || !expSheet || !invSheet) {
-    throw new Error('資料庫結構缺失 (Missing Sheets)');
-  }
+    if (!salesSheet || !detailsSheet || !expSheet || !invSheet) {
+      throw new Error('資料庫結構缺失 (Missing Sheets)');
+    }
   
-  const saleId = Utilities.getUuid();
-  const today = data.serverTimestamp ? new Date(data.serverTimestamp) : new Date();
-  
-  const status = (paymentMethod === 'CREDIT') ? 'UNPAID' : 'PAID';
-  const method = paymentMethod || 'CASH';
-
-  // 【名稱邏輯】：
-  // salesRep 是由前端傳入的「業績歸屬人」(修正時會帶入舊單業務)
-  // operator 是「實際操作者」(當前登入者)
-  const finalSalesRep = salesRep || (user ? (user.displayName || user.name || user.username) : 'Unknown');
-  const finalOperator = operator || (user ? (user.displayName || user.name || user.username) : 'Unknown');
-  
-  // 寫入 Sales 表 (維持固定順序，確保與讀取一致)
-  // Col 0: ID, 1: Date, 2: SalesRep (Main), 3: Cash, 4: Reserve, 5: Total, 6: Customer, 7: SalesRep (Backup), 8: Method, 9: Status
-  salesSheet.appendRow([
-    saleId, 
-    today, 
-    finalSalesRep, 
-    cashData.totalCash, 
-    cashData.reserve, 
-    expenseData.finalTotal,
-    customer || '',    
-    finalSalesRep,
-    method,            
-    status,
-    JSON.stringify(data.cashCounts || {}), // Col 10: Cash Breakdown Details
-    finalOperator                          // Col 11 (L 欄): 實際操作者
-  ]);
-  
-  // 寫入 Expenditures 表
-  expSheet.appendRow([
-    saleId, 
-    expenseData.stall, expenseData.cleaning, expenseData.electricity, 
-    expenseData.gas, expenseData.parking, expenseData.goods, 
-    expenseData.bags, expenseData.others || 0, expenseData.linePay, 
-    expenseData.serviceFee, expenseData.finalTotal,
-    customer || '',    
-    finalSalesRep,
-    today,
-    "", "", "", "", "", // 空出 Q, R, S, T 欄位
-    finalOperator       // Col 21 (U 欄): 實際操作者
-  ]);
-  
-  // 處理庫存扣除與明細收集
-  const invData = invSheet.getDataRange().getValues();
-  const allDetailRows = [];
-  const allInvLogRows = [];
-
-  salesData.forEach(item => {
-    const hasActivity = (Number(item.sold) > 0) || (Number(item.picked) > 0) || (Number(item.original) > 0) || (Number(item.returns) > 0);
-    if (!hasActivity) return; 
-
-    // 收集明細
-    allDetailRows.push([
-      saleId, item.productId, item.picked, item.original, item.returns, item.sold, item.unitPrice, (item.sold * item.unitPrice)
-    ]);
+    // 2. 讀取所有必要資料 (Snapshot Read)
+    const invData = invSheet.getDataRange().getValues(); // 讀取完整庫存
     
-    let consumedBatches = []; 
-    if (item.picked > 0) {
-      const result = deductInventory_(invSheet, invData, item.productId, item.picked, 'STOCK');
-      consumedBatches = result.consumed;
-    }
-    if (item.original > 0) {
-      deductInventory_(invSheet, invData, item.productId, item.original, 'ORIGINAL');
-    }
-    if (item.returns > 0) {
-      const returnRows = getReturnRows_(invData, item, consumedBatches, today);
-      allInvLogRows.push(...returnRows);
-    }
-  });
+    // 3. 準備資料 (In-Memory Calculation)
+    const saleId = Utilities.getUuid();
+    const today = data.serverTimestamp ? new Date(data.serverTimestamp) : new Date();
+    const status = (paymentMethod === 'CREDIT') ? 'UNPAID' : 'PAID';
+    const method = paymentMethod || 'CASH';
 
-  // 4. 執行批次寫入
-  if (allDetailRows.length > 0) batchAppendNoLock_(detailsSheet, allDetailRows);
-  if (allInvLogRows.length > 0) batchAppendNoLock_(invSheet, allInvLogRows);
+    // 【名稱邏輯】：
+    // salesRep 是由前端傳入的「業績歸屬人」(修正時會帶入舊單業務)
+    // operator 是「實際操作者」(當前登入者)
+    const finalSalesRep = salesRep || (user ? (user.displayName || user.name || user.username) : 'Unknown');
+    const finalOperator = operator || (user ? (user.displayName || user.name || user.username) : 'Unknown');
+    
+    // 3.1 準備 Sales Row (Col 0-11)
+    const newSalesRow = [
+        saleId, 
+        today, 
+        finalSalesRep, 
+        cashData.totalCash, 
+        cashData.reserve, 
+        expenseData.finalTotal,
+        customer || '',    
+        finalSalesRep,
+        method,            
+        status,
+        JSON.stringify(data.cashCounts || {}), // Col 10: Cash Breakdown Details
+        finalOperator                          // Col 11 (L 欄): 實際操作者
+    ];
 
-  SpreadsheetApp.flush(); // 強制寫入
-  return { success: true };
+    // 3.2 準備 Expenditures Row (Col 0-21)
+    const newExpRow = [
+        saleId, 
+        expenseData.stall, expenseData.cleaning, expenseData.electricity, 
+        expenseData.gas, expenseData.parking, expenseData.goods, 
+        expenseData.bags, expenseData.others || 0, expenseData.linePay, 
+        expenseData.serviceFee, expenseData.finalTotal,
+        customer || '',    
+        finalSalesRep,
+        today,
+        "", "", "", "", "", // 空出 Q, R, S, T 欄位
+        finalOperator       // Col 21 (U 欄): 實際操作者
+    ];
+    
+    // 3.3 處理庫存邏輯 (只修改記憶體 invData)
+    const newDetailRows = [];
+    const newInvLogRows = [];
+    let isInventoryModified = false;
+
+    salesData.forEach(item => {
+        const hasActivity = (Number(item.sold) > 0) || (Number(item.picked) > 0) || (Number(item.original) > 0) || (Number(item.returns) > 0);
+        if (!hasActivity) return; 
+
+        // 收集明細
+        newDetailRows.push([
+            saleId, item.productId, item.picked, item.original, item.returns, item.sold, item.unitPrice, (item.sold * item.unitPrice)
+        ]);
+        
+        let consumedBatches = []; 
+        if (item.picked > 0) {
+            // [Refactored] deductInventory_ now modifies invData in-place
+            const result = deductInventory_(invData, item.productId, item.picked, 'STOCK');
+            consumedBatches = result.consumed;
+            if (consumedBatches.length > 0) isInventoryModified = true;
+        }
+        if (item.original > 0) {
+            const result = deductInventory_(invData, item.productId, item.original, 'ORIGINAL');
+            if (result.consumed.length > 0) isInventoryModified = true;
+        }
+        if (item.returns > 0) {
+            // 計算退貨 (增加庫存日誌)
+            const returnRows = getReturnRows_(invData, item, consumedBatches, today);
+            newInvLogRows.push(...returnRows);
+        }
+    });
+
+    // 4. 執行批次寫入 (Atomic-like Batch Write)
+    
+    // 4.1 寫入主表與明細 (Append)
+    // 由於是單筆交易，可以直接 AppendRow 或用 BatchAppend
+    // 為了統一，我們用 Helper (但這裡只有一行，如果不習慣用 Helper 可以直接 appendRow，但 Helper 比較快)
+    // 這裡還是用 appendRow 比較簡單直觀，除了 Details 和 Logs 可能多筆
+    
+    salesSheet.appendRow(newSalesRow);
+    expSheet.appendRow(newExpRow);
+    
+    if (newDetailRows.length > 0) batchAppendNoLock_(detailsSheet, newDetailRows);
+    if (newInvLogRows.length > 0) batchAppendNoLock_(invSheet, newInvLogRows);
+
+    // 4.2 寫入庫存更新 (Update Whole Column)
+    // 為了確保原子性與效能，我們將記憶體中更新過的數量欄位 (Col C) 一次寫回
+    if (isInventoryModified) {
+        // 取第3欄 (Index 2), 去掉 Header (Row 0)
+        // 注意：getDataRange 包含 Header，所以 invData[0] 是 Header
+        const qtyColumn = invData.slice(1).map(r => [r[2]]); 
+        if (qtyColumn.length > 0) {
+            // 寫回 Range: Row 2, Col 3, Height = qtyColumn.length, Width = 1
+            invSheet.getRange(2, 3, qtyColumn.length, 1).setValues(qtyColumn);
+        }
+    }
+
+    SpreadsheetApp.flush(); // 強制寫入
+    return { success: true };
 
   } finally {
     lock.releaseLock(); // 5. 釋放號碼牌
@@ -352,7 +379,8 @@ function getProductMap_() {
   return map;
 }
 
-function deductInventory_(sheet, sheetData, productId, qtyToDeduct, targetType) {
+// [已重構] 純邏輯運算，直接修改記憶體中的 invData，不執行寫入
+function deductInventory_(sheetData, productId, qtyToDeduct, targetType) {
   let remaining = Number(qtyToDeduct);
   let consumedStats = [];
   if (remaining <= 0) return { consumed: [] };
@@ -361,14 +389,14 @@ function deductInventory_(sheet, sheetData, productId, qtyToDeduct, targetType) 
   for (let i = 1; i < sheetData.length; i++) {
     const row = sheetData[i];
     const pId = row[1];
-    const qty = Number(row[2]);
+    const qty = Number(row[2]); // Index 2 is Qty
     const expiry = row[3]; 
     const type = row[5];
     
     let isMatch = (targetType === 'STOCK') ? (type === 'STOCK') : (type !== 'STOCK');
     
     if (pId === productId && qty > 0 && isMatch) {
-      batches.push({ rowIndex: i + 1, qty: qty, expiry: expiry }); 
+      batches.push({ rowRef: row, qty: qty, expiry: expiry }); 
     }
   }
   batches.sort((a, b) => new Date(a.expiry) - new Date(b.expiry));
@@ -376,8 +404,10 @@ function deductInventory_(sheet, sheetData, productId, qtyToDeduct, targetType) 
   for (let batch of batches) {
     if (remaining <= 0) break;
     const deduct = Math.min(batch.qty, remaining);
-    const newQty = batch.qty - deduct;
-    sheet.getRange(batch.rowIndex, 3).setValue(newQty);
+    
+    // [重要] 直接修改陣列中的值 (Pass by reference)
+    batch.rowRef[2] = batch.qty - deduct;
+    
     consumedStats.push({ expiry: batch.expiry, deductedQty: deduct });
     remaining -= deduct;
   }
@@ -549,10 +579,12 @@ function voidAndFetchSaleService(payload) {
 
   // 3. 處理銷售明細與庫存回補
   const detailsData = detailsSheet.getDataRange().getValues();
-  const invValues = invSheet.getDataRange().getValues(); // 移出迴圈，減少讀取
+  const invData = invSheet.getDataRange().getValues(); // Snapshot of Inventory
   const fetchedDetails = [];
   const today = new Date();
   const voidRefundInvRows = [];
+
+  let isInventoryModified = false;
 
   for (let i = 1; i < detailsData.length; i++) {
     if (String(detailsData[i][0]) === saleId) {
@@ -565,13 +597,14 @@ function voidAndFetchSaleService(payload) {
 
       fetchedDetails.push({ productId, picked, original, returns, sold, unitPrice });
 
-      // 庫存回補
+      // 庫存回補 (Append New Stock/Original)
       if (picked > 0) {
         let expiry = new Date();
         expiry.setDate(expiry.getDate() + 30);
-        for (let j = invValues.length - 1; j >= 1; j--) {
-          if (invValues[j][1] === productId && invValues[j][5] === 'STOCK') {
-            expiry = invValues[j][3];
+        // Find latest expiry for this product
+        for (let j = invData.length - 1; j >= 1; j--) {
+          if (invData[j][1] === productId && invData[j][5] === 'STOCK') {
+            expiry = invData[j][3];
             break;
           }
         }
@@ -581,19 +614,37 @@ function voidAndFetchSaleService(payload) {
         voidRefundInvRows.push([Utilities.getUuid(), productId, original, today, today, 'ORIGINAL', 'VOID_REFUND: ' + saleId]);
       }
       if (returns > 0) {
-        const deductResult = deductInventory_(invSheet, invValues, productId, returns, 'ORIGINAL');
+        // [Voiding a Return] -> We must DEDUCT from ORIGINAL in Inventory
+        // deductInventory_ modifies invData in-place
+        // returns were added to Original, so to void, we remove from Original
+        const deductResult = deductInventory_(invData, productId, returns, 'ORIGINAL');
         const totalDeducted = deductResult.consumed.reduce((sum, item) => sum + item.deductedQty, 0);
+        
+        if (totalDeducted > 0) isInventoryModified = true;
+
         const remainingToDeduct = returns - totalDeducted;
         if (remainingToDeduct > 0) {
+           // Should not happen if data is consistent, but log if it does
            voidRefundInvRows.push([Utilities.getUuid(), productId, -remainingToDeduct, today, today, 'ORIGINAL', 'VOID_CANCEL_RETURN: ' + saleId]);
         }
       }
     }
   }
 
-  // 批次寫入庫存日誌
+  // 4. Atomic-like Writes
+
+  // 4.1 Append Refund Logs
   if (voidRefundInvRows.length > 0) {
     batchAppendNoLock_(invSheet, voidRefundInvRows);
+  }
+
+  // 4.2 Write Back Modified Inventory (for Cancel Return deductions)
+  if (isInventoryModified) {
+    // 取第3欄 (Index 2), 去掉 Header (Row 0)
+    const qtyColumn = invData.slice(1).map(r => [r[2]]); 
+    if (qtyColumn.length > 0) {
+        invSheet.getRange(2, 3, qtyColumn.length, 1).setValues(qtyColumn);
+    }
   }
 
   SpreadsheetApp.flush(); // 強制同步
@@ -735,4 +786,3 @@ function getRecentSalesToday(payload) {
   // 按時間倒序排列（最新的在前）
   return results.sort((a, b) => new Date(b.date) - new Date(a.date));
 }
-

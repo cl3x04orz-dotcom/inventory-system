@@ -251,6 +251,11 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             let newReturns = field === 'returns' ? value : r.returns;
             let newPrice = field === 'price' ? value : r.price;
 
+            // 1.5. 防止負數價格
+            if (field === 'price' && getSafeNum(newPrice) < 0) {
+                newPrice = 0;
+            }
+
             // 2. Local Price Memory Persistence
             if (field === 'price') {
                 localStorage.setItem(`last_price_${id}`, getSafeNum(newPrice).toString());
