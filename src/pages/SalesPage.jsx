@@ -35,8 +35,10 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [activeInput, setActiveInput] = useState(null); // { id: string, type: 'row'|'cash'|'expense', field?: string, denom?: number, key?: string }
 
     // Today Records States (for merge printing)
-    const [showTodayRecords, setShowTodayRecords] = useState(false);
-    const [todayRecords, setTodayRecords] = useState([]);
+    const [showMergeModal, setShowMergeModal] = useState(false);
+    const [mergeRecords, setMergeRecords] = useState([]);
+    const [mergeStartDate, setMergeStartDate] = useState(new Date().toISOString().split('T')[0]);
+    const [mergeEndDate, setMergeEndDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedSaleIds, setSelectedSaleIds] = useState([]);
     const [isMergePrinting, setIsMergePrinting] = useState(false);
     const [allAvailableProducts, setAllAvailableProducts] = useState([]); // All sorted products for merge print reference
@@ -688,14 +690,17 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         }
     };
 
-    // Load Today's Sales Records
-    const loadTodayRecords = async () => {
+    // Load Merge Sales Records
+    const loadMergeRecords = async (start = mergeStartDate, end = mergeEndDate) => {
         try {
-            const records = await callGAS(apiUrl, 'getRecentSalesToday', {}, user.token);
-            setTodayRecords(records);
+            const records = await callGAS(apiUrl, 'getSalesByDateRange', {
+                startDate: start,
+                endDate: end
+            }, user.token);
+            setMergeRecords(records);
         } catch (error) {
-            console.error('載入今日紀錄失敗:', error);
-            alert('載入今日紀錄失敗: ' + error.message);
+            console.error('載入銷售紀錄失敗:', error);
+            alert('載入銷售紀錄失敗: ' + error.message);
         }
     };
 
@@ -710,7 +715,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         setIsMergePrinting(true);
         try {
             // 1. 提取選中的單據
-            const selectedRecords = todayRecords.filter(r => selectedSaleIds.includes(r.saleId));
+            const selectedRecords = mergeRecords.filter(r => selectedSaleIds.includes(r.saleId));
 
             // 2. 建立產品 Map（productId -> 各單據的數值陣列）
             const productDataMap = {};
@@ -890,10 +895,10 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             {/* Merge Print Button */}
                             <button
                                 onClick={() => {
-                                    setShowTodayRecords(!showTodayRecords);
-                                    if (!showTodayRecords) loadTodayRecords();
+                                    setShowMergeModal(!showMergeModal);
+                                    if (!showMergeModal) loadMergeRecords();
                                 }}
-                                className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${showTodayRecords
+                                className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${showMergeModal
                                     ? 'bg-blue-50 text-blue-600 border-blue-200'
                                     : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
                                     }`}
@@ -1207,18 +1212,19 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                             <h2 className="text-lg font-bold mb-4 text-rose-500">支出與其他</h2>
                             <div className="grid grid-cols-2 gap-3">
-                                {['stall:攤位', 'cleaning:清潔', 'electricity:電費', 'gas:加油', 'parking:停車', 'goods:貨款', 'bags:塑膠袋', 'others:其他', 'salary:薪資發放', 'reserveFund:公積金', 'vehicleMaintenance:車輛保養'].map((item, idx, arr) => {
+                                {['stall:攤位', 'cleaning:清潔', 'electricity:電費', 'gas:加油', 'parking:停車', 'goods:貨款', 'bags:塑膠袋', 'others:其他', 'salary:薪資發放', 'reserveFund:公積金', 'vehicleMaintenance:車輛保養', 'linePay:Line Pay (收款)', 'serviceFee:服務費 (扣除)'].map((item, idx, arr) => {
                                     const [key, label] = item.split(':');
                                     const currentId = `input-expense-${key}`;
 
                                     // Sequential Navigation
-                                    const nextKey = idx < arr.length - 1 ? arr[idx + 1].split(':')[0] : 'linePay';
-                                    const nextId = `input-expense-${nextKey}`;
+                                    const nextKey = idx < arr.length - 1 ? arr[idx + 1].split(':')[0] : 'save-data';
+                                    const nextId = idx < arr.length - 1 ? `input-expense-${nextKey}` : 'btn-save-data';
                                     const prevId = idx > 0 ? `input-expense-${arr[idx - 1].split(':')[0]}` : 'input-reserve';
 
                                     // Grid Navigation (2 columns)
                                     const upKey = idx >= 2 ? arr[idx - 2].split(':')[0] : null;
-                                    const downKey = idx < arr.length - 2 ? arr[idx + 2].split(':')[0] : (idx === arr.length - 1 ? 'linePay' : arr[idx + 1].split(':')[0]);
+                                    const downKey = idx < arr.length - 2 ? arr[idx + 2].split(':')[0] : (idx === arr.length - 1 || idx === arr.length - 2 ? 'save-data' : arr[idx + 1].split(':')[0]);
+                                    const downId = downKey === 'save-data' ? 'btn-save-data' : `input-expense-${downKey}`;
 
                                     return (
                                         <div key={key}>
@@ -1238,7 +1244,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                     right: nextId,
                                                     left: prevId,
                                                     up: upKey ? `input-expense-${upKey}` : 'input-reserve',
-                                                    down: downKey.startsWith('input-') ? downKey : `input-expense-${downKey}`
+                                                    down: downId
                                                 })}
                                                 disabled={isCredit}
                                             />
@@ -1246,50 +1252,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     );
                                 })}
                             </div>
-                            <div className="mt-4 space-y-3">
-                                <div>
-                                    <label className="text-xs text-[var(--text-secondary)] block mb-1">Line Pay (收款)</label>
-                                    <input
-                                        id="input-expense-linePay"
-                                        type="text"
-                                        inputMode="decimal"
-                                        className="input-field border-green-200 text-green-600"
-                                        value={expenses.linePay || ''}
-                                        onChange={(e) => handleExpenseChange('linePay', e.target.value)}
-                                        onBlur={(e) => handleExpenseBlur('linePay', e.target.value)}
-                                        onFocus={() => setActiveInput({ id: 'input-expense-linePay', type: 'expense', key: 'linePay' })}
-                                        onKeyDown={(e) => handleSidebarKeyDown(e, {
-                                            next: 'input-expense-serviceFee',
-                                            prev: 'input-expense-others',
-                                            right: 'input-expense-serviceFee',
-                                            left: 'input-expense-others',
-                                            up: 'input-expense-bags' // Index 6 is bags, index 7 is others. LinePay is below both. 
-                                        })}
-                                        disabled={isCredit}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs text-[var(--text-secondary)] block mb-1">服務費 (扣除)</label>
-                                    <input
-                                        id="input-expense-serviceFee"
-                                        type="text"
-                                        inputMode="decimal"
-                                        className="input-field border-red-200 text-red-600"
-                                        value={expenses.serviceFee || ''}
-                                        onChange={(e) => handleExpenseChange('serviceFee', e.target.value)}
-                                        onBlur={(e) => handleExpenseBlur('serviceFee', e.target.value)}
-                                        onFocus={() => setActiveInput({ id: 'input-expense-serviceFee', type: 'expense', key: 'serviceFee' })}
-                                        disabled={isCredit}
-                                        onKeyDown={(e) => handleSidebarKeyDown(e, {
-                                            next: 'btn-save-data',
-                                            prev: 'input-expense-linePay',
-                                            right: 'btn-save-data',
-                                            left: 'input-expense-linePay',
-                                            up: 'input-expense-others'
-                                        })}
-                                    />
-                                </div>
-                            </div>
+
 
                         </div>
                     </div>
@@ -1310,13 +1273,20 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
             {/* Merge Print Modal */}
             <MergePrintModal
-                show={showTodayRecords}
+                show={showMergeModal}
                 onClose={() => {
                     setSelectedSaleIds([]);
-                    setShowTodayRecords(false);
+                    setShowMergeModal(false);
                 }}
-                records={todayRecords}
+                records={mergeRecords}
                 selectedIds={selectedSaleIds}
+                startDate={mergeStartDate}
+                endDate={mergeEndDate}
+                onDateChange={(type, value) => {
+                    if (type === 'start') setMergeStartDate(value);
+                    else setMergeEndDate(value);
+                }}
+                onSearch={() => loadMergeRecords(mergeStartDate, mergeEndDate)}
                 onToggleSelect={(saleId) => {
                     if (saleId === null) {
                         setSelectedSaleIds([]);

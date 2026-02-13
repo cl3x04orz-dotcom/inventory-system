@@ -35,9 +35,32 @@ export default function MergePrintModal({
                             </div>
                             <div>
                                 <h3 className="text-3xl sm:text-4xl font-black tracking-tight text-gray-800">合併列印</h3>
-                                <p className="text-gray-500 text-sm sm:text-base mt-1.5 font-medium">
-                                    選擇多筆單據以合併輸出
-                                </p>
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-3">
+                                    <p className="text-gray-500 text-sm sm:text-base font-medium whitespace-nowrap">
+                                        選擇日期範圍與單據：
+                                    </p>
+                                    <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-xl border border-gray-200">
+                                        <input
+                                            type="date"
+                                            value={startDate}
+                                            onChange={(e) => onDateChange('start', e.target.value)}
+                                            className="bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        />
+                                        <span className="text-gray-400">to</span>
+                                        <input
+                                            type="date"
+                                            value={endDate}
+                                            onChange={(e) => onDateChange('end', e.target.value)}
+                                            className="bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        />
+                                        <button
+                                            onClick={onSearch}
+                                            className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-blue-700 active:scale-95 transition-all shadow-sm shadow-blue-200"
+                                        >
+                                            查詢
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <button
