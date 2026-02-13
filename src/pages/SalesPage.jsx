@@ -902,96 +902,109 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             <RefreshCw size={20} className="text-[var(--accent-blue)]" /> 商品銷售登錄
                         </h2>
 
-                        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full md:w-auto">
-                            {/* Toggle on Left */}
-                            <div className="flex bg-[var(--bg-tertiary)] rounded-lg p-1 border border-[var(--border-primary)] self-start md:self-auto">
-                                <button
-                                    onClick={() => setPaymentType('CASH')}
-                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${paymentType === 'CASH'
-                                        ? 'bg-emerald-500 text-white shadow-sm'
-                                        : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-                                        }`}
-                                >
-                                    現金
-                                </button>
-                                <button
-                                    onClick={() => setPaymentType('CREDIT')}
-                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${paymentType === 'CREDIT'
-                                        ? 'bg-amber-500 text-white shadow-sm'
-                                        : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-                                        }`}
-                                >
-                                    賒銷
-                                </button>
+                        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full md:w-auto">
+
+                            {/* Group 1: Setup & Context (Toggle + Input) */}
+                            <div className="flex flex-row items-center gap-3">
+                                {/* Toggle */}
+                                <div className="flex bg-[var(--bg-tertiary)] rounded-lg p-1 border border-[var(--border-primary)] shrink-0">
+                                    <button
+                                        onClick={() => setPaymentType('CASH')}
+                                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${paymentType === 'CASH'
+                                            ? 'bg-emerald-500 text-white shadow-sm'
+                                            : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                                            }`}
+                                    >
+                                        現金
+                                    </button>
+                                    <button
+                                        onClick={() => setPaymentType('CREDIT')}
+                                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${paymentType === 'CREDIT'
+                                            ? 'bg-amber-500 text-white shadow-sm'
+                                            : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                                            }`}
+                                    >
+                                        賒銷
+                                    </button>
+                                </div>
+
+                                {/* Customer Input */}
+                                <div className="flex items-center gap-2 w-full md:w-auto">
+                                    <label className="text-sm text-[var(--text-secondary)] font-bold whitespace-nowrap hidden md:block">銷售對象:</label>
+                                    <input
+                                        id="input-location"
+                                        type="text"
+                                        className="input-field py-1 px-3 w-full md:w-40 lg:w-48"
+                                        placeholder="輸入銷售對象..."
+                                        value={location}
+                                        onChange={(e) => setLocation(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                focusAndSelect('input-m-0-picked') || focusAndSelect('input-0-picked');
+                                            }
+                                        }}
+                                    />
+                                </div>
                             </div>
 
-                            <div className="flex items-center gap-2 w-full md:w-auto">
-                                <label className="text-sm text-[var(--text-secondary)] font-bold whitespace-nowrap">銷售對象:</label>
-                                <input
-                                    id="input-location"
-                                    type="text"
-                                    className="input-field py-1 px-3 w-full md:w-48"
-                                    placeholder="輸入銷售對象..."
-                                    value={location}
-                                    onChange={(e) => setLocation(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            // Jump to first product (checks both mobile and desktop IDs)
-                                            focusAndSelect('input-m-0-picked') || focusAndSelect('input-0-picked');
-                                        }
-                                    }}
-                                />
+                            {/* Group 2: Action Buttons (Stacked) */}
+                            <div className="flex flex-col gap-2">
+                                {/* Row 1: Import & Sort */}
+                                <div className="flex flex-row items-center gap-2">
+                                    {/* History Import */}
+                                    <button
+                                        onClick={handleOpenHistoryImport}
+                                        className="flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border whitespace-nowrap transition-all bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]"
+                                    >
+                                        <RefreshCw size={16} className="rotate-180" />
+                                        導入退貨
+                                    </button>
+
+                                    {/* Sort */}
+                                    <button
+                                        onClick={toggleSorting}
+                                        className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${isSorting
+                                            ? 'bg-indigo-500 text-white border-indigo-500'
+                                            : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
+                                            }`}
+                                    >
+                                        <ListOrdered size={16} />
+                                        {isSorting ? '儲存順序' : '更改順序'}
+                                    </button>
+                                </div>
+
+                                {/* Row 2: Merge & Print */}
+                                <div className="flex flex-row items-center gap-2">
+                                    {/* Merge Print */}
+                                    <button
+                                        onClick={() => {
+                                            setShowMergeModal(!showMergeModal);
+                                            if (!showMergeModal) loadMergeRecords();
+                                        }}
+                                        className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${showMergeModal
+                                            ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                            : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
+                                            }`}
+                                    >
+                                        <Printer size={16} />
+                                        合併列印
+                                    </button>
+
+                                    {/* Print */}
+                                    <button
+                                        onClick={handlePrint}
+                                        disabled={isPrinting}
+                                        className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${isPrinting
+                                            ? 'bg-gray-400 text-white cursor-not-allowed'
+                                            : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
+                                            }`}
+                                    >
+                                        <Printer size={16} />
+                                        {isPrinting ? '列印中...' : '列印單據'}
+                                    </button>
+                                </div>
                             </div>
-
-                            {/* Drag and Drop Sort Toggle */}
-                            <button
-                                onClick={toggleSorting}
-                                className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${isSorting
-                                    ? 'bg-indigo-500 text-white border-indigo-500'
-                                    : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
-                                    }`}
-                            >
-                                <ListOrdered size={16} />
-                                {isSorting ? '儲存排序' : '自定義排序'}
-                            </button>
-
-                            {/* Print Button */}
-                            <button
-                                onClick={handlePrint}
-                                disabled={isPrinting}
-                                className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${isPrinting
-                                    ? 'bg-gray-400 text-white cursor-not-allowed'
-                                    : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
-                                    }`}
-                            >
-                                <Printer size={16} />
-                                {isPrinting ? '列印中...' : '列印領貨單'}
-                            </button>
-
-                            {/* Merge Print Button */}
-                            <button
-                                onClick={() => {
-                                    setShowMergeModal(!showMergeModal);
-                                    if (!showMergeModal) loadMergeRecords();
-                                }}
-                                className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${showMergeModal
-                                    ? 'bg-blue-50 text-blue-600 border-blue-200'
-                                    : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
-                                    }`}
-                            >
-                                <Printer size={16} />
-                                合併列印
-                            </button>
-
-                            {/* History Import Button */}
-                            <button
-                                onClick={handleOpenHistoryImport}
-                                className="flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border whitespace-nowrap transition-all bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]"
-                            >
-                                <RefreshCw size={16} className="rotate-180" />
-                                導入前期退貨
-                            </button>
 
                         </div>
                     </div>
