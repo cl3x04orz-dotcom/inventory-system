@@ -22,7 +22,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
             group: '進貨管理',
             items: [
                 { key: 'purchase_entry', label: '商品進貨登錄' },
-                { key: 'purchase_history', label: '進貨查詢' }
+                { id: 'view_purchase_history', label: '進貨查詢報表' },
             ]
         },
         {

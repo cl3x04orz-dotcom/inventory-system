@@ -139,16 +139,29 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
         const fields = ['vendor', 'product', 'qty', 'price', 'year', 'month', 'day'];
         const fieldIdx = fields.indexOf(field);
 
-        if (e.key === 'Enter' || e.key === 'ArrowRight') {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            // [Modified] Enter on Price -> New Row
+            if (field === 'price') {
+                addItem();
+                setTimeout(() => focusAndSelect(`${prefix}${idx + 1}-vendor`), 50);
+            } else if (fieldIdx < fields.length - 1) {
+                // Other fields -> Next field
+                focusAndSelect(`${prefix}${idx}-${fields[fieldIdx + 1]}`);
+            } else if (idx < items.length - 1) {
+                // Last field (day) -> Next row vendor
+                focusAndSelect(`${prefix}${idx + 1}-vendor`);
+            } else {
+                // Last row last field -> New row
+                addItem();
+                setTimeout(() => focusAndSelect(`${prefix}${idx + 1}-vendor`), 50);
+            }
+        } else if (e.key === 'ArrowRight') {
             e.preventDefault();
             if (fieldIdx < fields.length - 1) {
                 focusAndSelect(`${prefix}${idx}-${fields[fieldIdx + 1]}`);
             } else if (idx < items.length - 1) {
                 focusAndSelect(`${prefix}${idx + 1}-vendor`);
-            } else if (e.key === 'Enter') {
-                addItem();
-                // We need a short delay to wait for React to render the new row
-                setTimeout(() => focusAndSelect(`${prefix}${idx + 1}-vendor`), 50);
             }
         } else if (e.key === 'ArrowLeft') {
             e.preventDefault();
@@ -176,8 +189,9 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
         // VALIDATION STEP
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
-            if (!item.vendor.trim() || !item.productName.trim() || !item.quantity || !item.unitPrice || !item.expiryYear || !item.expiryMonth || !item.expiryDay) {
-                alert(`錯誤：第 ${i + 1} 列資料不完整！\n請確認「廠商」、「產品名稱」、「數量」、「單價」、「有效期限」皆已填寫。`);
+            // [Modified] Expiry is now optional
+            if (!item.vendor.trim() || !item.productName.trim() || !item.quantity || !item.unitPrice) {
+                alert(`錯誤：第 ${i + 1} 列資料不完整！\n請確認「廠商」、「產品名稱」、「數量」、「單價」皆已填寫。`);
                 return;
             }
         }
@@ -185,14 +199,19 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
         setLoading(true);
 
         const payloadItems = items.map(item => {
-            const m = item.expiryMonth.padStart(2, '0');
-            const d = item.expiryDay.padStart(2, '0');
+            let expiryString = "";
+            if (item.expiryYear && item.expiryMonth && item.expiryDay) {
+                const m = item.expiryMonth.padStart(2, '0');
+                const d = item.expiryDay.padStart(2, '0');
+                expiryString = `${item.expiryYear}-${m}-${d}`;
+            }
+
             return {
                 vendor: item.vendor,
                 productName: item.productName,
                 quantity: Number(item.quantity),
                 price: Number(item.unitPrice),
-                expiry: `${item.expiryYear}-${m}-${d}`,
+                expiry: expiryString,
                 paymentMethod: item.paymentMethod
             };
         });

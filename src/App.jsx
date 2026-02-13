@@ -361,7 +361,7 @@ function AppContent() {
                                 {(user.role === 'BOSS' || checkPermission('purchase') || checkPermission('purchaseHistory')) && (
                                     <MobileNavGroup label="進貨管理" icon={PackagePlus}>
                                         {checkPermission('purchase') && <NavItem label="商品進貨登錄" icon={PackagePlus} onClick={() => handlePageChange('purchase')} active={page === 'purchase'} />}
-                                        {checkPermission('purchaseHistory') && <NavItem label="進貨查詢" icon={ClipboardList} onClick={() => handlePageChange('purchaseHistory')} active={page === 'purchaseHistory'} />}
+                                        {checkPermission('purchaseHistory') && <NavItem label="進貨查詢報表" icon={ClipboardList} onClick={() => handlePageChange('purchaseHistory')} active={page === 'purchaseHistory'} />}
                                     </MobileNavGroup>
                                 )}
 
@@ -444,7 +444,7 @@ function AppContent() {
                             active={['purchase', 'purchaseHistory'].includes(page)}
                         >
                             {checkPermission('purchase') && <NavItem label="商品進貨登錄" icon={PackagePlus} onClick={() => handlePageChange('purchase')} active={page === 'purchase'} />}
-                            {checkPermission('purchaseHistory') && <NavItem label="進貨查詢" icon={ClipboardList} onClick={() => handlePageChange('purchaseHistory')} active={page === 'purchaseHistory'} />}
+                            {checkPermission('purchaseHistory') && <NavItem label="進貨查詢報表" icon={ClipboardList} onClick={() => handlePageChange('purchaseHistory')} active={page === 'purchaseHistory'} />}
                         </NavDropdown>
                     )}
 
