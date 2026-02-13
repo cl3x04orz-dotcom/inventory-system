@@ -788,3 +788,123 @@ function getRecentSalesToday(payload) {
   // 按時間倒序排列（最新的在前）
   return results.sort((a, b) => new Date(b.date) - new Date(a.date));
 }
+
+/**
+ * 獲取指定日期範圍的銷售紀錄
+ * 用於合併列印功能 (彈性日期)
+ */
+function getSalesByDateRange(payload) {
+  const { token, startDate, endDate } = payload;
+  
+  // 驗證使用者
+  let currentUser = null;
+  if (token && typeof verifyToken !== 'undefined') {
+    currentUser = verifyToken(token);
+  }
+  if (!currentUser && payload.userRole) {
+    currentUser = { 
+      role: payload.userRole, 
+      username: payload.operator || '' 
+    };
+  }
+  
+  if (!currentUser || !currentUser.username) {
+    throw new Error('使用者驗證失敗');
+  }
+  
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const salesSheet = ss.getSheetByName('Sales');
+  const detailsSheet = ss.getSheetByName('SalesDetails');
+  
+  if (!salesSheet || !detailsSheet) return [];
+  
+  // 解析日期範圍 (避免時區偏移導致日期跑掉)
+  // 將 YYYY-MM-DD 字串手動解析為本地時間的 00:00:00
+  const parseLocalYMD = (dateStr) => {
+    if (!dateStr) return new Date();
+    const parts = dateStr.split('-');
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    return new Date(y, m, d);
+  };
+
+  const start = parseLocalYMD(startDate);
+  start.setHours(0, 0, 0, 0);
+  
+  const end = parseLocalYMD(endDate);
+  end.setHours(23, 59, 59, 999);
+  
+  const salesData = salesSheet.getDataRange().getValues();
+  const detailsData = detailsSheet.getDataRange().getValues();
+  const productMap = typeof getProductMap_ !== 'undefined' ? getProductMap_() : {};
+  
+  const results = [];
+  
+  // 欄位索引
+  const IDX_ID = 0;
+  const IDX_DATE = 1;
+  const IDX_REP1 = 2;
+  const IDX_TOTAL = 5;
+  const IDX_CUST = 6;
+  const IDX_REP2 = 7;
+  const IDX_METHOD = 8;
+  const IDX_STATUS = 9;
+  
+  for (let i = 1; i < salesData.length; i++) {
+    const row = salesData[i];
+    const saleId = String(row[IDX_ID] || '').trim();
+    if (!saleId) continue;
+    
+    const saleDate = new Date(row[IDX_DATE]);
+    const salesRep1 = String(row[IDX_REP1] || '').trim();
+    const salesRep2 = String(row[IDX_REP2] || '').trim();
+    const customer = String(row[IDX_CUST] || '').trim();
+    const paymentMethod = String(row[IDX_METHOD] || 'CASH');
+    const status = String(row[IDX_STATUS] || '').toUpperCase();
+    const totalAmount = Number(row[IDX_TOTAL] || 0);
+    
+    // 過濾條件：日期範圍、非作廢
+    if (isNaN(saleDate.getTime()) || saleDate < start || saleDate > end) continue;
+    if (status === 'VOID') continue;
+    
+    const rowRep = salesRep2 || salesRep1;
+    
+    // 提取明細
+    const salesDetails = [];
+    for (let j = 1; j < detailsData.length; j++) {
+      if (String(detailsData[j][0]) === saleId) {
+        const productId = String(detailsData[j][1]);
+        const picked = Number(detailsData[j][2] || 0);
+        const original = Number(detailsData[j][3] || 0);
+        const returns = Number(detailsData[j][4] || 0);
+        const sold = Number(detailsData[j][5] || 0);
+        const unitPrice = Number(detailsData[j][6] || 0);
+        
+        if (sold > 0 || picked > 0 || original > 0) {
+          salesDetails.push({
+            productId: productId,
+            productName: productMap[productId] || productId,
+            picked: picked,
+            original: original,
+            returns: returns,
+            sold: sold,
+            unitPrice: unitPrice
+          });
+        }
+      }
+    }
+    
+    results.push({
+      saleId: saleId,
+      date: saleDate.toISOString(),
+      customer: customer,
+      salesRep: rowRep,
+      paymentMethod: paymentMethod,
+      totalAmount: totalAmount,
+      salesData: salesDetails
+    });
+  }
+  
+  return results.sort((a, b) => new Date(b.date) - new Date(a.date));
+}

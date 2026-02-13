@@ -6,6 +6,7 @@ import { callGAS } from '../utils/api';
 import { PRICE_MAP, sortProducts } from '../utils/constants';
 import { evaluateFormula } from '../utils/mathUtils';
 import MergePrintModal from '../components/MergePrintModal';
+import HistoryImportModal from '../components/HistoryImportModal';
 
 const getSafeNum = (v) => {
     if (typeof v === 'string' && v.trim().startsWith('=')) return 0;
@@ -42,6 +43,22 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [selectedSaleIds, setSelectedSaleIds] = useState([]);
     const [isMergePrinting, setIsMergePrinting] = useState(false);
     const [allAvailableProducts, setAllAvailableProducts] = useState([]); // All sorted products for merge print reference
+
+    // [New] History Import States
+    const [showHistoryImportModal, setShowHistoryImportModal] = useState(false);
+    const [historyImportStartDate, setHistoryImportStartDate] = useState(() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 1); // Default to yesterday
+        return d.toISOString().split('T')[0];
+    });
+    const [historyImportEndDate, setHistoryImportEndDate] = useState(() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 1); // Default to yesterday
+        return d.toISOString().split('T')[0];
+    });
+    const [historyImportRecords, setHistoryImportRecords] = useState([]);
+    const [selectedImportIds, setSelectedImportIds] = useState([]);
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
 
 
@@ -806,6 +823,66 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         }
     };
 
+    // History Import Logic
+    const loadHistoryRecords = async (start, end) => {
+        setIsHistoryLoading(true);
+        try {
+            const records = await callGAS(apiUrl, 'getSalesByDateRange', {
+                startDate: start,
+                endDate: end
+            }, user.token);
+            setHistoryImportRecords(records);
+        } catch (error) {
+            console.error('載入歷史紀錄失敗:', error);
+            alert('載入歷史紀錄失敗: ' + error.message);
+        } finally {
+            setIsHistoryLoading(false);
+        }
+    };
+
+    const handleOpenHistoryImport = () => {
+        setShowHistoryImportModal(true);
+        loadHistoryRecords(historyImportStartDate, historyImportEndDate);
+    };
+
+    const handleImportHistory = () => {
+        if (selectedImportIds.length === 0) return;
+
+        const selectedRecords = historyImportRecords.filter(r => selectedImportIds.includes(r.saleId));
+        if (selectedRecords.length === 0) return;
+
+        // Map product data for fast lookup and aggregation
+        const importDataMap = {};
+        selectedRecords.forEach(record => {
+            record.salesData.forEach(item => {
+                // Sum up returns
+                if (!importDataMap[item.productId]) importDataMap[item.productId] = 0;
+                importDataMap[item.productId] += (Number(item.returns) || 0);
+            });
+        });
+
+        // Update rows
+        setRows(prev => prev.map(row => {
+            const importReturns = importDataMap[String(row.id)];
+            if (importReturns !== undefined && importReturns > 0) {
+                const newOriginal = importReturns;
+                const newSold = getSafeNum(row.picked) + getSafeNum(newOriginal) - getSafeNum(row.returns);
+                const newSubtotal = newSold * getSafeNum(row.price);
+                return {
+                    ...row,
+                    original: newOriginal,
+                    sold: newSold,
+                    subtotal: newSubtotal
+                };
+            }
+            return row;
+        }));
+
+        setShowHistoryImportModal(false);
+        setSelectedImportIds([]);
+        alert(`已成功導入 ${selectedRecords.length} 筆紀錄的退貨資料！`);
+    };
+
 
     return (
         <>
@@ -905,6 +982,15 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             >
                                 <Printer size={16} />
                                 合併列印
+                            </button>
+
+                            {/* History Import Button */}
+                            <button
+                                onClick={handleOpenHistoryImport}
+                                className="flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border whitespace-nowrap transition-all bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]"
+                            >
+                                <RefreshCw size={16} className="rotate-180" />
+                                導入前期退貨
                             </button>
 
                         </div>
@@ -1298,6 +1384,31 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 }}
                 onMergePrint={handleMergePrint}
                 isPrinting={isMergePrinting}
+            />
+
+            {/* History Import Modal */}
+            <HistoryImportModal
+                show={showHistoryImportModal}
+                onClose={() => {
+                    setShowHistoryImportModal(false);
+                    setSelectedImportIds([]);
+                }}
+                records={historyImportRecords}
+                selectedIds={selectedImportIds}
+                onToggleSelect={(id) => {
+                    setSelectedImportIds(prev =>
+                        prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+                    );
+                }}
+                onImport={handleImportHistory}
+                startDate={historyImportStartDate}
+                endDate={historyImportEndDate}
+                onDateChange={(type, value) => {
+                    if (type === 'start') setHistoryImportStartDate(value);
+                    else setHistoryImportEndDate(value);
+                }}
+                onSearch={() => loadHistoryRecords(historyImportStartDate, historyImportEndDate)}
+                isLoading={isHistoryLoading}
             />
         </>
     );
