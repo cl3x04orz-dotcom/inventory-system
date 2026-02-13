@@ -20,7 +20,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [reserve, setReserve] = useState(5000);
     const [expenses, setExpenses] = useState({
         stall: 0, cleaning: 0, electricity: 0, gas: 0, parking: 0,
-        goods: 0, bags: 0, others: 0, linePay: 0, serviceFee: 0
+        goods: 0, bags: 0, others: 0, linePay: 0, serviceFee: 0,
+        salary: 0, reserveFund: 0, vehicleMaintenance: 0
     });
     const [location, setLocation] = useState(''); // This will be used as "Sales Target"
     const [targetSalesRep, setTargetSalesRep] = useState(''); // [New] 業績歸屬業務員 (修正時保留原始人名)
@@ -542,7 +543,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const totalExpensesPlusLinePay =
         getSafeNum(expenses.stall) + getSafeNum(expenses.cleaning) + getSafeNum(expenses.electricity) +
         getSafeNum(expenses.gas) + getSafeNum(expenses.parking) + getSafeNum(expenses.goods) +
-        getSafeNum(expenses.bags) + getSafeNum(expenses.others) + getSafeNum(expenses.linePay);
+        getSafeNum(expenses.bags) + getSafeNum(expenses.others) + getSafeNum(expenses.linePay) +
+        getSafeNum(expenses.salary) + getSafeNum(expenses.reserveFund) + getSafeNum(expenses.vehicleMaintenance);
 
     const isCredit = paymentType === 'CREDIT';
 
@@ -585,7 +587,11 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     unitPrice: r.price
                 })),
                 cashData: { totalCash: paymentType === 'CREDIT' ? 0 : totalCashNet, reserve },
-                expenseData: { ...expenses, finalTotal },
+                expenseData: {
+                    ...expenses,
+                    reserve: expenses.reserveFund, // Map reserveFund to reserve for backend
+                    finalTotal
+                },
                 cashCounts: cashCounts, // [New] Pass detailed cash counts
                 submissionId: submissionId // [New] 防止重複存檔的唯一辨識碼
             };
@@ -1201,7 +1207,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                             <h2 className="text-lg font-bold mb-4 text-rose-500">支出與其他</h2>
                             <div className="grid grid-cols-2 gap-3">
-                                {['stall:攤位', 'cleaning:清潔', 'electricity:電費', 'gas:加油', 'parking:停車', 'goods:貨款', 'bags:塑膠袋', 'others:其他'].map((item, idx, arr) => {
+                                {['stall:攤位', 'cleaning:清潔', 'electricity:電費', 'gas:加油', 'parking:停車', 'goods:貨款', 'bags:塑膠袋', 'others:其他', 'salary:薪資發放', 'reserveFund:公積金', 'vehicleMaintenance:車輛保養'].map((item, idx, arr) => {
                                     const [key, label] = item.split(':');
                                     const currentId = `input-expense-${key}`;
 
@@ -1212,7 +1218,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                                     // Grid Navigation (2 columns)
                                     const upKey = idx >= 2 ? arr[idx - 2].split(':')[0] : null;
-                                    const downKey = idx < arr.length - 2 ? arr[idx + 2].split(':')[0] : 'linePay';
+                                    const downKey = idx < arr.length - 2 ? arr[idx + 2].split(':')[0] : (idx === arr.length - 1 ? 'linePay' : arr[idx + 1].split(':')[0]);
 
                                     return (
                                         <div key={key}>
@@ -1221,7 +1227,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                 id={currentId}
                                                 type="text"
                                                 inputMode="decimal"
-                                                className="input-field text-sm"
+                                                className={`input-field text-sm ${['salary', 'reserveFund', 'vehicleMaintenance'].includes(key) ? 'border-amber-200/50 bg-amber-50/10' : ''}`}
                                                 value={expenses[key] || ''}
                                                 onChange={(e) => handleExpenseChange(key, e.target.value)}
                                                 onBlur={(e) => handleExpenseBlur(key, e.target.value)}

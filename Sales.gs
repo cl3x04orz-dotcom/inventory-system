@@ -73,9 +73,11 @@ function saveSalesService(data, user) {
         expenseData.serviceFee, expenseData.finalTotal, // L (11): 銷售產生維持 finalTotal (正常顯示)
         customer || '',    
         finalSalesRep,
-        today,               // O (14): 時間戳記 ✅
-        "", "", "",          // P, Q, R (15-17): 空白 (銷售無車輛保養等)
-        ""                   // S (18): 備註 (空白)
+        today,                                          // O (14): 時間戳記 ✅
+        Number(expenseData.vehicleMaintenance) || 0,    // P (15): 車輛保養 ✅
+        Number(expenseData.salary) || 0,                // Q (16): 薪資發放 ✅
+        Number(expenseData.reserve) || 0,               // R (17): 公積金 ✅
+        ""                                              // S (18): 備註 (空白)
     ];
     
     // 3.3 處理庫存邏輯 (只修改記憶體 invData)
