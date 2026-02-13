@@ -8,7 +8,11 @@ export default function MergePrintModal({
     selectedIds,
     onToggleSelect,
     onMergePrint,
-    isPrinting
+    isPrinting,
+    startDate,
+    endDate,
+    onDateChange,
+    onSearch
 }) {
     if (!show) return null;
 
@@ -114,7 +118,7 @@ export default function MergePrintModal({
                                                 <div className={`flex items-center gap-2 text-[11px] font-black px-3 py-1.5 rounded-xl whitespace-nowrap transition-colors ${isSelected ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'
                                                     }`}>
                                                     <Clock size={14} strokeWidth={2.5} />
-                                                    {new Date(record.date).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
+                                                    {new Date(record.date).toLocaleString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                                                 </div>
                                             </div>
 
