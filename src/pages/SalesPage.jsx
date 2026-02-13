@@ -1227,7 +1227,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                 id={currentId}
                                                 type="text"
                                                 inputMode="decimal"
-                                                className={`input-field text-sm ${['salary', 'reserveFund', 'vehicleMaintenance'].includes(key) ? 'border-amber-200/50 bg-amber-50/10' : ''}`}
+                                                className="input-field text-sm"
                                                 value={expenses[key] || ''}
                                                 onChange={(e) => handleExpenseChange(key, e.target.value)}
                                                 onBlur={(e) => handleExpenseBlur(key, e.target.value)}
