@@ -194,24 +194,9 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     // 注意：totalSales 是包含所有銷售的，所有這裡用 totalSales 減去 totalCreditSales
     const totalCashSales = totalSales - totalCreditSales;
 
-    // [Fix] 總支出計算邏輯更新
-    // 1. 如果是「銷售產生」的支出 (有結算總額 displayFinalTotal > 0): 薪資為匯款，需扣除 (不計入現金支出)
-    // 2. 如果是「手動支出」的支出 (結算總額 displayFinalTotal == 0): 薪資視為一般支出，需加入總額 (使用者需求)
+    // [Fix] 總支出計算邏輯更新：薪資（應叫金）統一視為現金支出（需扣除）
     const totalExpenses = expenseData?.reduce((acc, item) => {
         let expense = item.rowTotal || 0;
-
-        // 判斷是否為「銷售產生」的支出 (SaleID 存在且有結算金額)
-        // 根據 Sales.gs, 銷售產生的支出會寫入 L 欄 (displayFinalTotal > 0)
-        // 根據 Code.gs, 手動支出會寫入 L 欄 = 0
-        const isSalesGenerated = (Number(item.displayFinalTotal) || 0) !== 0;
-
-        if (isSalesGenerated) {
-            // 銷售產生的薪資 (匯款) -> 扣除
-            expense -= (item.salaryAmount || 0);
-        } else {
-            // 手動輸入的薪資 -> 保留 (不扣除)
-        }
-
         return acc + expense;
     }, 0) || 0;
 
