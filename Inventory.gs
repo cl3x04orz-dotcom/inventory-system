@@ -199,24 +199,29 @@ function getInventoryValuation() {
   if (invData.length <= 1) return [];
 
   const invHeaders = invData[0].map(h => String(h || '').trim().toLowerCase());
-  
-  // 找產品 ID 欄位 (關鍵：必須優先找包含 'product' 或 '產品' 的 ID，避免選到 A 欄的 Batch ID)
-  let idxPId = invHeaders.findIndex(h => (h.includes('product') || h.includes('產品') || h.includes('品項')) && h.includes('id'));
-  if (idxPId === -1) idxPId = invHeaders.findIndex(h => h.includes('product') || h.includes('產品') || h.includes('品項') || h.includes('商品'));
-  if (idxPId === -1) idxPId = invHeaders.findIndex(h => h.includes('id') || h.includes('序號') || h.includes('uuid'));
-  if (idxPId === -1) idxPId = 1; // 預設第 2 欄
-  
-  // 找數量 欄位
-  let idxQty = invHeaders.findIndex(h => h.includes('量') || h.includes('qty') || h.includes('quantity'));
-  if (idxQty === -1) idxQty = 2; // 預設第 3 欄
-  
-  // 找類型 欄位
-  let idxType = invHeaders.findIndex(h => h.includes('類') || h === 'type');
-  if (idxType === -1) idxType = 5; // 預設第 6 欄
-  
-  // 找價格 欄位
-  let idxPrice = invHeaders.findIndex(h => h.includes('價') || h.includes('cost') || h.includes('amount') || h.includes('金額'));
-  if (idxPrice === -1) idxPrice = 6; // 預設第 7 欄
+    // 優先使用標準索引 (對齊 getInventoryService)
+    let idxPId = 1;
+    let idxQty = 2;
+    let idxType = 5;
+    let idxPrice = 6;
+
+    // 若標題列不符標準，則動態搜尋備用
+    if (invHeaders[idxPId] !== 'productid' && invHeaders[idxPId] !== '產品id') {
+      const found = invHeaders.findIndex(h => (h.includes('product') || h.includes('產品')) && h.includes('id'));
+      if (found !== -1) idxPId = found;
+    }
+    if (invHeaders[idxQty] !== 'quantity' && invHeaders[idxQty] !== '數量') {
+      const found = invHeaders.findIndex(h => h.includes('量') || h.includes('qty'));
+      if (found !== -1) idxQty = found;
+    }
+    if (invHeaders[idxType] !== 'type' && invHeaders[idxType] !== '類型') {
+      const found = invHeaders.findIndex(h => h.includes('類') || h === 'type');
+      if (found !== -1) idxType = found;
+    }
+    if (invHeaders[idxPrice] !== 'cost' && invHeaders[idxPrice] !== '成本') {
+      const found = invHeaders.findIndex(h => h.includes('價') || h.includes('cost') || h.includes('金額'));
+      if (found !== -1) idxPrice = found;
+    }
 
   // 讀取 Products 分頁以取得名稱、排序權重與備用單價
   const dynamicProductMap = {};
@@ -314,14 +319,16 @@ function getInventoryValuation() {
     if (type === 'STOCK') {
       valuations[pName].stockQty += qty;
       valuations[pName].stockValue += (qty * price);
+      // 累計總額
+      valuations[pName].totalQty += qty;
+      valuations[pName].totalValue += (qty * price);
     } else if (type === 'ORIGINAL') {
       valuations[pName].originalQty += qty;
       valuations[pName].originalValue += (qty * price);
+      // 累計總額
+      valuations[pName].totalQty += qty;
+      valuations[pName].totalValue += (qty * price);
     }
-    
-    // 總計
-    valuations[pName].totalQty += qty;
-    valuations[pName].totalValue += (qty * price);
   }
   
   // 按照排序權重排序
