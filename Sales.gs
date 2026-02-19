@@ -8,7 +8,7 @@
 // 1. 銷售存檔 (Save Sales) - [Transaction Safe]
 // ===========================================
 function saveSalesService(data, user) {
-  const { salesData, cashData, expenseData, customer, paymentMethod, salesRep, operator, submissionId } = data; 
+  const { salesData, cashData, expenseData, customer, paymentMethod, salesRep, operator, submissionId, originalDate } = data; 
   
   // [防重複存檔] 檢查 submissionId
   if (submissionId) {
@@ -38,7 +38,19 @@ function saveSalesService(data, user) {
     
     // 3. 準備資料 (In-Memory Calculation)
     const saleId = Utilities.getUuid();
-    const today = data.serverTimestamp ? new Date(data.serverTimestamp) : new Date();
+    
+    // 如果是修正單據，優先使用原始日期 (originalDate)，否則使用當前時間
+    let today = new Date();
+    if (originalDate) {
+      try {
+        today = new Date(originalDate);
+      } catch (e) {
+        console.error("Failed to parse originalDate:", originalDate, e);
+      }
+    } else if (data.serverTimestamp) {
+      today = new Date(data.serverTimestamp);
+    }
+
     const status = (paymentMethod === 'CREDIT') ? 'UNPAID' : 'PAID';
     const method = paymentMethod || 'CASH';
 
@@ -77,7 +89,7 @@ function saveSalesService(data, user) {
         Number(expenseData.vehicleMaintenance) || 0,    // P (15): 車輛保養 ✅
         Number(expenseData.salary) || 0,                // Q (16): 薪資發放 ✅
         Number(expenseData.reserve) || 0,               // R (17): 公積金 ✅
-        ""                                              // S (18): 備註 (空白)
+        originalDate ? `[修正] 於 ${Utilities.formatDate(new Date(), "GMT+8", "yyyy/MM/dd HH:mm")} 修改，原始 ID: ${data.originalSaleId || 'N/A'}` : "" // S (18): 備註
     ];
     
     // 3.3 處理庫存邏輯 (只修改記憶體 invData)
@@ -516,7 +528,9 @@ function getSaleToCloneService(payload) {
       salesData: fetchedDetails,
       reserve: Number(originalSaleData[4] || 0),
       expenses: fetchedExpenses,
-      cashCounts: (originalSaleData[10] && String(originalSaleData[10]).startsWith('{')) ? JSON.parse(originalSaleData[10]) : {}
+      cashCounts: (originalSaleData[10] && String(originalSaleData[10]).startsWith('{')) ? JSON.parse(originalSaleData[10]) : {},
+      originalDate: originalSaleData[1], // 新增：檢索原始日期
+      originalSaleId: saleId            // 新增：紀錄來源 ID
     }
   };
 }
@@ -663,7 +677,9 @@ function voidAndFetchSaleService(payload) {
       salesData: fetchedDetails,
       reserve: Number(originalSaleData[4] || 0),
       expenses: fetchedExpenses,
-      cashCounts: (originalSaleData[10] && String(originalSaleData[10]).startsWith('{')) ? JSON.parse(originalSaleData[10]) : {}
+      cashCounts: (originalSaleData[10] && String(originalSaleData[10]).startsWith('{')) ? JSON.parse(originalSaleData[10]) : {},
+      originalDate: originalSaleData[1], // 新增：檢索原始日期
+      originalSaleId: saleId            // 新增：紀錄來源 ID
     }
   };
 

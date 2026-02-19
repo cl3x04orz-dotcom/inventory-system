@@ -27,6 +27,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [location, setLocation] = useState(''); // This will be used as "Sales Target"
     const [targetSalesRep, setTargetSalesRep] = useState(''); // [New] 業績歸屬業務員 (修正時保留原始人名)
     const [paymentType, setPaymentType] = useState('CASH');
+    const [originalDate, setOriginalDate] = useState(null); // [New] 保留原始單據日期
+    const [originalSaleId, setOriginalSaleId] = useState(null); // [New] 保留原始單據 ID 用於備註
     const [isSubmitting, setIsSubmitting] = useState(false);
     // [New] 防止重複提交的 ID
     const [submissionId, setSubmissionId] = useState(() => `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
@@ -198,6 +200,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 ...cloned.expenses
                             }));
                         }
+                        if (cloned.originalDate) setOriginalDate(cloned.originalDate);
+                        if (cloned.originalSaleId) setOriginalSaleId(cloned.originalSaleId);
 
                         // Merge Rows
                         finalRows = finalRows.map(row => {
@@ -608,7 +612,9 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     finalTotal
                 },
                 cashCounts: cashCounts, // [New] Pass detailed cash counts
-                submissionId: submissionId // [New] 防止重複存檔的唯一辨識碼
+                submissionId: submissionId, // [New] 防止重複存檔的唯一辨識碼
+                originalDate: originalDate, // [New] 傳回原始日期
+                originalSaleId: originalSaleId // [New] 傳回原始 ID 用於備註
             };
 
             setIsSubmitting(true);
