@@ -292,7 +292,7 @@ function getInventoryValuation() {
       price = defaultPriceMap[pId] || 0;
     }
 
-    if (qty <= 0 || !pId) continue;
+    if (!pId) continue; // 以前會過濾 qty <= 0，導致負數庫存沒被扣除，現在允許負數計入估值以反映淨額
     
     // [Fix] 嚴格對齊盤點邏輯：如果對不到 ID，代表是無效或髒資料，不列入估值
     const pName = dynamicProductMap[pId];

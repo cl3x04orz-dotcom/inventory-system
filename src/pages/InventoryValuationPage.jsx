@@ -35,7 +35,8 @@ export default function InventoryValuationPage({ user, apiUrl }) {
     }, [user.token, apiUrl]);
 
     const filteredData = data.filter(item =>
-        String(item.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+        String(item.name || '').toLowerCase().includes(searchTerm.toLowerCase()) &&
+        Number(item.totalQty || 0) !== 0
     );
 
     const totalValue = filteredData.reduce((sum, item) => sum + (Number(item.totalValue) || 0), 0);
@@ -118,8 +119,14 @@ export default function InventoryValuationPage({ user, apiUrl }) {
                                             <td className="p-4 font-medium text-[var(--text-primary)]">
                                                 {item.name}
                                             </td>
-                                            <td className="p-4 text-right font-mono text-[var(--text-secondary)]">
-                                                {qty.toLocaleString()}
+                                            <td className="p-4 text-right">
+                                                <div className="font-mono text-[var(--text-secondary)] text-lg">{qty.toLocaleString()}</div>
+                                                {(item.stockQty !== 0 && item.originalQty !== 0) && (
+                                                    <div className="text-[11px] leading-tight text-[var(--text-tertiary)] flex flex-col items-end mt-1">
+                                                        <span className={item.stockQty < 0 ? 'text-red-400' : ''}>現貨: {item.stockQty > 0 ? '+' : ''}{item.stockQty}</span>
+                                                        <span>退貨: {item.originalQty > 0 ? '+' : ''}{item.originalQty}</span>
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="p-4 text-right font-mono text-[var(--text-secondary)]">
                                                 ${unitCost.toFixed(2)}
@@ -181,6 +188,12 @@ export default function InventoryValuationPage({ user, apiUrl }) {
                                     <div className="bg-[var(--bg-tertiary)] p-2 rounded-lg">
                                         <div className="text-xs text-[var(--text-tertiary)] mb-1">庫存量</div>
                                         <div className="font-mono font-bold text-[var(--text-primary)]">{qty.toLocaleString()}</div>
+                                        {(item.stockQty !== 0 && item.originalQty !== 0) && (
+                                            <div className="text-[10px] text-[var(--text-tertiary)] mt-1 flex flex-col items-center">
+                                                <span className={item.stockQty < 0 ? 'text-red-400' : ''}>現貨: {item.stockQty}</span>
+                                                <span>退貨: {item.originalQty}</span>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="bg-[var(--bg-tertiary)] p-2 rounded-lg">
                                         <div className="text-xs text-[var(--text-tertiary)] mb-1">單位成本</div>
