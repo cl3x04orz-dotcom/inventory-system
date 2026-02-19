@@ -71,7 +71,7 @@ function addPurchaseService(data, user) {
             // Collect Inventory Row
             // Col 0: UUID, 1: ProductID, 2: Qty, 3: Expiry, 4: Date, 5: Type, 6: Price/Note
             inventoryRows.push([
-              Utilities.getUuid(), productId, item.quantity, item.expiry, entryDate, 'STOCK', item.price
+              Utilities.getUuid(), productId, item.quantity, item.expiry, entryDate, 'STOCK', item.price, item.productName
             ]);
         }
     });

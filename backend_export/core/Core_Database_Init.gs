@@ -30,7 +30,7 @@ function initDb() {
     };
     defineSheet('Users', ['UserID', 'Username', 'PasswordHash', 'Role', 'Status', 'CreatedAt', 'Permissions']);
     defineSheet('Products', ['ProductID', 'ProductName', 'Category', 'DefaultPrice', '(Reserve)', 'SafetyStock', 'SortWeight']);
-    defineSheet('Inventory', ['BatchID', 'ProductID', 'Quantity', 'ExpiryDate', 'EntryDate', 'Type', 'Cost']);
+    defineSheet('Inventory', ['BatchID', 'ProductID', 'Quantity', 'ExpiryDate', 'EntryDate', 'Type', 'Cost', 'ProductName']);
     defineSheet('Purchases', ['PurchaseID', 'Date', 'Vendor', 'ProductID', 'Quantity', 'UnitPrice', 'ExpiryDate', 'Buyer', 'PaymentMethod', 'Status', 'Operator']);
     defineSheet('Sales', ['SaleID', 'Date', 'SalesRep', 'TotalCash', 'Reserve', 'FinalTotal', 'Customer', 'Operator', 'PaymentMethod', 'Status']);
     defineSheet('SalesDetails', ['SaleID', 'ProductID', 'Picked', 'Original', 'Return', 'Sold', 'UnitPrice', 'Subtotal']);

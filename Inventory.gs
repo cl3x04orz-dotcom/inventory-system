@@ -404,3 +404,43 @@ function getStocktakeHistory(filter) {
   
   return results;
 }
+
+/**
+ * 一次性遷移腳本：為現有的 Inventory 資料補上商品名稱
+ * 執行後可讓試算表後台更易讀
+ */
+function migrateInventoryProductNames() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const iSheet = ss.getSheetByName('Inventory');
+  const productMap = typeof getProductMap !== 'undefined' ? getProductMap() : {};
+  
+  if (!iSheet) return "找不到 Inventory 分頁";
+  
+  const data = iSheet.getDataRange().getValues();
+  if (data.length <= 1) return "無資料可遷移";
+  
+  // 檢查是否已有正確的標題，若無則更新
+  const headers = data[0];
+  if (headers.length < 8) {
+    iSheet.getRange(1, 8).setValue("ProductName");
+  }
+  
+  const updates = [];
+  for (let i = 1; i < data.length; i++) {
+    const pId = String(data[i][1]).trim();
+    const existingName = data[i][7] || ""; // 第 8 欄
+    
+    if (pId && !existingName) {
+      updates.push([productMap[pId] || "Unknown"]);
+    } else {
+      updates.push([existingName]);
+    }
+  }
+  
+  if (updates.length > 0) {
+    iSheet.getRange(2, 8, updates.length, 1).setValues(updates);
+    return `遷移完成：已更新 ${updates.length} 列資料`;
+  }
+  
+  return "無須更新";
+}

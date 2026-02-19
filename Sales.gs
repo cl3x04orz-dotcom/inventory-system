@@ -423,12 +423,14 @@ function deductInventory_(sheetData, productId, qtyToDeduct, targetType) {
 function getReturnRows_(sheetData, item, consumedBatches, today) {
   let rows = [];
   let remainingReturn = item.returns;
+  const productMap = typeof getProductMap !== 'undefined' ? getProductMap() : {};
+  const pName = productMap[item.productId] || item.productName || 'Unknown';
   
   for (let batch of consumedBatches) {
     if (remainingReturn <= 0) break;
     const returnQty = Math.min(remainingReturn, batch.deductedQty);
     rows.push([
-      Utilities.getUuid(), item.productId, returnQty, batch.expiry, today, 'ORIGINAL', ''
+      Utilities.getUuid(), item.productId, returnQty, batch.expiry, today, 'ORIGINAL', '', pName
     ]);
     remainingReturn -= returnQty;
   }
@@ -441,7 +443,7 @@ function getReturnRows_(sheetData, item, consumedBatches, today) {
       fallbackExpiry = stockBatches[0][3]; 
     }
     rows.push([
-      Utilities.getUuid(), item.productId, remainingReturn, fallbackExpiry, today, 'ORIGINAL', ''
+      Utilities.getUuid(), item.productId, remainingReturn, fallbackExpiry, today, 'ORIGINAL', '', pName
     ]);
   }
   return rows;
@@ -583,6 +585,7 @@ function voidAndFetchSaleService(payload) {
   // 3. 處理銷售明細與庫存回補
   const detailsData = detailsSheet.getDataRange().getValues();
   const invData = invSheet.getDataRange().getValues(); // Snapshot of Inventory
+  const productMap = typeof getProductMap !== 'undefined' ? getProductMap() : {};
   const fetchedDetails = [];
   const today = new Date();
   const voidRefundInvRows = [];
@@ -597,6 +600,7 @@ function voidAndFetchSaleService(payload) {
       const returns = Number(detailsData[i][4] || 0);
       const sold = Number(detailsData[i][5] || 0);
       const unitPrice = Number(detailsData[i][6] || 0);
+      const pName = productMap[productId] || productId;
 
       fetchedDetails.push({ productId, picked, original, returns, sold, unitPrice });
 
@@ -611,10 +615,10 @@ function voidAndFetchSaleService(payload) {
             break;
           }
         }
-        voidRefundInvRows.push([Utilities.getUuid(), productId, picked, expiry, today, 'STOCK', 'VOID_REFUND: ' + saleId]);
+        voidRefundInvRows.push([Utilities.getUuid(), productId, picked, expiry, today, 'STOCK', 'VOID_REFUND: ' + saleId, pName]);
       }
       if (original > 0) {
-        voidRefundInvRows.push([Utilities.getUuid(), productId, original, today, today, 'ORIGINAL', 'VOID_REFUND: ' + saleId]);
+        voidRefundInvRows.push([Utilities.getUuid(), productId, original, today, today, 'ORIGINAL', 'VOID_REFUND: ' + saleId, pName]);
       }
       if (returns > 0) {
         // [Voiding a Return] -> We must DEDUCT from ORIGINAL in Inventory
@@ -628,7 +632,7 @@ function voidAndFetchSaleService(payload) {
         const remainingToDeduct = returns - totalDeducted;
         if (remainingToDeduct > 0) {
            // Should not happen if data is consistent, but log if it does
-           voidRefundInvRows.push([Utilities.getUuid(), productId, -remainingToDeduct, today, today, 'ORIGINAL', 'VOID_CANCEL_RETURN: ' + saleId]);
+           voidRefundInvRows.push([Utilities.getUuid(), productId, -remainingToDeduct, today, today, 'ORIGINAL', 'VOID_CANCEL_RETURN: ' + saleId, pName]);
         }
       }
     }
