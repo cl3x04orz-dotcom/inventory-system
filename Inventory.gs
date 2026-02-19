@@ -289,7 +289,13 @@ function getInventoryValuation() {
 
     if (qty <= 0 || !pId) continue;
     
-    const pName = dynamicProductMap[pId] || pId;
+    // [Fix] 嚴格對齊盤點邏輯：如果對不到 ID，代表是無效或髒資料，不列入估值
+    const pName = dynamicProductMap[pId];
+    if (!pName) {
+      console.warn(`估值跳過無效品項: ${pId} (請檢查庫存表資料格式)`);
+      continue;
+    }
+    
     if (!valuations[pName]) {
       valuations[pName] = { 
         name: pName, 
