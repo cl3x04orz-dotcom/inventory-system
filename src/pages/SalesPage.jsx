@@ -3,7 +3,7 @@ import { Save, RefreshCw, Calculator, DollarSign, GripVertical, ListOrdered, Pri
 
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { callGAS } from '../utils/api';
-import { PRICE_MAP, sortProducts } from '../utils/constants';
+import { sortProducts } from '../utils/constants';
 import { evaluateFormula } from '../utils/mathUtils';
 import MergePrintModal from '../components/MergePrintModal';
 import HistoryImportModal from '../components/HistoryImportModal';
@@ -154,15 +154,11 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                 // 1. Generate Base Rows
                 let finalRows = sortedProducts.map(p => {
-                    const systemPrice = Number(p.price) || 0;
-                    const mapPrice = PRICE_MAP[p.name] !== undefined ? PRICE_MAP[p.name] : null;
-
                     const localPriceKey = `last_price_${p.id}`;
                     const localPrice = localStorage.getItem(localPriceKey);
 
-                    let finalPrice = systemPrice;
-                    if (mapPrice !== null) finalPrice = mapPrice;
-                    if (localPrice !== null) finalPrice = Number(localPrice);
+                    // 優先使用記憶單價，若無則保持空白讓使用者填寫
+                    let finalPrice = localPrice !== null ? Number(localPrice) : '';
 
                     return {
                         id: p.id,
