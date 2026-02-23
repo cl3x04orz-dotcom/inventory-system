@@ -102,8 +102,11 @@ function saveSalesService(data, user) {
         if (!hasActivity) return; 
 
         // 收集明細
+        const productMap = getProductMap_(); // 獲取產品名稱對照表
+        const pName = productMap[item.productId] || item.productName || 'Unknown';
+        
         newDetailRows.push([
-            saleId, item.productId, item.picked, item.original, item.returns, item.sold, item.unitPrice, (item.sold * item.unitPrice)
+            saleId, item.productId, item.picked, item.original, item.returns, item.sold, item.unitPrice, (item.sold * item.unitPrice), pName
         ]);
         
         let consumedBatches = []; 
@@ -967,4 +970,47 @@ function parseLocalYMD_(dateStr) {
   const m = parseInt(parts[1], 10) - 1;
   const d = parseInt(parts[2], 10);
   return new Date(y, m, d);
+}
+
+/**
+ * 補齊舊銷售明細的產品名稱 (一次性執行)
+ */
+function backfillSalesDetailsProductNames() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const detailsSheet = ss.getSheetByName('SalesDetails');
+  const productMap = getProductMap_();
+  if (!detailsSheet) return "找不到 SalesDetails 分頁";
+
+  const data = detailsSheet.getDataRange().getValues();
+  if (data.length <= 1) return "無資料可補齊";
+
+  // 檢查標題，確保第 9 欄有產品名稱標題
+  if (data[0].length < 9) {
+    detailsSheet.getRange(1, 9).setValue("ProductName");
+  }
+
+  const updates = [];
+  let updatedCount = 0;
+  
+  // 遍歷所有列，ProductID 在第 2 欄 (index 1)
+  for (let i = 1; i < data.length; i++) {
+    const pId = String(data[i][1]).trim();
+    const existingName = data[i][8] || ""; // 產品名稱 在第 9 欄 (index 8)
+    
+    if (pId && !existingName) {
+      const name = productMap[pId] || "Unknown";
+      updates.push([name]);
+      updatedCount++;
+    } else {
+      updates.push([existingName]);
+    }
+  }
+
+  if (updatedCount > 0) {
+    detailsSheet.getRange(2, 9, updates.length, 1).setValues(updates);
+    SpreadsheetApp.flush();
+    return `補齊完成：共更新 ${updatedCount} 筆資料`;
+  }
+
+  return "無須更新";
 }
