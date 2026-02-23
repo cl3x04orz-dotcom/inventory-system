@@ -62,10 +62,10 @@ function addPurchaseService(data, user) {
             const uuid = Utilities.getUuid();
             
             // Collect Purchase Row
-            // Col 0: UUID, 1: Date, 2: Vendor, 3: ProductID, 4: Qty, 5: Price, 6: Expiry, 7: Operator, 8: Method, 9: Status, 10: SubmissionID(Note)
+            // Col 0: UUID, 1: Date, 2: Vendor, 3: ProductID, 4: Qty, 5: Price, 6: Expiry, 7: Operator, 8: Method, 9: Status, 10: SubmissionID(Note), 11: ProductName
             purchaseRows.push([
               uuid, entryDate, rowVendor, productId, item.quantity, 
-              item.price, item.expiry, operator, currPaymentMethod, status, submissionId || operator
+              item.price, item.expiry, operator, currPaymentMethod, status, submissionId || operator, item.productName || ''
             ]);
             
             // Collect Inventory Row
@@ -233,4 +233,38 @@ function getVendorsData_() {
     if (v) map[v] = m;
   }
   return map;
+}
+
+// ===========================================
+// 5. 補齊舊進貨資料的產品名稱 (一次性執行)
+// ===========================================
+function backfillPurchaseProductNames() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const purSheet = ss.getSheetByName('Purchases');
+  const pSheet = ss.getSheetByName('Products');
+  if (!purSheet || !pSheet) { Logger.log('資料表缺失'); return; }
+
+  // 建立 ProductID -> Name 對照表
+  const productMap = {};
+  pSheet.getDataRange().getValues().slice(1).forEach(r => {
+    if (r[0]) productMap[String(r[0])] = String(r[1] || '');
+  });
+
+  const allData = purSheet.getDataRange().getValues();
+  let updated = 0;
+
+  for (let i = 1; i < allData.length; i++) {
+    const productId = String(allData[i][3] || '').trim();
+    const currentName = String(allData[i][11] || '').trim();
+
+    // 只補空白的欄位
+    if (productId && !currentName && productMap[productId]) {
+      purSheet.getRange(i + 1, 12).setValue(productMap[productId]);
+      updated++;
+    }
+  }
+
+  SpreadsheetApp.flush();
+  Logger.log(`補齊完成：共更新 ${updated} 筆紀錄`);
+  return { success: true, updated: updated };
 }
