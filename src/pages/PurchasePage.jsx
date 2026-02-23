@@ -97,10 +97,11 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
             if (typeof value === 'string' && value.trim().startsWith('=')) {
                 const result = evaluateFormula(value);
                 handleItemChange(id, field, result);
-            } else {
-                // Force numeric cleanup on blur
+            } else if (value !== '') {
+                // Force numeric cleanup on blur (only if not empty)
                 handleItemChange(id, field, getSafeNum(value));
             }
+            // If empty, leave as empty string so validation can catch it
         }
     };
 
@@ -190,7 +191,7 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
             // [Modified] Expiry is now optional
-            if (!item.vendor.trim() || !item.productName.trim() || !item.quantity || !item.unitPrice) {
+            if (!item.vendor.trim() || !item.productName.trim() || !item.quantity || item.unitPrice === '') {
                 alert(`錯誤：第 ${i + 1} 列資料不完整！\n請確認「廠商」、「產品名稱」、「數量」、「單價」皆已填寫。`);
                 return;
             }
