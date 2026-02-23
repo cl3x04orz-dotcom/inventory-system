@@ -34,8 +34,10 @@ function getPayablesService(payload) {
   const priceIdx = headers.indexOf('UnitPrice');
   const methodIdx = headers.indexOf('PaymentMethod');
   const statusIdx = headers.indexOf('Status');
-  let operatorIdx = headers.indexOf('Operator');
-  if (operatorIdx === -1) operatorIdx = headers.indexOf('Buyer');
+  let operatorIdx = headers.indexOf('Buyer');
+  if (operatorIdx === -1) operatorIdx = headers.indexOf('Operator');
+  // 如果自動偵測失敗或指向錯誤位置（例如最後一欄 K），強制修正為 index 7 (H 欄)
+  if (operatorIdx === -1 || operatorIdx > 7) operatorIdx = 7; 
 
   if (methodIdx === -1 || statusIdx === -1) return [];
 
