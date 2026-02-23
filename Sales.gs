@@ -555,7 +555,10 @@ function getSaleToCloneService(payload) {
         bags: Number(expData[i][7] || 0),
         others: Number(expData[i][8] || 0),
         linePay: Number(expData[i][9] || 0),
-        serviceFee: Number(expData[i][10] || 0)
+        serviceFee: Number(expData[i][10] || 0),
+        vehicleMaintenance: Number(expData[i][15] || 0),
+        salary: Number(expData[i][16] || 0),
+        reserveFund: Number(expData[i][17] || 0)
       };
       break;
     }
