@@ -128,7 +128,8 @@ function getInventoryForStocktake() {
 function adjustInventoryService(payload, user) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const iSheet = ss.getSheetByName('Inventory');
-  const adjSheet = ss.getSheetByName('Adjustments') || ss.insertSheet('Adjustments').appendRow(['ID', '時間', '產品ID', '類型', '數量', '執行人', '備註']);
+  const adjSheet = ss.getSheetByName('Adjustments') || ss.insertSheet('Adjustments').appendRow(['ID', '時間', '產品ID', '類型', '數量', '執行人', '備註', '產品名稱']);
+  const productMap = typeof getProductMap !== 'undefined' ? getProductMap() : {};
   
   const iData = iSheet.getDataRange().getValues();
   let productId = "";
@@ -148,7 +149,8 @@ function adjustInventoryService(payload, user) {
     payload.type,
     payload.quantity,
     user.username || user.userId,
-    payload.note
+    payload.note,
+    productMap[productId] || ''
   ]);
   return { success: true };
 }
@@ -456,4 +458,36 @@ function migrateInventoryProductNames() {
   }
   
   return "無須更新";
+}
+
+/**
+ * 補齊舊調整紀錄的產品名稱 (一次性執行)
+ */
+function backfillAdjustmentProductNames() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const adjSheet = ss.getSheetByName('Adjustments');
+  const productMap = typeof getProductMap !== 'undefined' ? getProductMap() : {};
+  if (!adjSheet) return "找不到 Adjustments 分頁";
+
+  const data = adjSheet.getDataRange().getValues();
+  if (data.length <= 1) return "無資料可補齊";
+
+  // 檢查標題，確保第 8 欄有產品名稱標題
+  if (data[0].length < 8) {
+    adjSheet.getRange(1, 8).setValue("產品名稱");
+  }
+
+  let updatedCount = 0;
+  for (let i = 1; i < data.length; i++) {
+    const pId = String(data[i][2]).trim(); // 產品ID 在第 3 欄 (index 2)
+    const existingName = data[i][7] || ""; // 產品名稱 在第 8 欄 (index 7)
+    
+    if (pId && !existingName) {
+      const name = productMap[pId] || "Unknown";
+      adjSheet.getRange(i + 1, 8).setValue(name);
+      updatedCount++;
+    }
+  }
+
+  return `補齊完成：已更新 ${updatedCount} 筆資料`;
 }
