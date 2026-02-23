@@ -25,10 +25,18 @@ function getPayablesService(payload) {
   }
   
   const headers = data[0];
-  const uuidIdx = headers.indexOf('UUID');
-  const dateIdx = headers.indexOf('Date'), vendorIdx = headers.indexOf('Vendor'), productIdIdx = headers.indexOf('ProductID'), qtyIdx = headers.indexOf('Quantity'), priceIdx = headers.indexOf('UnitPrice'), methodIdx = headers.indexOf('PaymentMethod'), statusIdx = headers.indexOf('Status');
-  let operatorIdx = headers.indexOf('Operator'); if (operatorIdx === -1) operatorIdx = headers.indexOf('Buyer');
-  
+  // Purchases 表頭: ID, Date, Vendor, ProductID, Quantity, UnitPrice, Expiry, Buyer, PaymentMethod, Status, Operator
+  const idIdx = headers.indexOf('ID');
+  const dateIdx = headers.indexOf('Date');
+  const vendorIdx = headers.indexOf('Vendor');
+  const productIdIdx = headers.indexOf('ProductID');
+  const qtyIdx = headers.indexOf('Quantity');
+  const priceIdx = headers.indexOf('UnitPrice');
+  const methodIdx = headers.indexOf('PaymentMethod');
+  const statusIdx = headers.indexOf('Status');
+  let operatorIdx = headers.indexOf('Operator');
+  if (operatorIdx === -1) operatorIdx = headers.indexOf('Buyer');
+
   if (methodIdx === -1 || statusIdx === -1) return [];
 
   const startDate = (payload && payload.startDate) ? new Date(payload.startDate) : null;
@@ -37,22 +45,28 @@ function getPayablesService(payload) {
 
   const purchaseGroups = {};
   for (let i = 1; i < data.length; i++) {
-    const row = data[i], rowDate = new Date(row[dateIdx]);
+    const row = data[i];
+    const rowDate = new Date(row[dateIdx]);
     if (row[methodIdx] === 'CREDIT' && row[statusIdx] === 'UNPAID') {
       if (startDate && rowDate < startDate) continue;
       if (endDate && rowDate > endDate) continue;
-      const vendor = row[vendorIdx], dateStr = Utilities.formatDate(rowDate, "GMT+8", "yyyy-MM-dd"), rawOperator = row[operatorIdx] || '', operatorName = userMap[rawOperator] || rawOperator || '未知';
+      const vendor = row[vendorIdx];
+      const dateStr = Utilities.formatDate(rowDate, 'GMT+8', 'yyyy-MM-dd');
+      const rawOperator = row[operatorIdx] || '';
+      const operatorName = userMap[rawOperator] || rawOperator || '未知';
       const groupKey = `${vendor}_${dateStr}_${rawOperator}`;
       if (!purchaseGroups[groupKey]) {
         purchaseGroups[groupKey] = { uuids: [], date: dateStr, serverTimestamp: rowDate, vendor: vendor, operator: operatorName, amount: 0, items: [] };
       }
-      // 收集該組所有 UUID，以便批次更新整組
-      if (uuidIdx !== -1 && row[uuidIdx]) {
-        purchaseGroups[groupKey].uuids.push(String(row[uuidIdx]));
+      if (idIdx !== -1 && row[idIdx]) {
+        purchaseGroups[groupKey].uuids.push(String(row[idIdx]));
       }
-      const productId = row[productIdIdx], productName = productMap[productId] || productId, qty = Number(row[qtyIdx]), price = Number(row[priceIdx]), subtotal = qty * price;
-      purchaseGroups[groupKey].amount += subtotal;
-      purchaseGroups[groupKey].items.push({ productName: productName, qty: qty, price: price, subtotal: subtotal });
+      const productId = row[productIdIdx];
+      const productName = productMap[productId] || productId;
+      const qty = Number(row[qtyIdx]) || 0;
+      const price = Number(row[priceIdx]) || 0;
+      purchaseGroups[groupKey].amount += qty * price;
+      purchaseGroups[groupKey].items.push({ productName, qty, price, subtotal: qty * price });
     }
   }
   return Object.values(purchaseGroups).reverse();
@@ -60,7 +74,7 @@ function getPayablesService(payload) {
 
 function markPayableAsPaidService(payload) {
   const { targetUuids } = payload;
-  if (!targetUuids || targetUuids.length === 0) throw new Error('未提供 UUID');
+  if (!targetUuids || targetUuids.length === 0) throw new Error('未提供有效 ID');
 
   const lock = LockService.getScriptLock();
   try {
@@ -70,35 +84,30 @@ function markPayableAsPaidService(payload) {
     const sheet = ss.getSheetByName('Purchases');
     const lastRow = sheet.getLastRow();
     const lastCol = sheet.getLastColumn();
-
     if (lastRow <= 1) return { success: true, updated: 0 };
 
-    // 一次讀取整表（最小化 I/O 次數）
     const data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
     const headers = data[0];
-    const uuidColIdx = headers.indexOf('UUID');
+    const idColIdx = headers.indexOf('ID');
     const statusColIdx = headers.indexOf('Status');
 
-    if (uuidColIdx === -1 || statusColIdx === -1) throw new Error('找不到必要欄位 UUID 或 Status');
+    if (idColIdx === -1 || statusColIdx === -1) throw new Error('找不到 ID 或 Status 欄位');
 
     const targetSet = new Set(targetUuids.map(String));
     let updatedCount = 0;
 
     for (let i = 1; i < data.length; i++) {
-      if (targetSet.has(String(data[i][uuidColIdx]))) {
+      if (targetSet.has(String(data[i][idColIdx]))) {
         data[i][statusColIdx] = 'PAID';
         updatedCount++;
       }
     }
 
     if (updatedCount > 0) {
-      // 批次寫回整表（原子操作）
       sheet.getRange(1, 1, lastRow, lastCol).setValues(data);
       SpreadsheetApp.flush();
     }
-
     return { success: true, updated: updatedCount };
-
   } catch (e) {
     throw new Error('批次更新失敗: ' + e.message);
   } finally {

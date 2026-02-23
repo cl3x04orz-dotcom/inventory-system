@@ -294,7 +294,7 @@ function getSalesHistory(payload) {
 // ===========================================
 // 3. 應收帳款查詢 (Get Receivables)
 // ===========================================
-function getReceivablesService() {
+function getReceivablesService(payload) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const salesSheet = ss.getSheetByName('Sales');
   const detailsSheet = ss.getSheetByName('SalesDetails');
@@ -313,40 +313,49 @@ function getReceivablesService() {
   const IDX_METHOD = 8;
   const IDX_STATUS = 9;
 
+  const startDate = (payload && payload.startDate) ? new Date(payload.startDate) : null;
+  const endDate = (payload && payload.endDate) ? new Date(payload.endDate) : null;
+  if (endDate) endDate.setHours(23, 59, 59);
+
   const results = [];
   
   for (let i = 1; i < salesRows.length; i++) {
     const row = salesRows[i];
-    const method = String(row[IDX_METHOD] || "").toUpperCase();
-    const status = String(row[IDX_STATUS] || "").toUpperCase();
+    const method = String(row[IDX_METHOD] || '').toUpperCase();
+    const status = String(row[IDX_STATUS] || '').toUpperCase();
     
     if (method === 'CREDIT' && status === 'UNPAID') {
-      const saleId = row[IDX_ID];
-      const dateVal = row[IDX_DATE];
-      const dateStr = dateVal ? Utilities.formatDate(new Date(dateVal), "GMT+8", "yyyy-MM-dd'T'HH:mm:ss") : "";
+      const saleId = String(row[IDX_ID] || '');
+      if (!saleId) continue;
+      const rowDate = new Date(row[IDX_DATE]);
+      if (startDate && rowDate < startDate) continue;
+      if (endDate && rowDate > endDate) continue;
+
+      const dateStr = row[IDX_DATE] ? Utilities.formatDate(rowDate, 'GMT+8', "yyyy-MM-dd'T'HH:mm:ss") : '';
       
       const items = [];
       for (let j = 1; j < detailRows.length; j++) {
-        if (String(detailRows[j][0]) === String(saleId)) {
-           const qty = Number(detailRows[j][5] || 0);
-           if (qty > 0) {
-             const pId = detailRows[j][1];
-             items.push({
-               productName: productMap[pId] || pId,
-               qty: qty,
-               price: Number(detailRows[j][6] || 0),
-               subtotal: Number(detailRows[j][7] || 0)
-             });
-           }
+        if (String(detailRows[j][0]) === saleId) {
+          const qty = Number(detailRows[j][5] || 0);
+          if (qty > 0) {
+            const pId = detailRows[j][1];
+            items.push({
+              productName: productMap[pId] || pId,
+              qty: qty,
+              price: Number(detailRows[j][6] || 0),
+              subtotal: Number(detailRows[j][7] || 0)
+            });
+          }
         }
       }
       
       results.push({
-        id: i + 1, 
+        // uuids 陣列包含此筆的 SaleID，供前端批次操作
+        uuids: [saleId],
         saleId: saleId,
         date: dateStr,
-        customer: row[IDX_CUST] || "",
-        salesRep: row[IDX_REP] || "未知",
+        customer: row[IDX_CUST] || '',
+        salesRep: row[IDX_REP] || '未知',
         amount: Number(row[IDX_TOTAL] || 0),
         items: items
       });
@@ -361,11 +370,44 @@ function getReceivablesService() {
 // ===========================================
 
 function markAsPaidService(payload) {
-  const { recordId } = payload;
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const salesSheet = ss.getSheetByName('Sales');
-  salesSheet.getRange(recordId, 10).setValue('PAID');
-  return { success: true };
+  const { targetUuids } = payload;
+  if (!targetUuids || targetUuids.length === 0) throw new Error('未提供有效 SaleID');
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const salesSheet = ss.getSheetByName('Sales');
+    const lastRow = salesSheet.getLastRow();
+    const lastCol = salesSheet.getLastColumn();
+    if (lastRow <= 1) return { success: true, updated: 0 };
+
+    const data = salesSheet.getRange(1, 1, lastRow, lastCol).getValues();
+    // Sales 表固定欄位：Col 0 = SaleID, Col 9 = Status
+    const IDX_ID = 0;
+    const IDX_STATUS = 9;
+
+    const targetSet = new Set(targetUuids.map(String));
+    let updatedCount = 0;
+
+    for (let i = 1; i < data.length; i++) {
+      if (targetSet.has(String(data[i][IDX_ID]))) {
+        data[i][IDX_STATUS] = 'PAID';
+        updatedCount++;
+      }
+    }
+
+    if (updatedCount > 0) {
+      salesSheet.getRange(1, 1, lastRow, lastCol).setValues(data);
+      SpreadsheetApp.flush();
+    }
+    return { success: true, updated: updatedCount };
+  } catch (e) {
+    throw new Error('批次更新失敗: ' + e.message);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function getProductMap_() {
