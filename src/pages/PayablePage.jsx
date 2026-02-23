@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wallet, Search, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Wallet, Search, RefreshCw, ChevronDown, ChevronUp, CheckSquare } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import { getLocalDateString } from '../utils/constants';
 
@@ -14,9 +14,12 @@ export default function PayablePage({ user, apiUrl }) {
     const [operatorSearch, setOperatorSearch] = useState('');
 
     const [expandedRows, setExpandedRows] = useState(new Set());
+    // 批次選取：以 index 為 key（對應 filtered 陣列 index）
+    const [selectedGroups, setSelectedGroups] = useState(new Set());
 
     const fetchData = React.useCallback(async () => {
         setLoading(true);
+        setSelectedGroups(new Set()); // 清空選取
         try {
             const payload = {};
             if (startDate) payload.startDate = startDate;
@@ -24,13 +27,11 @@ export default function PayablePage({ user, apiUrl }) {
 
             const data = await callGAS(apiUrl, 'getPayables', payload, user.token);
             if (Array.isArray(data)) {
-                // Sort by date descending
                 const sorted = data.sort((a, b) => new Date(b.date) - new Date(a.date));
                 setRecords(sorted);
             }
         } catch (error) {
             console.error('Failed to fetch payables:', error);
-            // alert('獲取應付帳款失敗: ' + error.message);
         } finally {
             setLoading(false);
         }
@@ -40,15 +41,45 @@ export default function PayablePage({ user, apiUrl }) {
         fetchData();
     }, [fetchData]);
 
-    const handleMarkAsPaid = async (recordId) => {
-        if (!confirm('確定要將此筆帳款標記為已付款嗎？')) return;
+    // 批次付款：收集所有選取組別的 uuids 一起送後端
+    const handleBatchMarkAsPaid = async () => {
+        if (selectedGroups.size === 0) return;
+        if (!confirm(`確定要將選取的 ${selectedGroups.size} 筆帳款標記為已付款嗎？`)) return;
+
+        const allUuids = [];
+        filtered.forEach((r, i) => {
+            if (selectedGroups.has(i) && Array.isArray(r.uuids)) {
+                allUuids.push(...r.uuids);
+            }
+        });
+
+        if (allUuids.length === 0) {
+            alert('選取的帳款無 UUID 資訊，請重新整理後再試。');
+            return;
+        }
 
         setLoading(true);
         try {
-            // Using 'markPayableAsPaid' based on standard naming convention or previous knowledge
-            await callGAS(apiUrl, 'markPayableAsPaid', { recordId }, user.token);
+            await callGAS(apiUrl, 'markPayableAsPaid', { targetUuids: allUuids }, user.token);
+            alert(`成功標記 ${selectedGroups.size} 筆帳款為已付款！`);
+            fetchData();
+        } catch (error) {
+            console.error('Failed to mark as paid:', error);
+            alert('更新失敗: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // 單筆付款（保留相容）
+    const handleMarkAsPaid = async (r) => {
+        if (!confirm('確定要將此筆帳款標記為已付款嗎？')) return;
+        setLoading(true);
+        try {
+            const uuids = Array.isArray(r.uuids) ? r.uuids : [];
+            await callGAS(apiUrl, 'markPayableAsPaid', { targetUuids: uuids }, user.token);
             alert('更新成功！');
-            fetchData(); // Refresh list
+            fetchData();
         } catch (error) {
             console.error('Failed to mark as paid:', error);
             alert('更新失敗: ' + error.message);
@@ -58,13 +89,16 @@ export default function PayablePage({ user, apiUrl }) {
     };
 
     const toggleRow = (index) => {
-        const newExpanded = new Set(expandedRows);
-        if (newExpanded.has(index)) {
-            newExpanded.delete(index);
-        } else {
-            newExpanded.add(index);
-        }
-        setExpandedRows(newExpanded);
+        const next = new Set(expandedRows);
+        next.has(index) ? next.delete(index) : next.add(index);
+        setExpandedRows(next);
+    };
+
+    const toggleSelect = (e, index) => {
+        e.stopPropagation();
+        const next = new Set(selectedGroups);
+        next.has(index) ? next.delete(index) : next.add(index);
+        setSelectedGroups(next);
     };
 
     const getOperatorName = (r) => {
@@ -74,12 +108,28 @@ export default function PayablePage({ user, apiUrl }) {
     const filtered = records.filter(r => {
         const vendor = String(r.vendorName || r.vendor || '').toLowerCase();
         const op = String(getOperatorName(r)).toLowerCase();
-
         const matchVendor = !vendorSearch || vendor.includes(vendorSearch.toLowerCase());
         const matchOp = !operatorSearch || op.includes(operatorSearch.toLowerCase());
-
         return matchVendor && matchOp;
     });
+
+    const unpaidFiltered = filtered.filter(r => r.status !== 'PAID');
+    const allSelected = unpaidFiltered.length > 0 && unpaidFiltered.every((r, idx) => {
+        // find the actual index in filtered
+        const fi = filtered.indexOf(r);
+        return selectedGroups.has(fi);
+    });
+
+    const toggleSelectAll = (e) => {
+        e.stopPropagation();
+        if (allSelected) {
+            setSelectedGroups(new Set());
+        } else {
+            const next = new Set();
+            filtered.forEach((r, i) => { if (r.status !== 'PAID') next.add(i); });
+            setSelectedGroups(next);
+        }
+    };
 
     const totalAmount = filtered.reduce((sum, r) => sum + (Number(r.amount) || Number(r.total) || 0), 0);
 
@@ -93,9 +143,21 @@ export default function PayablePage({ user, apiUrl }) {
                         <span className="truncate">應付帳款</span>
                     </h1>
                 </div>
-                <div className="glass-panel px-3 py-2 border-[var(--border-primary)] bg-[var(--bg-secondary)] shrink-0 flex flex-col items-end">
-                    <p className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider">總應付金額</p>
-                    <p className="text-lg md:text-xl font-bold text-rose-500">${totalAmount.toLocaleString()}</p>
+                <div className="flex items-center gap-3">
+                    {selectedGroups.size > 0 && (
+                        <button
+                            onClick={handleBatchMarkAsPaid}
+                            disabled={loading}
+                            className="btn-primary flex items-center gap-2 text-sm px-4 py-2"
+                        >
+                            <CheckSquare size={16} />
+                            批次確認付款 ({selectedGroups.size})
+                        </button>
+                    )}
+                    <div className="glass-panel px-3 py-2 border-[var(--border-primary)] bg-[var(--bg-secondary)] shrink-0 flex flex-col items-end">
+                        <p className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider">總應付金額</p>
+                        <p className="text-lg md:text-xl font-bold text-rose-500">${totalAmount.toLocaleString()}</p>
+                    </div>
                 </div>
             </div>
 
@@ -152,7 +214,16 @@ export default function PayablePage({ user, apiUrl }) {
                 <table className="w-full text-left text-sm">
                     <thead className="bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-xs uppercase sticky top-0">
                         <tr>
-                            <th className="p-4 w-10"></th>
+                            <th className="p-4 w-10">
+                                <input
+                                    type="checkbox"
+                                    className="w-4 h-4 rounded cursor-pointer accent-rose-500"
+                                    checked={allSelected}
+                                    onChange={toggleSelectAll}
+                                    title="全選未付款"
+                                />
+                            </th>
+                            <th className="p-4 w-8"></th>
                             <th className="p-4 text-center">產生日期</th>
                             <th className="p-4">廠商名稱</th>
                             <th className="p-4 text-right">金額</th>
@@ -162,11 +233,24 @@ export default function PayablePage({ user, apiUrl }) {
                     </thead>
                     <tbody className="divide-y divide-[var(--border-primary)] bg-[var(--bg-primary)]">
                         {loading ? (
-                            <tr><td colSpan="6" className="p-10 text-center text-[var(--text-secondary)]">載入中...</td></tr>
+                            <tr><td colSpan="7" className="p-10 text-center text-[var(--text-secondary)]">載入中...</td></tr>
                         ) : filtered.length > 0 ? (
                             filtered.map((r, i) => (
                                 <React.Fragment key={i}>
-                                    <tr className="hover:bg-[var(--bg-secondary)] transition-colors cursor-pointer" onClick={() => toggleRow(i)}>
+                                    <tr
+                                        className={`hover:bg-[var(--bg-secondary)] transition-colors cursor-pointer ${selectedGroups.has(i) ? 'bg-rose-50/30' : ''}`}
+                                        onClick={() => toggleRow(i)}
+                                    >
+                                        <td className="p-4" onClick={(e) => e.stopPropagation()}>
+                                            {r.status !== 'PAID' && (
+                                                <input
+                                                    type="checkbox"
+                                                    className="w-4 h-4 rounded cursor-pointer accent-rose-500"
+                                                    checked={selectedGroups.has(i)}
+                                                    onChange={(e) => toggleSelect(e, i)}
+                                                />
+                                            )}
+                                        </td>
                                         <td className="p-4 text-[var(--text-tertiary)]">
                                             {expandedRows.has(i) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                         </td>
@@ -189,7 +273,7 @@ export default function PayablePage({ user, apiUrl }) {
                                         <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
                                             {r.status !== 'PAID' && (
                                                 <button
-                                                    onClick={() => handleMarkAsPaid(r.id)}
+                                                    onClick={() => handleMarkAsPaid(r)}
                                                     className="btn-primary text-xs py-1 px-3"
                                                 >
                                                     確認付款
@@ -199,7 +283,7 @@ export default function PayablePage({ user, apiUrl }) {
                                     </tr>
                                     {expandedRows.has(i) && (
                                         <tr className="bg-[var(--bg-secondary)]/50">
-                                            <td colSpan="6" className="p-4 pl-12">
+                                            <td colSpan="7" className="p-4 pl-16">
                                                 <div className="bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg overflow-hidden">
                                                     <table className="w-full text-sm">
                                                         <thead>
@@ -232,7 +316,7 @@ export default function PayablePage({ user, apiUrl }) {
                                 </React.Fragment>
                             ))
                         ) : (
-                            <tr><td colSpan="6" className="p-10 text-center text-[var(--text-secondary)]">無應付帳款</td></tr>
+                            <tr><td colSpan="7" className="p-10 text-center text-[var(--text-secondary)]">無應付帳款</td></tr>
                         )}
                     </tbody>
                 </table>
@@ -240,22 +324,47 @@ export default function PayablePage({ user, apiUrl }) {
 
             {/* Mobile Card View */}
             <div className="md:hidden space-y-4">
+                {/* 批次按鈕（手機版） */}
+                {selectedGroups.size > 0 && (
+                    <button
+                        onClick={handleBatchMarkAsPaid}
+                        disabled={loading}
+                        className="btn-primary w-full flex items-center justify-center gap-2 py-2.5"
+                    >
+                        <CheckSquare size={16} />
+                        批次確認付款 ({selectedGroups.size})
+                    </button>
+                )}
                 {loading ? (
                     <div className="p-10 text-center text-[var(--text-secondary)]">載入中...</div>
                 ) : filtered.length > 0 ? (
                     filtered.map((r, i) => (
-                        <div key={i} className="bg-[var(--bg-primary)] rounded-xl border border-[var(--border-primary)] p-4 shadow-sm" onClick={() => toggleRow(i)}>
+                        <div
+                            key={i}
+                            className={`bg-[var(--bg-primary)] rounded-xl border p-4 shadow-sm transition-colors ${selectedGroups.has(i) ? 'border-rose-400' : 'border-[var(--border-primary)]'}`}
+                            onClick={() => toggleRow(i)}
+                        >
                             <div className="flex justify-between items-start mb-3">
-                                <div>
-                                    <div className="text-xs text-[var(--text-tertiary)] mb-1">
-                                        {(() => {
-                                            const dateVal = r.serverTimestamp || r.timestamp || r.date;
-                                            const d = new Date(dateVal);
-                                            return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('zh-TW');
-                                        })()}
+                                <div className="flex items-start gap-3">
+                                    {r.status !== 'PAID' && (
+                                        <input
+                                            type="checkbox"
+                                            className="w-4 h-4 mt-1 rounded cursor-pointer accent-rose-500 shrink-0"
+                                            checked={selectedGroups.has(i)}
+                                            onChange={(e) => toggleSelect(e, i)}
+                                        />
+                                    )}
+                                    <div>
+                                        <div className="text-xs text-[var(--text-tertiary)] mb-1">
+                                            {(() => {
+                                                const dateVal = r.serverTimestamp || r.timestamp || r.date;
+                                                const d = new Date(dateVal);
+                                                return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('zh-TW');
+                                            })()}
+                                        </div>
+                                        <div className="font-bold text-[var(--text-primary)] text-lg">{r.vendorName || r.vendor || '未命名廠商'}</div>
+                                        <div className="text-xs text-[var(--text-secondary)] mt-1">採購: {getOperatorName(r)}</div>
                                     </div>
-                                    <div className="font-bold text-[var(--text-primary)] text-lg">{r.vendorName || r.vendor || '未命名廠商'}</div>
-                                    <div className="text-xs text-[var(--text-secondary)] mt-1">採購: {getOperatorName(r)}</div>
                                 </div>
                                 <div className="text-right">
                                     <div className="text-xl font-black font-mono text-rose-500">
@@ -276,8 +385,8 @@ export default function PayablePage({ user, apiUrl }) {
                                 {r.status !== 'PAID' && (
                                     <button
                                         onClick={(e) => {
-                                            e.stopPropagation(); // prevent card toggle
-                                            handleMarkAsPaid(r.id);
+                                            e.stopPropagation();
+                                            handleMarkAsPaid(r);
                                         }}
                                         className="btn-primary text-xs py-1.5 px-4"
                                     >

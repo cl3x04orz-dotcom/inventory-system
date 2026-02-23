@@ -25,6 +25,7 @@ function getPayablesService(payload) {
   }
   
   const headers = data[0];
+  const uuidIdx = headers.indexOf('UUID');
   const dateIdx = headers.indexOf('Date'), vendorIdx = headers.indexOf('Vendor'), productIdIdx = headers.indexOf('ProductID'), qtyIdx = headers.indexOf('Quantity'), priceIdx = headers.indexOf('UnitPrice'), methodIdx = headers.indexOf('PaymentMethod'), statusIdx = headers.indexOf('Status');
   let operatorIdx = headers.indexOf('Operator'); if (operatorIdx === -1) operatorIdx = headers.indexOf('Buyer');
   
@@ -43,7 +44,11 @@ function getPayablesService(payload) {
       const vendor = row[vendorIdx], dateStr = Utilities.formatDate(rowDate, "GMT+8", "yyyy-MM-dd"), rawOperator = row[operatorIdx] || '', operatorName = userMap[rawOperator] || rawOperator || '未知';
       const groupKey = `${vendor}_${dateStr}_${rawOperator}`;
       if (!purchaseGroups[groupKey]) {
-        purchaseGroups[groupKey] = { id: i + 1, date: dateStr, serverTimestamp: rowDate, vendor: vendor, operator: operatorName, amount: 0, items: [] };
+        purchaseGroups[groupKey] = { uuids: [], date: dateStr, serverTimestamp: rowDate, vendor: vendor, operator: operatorName, amount: 0, items: [] };
+      }
+      // 收集該組所有 UUID，以便批次更新整組
+      if (uuidIdx !== -1 && row[uuidIdx]) {
+        purchaseGroups[groupKey].uuids.push(String(row[uuidIdx]));
       }
       const productId = row[productIdIdx], productName = productMap[productId] || productId, qty = Number(row[qtyIdx]), price = Number(row[priceIdx]), subtotal = qty * price;
       purchaseGroups[groupKey].amount += subtotal;
@@ -54,12 +59,49 @@ function getPayablesService(payload) {
 }
 
 function markPayableAsPaidService(payload) {
-  const { recordId } = payload;
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Purchases');
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const statusIdx = headers.indexOf('Status') + 1;
-  if (statusIdx === 0) throw new Error('找不到狀態欄位');
-  sheet.getRange(recordId, statusIdx).setValue('PAID');
-  return { success: true };
+  const { targetUuids } = payload;
+  if (!targetUuids || targetUuids.length === 0) throw new Error('未提供 UUID');
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Purchases');
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+
+    if (lastRow <= 1) return { success: true, updated: 0 };
+
+    // 一次讀取整表（最小化 I/O 次數）
+    const data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+    const headers = data[0];
+    const uuidColIdx = headers.indexOf('UUID');
+    const statusColIdx = headers.indexOf('Status');
+
+    if (uuidColIdx === -1 || statusColIdx === -1) throw new Error('找不到必要欄位 UUID 或 Status');
+
+    const targetSet = new Set(targetUuids.map(String));
+    let updatedCount = 0;
+
+    for (let i = 1; i < data.length; i++) {
+      if (targetSet.has(String(data[i][uuidColIdx]))) {
+        data[i][statusColIdx] = 'PAID';
+        updatedCount++;
+      }
+    }
+
+    if (updatedCount > 0) {
+      // 批次寫回整表（原子操作）
+      sheet.getRange(1, 1, lastRow, lastCol).setValues(data);
+      SpreadsheetApp.flush();
+    }
+
+    return { success: true, updated: updatedCount };
+
+  } catch (e) {
+    throw new Error('批次更新失敗: ' + e.message);
+  } finally {
+    lock.releaseLock();
+  }
 }
