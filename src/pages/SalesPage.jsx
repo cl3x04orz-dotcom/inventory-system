@@ -35,6 +35,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
     const [isPrinting, setIsPrinting] = useState(false);
     const [isSorting, setIsSorting] = useState(false);
+    const [availableUsers, setAvailableUsers] = useState([]); // [New] 所有可用業務員清單
     const [activeInput, setActiveInput] = useState(null); // { id: string, type: 'row'|'cash'|'expense', field?: string, denom?: number, key?: string }
 
     // Today Records States (for merge printing)
@@ -227,7 +228,20 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     }
                 }
 
-                // 3. Single State Update
+                // 3. If correction, fetch available users for attribution override
+                if (clonedRaw) {
+                    try {
+                        const usersList = await callGAS(apiUrl, 'getUsers', {}, user.token);
+                        if (Array.isArray(usersList)) {
+                            // Filter for active users or just take all for dropdown
+                            setAvailableUsers(usersList.map(u => u.username));
+                        }
+                    } catch (e) {
+                        console.error('Failed to fetch users list', e);
+                    }
+                }
+
+                // 4. Single State Update
                 setRows(finalRows);
 
             } else {
@@ -948,6 +962,22 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                         }}
                                     />
                                 </div>
+
+                                {/* [New] Sales Rep Override - Only show during correction */}
+                                {availableUsers.length > 0 && originalSaleId && (
+                                    <div className="flex items-center gap-2 w-full md:w-auto bg-amber-50 border border-amber-200 px-3 py-1 rounded-lg animate-pulse">
+                                        <label className="text-sm text-amber-700 font-bold whitespace-nowrap">業績歸屬:</label>
+                                        <select
+                                            value={targetSalesRep}
+                                            onChange={(e) => setTargetSalesRep(e.target.value)}
+                                            className="bg-white border border-amber-300 text-amber-800 text-xs font-bold rounded p-1 focus:ring-1 focus:ring-amber-500 outline-none"
+                                        >
+                                            {availableUsers.map(u => (
+                                                <option key={u} value={u}>{u}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Group 2: Action Buttons (Stacked) */}
