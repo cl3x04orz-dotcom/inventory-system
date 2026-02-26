@@ -1025,19 +1025,28 @@ function backfillSalesDetailsCustomerNames() {
   if (!salesSheet || !detailsSheet) return "找不到 Sales 或 SalesDetails 分頁";
 
   // 1. 建立 SaleID -> Customer 對照表
-  const salesData = salesSheet.getDataRange().getValues();
+  const salesData = salesSheet.getDataRange().getDisplayValues();
   const saleToCustomerMap = {};
-  // 假設 Sales 標題為 ID, Date, SalesRep, ..., Customer (第 7 欄, index 6)
-  // 我們透過標題動態找索引更安全
-  const salesHeaders = salesData[0];
-  const idIdx = salesHeaders.indexOf('ID');
-  const customerIdx = salesHeaders.indexOf('Customer');
   
-  if (idIdx === -1 || customerIdx === -1) return "Sales 表結構錯誤，找不到 ID 或 Customer 欄位";
+  const salesHeaders = salesData[0];
+  
+  // 尋找 ID 欄位 (index 0)
+  let idIdx = salesHeaders.indexOf('ID');
+  if (idIdx === -1) idIdx = salesHeaders.indexOf('編號');
+  if (idIdx === -1) idIdx = 0; // 最終備案：A 欄
+
+  // 尋找 Customer 欄位 (index 6, G 欄)
+  let customerIdx = salesHeaders.indexOf('Customer');
+  if (customerIdx === -1) customerIdx = salesHeaders.indexOf('銷售對象');
+  if (customerIdx === -1) customerIdx = salesHeaders.indexOf('對象');
+  if (customerIdx === -1) customerIdx = salesHeaders.indexOf('地點');
+  if (customerIdx === -1) customerIdx = 6; // 最終備案：G 欄
+  
+  console.log(`Debug: ID Index = ${idIdx}, Customer Index = ${customerIdx}`);
 
   for (let i = 1; i < salesData.length; i++) {
-    const sId = String(salesData[i][idIdx]);
-    const cust = String(salesData[i][customerIdx]);
+    const sId = String(salesData[i][idIdx] || "").trim();
+    const cust = String(salesData[i][customerIdx] || "").trim();
     if (sId) saleToCustomerMap[sId] = cust;
   }
 
@@ -1052,15 +1061,21 @@ function backfillSalesDetailsCustomerNames() {
 
   const updates = [];
   let updatedCount = 0;
+  let missingInMap = 0;
 
   for (let i = 1; i < detailsData.length; i++) {
-    const sId = String(detailsData[i][0]); // SaleID 在 A 欄 (index 0)
+    const sId = String(detailsData[i][0] || "").trim(); // SaleID 在 A 欄 (index 0)
     const existingTarget = detailsData[i][9] || ""; // Target 在 J 欄 (index 9)
     
     if (sId && !existingTarget) {
-      const target = saleToCustomerMap[sId] || "";
-      updates.push([target]);
-      if (target) updatedCount++;
+      const target = saleToCustomerMap[sId];
+      if (target !== undefined) {
+        updates.push([target]);
+        updatedCount++;
+      } else {
+        updates.push([""]);
+        missingInMap++;
+      }
     } else {
       updates.push([existingTarget]);
     }
@@ -1069,8 +1084,8 @@ function backfillSalesDetailsCustomerNames() {
   if (updatedCount > 0) {
     detailsSheet.getRange(2, 10, updates.length, 1).setValues(updates);
     SpreadsheetApp.flush();
-    return `補齊完成：共更新 ${updatedCount} 筆資料的銷售對象`;
+    return `補齊完成：更新 ${updatedCount} 筆。 (診斷: Sales標題為[${salesHeaders[idIdx]}]與[${salesHeaders[customerIdx]}], 未匹配到ID共 ${missingInMap} 筆)`;
   }
 
-  return "無須更新或找不到對應的銷售對象";
+  return `無須更新或未匹配到任何資料。 (診斷: Sales標題為[${salesHeaders[idIdx]}]與[${salesHeaders[customerIdx]}], 找到ID對照共 ${Object.keys(saleToCustomerMap).length} 筆, 明細中未找到對應ID共 ${missingInMap} 筆)`;
 }
