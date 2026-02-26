@@ -83,7 +83,7 @@ export default function IncomeStatementPage({ user, apiUrl }) {
     const getPercent = (val, total) => total === 0 ? '0%' : `${((val / total) * 100).toFixed(1)}%`;
 
     return (
-        <div className="max-w-4xl mx-auto p-2 md:p-6 space-y-2 md:space-y-6 flex flex-col h-[calc(100dvh-6rem)] overflow-hidden">
+        <div className="max-w-4xl mx-auto p-2 md:p-4 space-y-2 md:space-y-4 flex flex-col">
             <div className="flex justify-between items-center shrink-0 gap-2">
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -134,9 +134,9 @@ export default function IncomeStatementPage({ user, apiUrl }) {
                 <button onClick={fetchData} className="btn-primary h-8 md:h-10 px-6 w-full md:w-auto text-xs md:text-sm">查詢</button>
             </div>
 
-            <div className="bg-[var(--bg-primary)] rounded-xl border border-[var(--border-primary)] overflow-hidden flex-1 flex flex-col shadow-sm min-h-0">
-                <div className="flex-1 p-3 md:p-8">
-                    <div className="space-y-4 md:space-y-6 max-w-2xl mx-auto font-mono text-sm md:text-base">
+            <div className="bg-[var(--bg-primary)] rounded-xl border border-[var(--border-primary)] shadow-sm">
+                <div className="p-3 md:p-6">
+                    <div className="space-y-3 md:space-y-5 max-w-2xl mx-auto font-mono text-sm md:text-base">
                         {/* Revenue Section */}
                         <div className="space-y-1 md:space-y-2">
                             <h3 className="text-emerald-500 font-bold text-base md:text-lg border-b border-[var(--border-primary)] pb-1 md:pb-2 mb-2 md:mb-4">營業收入 (Revenue)</h3>
@@ -158,10 +158,10 @@ export default function IncomeStatementPage({ user, apiUrl }) {
                         </div>
 
                         {/* Expenses Section */}
-                        <div className="space-y-1 md:space-y-2 mt-2 md:mt-8">
-                            <h3 className="text-amber-500 font-bold text-base md:text-lg border-b border-amber-200 pb-1 md:pb-2 mb-2 md:mb-4 whitespace-nowrap">營業費用 (Operating Expenses)</h3>
+                        <div className="space-y-1 md:space-y-2 mt-1 md:mt-4">
+                            <h3 className="text-amber-500 font-bold text-sm md:text-base border-b border-amber-200 pb-1 md:pb-2 mb-2 md:mb-3 whitespace-nowrap">營業費用 (Operating Expenses)</h3>
 
-                            <div className="grid grid-cols-3 md:grid-cols-1 gap-2 md:gap-0">
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 md:gap-y-1.5">
                                 {Object.entries(data.expenses).map(([key, val]) => {
                                     const labels = {
                                         stall: '攤位費', cleaning: '清潔費', electricity: '電費', gas: '加油費',
@@ -170,9 +170,9 @@ export default function IncomeStatementPage({ user, apiUrl }) {
                                     };
                                     if (val === 0) return null;
                                     return (
-                                        <div key={key} className="flex flex-col md:flex-row justify-center md:justify-between items-center md:items-center text-[var(--text-secondary)] text-[10px] md:text-sm bg-[var(--bg-secondary)] md:bg-transparent p-1 md:p-0 rounded md:rounded-none">
-                                            <span className="font-medium">{labels[key]}</span>
-                                            <span className="text-[var(--text-primary)] font-bold md:font-normal">{formatCurrency(val)}</span>
+                                        <div key={key} className="flex justify-between items-center text-[var(--text-secondary)] text-xs md:text-sm">
+                                            <span>{labels[key]}</span>
+                                            <span className="text-[var(--text-primary)] font-medium">{formatCurrency(val)}</span>
                                         </div>
                                     );
                                 })}
