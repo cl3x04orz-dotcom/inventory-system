@@ -150,7 +150,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
             try {
                 const voidRes = await callGAS(apiUrl, 'voidAndFetchSale', { saleId }, user.token);
                 if (voidRes.success) {
-                    setPage('sales'); // 成功跳轉
+                    setPage('sales'); // Correct for Sales report
                 } else {
                     throw new Error(voidRes.error || '作廢失敗');
                 }

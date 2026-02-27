@@ -49,13 +49,31 @@ function getPayablesService(payload) {
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     const rowDate = new Date(row[dateIdx]);
-    if (row[methodIdx] === 'CREDIT' && row[statusIdx] === 'UNPAID') {
+    const status = String(row[statusIdx] || '').toUpperCase();
+    if (row[methodIdx] === 'CREDIT' && status === 'UNPAID' && status !== 'VOID') {
       if (startDate && rowDate < startDate) continue;
       if (endDate && rowDate > endDate) continue;
       const vendor = row[vendorIdx];
       const dateStr = Utilities.formatDate(rowDate, 'GMT+8', 'yyyy-MM-dd');
-      const rawOperator = row[operatorIdx] || '';
-      const operatorName = userMap[rawOperator] || rawOperator || '未知';
+      
+      const modBy = String(row[10] || '');
+      const status = String(row[9] || '').toUpperCase();
+      let operatorName = '未知';
+      let rawOperator = row[operatorIdx] || ''; // Buyer
+
+      const buyerName = userMap[rawOperator] || rawOperator || '未知';
+
+      if (modBy.startsWith('VOID_BY: ')) {
+        const voidName = modBy.replace('VOID_BY: ', '');
+        operatorName = `${buyerName} (作廢: ${userMap[voidName] || voidName})`;
+      } else if (status === 'VOID' && modBy && !modBy.startsWith('purchase_') && !modBy.includes('-')) {
+        operatorName = `${buyerName} (作廢: ${userMap[modBy] || modBy})`;
+      } else {
+        const isTechnicalId = modBy.startsWith('purchase_') || modBy.includes('-');
+        rawOperator = (!modBy || isTechnicalId) ? rawOperator : modBy;
+        operatorName = userMap[rawOperator] || rawOperator || '未知';
+      }
+
       const groupKey = `${vendor}_${dateStr}_${rawOperator}`;
       if (!purchaseGroups[groupKey]) {
         purchaseGroups[groupKey] = { uuids: [], date: dateStr, serverTimestamp: rowDate, vendor: vendor, operator: operatorName, amount: 0, items: [] };

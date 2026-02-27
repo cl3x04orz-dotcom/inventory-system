@@ -45,6 +45,7 @@ function apiHandler(request) {
         'addPurchase': 'purchase_entry', 
         'getPurchaseSuggestions': 'purchase_entry',
         'getPurchaseHistory': 'purchase_history',
+        'voidAndFetchPurchase': 'purchase_history',
         
         // Inventory (庫存管理)
         'adjustInventory': 'inventory_adjust',
@@ -144,6 +145,7 @@ function apiHandler(request) {
             case 'getPurchaseSuggestions': return typeof getPurchaseSuggestionsService !== 'undefined' ? getPurchaseSuggestionsService() : {error: '後端服務缺失: getPurchaseSuggestionsService'}; 
             case 'addPurchase': return typeof addPurchaseService !== 'undefined' ? addPurchaseService(payload, user) : {error: '後端服務缺失: addPurchaseService (進貨功能)'}; 
             case 'getPurchaseHistory': return typeof getPurchaseHistory !== 'undefined' ? getPurchaseHistory(payload) : {error: '後端服務缺失: getPurchaseHistory'};
+            case 'voidAndFetchPurchase': return typeof voidAndFetchPurchaseService !== 'undefined' ? voidAndFetchPurchaseService(payload, user) : {error: '後端服務缺失: voidAndFetchPurchaseService'};
             case 'saveVendorDefault': return typeof saveVendorDefaultService !== 'undefined' ? saveVendorDefaultService(payload) : {error: '後端服務缺失: saveVendorDefaultService'};
 
             // 估值與盤點
@@ -477,6 +479,16 @@ function getExpendituresService(payload) {
     const start = payload.startDate ? new Date(payload.startDate + 'T00:00:00') : null;
     const end = payload.endDate ? new Date(payload.endDate + 'T23:59:59') : null;
 
+    // 建立使用者名稱映射 (用於業務員、執行人顯示中文)
+    const userMap = {};
+    const uSheet = ss.getSheetByName('Users');
+    if (uSheet) {
+        const uData = uSheet.getDataRange().getValues();
+        for (let i = 1; i < uData.length; i++) {
+            if (uData[i][0]) userMap[uData[i][0]] = uData[i][1]; // ID -> Name
+        }
+    }
+
     return rows.map(row => {
         let obj = {};
         headers.forEach((h, i) => {
@@ -500,13 +512,14 @@ function getExpendituresService(payload) {
         
         if (row.length > 11) obj['finalTotal'] = row[11];
         if (row.length > 12) obj['customer'] = row[12];
-        if (row.length > 13) obj['salesRep'] = row[13];
-        if (row.length > 14) obj['date'] = row[14]; // O 欄 = 時間戳記
-        if (row.length > 15) obj['vehicleMaintenance'] = row[15]; // P 欄 ✅
-        if (row.length > 16) obj['salary'] = row[16]; // Q 欄 ✅
-        if (row.length > 17) obj['reserve'] = row[17]; // R 欄 ✅
-        if (row.length > 18) obj['note'] = row[18]; // S 欄
-        if (row.length > 20) obj['operator'] = row[20]; // U 欄
+        if (row.length > 13) {
+            const rawSales = row[13];
+            obj['salesRep'] = userMap[rawSales] || rawSales || '-';
+        }
+        if (row.length > 20) {
+            const rawOp = row[20];
+            obj['operator'] = userMap[rawOp] || rawOp || '-';
+        }
         
         return obj;
     }).filter(item => {

@@ -205,8 +205,8 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
         return false;
     });
 
-    const stockItems = filteredInventory.filter(item => item.type === 'STOCK');
-    const originalItems = filteredInventory.filter(item => item.type !== 'STOCK');
+    const stockItems = filteredInventory.filter(item => item.type === 'STOCK' || item.type === 'VOID_REFUND');
+    const originalItems = filteredInventory.filter(item => item.type !== 'STOCK' && item.type !== 'VOID_REFUND');
 
     // Calculate total quantity per product for safety check
     const productTotals = {};

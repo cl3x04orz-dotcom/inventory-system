@@ -129,16 +129,130 @@ function getPurchaseHistory(filter) {
     const pName = String(productMap[row[3]] || 'Unknown').toLowerCase();
     const keyword = filter.keyword ? filter.keyword.toLowerCase() : '';
     return (rowDate >= start && rowDate <= end) && (!keyword || vName.includes(keyword) || pName.includes(keyword));
-  }).map(row => ({
-      date: row[1],
-      vendorName: row[2],
-      productName: productMap[row[3]] || 'Unknown',
-      quantity: Number(row[4]) || 0,
-      unitPrice: Number(row[5]) || 0,
-      totalPrice: (Number(row[4]) || 0) * (Number(row[5]) || 0),
-      expiry: row[6],
-      operator: userMap[row[7]] || row[7] || '-'
-  })).reverse();
+  }).map(row => {
+      // 抓取執行人邏輯：
+      // 1. 優先抓第 11 欄 (index 10)，看是否有 "VOID_BY: " 標記
+      // 2. 如果沒有標記，檢查是否為技術 ID (如果不是則為修改人)
+      // 3. 都沒有則抓第 8 欄 (index 7) 採購人
+      const modBy = String(row[10] || '');
+      const status = String(row[9] || '').toUpperCase();
+      let finalOperatorName = '-';
+      
+      const buyerName = userMap[row[7]] || row[7] || '-';
+
+      if (modBy.startsWith('VOID_BY: ')) {
+        const voidName = modBy.replace('VOID_BY: ', '');
+        finalOperatorName = `${buyerName} (作廢: ${userMap[voidName] || voidName})`;
+      } else if (status === 'VOID' && modBy && !modBy.startsWith('purchase_') && !modBy.includes('-')) {
+        // 舊單處理：如果是 VOID 且 modBy 是名字而非技術 ID
+        finalOperatorName = `${buyerName} (作廢: ${userMap[modBy] || modBy})`;
+      } else {
+        const isTechnicalId = modBy.startsWith('purchase_') || modBy.includes('-');
+        const finalOperatorKey = (!modBy || isTechnicalId) ? row[7] : modBy;
+        finalOperatorName = userMap[finalOperatorKey] || finalOperatorKey || '-';
+      }
+      
+      return {
+        id: row[0],
+        date: row[1],
+        vendorName: row[2],
+        productName: productMap[row[3]] || 'Unknown',
+        productId: row[3],
+        quantity: Number(row[4]) || 0,
+        unitPrice: Number(row[5]) || 0,
+        totalPrice: (Number(row[4]) || 0) * (Number(row[5]) || 0),
+        expiry: row[6],
+        operator: finalOperatorName,
+        paymentMethod: row[8] || 'CASH',
+        status: status
+      };
+  }).reverse();
+}
+
+/**
+ * 作廢進貨並獲取資料 (用於修正)
+ */
+function voidAndFetchPurchaseService(payload, user) {
+  const { id } = payload;
+  if (!id) throw new Error("缺少單據 ID");
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const purSheet = ss.getSheetByName('Purchases');
+  const iSheet = ss.getSheetByName('Inventory');
+  
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+
+    const purData = purSheet.getDataRange().getValues();
+    let rowIndex = -1;
+    let originalData = null;
+
+    for (let i = 1; i < purData.length; i++) {
+        if (String(purData[i][0]) === String(id)) {
+            rowIndex = i + 1;
+            originalData = purData[i];
+            break;
+        }
+    }
+
+    if (rowIndex === -1) throw new Error("找不到進貨紀錄");
+    if (String(originalData[9]).toUpperCase() === 'VOID') throw new Error("此單據已作廢");
+
+    // 1. 標記進貨表為 VOID，並紀錄修改人
+    purSheet.getRange(rowIndex, 10).setValue('VOID');
+    if (user) {
+      const opName = user.username || user.userId || user.displayName || '';
+      purSheet.getRange(rowIndex, 11).setValue('VOID_BY: ' + opName);
+    }
+
+    // 2. 扣回庫存
+    const productId = originalData[3];
+    const qty = Number(originalData[4]) || 0;
+    const expiry = originalData[6];
+    const pName = originalData[11] || productMap[productId] || 'Unknown';
+    const price = originalData[5];
+
+    if (qty > 0) {
+        const invRow = [
+            Utilities.getUuid(),
+            productId,
+            -qty,
+            expiry,
+            new Date(),
+            'STOCK', // Use STOCK to ensure it's counted in totals
+            `VOID_REFUND: ${id}`,
+            pName
+        ];
+        
+        if (typeof batchAppendNoLock_ !== 'undefined') {
+            batchAppendNoLock_(iSheet, [invRow]);
+        } else {
+            iSheet.appendRow(invRow);
+        }
+    }
+
+    SpreadsheetApp.flush();
+
+    // 3. 回傳原始資料供克隆
+    return {
+        success: true,
+        originalRecord: {
+            vendor: originalData[2],
+            productName: pName,
+            productId: productId,
+            quantity: qty,
+            unitPrice: price,
+            expiry: expiry,
+            paymentMethod: originalData[8] || 'CASH'
+        }
+    };
+
+  } catch (e) {
+    throw new Error("作廢失敗: " + e.message);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function getPurchaseSuggestionsService() {
@@ -267,4 +381,26 @@ function backfillPurchaseProductNames() {
   SpreadsheetApp.flush();
   Logger.log(`補齊完成：共更新 ${updated} 筆紀錄`);
   return { success: true, updated: updated };
+}
+
+/**
+ * 一次性庫存修復：將 VOID_REFUND 類別改回 STOCK
+ * 解決前端顯示分成兩個表格的問題
+ */
+function repairInventoryTypes() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const iSheet = ss.getSheetByName('Inventory');
+  if (!iSheet) return;
+
+  const data = iSheet.getDataRange().getValues();
+  let updated = 0;
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][5] === 'VOID_REFUND') {
+      iSheet.getRange(i + 1, 6).setValue('STOCK');
+      updated++;
+    }
+  }
+  SpreadsheetApp.flush();
+  Logger.log(`修復完成：共更新 ${updated} 筆庫存紀錄`);
+  return { success: true, updated };
 }

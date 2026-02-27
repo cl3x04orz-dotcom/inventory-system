@@ -30,6 +30,39 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
         if (user?.token) fetchSuggestions();
     }, [user.token, apiUrl]);
 
+    // [New] Handle Correction/Clone from sessionStorage
+    useEffect(() => {
+        const cloned = sessionStorage.getItem('clonedPurchase');
+        if (cloned) {
+            try {
+                const data = JSON.parse(cloned);
+                const original = data.originalRecord || data; // Handle both direct and nested formats
+
+                // Formulate the item for the purchase page
+                const expiry = original.expiry ? new Date(original.expiry) : null;
+                const newItem = {
+                    id: Date.now(),
+                    vendor: original.vendor || '',
+                    productName: original.productName || '',
+                    quantity: original.quantity || '',
+                    unitPrice: original.unitPrice || '',
+                    expiryYear: expiry ? expiry.getFullYear().toString() : currentYear,
+                    expiryMonth: expiry ? (expiry.getMonth() + 1).toString() : '',
+                    expiryDay: expiry ? expiry.getDate().toString() : '',
+                    paymentMethod: original.paymentMethod || 'CASH'
+                };
+
+                setItems([newItem]);
+                sessionStorage.removeItem('clonedPurchase');
+
+                // Optional: show a small toast or log
+                console.log("Loaded cloned purchase data");
+            } catch (e) {
+                console.error("Failed to parse cloned purchase", e);
+            }
+        }
+    }, [currentYear]);
+
     // Auto-switch payment method per item when vendor changes
     useEffect(() => {
         setItems(prev => prev.map(item => {

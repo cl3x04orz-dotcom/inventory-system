@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Calendar, Filter, RefreshCw, ClipboardList, DollarSign, User, Truck } from 'lucide-react';
+import { Search, Calendar, Filter, RefreshCw, ClipboardList, DollarSign, User, Truck, RotateCcw } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import { getLocalDateString } from '../utils/constants';
 
-export default function PurchaseHistoryPage({ user, apiUrl }) {
+export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(false);
     const [productSearch, setProductSearch] = useState('');
     const [vendorSearch, setVendorSearch] = useState('');
+    const [operatorSearch, setOperatorSearch] = useState('');
+    const [showVoided, setShowVoided] = useState(true);
     const [startDate, setStartDate] = useState(getLocalDateString());
     const [endDate, setEndDate] = useState(getLocalDateString());
+    const [isVoiding, setIsVoiding] = useState(false);
 
     const fetchHistory = React.useCallback(async () => {
         setLoading(true);
@@ -35,19 +38,56 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
         fetchHistory();
     }, [fetchHistory]);
 
+    const handleCorrection = async (id) => {
+        if (!window.confirm('確定要「作廢並修正」此筆進貨嗎？\n系統將會：\n1. 作廢舊單並回補庫存\n2. 自動跳轉到進貨頁面填入舊資料\n3. 讓您修改後重新存檔')) return;
+
+        setIsVoiding(true);
+        try {
+            const res = await callGAS(apiUrl, 'voidAndFetchPurchase', { id }, user.token);
+            if (res.success && res.originalRecord) {
+                sessionStorage.setItem('clonedPurchase', JSON.stringify(res.originalRecord));
+                if (typeof setPage === 'function') {
+                    setPage('purchase');
+                } else {
+                    // Fallback if setPage isn't passed (unlikely given current architecture)
+                    window.location.reload();
+                }
+            } else {
+                throw new Error(res.error || '無法作廢單據');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('修正功能失敗: ' + error.message);
+            setIsVoiding(false);
+        }
+    };
+
     const filtered = records.filter(r => {
         const pName = String(r.productName || '').toLowerCase();
         const vName = String(r.vendorName || r.vendor || '').toLowerCase();
-        const pSearch = productSearch.toLowerCase();
-        const vSearch = vendorSearch.toLowerCase();
+        const oName = String(r.operator || '').toLowerCase();
+        const pSearch = (productSearch || '').toLowerCase();
+        const vSearch = (vendorSearch || '').toLowerCase();
+        const oSearch = (operatorSearch || '').toLowerCase();
+        const matchVoid = showVoided ? true : r.status !== 'VOID';
 
-        return pName.includes(pSearch) && vName.includes(vSearch);
+        return pName.includes(pSearch) && vName.includes(vSearch) && oName.includes(oSearch) && matchVoid;
     });
 
-    const totalAmount = filtered.reduce((sum, r) => sum + (Number(r.totalPrice) || 0), 0);
+    const totalAmount = filtered.reduce((sum, r) => {
+        if (r.status === 'VOID') return sum;
+        return sum + (Number(r.totalPrice) || 0);
+    }, 0);
 
     return (
-        <div className="max-w-[90rem] mx-auto p-4">
+        <div className="max-w-[90rem] mx-auto p-4 relative">
+            {/* Frosted Loading Overlay */}
+            {isVoiding && (
+                <div className="fixed inset-0 bg-white/30 backdrop-blur-md z-50 flex flex-col items-center justify-center animate-in fade-in duration-300">
+                    <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4 shadow-lg"></div>
+                    <p className="text-xl font-bold text-blue-900 drop-shadow-sm">舊單作廢處理中，請稍候...</p>
+                </div>
+            )}
             <div className="glass-panel p-6">
                 {/* Header & Stats */}
                 {/* Header & Stats */}
@@ -185,6 +225,19 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                         >
                             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} /> 刷新
                         </button>
+
+                        <div className="flex items-center gap-2 ml-auto">
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    className="sr-only peer"
+                                    checked={showVoided}
+                                    onChange={(e) => setShowVoided(e.target.checked)}
+                                />
+                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                <span className="ml-2 text-xs font-bold text-[var(--text-secondary)] uppercase">顯示作廢資料</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -194,7 +247,7 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                         <div className="text-center py-10 text-[var(--text-secondary)]">載入中...</div>
                     ) : filtered.length > 0 ? (
                         filtered.map((record, idx) => (
-                            <div key={idx} className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)] shadow-sm space-y-3">
+                            <div key={idx} className={`bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)] shadow-sm space-y-3 ${record.status === 'VOID' ? 'opacity-50 saturate-50' : ''}`}>
                                 {/* Header: Date & Total Price */}
                                 <div className="flex justify-between items-start border-b border-[var(--border-primary)] pb-2">
                                     <div className="flex items-center gap-2 text-[var(--text-secondary)]">
@@ -206,8 +259,21 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                                             {record.date ? new Date(record.date).toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit' }) : ''}
                                         </span>
                                     </div>
-                                    <div className="text-lg font-bold text-emerald-600 font-mono">
-                                        ${(Number(record.totalPrice) || 0).toLocaleString()}
+                                    <div className="flex flex-col items-end gap-2">
+                                        <div className="text-lg font-bold text-emerald-600 font-mono">
+                                            ${(Number(record.totalPrice) || 0).toLocaleString()}
+                                        </div>
+                                        {record.status !== 'VOID' && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleCorrection(record.id); }}
+                                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-amber-600 border border-amber-200 hover:bg-amber-100 transition-colors text-xs font-bold"
+                                            >
+                                                <RotateCcw size={12} /> 修正
+                                            </button>
+                                        )}
+                                        {record.status === 'VOID' && (
+                                            <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded font-bold">已作廢</span>
+                                        )}
                                     </div>
                                 </div>
 
@@ -267,14 +333,15 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                                     <th className="p-4 text-right">總價</th>
                                     <th className="p-4">效期</th>
                                     <th className="p-4">執行人</th>
+                                    <th className="p-4 text-center">操作</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[var(--border-primary)] bg-[var(--bg-primary)]">
                                 {loading ? (
-                                    <tr><td colSpan="8" className="p-20 text-center text-[var(--text-secondary)]">載入中...</td></tr>
+                                    <tr><td colSpan="9" className="p-20 text-center text-[var(--text-secondary)]">載入中...</td></tr>
                                 ) : filtered.length > 0 ? (
                                     filtered.map((record, idx) => (
-                                        <tr key={idx} className="hover:bg-[var(--bg-hover)] transition-colors group">
+                                        <tr key={idx} className={`hover:bg-[var(--bg-hover)] transition-colors group ${record.status === 'VOID' ? 'opacity-40 saturate-0 grayscale select-none' : ''}`}>
                                             <td className="p-4">
                                                 <div className="flex items-center gap-2 text-[var(--text-secondary)]">
                                                     <Calendar size={14} className="text-[var(--text-tertiary)] group-hover:text-[var(--accent-blue)] transition-colors" />
@@ -300,6 +367,19 @@ export default function PurchaseHistoryPage({ user, apiUrl }) {
                                                 <div className="flex items-center gap-1">
                                                     <User size={12} /> {record.operator || '-'}
                                                 </div>
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                {record.status !== 'VOID' ? (
+                                                    <button
+                                                        onClick={() => handleCorrection(record.id)}
+                                                        className="p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors"
+                                                        title="修正此單"
+                                                    >
+                                                        <RotateCcw size={16} />
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded font-bold uppercase">Void</span>
+                                                )}
                                             </td>
                                         </tr>
                                     ))

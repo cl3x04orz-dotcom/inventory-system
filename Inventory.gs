@@ -110,7 +110,7 @@ function getInventoryForStocktake() {
     const pId = row[1];
     const qty = Number(row[2]);
     const type = row[5];
-    if (type === 'STOCK') {
+    if (type === 'STOCK' || type === 'VOID_REFUND') {
       totals[pId] = (totals[pId] || 0) + qty;
     }
   });
@@ -318,7 +318,7 @@ function getInventoryValuation() {
     }
     
     // 根據類型分別累加
-    if (type === 'STOCK') {
+    if (type === 'STOCK' || type === 'VOID_REFUND') {
       valuations[pName].stockQty += qty;
       valuations[pName].stockValue += (qty * price);
       // 累計總額

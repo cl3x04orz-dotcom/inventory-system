@@ -560,8 +560,8 @@ function AppContent() {
                         {page === 'sales' && <SalesPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'inventory' && <InventoryPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'purchase' && <PurchasePage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'report' && <ReportPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} setPage={setPage} />}
-                        {page === 'purchaseHistory' && <PurchaseHistoryPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'report' && <ReportPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} setPage={handlePageChange} />}
+                        {page === 'purchaseHistory' && <PurchaseHistoryPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} setPage={handlePageChange} />}
                         {page === 'adjustHistory' && <AdjustmentHistoryPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'valuation' && <InventoryValuationPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'stocktake' && <StocktakePage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
