@@ -106,7 +106,7 @@ function saveSalesService(data, user) {
         const pName = productMap[item.productId] || item.productName || 'Unknown';
         
         newDetailRows.push([
-            saleId, item.productId, item.picked, item.original, item.returns, item.sold, item.unitPrice, (item.sold * item.unitPrice), pName, (location || '')
+            saleId, item.productId, item.picked, item.original, item.returns, item.sold, item.unitPrice, (item.sold * item.unitPrice), pName, (customer || '')
         ]);
         
         let consumedBatches = []; 
