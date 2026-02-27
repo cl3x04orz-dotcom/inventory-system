@@ -43,12 +43,12 @@ function getInventoryService() {
                              headers.indexOf('sortweight') !== -1 ? headers.indexOf('sortweight') :
                              headers.findIndex(h => h.includes('權重') && !h.includes('單位'));
             
-            if (idxId !== -1 && idxWeight !== -1) {
-                for (let i = 1; i < productData.length; i++) {
-                    const productId = String(productData[i][idxId] || '').trim();
-                    const weight = Number(productData[i][idxWeight]) || 999999; // 沒有權重的排最後
-                    if (productId) sortWeightMap[productId] = weight;
-                }
+            const finalIdxId = idxId !== -1 ? idxId : 0;
+            
+            for (let i = 1; i < productData.length; i++) {
+                const productId = String(productData[i][finalIdxId] || '').trim();
+                const weight = idxWeight !== -1 ? (Number(productData[i][idxWeight]) || 999999) : 999999;
+                if (productId) sortWeightMap[productId] = weight;
             }
         }
     }
@@ -64,7 +64,7 @@ function getInventoryService() {
     }));
     
     // 按照排序權重排序
-    result.sort((a, b) => a.sortWeight - b.sortWeight);
+    result.sort((a, b) => (a.sortWeight - b.sortWeight) || a.productName.localeCompare(b.productName, 'zh-TW'));
     
     return result;
 }

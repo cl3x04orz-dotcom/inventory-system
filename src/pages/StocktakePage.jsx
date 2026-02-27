@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Save, Search, AlertTriangle, CheckSquare, RotateCcw, Package, AlertCircle } from 'lucide-react';
 import { callGAS } from '../utils/api';
-import { sortProducts, getLocalDateString } from '../utils/constants';
+import { sortProducts, getLocalDateString, CASE_MAP } from '../utils/constants';
 
 export default function StocktakePage({ user, apiUrl, logActivity }) {
     const [inventory, setInventory] = useState([]);
     const [stocktakeData, setStocktakeData] = useState({}); // { [productId]: { physicalQty, reason, accountability } }
+    const [customCaseSizes, setCustomCaseSizes] = useState({}); // Consistent with InventoryPage
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -34,7 +35,10 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
                     }
                 });
 
-                const aggregatedList = Object.values(aggregatedMap);
+                const aggregatedList = Object.values(aggregatedMap).map(item => ({
+                    ...item,
+                    pcsPerBox: Number(item.pcsPerBox) || 0
+                }));
                 const sorted = sortProducts(aggregatedList, 'productName');
                 setInventory(sorted);
 
@@ -60,7 +64,12 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
     }, [apiUrl, user.token, getRowKey]);
 
     useEffect(() => {
-        if (user?.token) fetchInventory();
+        if (user?.token) {
+            fetchInventory();
+            // Load custom case sizes from localStorage (consistent with InventoryPage)
+            const saved = localStorage.getItem('customCaseSizes');
+            if (saved) setCustomCaseSizes(JSON.parse(saved));
+        }
     }, [user.token, fetchInventory]);
 
     const handleInputChange = (id, field, value) => {
@@ -127,6 +136,18 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
     const calculateDiff = (bookQty, physicalQty) => {
         if (physicalQty === '' || physicalQty === undefined) return 0;
         return Number(physicalQty) - Number(bookQty);
+    };
+
+    const formatBoxCount = (productName, qty) => {
+        const customCase = customCaseSizes[productName];
+        const pcsPerBox = customCase !== undefined && customCase !== 0 ? customCase : (CASE_MAP[productName] || 0);
+
+        if (!pcsPerBox || pcsPerBox <= 0) return '-';
+        const q = Number(qty) || 0;
+        const boxes = Math.floor(q / pcsPerBox);
+        const units = q % pcsPerBox;
+        if (boxes === 0) return `${units} 支`;
+        return `${boxes} 箱 ${units > 0 ? `${units} 支` : ''}`;
     };
 
     const getItemsToSubmit = () => {
@@ -249,6 +270,7 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
                         <tr>
                             <th className="p-4">產品名稱</th>
                             <th className="p-4 text-right">帳面庫存</th>
+                            <th className="p-4 text-right">帳面箱數</th>
                             {isStockType && (
                                 <>
                                     <th className="p-4">實盤數量</th>
@@ -261,9 +283,9 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
                     </thead>
                     <tbody className="divide-y divide-[var(--border-primary)]">
                         {loading ? (
-                            <tr><td colSpan={isStockType ? "6" : "2"} className="p-6 text-center text-[var(--text-secondary)]">載入中...</td></tr>
+                            <tr><td colSpan={isStockType ? "7" : "3"} className="p-6 text-center text-[var(--text-secondary)]">載入中...</td></tr>
                         ) : items.length === 0 ? (
-                            <tr><td colSpan={isStockType ? "6" : "2"} className="p-6 text-center text-[var(--text-secondary)]">無資料</td></tr>
+                            <tr><td colSpan={isStockType ? "7" : "3"} className="p-6 text-center text-[var(--text-secondary)]">無資料</td></tr>
                         ) : (
                             items.map((item, idx) => {
                                 if (!item) return null;
@@ -283,6 +305,9 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
                                         </td>
                                         <td className={`p-4 text-right font-mono ${hasQuantity ? 'text-orange-500 font-bold text-lg' : 'text-[var(--text-secondary)]'}`}>
                                             {item.quantity}
+                                        </td>
+                                        <td className="p-4 text-right text-xs text-[var(--text-tertiary)] font-bold">
+                                            {formatBoxCount(item.productName, item.quantity)}
                                         </td>
                                         {isStockType && (
                                             <>
@@ -374,7 +399,7 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
                                     <div className="flex flex-col items-end">
                                         <span className="text-xs text-[var(--text-secondary)]">帳面庫存</span>
                                         <span className={`font-mono text-lg font-bold ${hasQuantity ? 'text-orange-500' : 'text-[var(--text-secondary)]'}`}>
-                                            {item.quantity}
+                                            {item.quantity} / {formatBoxCount(item.productName, item.quantity)}
                                         </span>
                                     </div>
                                 </div>
