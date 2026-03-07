@@ -163,7 +163,7 @@ export default function PayablePage({ user, apiUrl }) {
 
             {/* Filters */}
             <div className="mb-6 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)]">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div className="space-y-1">
                         <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase px-1">開始日期</label>
                         <input
@@ -202,10 +202,6 @@ export default function PayablePage({ user, apiUrl }) {
                             onChange={(e) => setOperatorSearch(e.target.value)}
                         />
                     </div>
-
-                    <button onClick={fetchData} className="btn-secondary h-10 px-6 flex items-center gap-2 justify-center w-full md:w-auto">
-                        <RefreshCw size={18} /> 查詢
-                    </button>
                 </div>
             </div>
 

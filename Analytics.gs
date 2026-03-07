@@ -58,8 +58,8 @@ function getDataWithNormalizedHeaders_(sheetName) {
 }
 
 function getValidSalesMap_(startDateStr, endDateStr) {
-  const start = new Date(startDateStr); start.setHours(0,0,0,0);
-  const end = new Date(endDateStr); end.setHours(23,59,59,999);
+  const start = parseLocalYMD_(startDateStr); start.setHours(0,0,0,0);
+  const end = parseLocalYMD_(endDateStr); end.setHours(23,59,59,999);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Sales');
   if (!sheet) return {};
@@ -132,8 +132,8 @@ function getProfitAnalysis(payload) {
 function getCustomerRanking(payload) {
   const { startDate, endDate } = payload;
   const salesData = getDataWithNormalizedHeaders_('Sales');
-  const start = new Date(startDate); start.setHours(0,0,0,0);
-  const end = new Date(endDate); end.setHours(23,59,59,999);
+  const start = parseLocalYMD_(startDate); start.setHours(0,0,0,0);
+  const end = parseLocalYMD_(endDate); end.setHours(23,59,59,999);
   const stats = {};
 
   salesData.forEach(row => {

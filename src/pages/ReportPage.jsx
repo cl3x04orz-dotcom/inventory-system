@@ -22,6 +22,9 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     const [endDate, setEndDate] = useState(getLocalDateString());
     const [location, setLocation] = useState('');
     const [salesRep, setSalesRep] = useState('');
+    const [productTerm, setProductTerm] = useState('');
+    const [rawSales, setRawSales] = useState([]);
+    const [rawExpenses, setRawExpenses] = useState([]);
     const [loading, setLoading] = useState(false);
     const [reportData, setReportData] = useState([]);
     const [expenseData, setExpenseData] = useState([]);
@@ -29,108 +32,72 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     const [isVoiding, setIsVoiding] = useState(false); // [New] Loading state for voiding
     const [expandedGroups, setExpandedGroups] = useState({}); // [New] Track expanded transactions
 
+    // 1. Fetch Data from Server (Only on Date Change)
     const fetchData = useCallback(async () => {
         if (!startDate || !endDate) return;
         setLoading(true);
 
         try {
-            const payload = { startDate, endDate }; // Basic payload for date range
-
-            // RBAC Check: Only fetch expenditures if user has finance permission
+            const payload = { startDate, endDate };
             const hasFinancePerm = user.role === 'BOSS' ||
                 (user.permissions && user.permissions.some(p => p === 'finance' || p.startsWith('finance_')));
 
-            const promises = [
-                callGAS(apiUrl, 'getSalesHistory', payload, user.token)
-            ];
-
-            if (hasFinancePerm) {
-                promises.push(callGAS(apiUrl, 'getExpenditures', payload, user.token));
-            }
+            const promises = [callGAS(apiUrl, 'getSalesHistory', payload, user.token)];
+            if (hasFinancePerm) promises.push(callGAS(apiUrl, 'getExpenditures', payload, user.token));
 
             const results = await Promise.all(promises);
-            const salesRes = results[0];
-            const expenseRes = hasFinancePerm ? results[1] : [];
-
-            // 1. Process Sales Data
-            let filteredSales = Array.isArray(salesRes) ? salesRes : [];
-            const locTerm = location.trim().toLowerCase();
-            const repTerm = salesRep.trim().toLowerCase();
-
-            if (locTerm) {
-                filteredSales = filteredSales.filter(item =>
-                    String(item.location || '').toLowerCase().includes(locTerm)
-                );
-            }
-            if (repTerm) {
-                filteredSales = filteredSales.filter(item =>
-                    String(item.salesRep || '').toLowerCase().includes(repTerm)
-                );
-            }
-            setReportData(filteredSales);
-
-            // 2. Process Expenditure Data
-            let filteredExpenses = Array.isArray(expenseRes) ? expenseRes : [];
-            if (locTerm) {
-                filteredExpenses = filteredExpenses.filter(item =>
-                    String(item.customer || '').toLowerCase().includes(locTerm) ||
-                    String(item.note || '').toLowerCase().includes(locTerm)
-                );
-            }
-            if (repTerm) {
-                filteredExpenses = filteredExpenses.filter(item =>
-                    String(item.salesRep || '').toLowerCase().includes(repTerm)
-                );
-            }
-
-            // Calculate row totals for expenses
-            filteredExpenses.forEach(item => {
-                // [Fix] Line Pay 不計入「總支出」顯示，但需計入「應繳回」扣除
-                item.linePayAmount = Number(item.linePay || 0);
-
-                const rowTotal =
-                    Number(item.stall || 0) + Number(item.cleaning || 0) + Number(item.electricity || 0) +
-                    Number(item.gas || 0) + Number(item.parking || 0) + Number(item.goods || 0) +
-                    Number(item.bags || 0) + Number(item.others || 0) + Number(item.vehicleMaintenance || 0) +
-                    Number(item.salary || 0) + Number(item.serviceFee || 0) +
-                    Number(item.reserve || 0);
-                // Removed: Number(item.linePay || 0)
-
-                item.rowTotal = rowTotal;
-                // [Fix] 標記薪資金額 (匯款)，不計入「應繳回金額」的現金支出扣除
-                item.salaryAmount = Number(item.salary || 0);
-
-                // 模糊匹配結算金額欄位 (Expenditures L 欄)
-                const finalTotalKey = Object.keys(item).find(k => {
-                    const lowK = k.toLowerCase().trim();
-                    return lowK === 'finaltotal' ||
-                        lowK.includes('結算') ||
-                        lowK.includes('结算') ||
-                        lowK.includes('總支出金額') ||
-                        lowK.includes('总支出金额');
-                });
-
-                // 讀取值並確保是數字，如果找不到或為 0，則給予 fallback
-                const extractedValue = finalTotalKey ? Number(item[finalTotalKey]) : Number(item.finalTotal || 0);
-                item.displayFinalTotal = extractedValue;
-
-                // [Fix] 僅在前端相容讀取原始中文鍵值 (不依賴後端 Mapping)
-                item.normCustomer = item.customer || item['對象/備註'] || item['對象'] || '';
-                item.normSalesRep = item.salesRep || item['業務'] || '';
-                item.normNote = item.note || item['備註'] || '';
-            });
-
-            setExpenseData(filteredExpenses);
-
+            setRawSales(Array.isArray(results[0]) ? results[0] : []);
+            setRawExpenses(hasFinancePerm ? (Array.isArray(results[1]) ? results[1] : []) : []);
         } catch (error) {
             console.error(error);
             alert('查詢失敗: ' + error.message);
         } finally {
             setLoading(false);
         }
-    }, [startDate, endDate, location, salesRep, user.token, apiUrl]);
+    }, [startDate, endDate, user.token, apiUrl]);
 
-    // Initial fetch and fetch on dependency change
+    // 2. Perform Local Filtering (Instant Response)
+    React.useEffect(() => {
+        const locTerm = location.trim().toLowerCase();
+        const repTerm = salesRep.trim().toLowerCase();
+        const prodTerm = productTerm.trim().toLowerCase();
+
+        // Filter Sales
+        let filteredSales = [...rawSales];
+        if (locTerm) filteredSales = filteredSales.filter(item => String(item.location || '').toLowerCase().includes(locTerm));
+        if (repTerm) filteredSales = filteredSales.filter(item => String(item.salesRep || '').toLowerCase().includes(repTerm));
+        if (prodTerm) filteredSales = filteredSales.filter(item => String(item.productName || '').toLowerCase().includes(prodTerm));
+        setReportData(filteredSales);
+
+        // Filter Expenses
+        let filteredExpenses = rawExpenses.map(item => ({
+            ...item,
+            linePayAmount: Number(item.linePay || 0),
+            rowTotal: Number(item.stall || 0) + Number(item.cleaning || 0) + Number(item.electricity || 0) +
+                Number(item.gas || 0) + Number(item.parking || 0) + Number(item.goods || 0) +
+                Number(item.bags || 0) + Number(item.others || 0) + Number(item.vehicleMaintenance || 0) +
+                Number(item.salary || 0) + Number(item.serviceFee || 0) + Number(item.reserve || 0),
+            salaryAmount: Number(item.salary || 0),
+            normCustomer: item.customer || item['對象/備註'] || item['對象'] || '',
+            normSalesRep: item.salesRep || item['業務'] || '',
+            normNote: item.note || item['備註'] || '',
+            displayFinalTotal: Number(item[Object.keys(item).find(k => ['finaltotal', '結算', '结算', '總支出金額', '总支出金额'].some(term => k.toLowerCase().includes(term)))] || item.finalTotal || 0)
+        }));
+
+        if (locTerm) {
+            filteredExpenses = filteredExpenses.filter(item =>
+                String(item.normCustomer).toLowerCase().includes(locTerm) ||
+                String(item.normNote).toLowerCase().includes(locTerm)
+            );
+        }
+        if (repTerm) {
+            filteredExpenses = filteredExpenses.filter(item => String(item.normSalesRep).toLowerCase().includes(repTerm));
+        }
+        setExpenseData(filteredExpenses);
+
+    }, [rawSales, rawExpenses, location, salesRep, productTerm]);
+
+    // Trigger Fetching
     React.useEffect(() => {
         fetchData();
     }, [fetchData]);
@@ -173,12 +140,6 @@ export default function ReportPage({ user, apiUrl, setPage }) {
         }
     };
 
-    const handleSearch = (e) => {
-        e.preventDefault();
-        fetchData();
-    };
-
-    // Calculate summaries
     // Calculate summaries
     const totalSales = reportData?.reduce((acc, item) => acc + (Number(item.totalAmount) || 0), 0) || 0;
     const totalQty = reportData?.reduce((acc, item) => acc + (Number(item.soldQty) || 0), 0) || 0;
@@ -364,7 +325,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                 </div>
 
                 {/* Filters - Mobile View (Horizontal, No Border, mimics SalesPage) */}
-                <form onSubmit={handleSearch} className="md:hidden mb-6 space-y-3">
+                <div className="md:hidden mb-6 space-y-3">
                     <div className="flex items-center gap-3">
                         <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">開始日期:</label>
                         <input
@@ -396,6 +357,16 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                         />
                     </div>
                     <div className="flex items-center gap-3">
+                        <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">產品名稱:</label>
+                        <input
+                            type="text"
+                            placeholder="輸入產品名稱..."
+                            className="input-field flex-1 py-1.5 px-3"
+                            value={productTerm}
+                            onChange={e => setProductTerm(e.target.value)}
+                        />
+                    </div>
+                    <div className="flex items-center gap-3">
                         <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">業務員:</label>
                         <div className="flex flex-1 gap-2">
                             <input
@@ -406,19 +377,20 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                 onChange={e => setSalesRep(e.target.value)}
                             />
                             <button
-                                type="submit"
+                                type="button"
                                 disabled={loading}
                                 className="btn-primary px-4 py-1.5 flex items-center justify-center rounded-lg shadow-sm active:scale-95 transition-transform"
+                                onClick={fetchData}
                             >
                                 <Search size={18} />
                             </button>
                         </div>
                     </div>
-                </form>
+                </div>
 
                 {/* Filters - Desktop View (Original Grid) */}
-                <form onSubmit={handleSearch} className="hidden md:block mb-6 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] shadow-sm">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="hidden md:block mb-6 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] shadow-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                         <div className="grid grid-cols-2 gap-4 md:contents">
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-[var(--text-secondary)] uppercase px-1">開始日期</label>
@@ -451,6 +423,16 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                 onChange={e => setLocation(e.target.value)}
                             />
                         </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-[var(--text-secondary)] uppercase px-1">產品名稱</label>
+                            <input
+                                type="text"
+                                placeholder="關鍵字..."
+                                className="input-field w-full"
+                                value={productTerm}
+                                onChange={e => setProductTerm(e.target.value)}
+                            />
+                        </div>
                         <div className="flex gap-2">
                             <div className="space-y-1 flex-1">
                                 <label className="text-xs font-bold text-[var(--text-secondary)] uppercase px-1">業務員</label>
@@ -462,16 +444,9 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                     onChange={e => setSalesRep(e.target.value)}
                                 />
                             </div>
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="btn-primary py-2 px-6 flex items-center justify-center gap-2 self-end h-[42px] min-w-[100px]"
-                            >
-                                {loading ? '...' : <Search size={18} />} 查詢
-                            </button>
                         </div>
                     </div>
-                </form>
+                </div>
 
                 {/* Content Logic */}
                 {reportData && (

@@ -17,8 +17,7 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
         try {
             const data = await callGAS(apiUrl, 'getAdjustmentHistory', {
                 startDate,
-                endDate,
-                productName: searchTerm
+                endDate
             }, user.token);
 
             // console.log('Adjustment History Data:', data);
@@ -32,7 +31,7 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
         } finally {
             setLoading(false);
         }
-    }, [apiUrl, user.token, startDate, endDate, searchTerm]);
+    }, [apiUrl, user.token, startDate, endDate]);
 
     useEffect(() => {
         fetchHistory();
@@ -64,14 +63,6 @@ export default function AdjustmentHistoryPage({ user, apiUrl }) {
                             <p className="text-[10px] text-[var(--text-tertiary)] uppercase font-bold tracking-wider">總記錄數</p>
                             <p className="text-xl font-bold text-blue-500">{filtered.length}</p>
                         </div>
-                        <button
-                            onClick={fetchHistory}
-                            disabled={loading}
-                            className="btn-secondary h-[46px] px-6 flex items-center justify-center gap-2 whitespace-nowrap"
-                        >
-                            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-                            <span>刷新</span>
-                        </button>
                     </div>
                 </div>
 

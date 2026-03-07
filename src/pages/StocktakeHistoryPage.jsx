@@ -18,9 +18,7 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
         try {
             const data = await callGAS(apiUrl, 'getStocktakeHistory', {
                 startDate,
-                endDate,
-                productName: searchTerm,
-                diffOnly
+                endDate
             }, user.token);
 
             if (Array.isArray(data)) {
@@ -32,7 +30,7 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
         } finally {
             setLoading(false);
         }
-    }, [apiUrl, user.token, startDate, endDate, searchTerm, diffOnly]);
+    }, [apiUrl, user.token, startDate, endDate]);
 
     useEffect(() => {
         fetchHistory();
@@ -69,9 +67,11 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
         };
     }, [startDate, endDate]);
 
-    const filtered = records.filter(r =>
-        String(r.productName || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filtered = records.filter(r => {
+        const matchesTerm = String(r.productName || '').toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesDiff = diffOnly ? r.diff !== 0 : true;
+        return matchesTerm && matchesDiff;
+    });
 
     const totalRecords = filtered.length;
     const withDiff = filtered.filter(r => r.diff !== 0).length;
@@ -156,14 +156,6 @@ export default function StocktakeHistoryPage({ user, apiUrl }) {
                                 />
                                 <span className="text-[11px] text-[var(--text-secondary)] font-bold whitespace-nowrap">僅顯示差異</span>
                             </label>
-
-                            <button
-                                onClick={fetchHistory}
-                                disabled={loading}
-                                className="btn-secondary h-10 px-4 flex items-center gap-2 whitespace-nowrap"
-                            >
-                                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> 刷新
-                            </button>
                         </div>
                     </div>
                 </div>

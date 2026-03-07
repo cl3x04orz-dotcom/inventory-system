@@ -27,8 +27,8 @@ export default function CostCalculationPage({ user, apiUrl }) {
     };
 
     useEffect(() => {
-        if (user?.token) fetchData();
-    }, [user.token, apiUrl]);
+        if (user?.token && startDate && endDate) fetchData();
+    }, [user.token, apiUrl, startDate, endDate]);
 
     const filteredData = data.filter(item => {
         const searchStr = `${item.customer || ''} ${item.salesRep || ''} ${item.note || ''}`.toLowerCase();
@@ -108,7 +108,7 @@ export default function CostCalculationPage({ user, apiUrl }) {
                 </div>
             </div>
 
-            <div className="p-3 shrink-0 grid grid-cols-1 md:grid-cols-3 gap-3 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">
+            <div className="p-3 shrink-0 grid grid-cols-1 md:grid-cols-2 gap-3 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">
                 {/* Date Inputs: Grid cols 2 on mobile to take only 1 row height */}
                 <div className="grid grid-cols-2 md:flex md:flex-row md:items-center gap-2 w-full">
                     <div className="space-y-1 w-full md:w-auto md:flex-1">
@@ -125,10 +125,6 @@ export default function CostCalculationPage({ user, apiUrl }) {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
                     <input type="text" placeholder="搜尋..." className="input-field pl-10 w-full h-10 text-[var(--text-primary)] bg-[var(--bg-primary)]" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
-
-                <button onClick={fetchData} className="btn-primary w-full md:w-auto h-10 flex items-center justify-center gap-2">
-                    <RefreshCw size={18} className={loading ? 'animate-spin' : ''} /> 計算
-                </button>
             </div>
 
             {/* Compact 5-Col Grid for Expenses on Mobile (2 Rows x 5 Cols = 10 items) */}

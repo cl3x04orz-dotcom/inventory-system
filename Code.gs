@@ -183,7 +183,7 @@ function apiHandler(request) {
             case 'saveExpenditure': return saveExpenditureService(payload);
 
             // 帳款管理 (Assuming these are in other files or need to be defined if missing)
-            case 'getReceivables': return typeof getReceivablesService !== 'undefined' ? getReceivablesService() : {error: 'Service missing'};
+            case 'getReceivables': return typeof getReceivablesService !== 'undefined' ? getReceivablesService(payload) : {error: 'Service missing'};
             case 'markAsPaid': return typeof markAsPaidService !== 'undefined' ? markAsPaidService(payload) : {error: 'Service missing'};
             case 'getPayables': return typeof getPayablesService !== 'undefined' ? getPayablesService(payload) : {error: 'Service missing'};
             case 'markPayableAsPaid': return typeof markPayableAsPaidService !== 'undefined' ? markPayableAsPaidService(payload) : {error: 'Service missing'};
@@ -603,4 +603,14 @@ function batchAppendNoLock_(sheet, rowsData) {
   const lastRow = sheet.getLastRow();
   const range = sheet.getRange(lastRow + 1, 1, rowsData.length, rowsData[0].length);
   range.setValues(rowsData);
+}
+
+// 解析日期字串 (YYYY-MM-DD) 為本地時間物件，避免 UTC 偏移
+function parseLocalYMD_(dateStr) {
+  if (!dateStr) return new Date();
+  const parts = dateStr.split('-');
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+  return new Date(y, m, d);
 }

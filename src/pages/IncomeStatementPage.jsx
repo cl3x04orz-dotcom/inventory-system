@@ -76,8 +76,8 @@ export default function IncomeStatementPage({ user, apiUrl }) {
     };
 
     useEffect(() => {
-        if (user?.token) fetchData();
-    }, [user.token, apiUrl]);
+        if (user?.token && startDate && endDate) fetchData();
+    }, [user.token, apiUrl, startDate, endDate]);
 
     const formatCurrency = (val) => `$${Math.round(val).toLocaleString()}`;
     const getPercent = (val, total) => total === 0 ? '0%' : `${((val / total) * 100).toFixed(1)}%`;
@@ -99,9 +99,6 @@ export default function IncomeStatementPage({ user, apiUrl }) {
                         </p>
                     </div>
                 </div>
-                <button onClick={fetchData} className="btn-secondary p-1.5 md:p-2 rounded-lg md:rounded-xl shrink-0">
-                    <RefreshCw size={16} className={`md:w-5 md:h-5 ${loading ? 'animate-spin' : ''}`} />
-                </button>
             </div>
 
             <div className="bg-[var(--bg-secondary)] p-2 md:p-4 rounded-xl border border-[var(--border-primary)] shrink-0 flex flex-col md:flex-row md:items-center gap-2 md:gap-4 shadow-sm">
@@ -131,7 +128,6 @@ export default function IncomeStatementPage({ user, apiUrl }) {
                     </div>
                 </div>
 
-                <button onClick={fetchData} className="btn-primary h-8 md:h-10 px-6 w-full md:w-auto text-xs md:text-sm">查詢</button>
             </div>
 
             <div className="bg-[var(--bg-primary)] rounded-xl border border-[var(--border-primary)] shadow-sm">

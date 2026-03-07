@@ -28,8 +28,8 @@ export default function CustomerRankingPage({ user, apiUrl }) {
     };
 
     useEffect(() => {
-        if (user?.token) fetchData();
-    }, [user.token, apiUrl]);
+        if (user?.token && startDate && endDate) fetchData();
+    }, [user.token, apiUrl, startDate, endDate]);
 
     const filteredData = data.filter(item =>
         String(item.customerName || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -44,30 +44,24 @@ export default function CustomerRankingPage({ user, apiUrl }) {
                     </h1>
                     <p className="text-[var(--text-secondary)] text-sm mt-1">分析指定期間內各客戶的採購總額與貢獻度</p>
                 </div>
-                <button onClick={fetchData} disabled={loading} className="btn-secondary p-2 rounded-xl">
-                    <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-                </button>
             </div>
 
-            <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shrink-0 grid grid-cols-1 md:grid-cols-3 gap-4 shadow-sm">
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shrink-0 grid grid-cols-1 md:grid-cols-2 gap-4 shadow-sm">
                 <div className="flex items-center gap-2">
-                    <input type="date" className="input-field flex-1 text-sm" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                    <input type="date" className="input-field flex-1 text-sm bg-[var(--bg-tertiary)]" value={startDate} onChange={e => setStartDate(e.target.value)} />
                     <span className="text-[var(--text-secondary)] font-bold hidden md:inline">至</span>
-                    <input type="date" className="input-field flex-1 text-sm" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                    <input type="date" className="input-field flex-1 text-sm bg-[var(--bg-tertiary)]" value={endDate} onChange={e => setEndDate(e.target.value)} />
                 </div>
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
                     <input
                         type="text"
                         placeholder="搜尋客戶名稱..."
-                        className="input-field pl-10 w-full"
+                        className="input-field pl-10 w-full bg-[var(--bg-tertiary)]"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <button onClick={fetchData} className="btn-primary flex items-center justify-center gap-2 h-[42px]">
-                    <Search size={18} /> 執行查詢
-                </button>
             </div>
 
             <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] overflow-hidden flex-1 flex flex-col shadow-sm">

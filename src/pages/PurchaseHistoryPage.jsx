@@ -218,13 +218,7 @@ export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
                             />
                         </div>
 
-                        <button
-                            onClick={fetchHistory}
-                            disabled={loading}
-                            className="btn-secondary h-[42px] flex items-center gap-2 whitespace-nowrap px-6"
-                        >
-                            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} /> 刷新
-                        </button>
+                        {/* Refresh Button removed for auto-search consistency */}
 
                         <div className="flex items-center gap-2 ml-auto">
                             <label className="relative inline-flex items-center cursor-pointer">

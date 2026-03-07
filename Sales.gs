@@ -316,9 +316,10 @@ function getReceivablesService(payload) {
   const IDX_METHOD = 8;
   const IDX_STATUS = 9;
 
-  const startDate = (payload && payload.startDate) ? new Date(payload.startDate) : null;
-  const endDate = (payload && payload.endDate) ? new Date(payload.endDate) : null;
-  if (endDate) endDate.setHours(23, 59, 59);
+  const startDate = payload.startDate ? parseLocalYMD_(payload.startDate) : null;
+  const endDate = payload.endDate ? parseLocalYMD_(payload.endDate) : null;
+  if (startDate) startDate.setHours(0, 0, 0, 0);
+  if (endDate) endDate.setHours(23, 59, 59, 999);
 
   const results = [];
   
@@ -962,15 +963,6 @@ function getSalesByDateRange(payload) {
 // 8. 通用 Helper Functions
 // ===========================================
 
-// 解析日期字串 (YYYY-MM-DD) 為本地時間物件，避免 UTC 偏移
-function parseLocalYMD_(dateStr) {
-  if (!dateStr) return new Date();
-  const parts = dateStr.split('-');
-  const y = parseInt(parts[0], 10);
-  const m = parseInt(parts[1], 10) - 1;
-  const d = parseInt(parts[2], 10);
-  return new Date(y, m, d);
-}
 
 /**
  * 補齊舊銷售明細的產品名稱 (一次性執行)

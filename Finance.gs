@@ -41,9 +41,10 @@ function getPayablesService(payload) {
 
   if (methodIdx === -1 || statusIdx === -1) return [];
 
-  const startDate = (payload && payload.startDate) ? new Date(payload.startDate) : null;
-  const endDate = (payload && payload.endDate) ? new Date(payload.endDate) : null;
-  if (endDate) endDate.setHours(23, 59, 59);
+  const startDate = payload.startDate ? parseLocalYMD_(payload.startDate) : null;
+  const endDate = payload.endDate ? parseLocalYMD_(payload.endDate) : null;
+  if (startDate) startDate.setHours(0, 0, 0, 0);
+  if (endDate) endDate.setHours(23, 59, 59, 999);
 
   const purchaseGroups = {};
   for (let i = 1; i < data.length; i++) {
