@@ -354,6 +354,7 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                             <input
                                                 id={`item-m-${idx}-vendor`}
                                                 list="vendors-list"
+                                                autoComplete="off"
                                                 className="input-field flex-1 py-1.5 px-3"
                                                 placeholder="廠商名稱"
                                                 value={item.vendor}
@@ -368,6 +369,7 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                             <input
                                                 id={`item-m-${idx}-product`}
                                                 list={`products-list-${idx}`}
+                                                autoComplete="off"
                                                 className="input-field flex-1 py-1.5 px-3"
                                                 placeholder="產品名稱"
                                                 value={item.productName}
@@ -386,6 +388,7 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                                 id={`item-m-${idx}-qty`}
                                                 type="text"
                                                 inputMode="decimal"
+                                                autoComplete="off"
                                                 className="input-field flex-1 py-1.5 px-3"
                                                 placeholder="0"
                                                 value={item.quantity}
@@ -402,6 +405,7 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                                 id={`item-m-${idx}-price`}
                                                 type="text"
                                                 inputMode="decimal"
+                                                autoComplete="off"
                                                 className="input-field flex-1 py-1.5 px-3"
                                                 placeholder="0"
                                                 value={item.unitPrice}
@@ -491,6 +495,7 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                             <input
                                                 id={`item-${idx}-vendor`}
                                                 list="vendors-list"
+                                                autoComplete="off"
                                                 className="input-field w-full py-1.5 px-2 text-sm"
                                                 placeholder="廠商"
                                                 value={item.vendor}
@@ -508,6 +513,7 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                             <input
                                                 id={`item-${idx}-product`}
                                                 list={`products-list-${idx}`}
+                                                autoComplete="off"
                                                 className="input-field w-full py-1.5 px-2 text-sm"
                                                 placeholder="產品名稱"
                                                 value={item.productName}
@@ -525,6 +531,7 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                                 id={`item-${idx}-qty`}
                                                 type="text"
                                                 inputMode="decimal"
+                                                autoComplete="off"
                                                 className="input-field w-full py-1.5 px-1 text-center text-sm"
                                                 placeholder="0"
                                                 value={item.quantity}
@@ -543,6 +550,7 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                                 id={`item-${idx}-price`}
                                                 type="text"
                                                 inputMode="decimal"
+                                                autoComplete="off"
                                                 className="input-field w-full py-1.5 px-1 text-center text-sm"
                                                 placeholder="0"
                                                 value={item.unitPrice}

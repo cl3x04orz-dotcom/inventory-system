@@ -950,6 +950,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     <input
                                         id="input-location"
                                         type="text"
+                                        autoComplete="off"
                                         className="input-field py-1 px-3 w-full md:w-40 lg:w-48"
                                         placeholder="輸入銷售對象..."
                                         value={location}
@@ -1085,6 +1086,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                         id={`input-m-${idx}-picked`}
                                                                         type="text"
                                                                         inputMode="decimal"
+                                                                        autoComplete="off"
                                                                         className="input-field text-center p-2 text-base font-bold bg-white"
                                                                         value={row.picked || ''}
                                                                         onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
@@ -1100,6 +1102,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                         id={`input-m-${idx}-original`}
                                                                         type="text"
                                                                         inputMode="decimal"
+                                                                        autoComplete="off"
                                                                         className="input-field text-center p-2 text-base font-bold bg-white"
                                                                         value={row.original || ''}
                                                                         onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
@@ -1115,6 +1118,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                         id={`input-m-${idx}-returns`}
                                                                         type="text"
                                                                         inputMode="decimal"
+                                                                        autoComplete="off"
                                                                         className="input-field text-center p-2 text-base font-bold text-red-600 bg-white"
                                                                         value={row.returns || ''}
                                                                         onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
@@ -1130,6 +1134,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                         id={`input-m-${idx}-price`}
                                                                         type="text"
                                                                         inputMode="decimal"
+                                                                        autoComplete="off"
                                                                         className="input-field text-center p-2 text-base font-bold bg-white"
                                                                         value={row.price}
                                                                         onChange={(e) => handleRowChange(row.id, 'price', e.target.value)}
@@ -1211,6 +1216,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                 <input
                                                                     id={`input-${idx}-picked`}
                                                                     type="text"
+                                                                    autoComplete="off"
                                                                     className="input-field text-center p-1"
                                                                     value={row.picked || ''}
                                                                     onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
@@ -1224,6 +1230,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                 <input
                                                                     id={`input-${idx}-original`}
                                                                     type="text"
+                                                                    autoComplete="off"
                                                                     className="input-field text-center p-1"
                                                                     value={row.original || ''}
                                                                     onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
@@ -1247,7 +1254,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                 />
                                                             </td>
                                                             <td className="p-3 text-center font-bold text-blue-500">{row.sold}</td>
-                                                            <td className="p-3"><input id={`input-${idx}-price`} type="text" className="input-field text-center p-1 w-20" value={row.price} onChange={(e) => handleRowChange(row.id, 'price', e.target.value)} onBlur={(e) => handleBlur(row.id, 'price', e.target.value)} onFocus={() => setActiveInput({ id: `input-${idx}-price`, type: 'row', rowId: row.id, field: 'price' })} onKeyDown={(e) => handleKeyDown(e, idx, 'price')} disabled={isSorting} /></td>
+                                                            <td className="p-3"><input id={`input-${idx}-price`} type="text" autoComplete="off" className="input-field text-center p-1 w-20" value={row.price} onChange={(e) => handleRowChange(row.id, 'price', e.target.value)} onBlur={(e) => handleBlur(row.id, 'price', e.target.value)} onFocus={() => setActiveInput({ id: `input-${idx}-price`, type: 'row', rowId: row.id, field: 'price' })} onKeyDown={(e) => handleKeyDown(e, idx, 'price')} disabled={isSorting} /></td>
                                                             <td className="p-3 text-right font-mono text-rose-600">${row.subtotal?.toLocaleString()}</td>
                                                         </tr>
                                                     )}
@@ -1292,6 +1299,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                 id={currentId}
                                                 type="text"
                                                 inputMode="decimal"
+                                                autoComplete="off"
                                                 className="input-field flex-1"
                                                 placeholder="0"
                                                 value={cashCounts[denom] || ''}
@@ -1317,6 +1325,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                         id="input-reserve"
                                         type="text"
                                         inputMode="decimal"
+                                        autoComplete="off"
                                         className="input-field flex-1 border-red-900/50 focus:ring-red-500"
                                         value={reserve}
                                         onChange={(e) => handleReserveChange(e.target.value)}
@@ -1364,6 +1373,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                 id={currentId}
                                                 type="text"
                                                 inputMode="decimal"
+                                                autoComplete="off"
                                                 className="input-field text-sm"
                                                 value={expenses[key] || ''}
                                                 onChange={(e) => handleExpenseChange(key, e.target.value)}

@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Search, Calendar, MapPin, User, FileText, TrendingUp, Package, DollarSign, RotateCcw } from 'lucide-react';
+import { Search, Calendar, MapPin, User, FileText, TrendingUp, Package, DollarSign, RotateCcw, ChevronDown, ChevronRight } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import { getLocalDateString } from '../utils/constants';
 
@@ -27,6 +27,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     const [expenseData, setExpenseData] = useState([]);
     const [viewMode, setViewMode] = useState('SALES'); // 'SALES' or 'EXPENSES'
     const [isVoiding, setIsVoiding] = useState(false); // [New] Loading state for voiding
+    const [expandedGroups, setExpandedGroups] = useState({}); // [New] Track expanded transactions
 
     const fetchData = useCallback(async () => {
         if (!startDate || !endDate) return;
@@ -36,7 +37,8 @@ export default function ReportPage({ user, apiUrl, setPage }) {
             const payload = { startDate, endDate }; // Basic payload for date range
 
             // RBAC Check: Only fetch expenditures if user has finance permission
-            const hasFinancePerm = user.role === 'BOSS' || (user.permissions && user.permissions.includes('finance'));
+            const hasFinancePerm = user.role === 'BOSS' ||
+                (user.permissions && user.permissions.some(p => p === 'finance' || p.startsWith('finance_')));
 
             const promises = [
                 callGAS(apiUrl, 'getSalesHistory', payload, user.token)
@@ -224,6 +226,91 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     }, {});
 
     const summaryList = productSummary ? Object.values(productSummary).sort((a, b) => b.qty - a.qty) : [];
+
+    // [New] Group Sales by Transaction (Date + Location + SalesRep)
+    const groupedSales = (reportData || []).reduce((acc, item) => {
+        const dateStr = new Date(item.date).toLocaleString('zh-TW', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', hour12: false
+        });
+        const key = `${dateStr}_${item.location}_${item.salesRep}`;
+        if (!acc[key]) {
+            acc[key] = {
+                key,
+                dateDisplay: dateStr,
+                location: item.location,
+                salesRep: item.salesRep,
+                operator: item.operator,
+                saleId: item.saleId,
+                items: [],
+                totalAmount: 0,
+                totalQty: 0,
+                totalExpense: 0,
+                expenseDetails: {}
+            };
+        }
+        acc[key].items.push(item);
+        acc[key].totalAmount += (Number(item.totalAmount) || 0);
+        acc[key].totalQty += (Number(item.soldQty) || 0);
+        return acc;
+    }, {});
+
+    // [New] Add Expenses to the same groups
+    (expenseData || []).forEach(item => {
+        const dateStr = new Date(item.date).toLocaleString('zh-TW', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', hour12: false
+        });
+        const key = `${dateStr}_${item.normCustomer || '-'}_${item.normSalesRep}`;
+        if (!groupedSales[key]) {
+            groupedSales[key] = {
+                key,
+                dateDisplay: dateStr,
+                location: item.normCustomer || '-',
+                salesRep: item.normSalesRep,
+                operator: item.operator,
+                saleId: item.saleId,
+                items: [],
+                totalAmount: 0,
+                totalQty: 0,
+                totalExpense: 0,
+                expenseDetails: {}
+            };
+        }
+        groupedSales[key].totalExpense += (Number(item.rowTotal) || 0);
+
+        // Collect expense details
+        const cats = {
+            "攤位": item.stall,
+            "清潔": item.cleaning,
+            "電費": item.electricity,
+            "加油": item.gas,
+            "停車": item.parking,
+            "貨款": item.goods,
+            "塑膠袋": item.bags,
+            "其他": item.others,
+            "LinePay": item.linePay,
+            "服務費": item.serviceFee,
+            "公積金": item.reserve,
+            "保修": item.vehicleMaintenance,
+            "薪資": item.salary
+        };
+
+        Object.entries(cats).forEach(([label, amount]) => {
+            const val = Number(amount) || 0;
+            if (val > 0) {
+                groupedSales[key].expenseDetails[label] = (groupedSales[key].expenseDetails[label] || 0) + val;
+            }
+        });
+    });
+    const sortedGroups = Object.values(groupedSales).sort((a, b) => b.key.localeCompare(a.key));
+
+    const toggleGroup = (key) => {
+        setExpandedGroups(prev => ({
+            ...prev,
+            [key]: !prev[key]
+        }));
+    };
 
     return (
         <div className="max-w-[90rem] mx-auto p-4 relative">
@@ -437,97 +524,193 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                     onClick={() => setViewMode('EXPENSES')}
                                     className={`font-bold flex items-center gap-2 pb-2 border-b-2 transition-colors ${viewMode === 'EXPENSES' ? 'text-rose-600 border-rose-600' : 'text-[var(--text-secondary)] border-transparent hover:text-[var(--text-primary)]'}`}
                                 >
-                                    <DollarSign size={16} /> 支出明細 ({expenseData.length})
                                 </button>
                             </div>
 
                             <div className="overflow-auto flex-1">
                                 {viewMode === 'SALES' ? (
                                     <>
-                                        {/* Mobile Card View (SALES) */}
+                                        {/* Mobile Card View (SALES) - Grouped */}
                                         <div className="md:hidden divide-y divide-[var(--border-primary)]">
-                                            {reportData.map((item, idx) => (
-                                                <div key={idx} className="p-4 space-y-3 bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] transition-colors">
-                                                    <div className="flex justify-between items-start">
-                                                        <div className="text-xs font-mono text-[var(--text-tertiary)]">
-                                                            {new Date(item.date).toLocaleString('zh-TW', {
-                                                                year: 'numeric', month: '2-digit', day: '2-digit',
-                                                                hour: '2-digit', minute: '2-digit', hour12: false
-                                                            })}
+                                            {sortedGroups.map((group) => {
+                                                const isExpanded = expandedGroups[group.key];
+                                                return (
+                                                    <div key={group.key} className={`bg-[var(--bg-secondary)] transition-colors ${isExpanded ? 'bg-blue-50/20' : ''}`}>
+                                                        <div
+                                                            className="p-4 space-y-3 cursor-pointer"
+                                                            onClick={() => toggleGroup(group.key)}
+                                                        >
+                                                            <div className="flex justify-between items-start">
+                                                                <div className="text-xs font-mono text-[var(--text-tertiary)] flex items-center gap-2">
+                                                                    {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                                                    {group.dateDisplay}
+                                                                </div>
+                                                                <div className="flex flex-col items-end gap-2">
+                                                                    <div className="text-emerald-600 font-bold font-mono text-lg">${Math.round(group.totalAmount).toLocaleString()}</div>
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleCorrection(group.saleId); }}
+                                                                        className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-amber-600 border border-amber-200 hover:bg-amber-100 transition-colors text-xs font-bold shadow-sm"
+                                                                        title="作廢並修正全單"
+                                                                    >
+                                                                        <RotateCcw size={12} /> 修正
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex flex-wrap gap-2 text-sm">
+                                                                <div className="flex items-center gap-1 bg-blue-500/10 text-blue-700 px-2 py-0.5 rounded-md">
+                                                                    <MapPin size={12} /> <span className="font-bold">{group.location}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-md">
+                                                                    <User size={12} /> <span>{group.salesRep}</span>
+                                                                    {group.operator && group.operator !== group.salesRep && (
+                                                                        <span className="text-[10px] text-amber-600 ml-1">(修: {group.operator})</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            <div className="bg-[var(--bg-tertiary)]/50 p-3 rounded-md space-y-2">
+                                                                <div className="text-base text-[var(--text-tertiary)] flex justify-between items-center">
+                                                                    <span>共 {group.items.length} 項商品 / 總數: {group.totalQty}</span>
+                                                                    <div className="flex gap-4">
+                                                                        {Object.keys(group.expenseDetails).length > 0 && (
+                                                                            <div className="flex flex-col items-end gap-1">
+                                                                                {Object.entries(group.expenseDetails).map(([label, amount], idx) => (
+                                                                                    <div key={idx} className="flex items-center gap-1.5 text-rose-600 font-bold">
+                                                                                        <span className="text-sm">{label}:</span>
+                                                                                        <span className="font-mono text-base">${amount.toLocaleString()}</span>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
+                                                                        <div className="text-right">
+                                                                            <div className="text-[var(--text-tertiary)] text-[10px] mb-0.5">銷售總額</div>
+                                                                            <span className="text-emerald-700 font-bold font-mono text-xl">${Math.round(group.totalAmount).toLocaleString()}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        <div className="flex flex-col items-end gap-2">
-                                                            <div className="text-emerald-600 font-bold font-mono text-lg">${item.totalAmount}</div>
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleCorrection(item.saleId); }}
-                                                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-amber-600 border border-amber-200 hover:bg-amber-100 transition-colors text-xs font-bold"
-                                                                title="修正此單"
-                                                            >
-                                                                <RotateCcw size={12} /> 修正
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex flex-wrap gap-2 text-sm">
-                                                        <div className="flex items-center gap-1 bg-blue-500/10 text-blue-700 px-2 py-0.5 rounded-md">
-                                                            <MapPin size={12} /> <span className="font-medium">{item.location}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-md">
-                                                            <User size={12} /> <span>{item.salesRep}</span>
-                                                            {item.operator && item.operator !== item.salesRep && (
-                                                                <span className="text-[10px] text-amber-600 ml-1">(修: {item.operator})</span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex justify-between items-center pt-1 border-t border-[var(--border-primary)]">
-                                                        <div className="font-bold text-[var(--text-primary)]">{item.productName}</div>
-                                                        <div className="text-[var(--text-secondary)]">數量: <span className="font-bold text-[var(--text-primary)]">{item.soldQty}</span></div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
 
-                                        {/* Desktop Table View (SALES) */}
-                                        <table className="hidden md:table w-full text-left text-sm">
-                                            <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] sticky top-0 z-10">
-                                                <tr>
-                                                    <th className="p-3 font-medium w-48">日期</th>
-                                                    <th className="p-3 font-medium w-32">銷售對象</th>
-                                                    <th className="p-3 font-medium w-32">業務</th>
-                                                    <th className="p-3 font-medium">商品</th>
-                                                    <th className="p-3 font-medium text-right w-24">數量</th>
-                                                    <th className="p-3 font-medium text-right w-32">金額</th>
-                                                    <th className="p-3 font-medium text-center w-24">操作</th>
+                                                        {isExpanded && (
+                                                            <div className="px-4 pb-4 animate-in slide-in-from-top-2 duration-200">
+                                                                <div className="bg-[var(--bg-tertiary)] rounded-lg p-3 space-y-2 border border-[var(--border-primary)]/50">
+                                                                    {group.items.map((it, i) => (
+                                                                        <div key={i} className="flex justify-between items-center text-sm pb-2 border-b border-[var(--border-primary)]/30 last:border-0 last:pb-0">
+                                                                            <div>
+                                                                                <div className="font-bold text-[var(--text-primary)] text-base">{it.productName}</div>
+                                                                                <div className="text-[var(--text-tertiary)] text-base">單價: ${(it.totalAmount / it.soldQty).toLocaleString()}</div>
+                                                                            </div>
+                                                                            <div className="text-right">
+                                                                                <div className="font-bold text-blue-600 text-base">x {it.soldQty}</div>
+                                                                                <div className="font-mono text-[var(--text-secondary)] text-sm">${it.totalAmount.toLocaleString()}</div>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                        {/* Desktop Table View (SALES) - Grouped */}
+                                        <table className="hidden md:table w-full text-left text-sm border-separate border-spacing-0">
+                                            <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] sticky top-0 z-10 shadow-sm">
+                                                <tr className="text-xs uppercase font-bold">
+                                                    <th className="p-3 w-10"></th>
+                                                    <th className="p-3 w-48">日期</th>
+                                                    <th className="p-3 w-32">銷售對象</th>
+                                                    <th className="p-3 w-28">業務</th>
+                                                    <th className="p-3">摘要</th>
+                                                    <th className="p-3 text-right w-40">支出</th>
+                                                    <th className="p-3 text-right w-28 text-emerald-600">總金額</th>
+                                                    <th className="p-3 text-center w-24">操作</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-[var(--border-primary)] text-[var(--text-secondary)] bg-[var(--bg-secondary)]">
-                                                {reportData.map((item, idx) => (
-                                                    <tr key={idx} className="hover:bg-[var(--bg-hover)] transition-colors">
-                                                        <td className="p-3 text-[var(--text-tertiary)]">
-                                                            {new Date(item.date).toLocaleString('zh-TW', {
-                                                                year: 'numeric', month: '2-digit', day: '2-digit',
-                                                                hour: '2-digit', minute: '2-digit', hour12: false
-                                                            })}
-                                                        </td>
-                                                        <td className="p-3">{item.location}</td>
-                                                        <td className="p-3 text-[var(--text-secondary)] font-bold">
-                                                            {item.salesRep}
-                                                            {item.operator && item.operator !== item.salesRep && (
-                                                                <div className="text-[10px] text-amber-600 font-normal">修: {item.operator}</div>
-                                                            )}
-                                                        </td>
-                                                        <td className="p-3 text-[var(--text-primary)]">{item.productName}</td>
-                                                        <td className="p-3 text-right">{item.soldQty}</td>
-                                                        <td className="p-3 text-right">${item.totalAmount}</td>
-                                                        <td className="p-3 text-center">
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleCorrection(item.saleId); }}
-                                                                className="p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors"
-                                                                title="修正此單"
+                                            <tbody className="divide-y divide-[var(--border-primary)] bg-[var(--bg-secondary)]">
+                                                {sortedGroups.map((group) => {
+                                                    const isExpanded = expandedGroups[group.key];
+                                                    return (
+                                                        <React.Fragment key={group.key}>
+                                                            <tr
+                                                                className={`hover:bg-[var(--bg-hover)] transition-colors cursor-pointer group ${isExpanded ? 'bg-blue-50/30' : ''}`}
+                                                                onClick={() => toggleGroup(group.key)}
                                                             >
-                                                                <RotateCcw size={16} />
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
+                                                                <td className="p-3 text-center">
+                                                                    {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                                                </td>
+                                                                <td className="p-3 text-[var(--text-tertiary)] font-mono text-xs">
+                                                                    {group.dateDisplay}
+                                                                </td>
+                                                                <td className="p-3 font-bold text-[var(--text-primary)] text-base">
+                                                                    {group.location}
+                                                                </td>
+                                                                <td className="p-3 text-[var(--text-secondary)] text-sm">
+                                                                    <div className="font-bold">{group.salesRep}</div>
+                                                                    {group.operator && group.operator !== group.salesRep && (
+                                                                        <div className="text-[10px] text-amber-600 font-normal mt-0.5">修: {group.operator}</div>
+                                                                    )}
+                                                                </td>
+                                                                <td className="p-3 text-xs text-[var(--text-tertiary)]">
+                                                                    <div>{group.items.length} 項商品</div>
+                                                                </td>
+                                                                <td className="p-3 text-right font-mono text-rose-600">
+                                                                    {Object.keys(group.expenseDetails).length > 0 ? (
+                                                                        <div className="flex flex-col items-end gap-1">
+                                                                            {Object.entries(group.expenseDetails).map(([label, amount], idx) => (
+                                                                                <div key={idx} className="flex items-center gap-2 whitespace-nowrap bg-rose-50 px-2 py-0.5 rounded border border-rose-100">
+                                                                                    <span className="text-[10px] font-bold opacity-80">{label}</span>
+                                                                                    <span className="font-bold text-sm font-mono">${amount.toLocaleString()}</span>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : '-'}
+                                                                </td>
+                                                                <td className="p-3 text-right font-bold text-emerald-600 font-mono text-lg">
+                                                                    ${Math.round(group.totalAmount).toLocaleString()}
+                                                                </td>
+                                                                <td className="p-3 text-center">
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleCorrection(group.saleId); }}
+                                                                        className="p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors shadow-sm"
+                                                                        title="作廢並修正全單"
+                                                                    >
+                                                                        <RotateCcw size={16} />
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                            {isExpanded && (
+                                                                <tr>
+                                                                    <td colSpan="8" className="p-0 bg-[var(--bg-tertiary)] hover:bg-transparent">
+                                                                        <div className="px-4 md:px-12 py-4">
+                                                                            <div className="max-w-4xl mx-auto">
+                                                                                <table className="w-full text-sm border-l-4 border-blue-200">
+                                                                                    <thead>
+                                                                                        <tr className="text-[var(--text-tertiary)] font-bold uppercase tracking-wider text-xs border-b border-[var(--border-primary)]/30">
+                                                                                            <th className="px-4 py-3 text-left">品項</th>
+                                                                                            <th className="px-4 py-3 text-right">數量</th>
+                                                                                            <th className="px-4 py-3 text-right">單價</th>
+                                                                                            <th className="px-4 py-3 text-right">小計</th>
+                                                                                        </tr>
+                                                                                    </thead>
+                                                                                    <tbody className="divide-y divide-[var(--border-primary)]/70">
+                                                                                        {group.items.map((it, i) => (
+                                                                                            <tr key={i} className="hover:bg-white/70 transition-colors">
+                                                                                                <td className="px-4 py-3 text-[var(--text-primary)] font-bold text-base">{it.productName}</td>
+                                                                                                <td className="px-4 py-3 text-right font-bold text-blue-600 text-lg">{it.soldQty}</td>
+                                                                                                <td className="px-4 py-3 text-right text-[var(--text-secondary)] text-lg">${(it.totalAmount / it.soldQty).toLocaleString()}</td>
+                                                                                                <td className="px-4 py-3 text-right font-mono font-bold text-emerald-800 text-lg">${it.totalAmount.toLocaleString()}</td>
+                                                                                            </tr>
+                                                                                        ))}
+                                                                                    </tbody>
+                                                                                </table>
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            )}
+                                                        </React.Fragment>
+                                                    );
+                                                })}
                                             </tbody>
                                         </table>
                                     </>
