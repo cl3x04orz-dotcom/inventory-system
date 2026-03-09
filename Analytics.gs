@@ -9,19 +9,42 @@
 // ==========================================
 function getProductInfoMap_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName('Inventory') || ss.getSheetByName('Products');
-  if (!sheet) return {};
-  const values = sheet.getDataRange().getValues();
+  const prodSheet = ss.getSheetByName('Products');
+  const invSheet = ss.getSheetByName('Inventory');
   const map = {};
-  for (let i = 1; i < values.length; i++) {
-    const row = values[i];
-    const pid = String(row[1] || "").trim();
-    if (pid && pid !== "ProductID") {
-      if (!map[pid]) {
-        map[pid] = { name: row[1], cost: Number(row[6]) || 0, stock: Number(row[2]) || 0 };
-      } else {
-        map[pid].stock += (Number(row[2]) || 0);
-        if (map[pid].cost === 0) map[pid].cost = Number(row[6]) || 0;
+
+  // 1. 從 Products 表抓取基本資訊 (最準確的名稱與最新成本)
+  if (prodSheet) {
+    const pValues = prodSheet.getDataRange().getValues();
+    const headers = pValues[0];
+    const pidIdx = 0; // Col A
+    const nameIdx = 1; // Col B
+    const costIdx = headers.findIndex(h => h.includes('成本') || h.toLowerCase() === 'cost');
+
+    for (let i = 1; i < pValues.length; i++) {
+      const pid = String(pValues[i][pidIdx] || "").trim();
+      if (pid) {
+        map[pid] = { 
+          name: String(pValues[i][nameIdx] || "").trim(),
+          cost: costIdx !== -1 ? (Number(pValues[i][costIdx]) || 0) : 0,
+          stock: 0 
+        };
+      }
+    }
+  }
+
+  // 2. 從 Inventory 表補充庫存數量
+  if (invSheet) {
+    const iValues = invSheet.getDataRange().getValues();
+    for (let i = 1; i < iValues.length; i++) {
+      const pid = String(iValues[i][1] || "").trim(); // Inventory B 欄是 PID
+      if (pid && pid !== "ProductID") {
+        if (!map[pid]) {
+          const rowName = String(iValues[i][7] || "").trim(); // H 欄是名稱
+          map[pid] = { name: rowName, cost: 0, stock: 0 };
+        }
+        // 累加庫存數量 (C 欄是數量)
+        map[pid].stock += (Number(iValues[i][2]) || 0);
       }
     }
   }
@@ -118,7 +141,15 @@ function getProfitAnalysis(payload) {
       const info = productMap[pid] || { name: pid, cost: 0 };
       const qty = Number(row['sold'] || row[5] || 0);
       const revenue = Number(row['subtotal'] || row[7] || 0);
-      const cost = qty * info.cost;
+      
+      // [優化] 優先使用明細中紀錄的當時成本 (index 10 / unitcost)，若無則用目前成本
+      const recordedCost = row['unitcost'] !== undefined ? Number(row['unitcost']) : Number(row[10]);
+      const actualUnitCost = (recordedCost !== undefined && !isNaN(recordedCost) && recordedCost !== 0) 
+        ? recordedCost 
+        : info.cost;
+        
+      const cost = qty * actualUnitCost;
+
       if (pid) {
         if (!stats[pid]) stats[pid] = { productName: info.name, revenue: 0, cost: 0 };
         stats[pid].revenue += revenue;

@@ -102,6 +102,27 @@ function addPurchaseService(data, user) {
         }
     }
 
+    // 4. Update latest cost in Products sheet for existing products
+    const pValues = pSheet.getDataRange().getValues();
+    const headers = pValues[0];
+    const pidIdx = 0; // Col A
+    const costIdx = headers.findIndex(h => h.includes('成本') || h.toLowerCase() === 'cost');
+    
+    if (costIdx !== -1) {
+        items.forEach(item => {
+            const pid = productMap[item.productName];
+            if (pid) {
+                // Find the row for this PID
+                for (let i = 1; i < pValues.length; i++) {
+                    if (String(pValues[i][pidIdx]) === String(pid)) {
+                        pSheet.getRange(i + 1, costIdx + 1).setValue(item.price);
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
     SpreadsheetApp.flush(); // Force write
     return { success: true, count: items.length };
 

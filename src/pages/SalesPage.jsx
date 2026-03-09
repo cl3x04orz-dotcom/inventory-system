@@ -1244,6 +1244,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                 <input
                                                                     id={`input-${idx}-returns`}
                                                                     type="text"
+                                                                    autoComplete="off"
                                                                     className="input-field text-center p-1 text-red-600"
                                                                     value={row.returns || ''}
                                                                     onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}

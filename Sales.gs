@@ -97,16 +97,29 @@ function saveSalesService(data, user) {
     const newInvLogRows = [];
     let isInventoryModified = false;
 
+    // 獲取產品資訊（包含成本）對照表
+    const productInfoMap = typeof getProductInfoMap_ !== 'undefined' ? getProductInfoMap_() : {};
+
     salesData.forEach(item => {
         const hasActivity = (Number(item.sold) > 0) || (Number(item.picked) > 0) || (Number(item.original) > 0) || (Number(item.returns) > 0);
         if (!hasActivity) return; 
 
-        // 收集明細
-        const productMap = getProductMap_(); // 獲取產品名稱對照表
-        const pName = productMap[item.productId] || item.productName || 'Unknown';
+        const pInfo = productInfoMap[item.productId] || {};
+        const pName = pInfo.name || item.productName || 'Unknown';
+        const unitCost = Number(pInfo.cost) || 0; // 獲得當下成本
         
         newDetailRows.push([
-            saleId, item.productId, item.picked, item.original, item.returns, item.sold, item.unitPrice, (item.sold * item.unitPrice), pName, (customer || '')
+            saleId, 
+            item.productId, 
+            item.picked, 
+            item.original, 
+            item.returns, 
+            item.sold, 
+            item.unitPrice, 
+            (item.sold * item.unitPrice), 
+            pName, 
+            (customer || ''),
+            unitCost // 第 11 欄 (K): 銷售當下成本
         ]);
         
         let consumedBatches = []; 
@@ -987,9 +1000,12 @@ function backfillSalesDetailsProductNames() {
   // 遍歷所有列，ProductID 在第 2 欄 (index 1)
   for (let i = 1; i < data.length; i++) {
     const pId = String(data[i][1]).trim();
-    const existingName = data[i][8] || ""; // 產品名稱 在第 9 欄 (index 8)
+    const existingName = String(data[i][8] || "").trim(); // 產品名稱 在第 9 欄 (index 8)
     
-    if (pId && !existingName) {
+    // 如果名稱為空，或是名稱看起來像 ID (包含連字號)，則補齊/修正
+    const isIdLike = existingName.includes('-') && existingName.length > 20;
+    
+    if (pId && (!existingName || isIdLike)) {
       const name = productMap[pId] || "Unknown";
       updates.push([name]);
       updatedCount++;
@@ -1080,4 +1096,47 @@ function backfillSalesDetailsCustomerNames() {
   }
 
   return `無須更新或未匹配到任何資料。 (診斷: Sales標題為[${salesHeaders[idIdx]}]與[${salesHeaders[customerIdx]}], 找到ID對照共 ${Object.keys(saleToCustomerMap).length} 筆, 明細中未找到對應ID共 ${missingInMap} 筆)`;
+}
+
+/**
+ * 補齊舊銷售明細的單位成本 (一次性執行)
+ */
+function backfillSalesDetailsUnitCosts() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const detailsSheet = ss.getSheetByName('SalesDetails');
+  const productInfoMap = typeof getProductInfoMap_ !== 'undefined' ? getProductInfoMap_() : {};
+  if (!detailsSheet) return "找不到 SalesDetails 分頁";
+
+  const data = detailsSheet.getDataRange().getValues();
+  if (data.length <= 1) return "無資料可補齊";
+
+  const headers = data[0];
+  // 檢查標題，確保第 11 欄 (K) 有 UnitCost 標題
+  if (headers.length < 11) {
+    detailsSheet.getRange(1, 11).setValue("UnitCost");
+  }
+
+  const updates = [];
+  let updatedCount = 0;
+  
+  for (let i = 1; i < data.length; i++) {
+    const pId = String(data[i][1] || "").trim(); // ProductID 在第 2 欄 (index 1)
+    const existingCost = data[i][10]; // UnitCost 在第 11 欄 (index 10)
+    
+    if (pId && (existingCost === "" || existingCost === undefined)) {
+      const cost = (productInfoMap[pId] && productInfoMap[pId].cost) ? productInfoMap[pId].cost : 0;
+      updates.push([cost]);
+      updatedCount++;
+    } else {
+      updates.push([existingCost || 0]);
+    }
+  }
+
+  if (updatedCount > 0) {
+    detailsSheet.getRange(2, 11, updates.length, 1).setValues(updates);
+    SpreadsheetApp.flush();
+    return `補齊完成：共更新 ${updatedCount} 筆資料`;
+  }
+
+  return "無須更新";
 }
