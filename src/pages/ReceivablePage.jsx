@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wallet, RefreshCw, ChevronDown, ChevronUp, CheckSquare } from 'lucide-react';
+import { Wallet, RefreshCw, ChevronDown, ChevronUp, CheckSquare, Banknote, CreditCard, X } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import { getLocalDateString } from '../utils/constants';
 
@@ -14,6 +14,10 @@ export default function ReceivablePage({ user, apiUrl }) {
 
     const [expandedRows, setExpandedRows] = useState(new Set());
     const [selectedGroups, setSelectedGroups] = useState(new Set());
+
+    // Modal state
+    const [showModal, setShowModal] = useState(false);
+    const [modalData, setModalData] = useState({ type: null, record: null }); // type: 'single' | 'batch'
 
     const fetchData = React.useCallback(async () => {
         setLoading(true);
@@ -37,26 +41,35 @@ export default function ReceivablePage({ user, apiUrl }) {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    const handleBatchMarkAsPaid = async () => {
-        if (selectedGroups.size === 0) return;
-        if (!confirm(`確定要將選取的 ${selectedGroups.size} 筆帳款標記為已收款嗎？`)) return;
-
+    const handleConfirmPayment = async (paymentMethod) => {
+        const { type, record } = modalData;
         const allUuids = [];
-        filtered.forEach((r, i) => {
-            if (selectedGroups.has(i) && Array.isArray(r.uuids)) {
-                allUuids.push(...r.uuids);
-            }
-        });
+
+        if (type === 'batch') {
+            filtered.forEach((r, i) => {
+                if (selectedGroups.has(i) && Array.isArray(r.uuids)) {
+                    allUuids.push(...r.uuids);
+                }
+            });
+        } else if (type === 'single' && record) {
+            allUuids.push(...(Array.isArray(record.uuids) ? record.uuids : []));
+        }
 
         if (allUuids.length === 0) {
-            alert('選取的帳款無收款 ID，請重新整理後再試。');
+            alert('無有效收款 ID');
+            setShowModal(false);
             return;
         }
 
         setLoading(true);
+        setShowModal(false);
         try {
-            await callGAS(apiUrl, 'markAsPaid', { targetUuids: allUuids }, user.token);
-            alert(`成功標記 ${selectedGroups.size} 筆帳款為已收款！`);
+            await callGAS(apiUrl, 'markAsPaid', {
+                targetUuids: allUuids,
+                paymentMethod: paymentMethod // CASH or TRANSFER
+            }, user.token);
+
+            alert(`成功標記為已收款 (${paymentMethod === 'CASH' ? '現金' : '匯款'})！`);
             fetchData();
         } catch (error) {
             console.error('Failed to mark as paid:', error);
@@ -66,19 +79,15 @@ export default function ReceivablePage({ user, apiUrl }) {
         }
     };
 
-    const handleMarkAsPaid = async (r) => {
-        if (!confirm('確定要將此筆帳款標記為已收款嗎？')) return;
-        setLoading(true);
-        try {
-            const uuids = Array.isArray(r.uuids) ? r.uuids : [];
-            await callGAS(apiUrl, 'markAsPaid', { targetUuids: uuids }, user.token);
-            alert('更新成功！');
-            fetchData();
-        } catch (error) {
-            alert('更新失敗: ' + error.message);
-        } finally {
-            setLoading(false);
-        }
+    const handleBatchMarkAsPaid = () => {
+        if (selectedGroups.size === 0) return;
+        setModalData({ type: 'batch', record: null });
+        setShowModal(true);
+    };
+
+    const handleMarkAsPaid = (r) => {
+        setModalData({ type: 'single', record: r });
+        setShowModal(true);
     };
 
     const toggleRow = (index) => {
@@ -362,6 +371,62 @@ export default function ReceivablePage({ user, apiUrl }) {
                     <div className="p-10 text-center text-[var(--text-secondary)]">無應收帳款</div>
                 )}
             </div>
+
+            {/* Payment Method Modal */}
+            {showModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-primary)] shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 text-center">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-lg font-bold text-[var(--text-primary)]">選擇收款方式</h3>
+                                <button onClick={() => setShowModal(false)} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors">
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4">
+                                <button
+                                    onClick={() => handleConfirmPayment('CASH')}
+                                    className="flex items-center justify-between p-4 rounded-xl border-2 border-emerald-100 bg-emerald-50/30 hover:bg-emerald-50 hover:border-emerald-500 transition-all group"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-200">
+                                            <Banknote size={24} />
+                                        </div>
+                                        <div className="text-left">
+                                            <p className="font-bold text-emerald-700">現金收款</p>
+                                            <p className="text-[10px] text-emerald-600/70">紀錄於當日銷售報表</p>
+                                        </div>
+                                    </div>
+                                    <div className="w-6 h-6 rounded-full border-2 border-emerald-200 flex items-center justify-center group-hover:border-emerald-500">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 scale-0 group-hover:scale-100 transition-transform"></div>
+                                    </div>
+                                </button>
+
+                                <button
+                                    onClick={() => handleConfirmPayment('TRANSFER')}
+                                    className="flex items-center justify-between p-4 rounded-xl border-2 border-blue-100 bg-blue-50/30 hover:bg-blue-50 hover:border-blue-500 transition-all group"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                                            <CreditCard size={24} />
+                                        </div>
+                                        <div className="text-left">
+                                            <p className="font-bold text-blue-700">匯款收款</p>
+                                            <p className="text-[10px] text-blue-600/70">純入帳，不計入現金報表</p>
+                                        </div>
+                                    </div>
+                                    <div className="w-6 h-6 rounded-full border-2 border-blue-200 flex items-center justify-center group-hover:border-blue-500">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-blue-500 scale-0 group-hover:scale-100 transition-transform"></div>
+                                    </div>
+                                </button>
+                            </div>
+
+                            <p className="mt-6 text-[10px] text-[var(--text-tertiary)] italic">此動作無法輕易復原，請確認後點擊</p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

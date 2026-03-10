@@ -141,21 +141,54 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     };
 
     // Calculate summaries
-    const totalSales = reportData?.reduce((acc, item) => acc + (Number(item.totalAmount) || 0), 0) || 0;
-    const totalQty = reportData?.reduce((acc, item) => acc + (Number(item.soldQty) || 0), 0) || 0;
+    // [Fix] 業績統計 (總銷售、總銷量)：排除「補收款」模式，避免同一筆單重複計入業績
+    const totalSales = reportData?.reduce((acc, item) => {
+        if (!item.isCollectionReportMode) return acc + (Number(item.totalAmount) || 0);
+        return acc;
+    }, 0) || 0;
 
-    // [Fix] 計算「總賒帳金額」 (包含 'CREDIT', '賒帳', '賒銷')
-    const totalCreditSales = reportData?.reduce((acc, item) => {
-        const method = (item.paymentMethod || '').trim().toUpperCase();
-        if (method === 'CREDIT' || method === '賒帳' || method === '賒銷') {
+    const totalQty = reportData?.reduce((acc, item) => {
+        if (!item.isCollectionReportMode) return acc + (Number(item.soldQty) || 0);
+        return acc;
+    }, 0) || 0;
+
+    // 定義非現金付款方式判斷
+    const isNonCashMethod = (method) => {
+        const m = (method || '').trim().toUpperCase();
+        return ['CREDIT', 'TRANSFER', '賒帳', '賒銷', '匯款'].includes(m);
+    };
+
+    // [Fix] 計算「今日原始銷售中的非現金部分」
+    const totalNonCashSales = reportData?.reduce((acc, item) => {
+        if (!item.isCollectionReportMode && isNonCashMethod(item.paymentMethod)) {
             return acc + (Number(item.totalAmount) || 0);
         }
         return acc;
     }, 0) || 0;
 
-    // [Fix] 計算「應繳回金額」時，需排除賒帳 的銷售額
-    // 注意：totalSales 是包含所有銷售的，所有這裡用 totalSales 減去 totalCreditSales
-    const totalCashSales = totalSales - totalCreditSales;
+    // [Fix] 計算「今日補收到的現金」 (排除匯款補收)
+    const totalCollectionCash = reportData?.reduce((acc, item) => {
+        if (item.isCollectionReportMode && !isNonCashMethod(item.paymentMethod)) {
+            return acc + (Number(item.totalAmount) || 0);
+        }
+        return acc;
+    }, 0) || 0;
+
+    // [Fix] 計算「有支出分錄的非現金銷售額」 (用於扣除結算總額)
+    // 只有「賒帳 (CREDIT)」會在錄入時產生對沖需求。
+    const totalNonCashWithExpenseEntry = reportData?.reduce((acc, item) => {
+        const m = (item.paymentMethod || '').trim().toUpperCase();
+        const isCredit = ['CREDIT', '賒帳', '賒銷'].includes(m);
+
+        if (isCredit && !item.isCollectionReportMode) {
+            return acc + (Number(item.totalAmount) || 0);
+        }
+        return acc;
+    }, 0) || 0;
+
+    // [Fix] 計算最終「應繳現金基數」：
+    // (今日總銷售 - 今日非現金銷售) + 今日補收現金
+    const totalCashSales = (totalSales - totalNonCashSales) + totalCollectionCash;
 
     // [Fix] 總支出計算邏輯更新：薪資（應叫金）統一視為現金支出（需扣除）
     const totalExpenses = expenseData?.reduce((acc, item) => {
@@ -169,8 +202,8 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     // 原始結算金額 (從支出表讀取的前端輸入值)
     const rawFinalTotal = expenseData?.reduce((acc, item) => acc + (Number(item.displayFinalTotal) || 0), 0) || 0;
 
-    // [Adjustment] 結算金額也應排除賒帳 (假設使用者若將賒帳計入結算，此處予以扣除)
-    const totalFinalTotal = rawFinalTotal - totalCreditSales;
+    // [Adjustment] 結算金額補正：需扣除「有支出分錄的非現金銷售額」
+    const totalFinalTotal = rawFinalTotal - totalNonCashWithExpenseEntry;
 
     // 應繳回 = 現金銷售 - 現金支出 - Line Pay(非現金收入/已入帳) + 結算(找零/補錢 - 賒帳已扣除)
     const totalReturnAmount = totalCashSales - totalExpenses - totalLinePay + totalFinalTotal;

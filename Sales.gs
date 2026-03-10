@@ -221,7 +221,10 @@ function getSalesHistory(payload) {
   const IDX_REP1 = 2; // C欄 (主要業務)
   const IDX_CUST = 6; // G欄 (客戶/地點)
   const IDX_REP2 = 7; // H欄 (備用業務)
-  const IDX_METHOD = 8; // I欄 (交易方式)
+  const IDX_METHOD = 8; // I欄 (原始交易方式)
+  const IDX_STATUS = 9; // J欄 (狀態)
+  const IDX_PAY_DATE = 12; // M欄 (實際收款日期) - [New]
+  const IDX_ACTUAL_METHOD = 13; // N欄 (實際收款方式) - [New]
 
   const matchedSales = {}; // SaleID -> Info
 
@@ -230,40 +233,47 @@ function getSalesHistory(payload) {
     const sId = String(row[IDX_ID] || "").trim();
     if (!sId) continue;
 
+    const rowStatus = String(row[IDX_STATUS] || "").toUpperCase();
+    if (rowStatus === 'VOID') continue;
+
     const dateVal = row[IDX_DATE];
     const sDate = new Date(dateVal);
-    if (isNaN(sDate.getTime()) || sDate < start || sDate > end) continue;
-
+    
+    // [New] 收款日期比對 (用於計入今日現金)
+    const payDateVal = row[IDX_PAY_DATE];
+    const pDate = payDateVal ? new Date(payDateVal) : null;
+    
     const rowCust = String(row[IDX_CUST] || "").trim();
     if (qCust && !rowCust.toLowerCase().includes(qCust)) continue;
 
     let rowRep = String(row[IDX_REP2] || "").trim();
     if (!rowRep || rowRep === '???') rowRep = String(row[IDX_REP1] || "").trim();
-    
-    // 搜尋過濾
     if (qRep && !rowRep.toLowerCase().includes(qRep)) continue;
 
     // --- [權限過濾] ---
-    // 非管理員，且資料的業務員並非當前使用者 -> 跳過 (改為精準比對)
     if (!isAdmin && currentUsername) {
-        const rRep = rowRep.toLowerCase();
-        const cUser = currentUsername.toLowerCase();
-        
-        // 必須完全相等，或是符合 "Username (XXX)" 格式的前綴匹配 (如果系統有這種格式)
-        // 這裡先採用嚴格相等，若有 "User A, User B" 多人情境需另行處理，但在 Sales 系統看起來是單一業務
-        if (rRep !== cUser) {
-            continue;
-        }
+        if (rowRep.toLowerCase() !== currentUsername.toLowerCase()) continue;
     }
-    // ------------------
+
+    // --- [核心判斷：該筆單據是否屬於此日期範圍？] ---
+    // 條件 A: 銷售日期在範圍內 (一般的本日銷貨)
+    const isSaleInBatch = (!isNaN(sDate.getTime()) && sDate >= start && sDate <= end);
+    
+    // 條件 B: 實際收款日期在範圍內 (以前的欠款，今天收回現金)
+    const isCollectionInBatch = (pDate && !isNaN(pDate.getTime()) && pDate >= start && pDate <= end);
+
+    if (!isSaleInBatch && !isCollectionInBatch) continue;
 
     matchedSales[sId] = {
       date: sDate,
       customer: rowCust,
       salesRep: rowRep,
       paymentMethod: String(row[IDX_METHOD] || "CASH"),
-      status: String(row[9] || "").toUpperCase(),
-      operator: String(row[11] || "") // Col 11 (L 欄): 實際操作者
+      actualPaymentMethod: String(row[IDX_ACTUAL_METHOD] || ""),
+      paymentDate: pDate,
+      status: rowStatus,
+      operator: String(row[11] || ""),
+      isCollectionReportMode: isCollectionInBatch && !isSaleInBatch // 標註這是補收回的單
     };
   }
 
@@ -281,25 +291,31 @@ function getSalesHistory(payload) {
     
     if (dSaleId && matchedSales[dSaleId]) {
       const info = matchedSales[dSaleId];
-      // [關鍵]：過濾掉已作廢的紀錄
-      if (info.status === 'VOID') continue;
-
       const soldQty = Number(row[D_IDX_SOLD] || 0);
       if (soldQty <= 0) continue;
 
       const pId = String(row[D_IDX_PID] || "").trim();
       const pName = productMap[pId] || pId || '未知商品';
       
+      // 判斷該顯示什麼樣的付款方式
+      // 如果是「今日補收回」，顯示實際收款方式 (如 CASH)
+      // 如果是「今日銷售」，顯示原始付款方式 (賒銷、現金)
+      let displayMethod = info.paymentMethod;
+      if (info.isCollectionReportMode && info.actualPaymentMethod) {
+          displayMethod = info.actualPaymentMethod;
+      }
+
       results.push({
-        date: info.date.toISOString(),
-        location: info.customer, 
+        date: info.isCollectionReportMode ? info.paymentDate.toISOString() : info.date.toISOString(),
+        location: info.customer + (info.isCollectionReportMode ? " (補收款)" : ""), 
         salesRep: info.salesRep,
         productName: pName,
         soldQty: soldQty,
         totalAmount: Number(row[D_IDX_AMT] || 0),
-        paymentMethod: info.paymentMethod,
+        paymentMethod: displayMethod,
         saleId: dSaleId,
-        operator: info.operator // 新增回傳操作者
+        operator: info.operator,
+        isCollectionReportMode: info.isCollectionReportMode // [New] 務必回傳此標記供前端判斷
       });
     }
   }
@@ -387,7 +403,7 @@ function getReceivablesService(payload) {
 // ===========================================
 
 function markAsPaidService(payload) {
-  const { targetUuids } = payload;
+  const { targetUuids, paymentMethod } = payload;
   if (!targetUuids || targetUuids.length === 0) throw new Error('未提供有效 SaleID');
 
   const lock = LockService.getScriptLock();
@@ -400,28 +416,41 @@ function markAsPaidService(payload) {
     const lastCol = salesSheet.getLastColumn();
     if (lastRow <= 1) return { success: true, updated: 0 };
 
-    const data = salesSheet.getRange(1, 1, lastRow, lastCol).getValues();
-    // Sales 表固定欄位：Col 0 = SaleID, Col 9 = Status
+    // 擴充欄位檢查
+    // M 欄 (Index 12): PaymentDate
+    // N 欄 (Index 13): ActualPaymentMethod
+    if (lastCol < 14) {
+        // 先確保標題存在
+        salesSheet.getRange(1, 13).setValue("PaymentDate");
+        salesSheet.getRange(1, 14).setValue("ActualPaymentMethod");
+    }
+
+    const data = salesSheet.getRange(1, 1, lastRow, Math.max(lastCol, 14)).getValues();
     const IDX_ID = 0;
     const IDX_STATUS = 9;
+    const IDX_PAY_DATE = 12;
+    const IDX_ACT_METHOD = 13;
 
     const targetSet = new Set(targetUuids.map(String));
     let updatedCount = 0;
+    const now = new Date();
 
     for (let i = 1; i < data.length; i++) {
-      if (targetSet.has(String(data[i][IDX_ID]))) {
-        data[i][IDX_STATUS] = 'PAID';
-        updatedCount++;
-      }
+        if (targetSet.has(String(data[i][IDX_ID]))) {
+            data[i][IDX_STATUS] = 'PAID';
+            data[i][IDX_PAY_DATE] = now;
+            data[i][IDX_ACT_METHOD] = paymentMethod || 'CASH';
+            updatedCount++;
+        }
     }
 
     if (updatedCount > 0) {
-      salesSheet.getRange(1, 1, lastRow, lastCol).setValues(data);
+      salesSheet.getRange(1, 1, lastRow, Math.max(lastCol, 14)).setValues(data);
       SpreadsheetApp.flush();
     }
     return { success: true, updated: updatedCount };
   } catch (e) {
-    throw new Error('批次更新失敗: ' + e.message);
+    throw new Error('標記收款失敗: ' + e.message);
   } finally {
     lock.releaseLock();
   }
