@@ -301,13 +301,14 @@ function getSalesHistory(payload) {
       let collectionNote = "";
       let displayMethod = info.paymentMethod;
       if (info.isCollectionReportMode) {
-          collectionNote = info.actualPaymentMethod === 'TRANSFER' ? " (匯款補收)" : " (現金補收)";
+          collectionNote = info.actualPaymentMethod === 'TRANSFER' ? "(匯款補收)" : "(現金補收)";
           if (info.actualPaymentMethod) displayMethod = info.actualPaymentMethod;
       }
 
       results.push({
         date: info.isCollectionReportMode ? info.paymentDate.toISOString() : info.date.toISOString(),
-        location: info.customer + collectionNote, 
+        location: info.customer, // 保持原始純名字
+        collectionNote: collectionNote, // 新增獨立註解欄位
         salesRep: info.salesRep,
         productName: pName,
         soldQty: soldQty,

@@ -213,6 +213,9 @@ export default function ReportPage({ user, apiUrl, setPage }) {
 
     // Group by Product for summary table
     const productSummary = reportData?.reduce((acc, item) => {
+        // [Fix] 排除「補收款」模式，避免重複計入商品銷量與金額 (已在原單計入)
+        if (item.isCollectionReportMode) return acc;
+
         const id = item.productName; // Use name as key for simplicity in display
         if (!acc[id]) {
             acc[id] = { name: item.productName, qty: 0, amount: 0 };
@@ -249,7 +252,8 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                 totalCollectionCash: 0,
                 totalNonCashWithExpenseEntry: 0,
                 rawFinalTotal: 0,
-                totalLinePay: 0
+                totalLinePay: 0,
+                collectionNote: item.collectionNote
             };
         }
         acc[key].items.push(item);
@@ -621,13 +625,18 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                                 </div>
                                                             </div>
                                                             <div className="flex flex-wrap gap-2 text-sm">
-                                                                <div className="flex items-center gap-1 bg-blue-500/10 text-blue-700 px-2 py-0.5 rounded-md">
-                                                                    <MapPin size={12} /> <span className="font-bold">{group.location}</span>
+                                                                <div className="flex flex-col bg-blue-500/10 text-blue-700 px-2 py-0.5 rounded-md">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <MapPin size={12} /> <span className="font-bold">{group.location}</span>
+                                                                    </div>
+                                                                    {group.collectionNote && (
+                                                                        <div className="text-[10px] text-amber-600 font-medium ml-4">{group.collectionNote}</div>
+                                                                    )}
                                                                 </div>
                                                                 <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-md">
                                                                     <User size={12} /> <span>{group.salesRep}</span>
                                                                     {group.operator && group.operator !== group.salesRep && (
-                                                                        <span className="text-[10px] text-amber-600 ml-1">(修: {group.operator})</span>
+                                                                        <span className="text-[10px] text-amber-600 ml-1">(修正：{group.operator})</span>
                                                                     )}
                                                                 </div>
                                                             </div>
@@ -706,13 +715,16 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                                 <td className="p-3 text-[var(--text-tertiary)] font-mono text-xs">
                                                                     {group.dateDisplay}
                                                                 </td>
-                                                                <td className="p-3 font-bold text-[var(--text-primary)] text-base">
-                                                                    {group.location}
+                                                                <td className="p-3">
+                                                                    <div className="font-bold text-[var(--text-primary)] text-base leading-tight">{group.location}</div>
+                                                                    {group.collectionNote && (
+                                                                        <div className="text-[11px] text-amber-600 font-medium mt-0.5">{group.collectionNote}</div>
+                                                                    )}
                                                                 </td>
                                                                 <td className="p-3 text-[var(--text-secondary)] text-sm">
                                                                     <div className="font-bold">{group.salesRep}</div>
                                                                     {group.operator && group.operator !== group.salesRep && (
-                                                                        <div className="text-[10px] text-amber-600 font-normal mt-0.5">修: {group.operator}</div>
+                                                                        <div className="text-[10px] text-amber-600 font-normal mt-0.5">修正：{group.operator}</div>
                                                                     )}
                                                                 </td>
                                                                 <td className="p-3 text-xs text-[var(--text-tertiary)]">
