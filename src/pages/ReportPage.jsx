@@ -5,7 +5,10 @@ import { getLocalDateString } from '../utils/constants';
 
 // 格式化數字：四捨五入到小數點第 1 位
 const formatNumberWithDecimal = (num) => {
-    return num.toFixed(1).replace(/\.0$/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    // 處理 -0 並確保顯示為 0
+    let val = Number(num) || 0;
+    if (Object.is(val, -0) || (val < 0 && val > -0.01)) val = 0;
+    return val.toFixed(1).replace(/\.0$/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 };
 
 // 根據數字長度動態調整字體大小
@@ -240,12 +243,37 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                 totalAmount: 0,
                 totalQty: 0,
                 totalExpense: 0,
-                expenseDetails: {}
+                expenseDetails: {},
+                // For Balance calculation
+                totalNonCashSales: 0,
+                totalCollectionCash: 0,
+                totalNonCashWithExpenseEntry: 0,
+                rawFinalTotal: 0,
+                totalLinePay: 0
             };
         }
         acc[key].items.push(item);
-        acc[key].totalAmount += (Number(item.totalAmount) || 0);
+        const amount = Number(item.totalAmount) || 0;
+        acc[key].totalAmount += amount;
         acc[key].totalQty += (Number(item.soldQty) || 0);
+
+        // Track sub-totals for balance logic
+        const isNonCash = isNonCashMethod(item.paymentMethod);
+        if (!item.isCollectionReportMode) {
+            if (isNonCash) {
+                acc[key].totalNonCashSales += amount;
+                const m = (item.paymentMethod || '').trim().toUpperCase();
+                if (['CREDIT', '賒帳', '賒銷'].includes(m)) {
+                    acc[key].totalNonCashWithExpenseEntry += amount;
+                }
+            }
+        } else {
+            // Collection mode
+            if (!isNonCash) {
+                acc[key].totalCollectionCash += amount;
+            }
+        }
+
         return acc;
     }, {});
 
@@ -268,10 +296,17 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                 totalAmount: 0,
                 totalQty: 0,
                 totalExpense: 0,
-                expenseDetails: {}
+                expenseDetails: {},
+                totalNonCashSales: 0,
+                totalCollectionCash: 0,
+                totalNonCashWithExpenseEntry: 0,
+                rawFinalTotal: 0,
+                totalLinePay: 0
             };
         }
         groupedSales[key].totalExpense += (Number(item.rowTotal) || 0);
+        groupedSales[key].rawFinalTotal += (Number(item.displayFinalTotal) || 0);
+        groupedSales[key].totalLinePay += (Number(item.linePayAmount) || 0);
 
         // Collect expense details
         const cats = {
@@ -297,7 +332,23 @@ export default function ReportPage({ user, apiUrl, setPage }) {
             }
         });
     });
-    const sortedGroups = Object.values(groupedSales).sort((a, b) => b.key.localeCompare(a.key));
+
+    // Use database Column L (rawFinalTotal) as balance (Settlement)
+    const sortedGroups = Object.values(groupedSales).sort((a, b) => b.key.localeCompare(a.key)); // Newest first
+    sortedGroups.forEach(g => {
+        let val = Number(g.rawFinalTotal) || 0;
+
+        // Handle -0 and tiny negative numbers
+        if (Object.is(val, -0) || (val < 0 && val > -0.001)) val = 0;
+
+        // Force 0 for Credit/Non-cash transactions as per user request
+        const isActuallyNonCash = g.items.length > 0 && g.items.every(item => isNonCashMethod(item.paymentMethod));
+        if (isActuallyNonCash) {
+            val = 0;
+        }
+
+        g.balance = val;
+    });
 
     const toggleGroup = (key) => {
         setExpandedGroups(prev => ({
@@ -328,7 +379,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
 
                     {/* Summary Stats (Integrated in Header) */}
                     {reportData && (
-                        <div className="grid grid-cols-3 md:grid-cols-6 gap-2 md:gap-3 w-full md:w-auto">
+                        <div className="grid grid-cols-3 md:grid-cols-7 gap-2 md:gap-3 w-full md:w-auto">
                             <div className="px-2 md:px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-200/20 shadow-sm">
                                 <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">應繳回</p>
                                 <p className={`${getDynamicFontSize(totalReturnAmount)} font-bold text-amber-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalReturnAmount)}</p>
@@ -340,6 +391,10 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                             <div className="px-2 md:px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-200/20 shadow-sm">
                                 <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總支出</p>
                                 <p className={`${getDynamicFontSize(totalExpenses)} font-bold text-rose-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalExpenses)}</p>
+                            </div>
+                            <div className="px-2 md:px-4 py-2 rounded-xl bg-indigo-500/10 border border-indigo-200/20 shadow-sm">
+                                <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">Line Pay</p>
+                                <p className={`${getDynamicFontSize(totalLinePay)} font-bold text-indigo-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalLinePay)}</p>
                             </div>
                             <div className="px-2 md:px-4 py-2 rounded-xl bg-cyan-500/10 border border-cyan-200/20 shadow-sm">
                                 <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">結算</p>
@@ -554,7 +609,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                                     {group.dateDisplay}
                                                                 </div>
                                                                 <div className="flex flex-col items-end gap-2">
-                                                                    <div className="text-emerald-600 font-bold font-mono text-lg">${Math.round(group.totalAmount).toLocaleString()}</div>
+                                                                    <div className="text-emerald-600 font-bold font-mono text-lg">${(Math.round(group.totalAmount) || 0).toLocaleString()}</div>
                                                                     <button
                                                                         onClick={(e) => { e.stopPropagation(); handleCorrection(group.saleId); }}
                                                                         className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-amber-600 border border-amber-200 hover:bg-amber-100 transition-colors text-xs font-bold shadow-sm"
@@ -562,6 +617,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                                     >
                                                                         <RotateCcw size={12} /> 修正
                                                                     </button>
+                                                                    <div className="text-[10px] text-[var(--text-tertiary)] font-bold mt-1">結算: ${(Math.round(group.balance) || 0).toLocaleString()}</div>
                                                                 </div>
                                                             </div>
                                                             <div className="flex flex-wrap gap-2 text-sm">
@@ -591,7 +647,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                                         )}
                                                                         <div className="text-right">
                                                                             <div className="text-[var(--text-tertiary)] text-[10px] mb-0.5">銷售總額</div>
-                                                                            <span className="text-emerald-700 font-bold font-mono text-xl">${Math.round(group.totalAmount).toLocaleString()}</span>
+                                                                            <span className="text-emerald-700 font-bold font-mono text-xl">${(Math.round(group.totalAmount) || 0).toLocaleString()}</span>
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -631,6 +687,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                     <th className="p-3">摘要</th>
                                                     <th className="p-3 text-right w-40">支出</th>
                                                     <th className="p-3 text-right w-28 text-emerald-600">總金額</th>
+                                                    <th className="p-3 text-right w-28 text-amber-600">結算</th>
                                                     <th className="p-3 text-center w-24">操作</th>
                                                 </tr>
                                             </thead>
@@ -674,7 +731,10 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                                     ) : '-'}
                                                                 </td>
                                                                 <td className="p-3 text-right font-bold text-emerald-600 font-mono text-lg">
-                                                                    ${Math.round(group.totalAmount).toLocaleString()}
+                                                                    ${(Math.round(group.totalAmount) || 0).toLocaleString()}
+                                                                </td>
+                                                                <td className="p-3 text-right font-bold text-amber-600 font-mono text-lg">
+                                                                    ${(Math.round(group.balance) || 0).toLocaleString()}
                                                                 </td>
                                                                 <td className="p-3 text-center">
                                                                     <button
@@ -688,7 +748,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                             </tr>
                                                             {isExpanded && (
                                                                 <tr>
-                                                                    <td colSpan="8" className="p-0 bg-[var(--bg-tertiary)] hover:bg-transparent">
+                                                                    <td colSpan="9" className="p-0 bg-[var(--bg-tertiary)] hover:bg-transparent">
                                                                         <div className="px-4 md:px-12 py-4">
                                                                             <div className="max-w-4xl mx-auto">
                                                                                 <table className="w-full text-sm border-l-4 border-blue-200">
