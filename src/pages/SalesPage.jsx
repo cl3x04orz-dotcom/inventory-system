@@ -21,9 +21,10 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [reserve, setReserve] = useState(5000);
     const [expenses, setExpenses] = useState({
         stall: 0, cleaning: 0, electricity: 0, gas: 0, parking: 0,
-        goods: 0, bags: 0, others: 0, linePay: 0, serviceFee: 0,
+        goods: 0, goodsVendor: '', bags: 0, others: 0, linePay: 0, serviceFee: 0,
         salary: 0, reserveFund: 0, vehicleMaintenance: 0
     });
+    const [showVendorModal, setShowVendorModal] = useState(false);
     const [location, setLocation] = useState(''); // This will be used as "Sales Target"
     const [targetSalesRep, setTargetSalesRep] = useState(''); // [New] 業績歸屬業務員 (修正時保留原始人名)
     const [paymentType, setPaymentType] = useState('CASH');
@@ -371,11 +372,18 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     };
 
     const handleExpenseBlur = (key, value) => {
+        let finalVal = value;
         if (typeof value === 'string' && value.trim().startsWith('=')) {
-            const result = evaluateFormula(value);
-            handleExpenseChange(key, result);
+            finalVal = evaluateFormula(value);
+            handleExpenseChange(key, finalVal);
         } else {
-            handleExpenseChange(key, getSafeNum(value));
+            finalVal = getSafeNum(value);
+            handleExpenseChange(key, finalVal);
+        }
+
+        // [New] 如果是「貨款」且大於 0，跳出填寫廠商彈窗
+        if (key === 'goods' && getSafeNum(finalVal) > 0) {
+            setShowVendorModal(true);
         }
     };
 
@@ -1466,6 +1474,45 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 onSearch={() => loadHistoryRecords(historyImportStartDate, historyImportEndDate)}
                 isLoading={isHistoryLoading}
             />
+            {/* Vendor Selection Modal */}
+            {showVendorModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="bg-gradient-to-r from-rose-500 to-pink-600 p-4 text-white">
+                            <h3 className="text-lg font-bold flex items-center gap-2">
+                                <DollarSign size={20} />
+                                填寫貨款廠商
+                            </h3>
+                            <p className="text-rose-100 text-xs mt-1">請輸入此筆貨款的對象廠商名稱</p>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="text-sm font-bold text-gray-700 block mb-2">廠商名稱</label>
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    className="w-full h-12 px-4 rounded-xl border-2 border-gray-200 focus:border-rose-500 focus:ring-0 text-lg font-bold transition-all"
+                                    placeholder="例如：小李冷泡茶"
+                                    value={expenses.goodsVendor || ''}
+                                    onChange={(e) => handleExpenseChange('goodsVendor', e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') setShowVendorModal(false);
+                                    }}
+                                />
+                            </div>
+                            <button
+                                onClick={() => setShowVendorModal(false)}
+                                className="w-full py-4 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-rose-200 transition-all active:scale-[0.98]"
+                            >
+                                確認
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

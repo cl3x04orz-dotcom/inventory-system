@@ -76,7 +76,11 @@ function saveSalesService(data, user) {
         finalOperator                          // Col 11 (L 欄): 實際操作者
     ];
 
-    // 3.2 準備 Expenditures Row (Col 0-21)
+    // 3.2 準備 Expenditures Row (Col 0-18)
+    const baseNote = originalDate ? `[修正] 於 ${Utilities.formatDate(new Date(), "GMT+8", "yyyy/MM/dd HH:mm")} 修改，原始 ID: ${data.originalSaleId || 'N/A'}` : "";
+    const vendorNote = expenseData.goodsVendor ? `[貨款廠商: ${expenseData.goodsVendor}] ` : "";
+    const finalNote = (vendorNote + baseNote).trim();
+
     const newExpRow = [
         saleId, 
         expenseData.stall, expenseData.cleaning, expenseData.electricity, 
@@ -89,7 +93,7 @@ function saveSalesService(data, user) {
         Number(expenseData.vehicleMaintenance) || 0,    // P (15): 車輛保養 ✅
         Number(expenseData.salary) || 0,                // Q (16): 薪資發放 ✅
         Number(expenseData.reserve) || 0,               // R (17): 公積金 ✅
-        originalDate ? `[修正] 於 ${Utilities.formatDate(new Date(), "GMT+8", "yyyy/MM/dd HH:mm")} 修改，原始 ID: ${data.originalSaleId || 'N/A'}` : "" // S (18): 備註
+        finalNote                                       // S (18): 備註
     ];
     
     // 3.3 處理庫存邏輯 (只修改記憶體 invData)
