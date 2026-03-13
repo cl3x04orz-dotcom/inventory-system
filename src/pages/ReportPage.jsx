@@ -233,6 +233,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
             year: 'numeric', month: '2-digit', day: '2-digit',
             hour: '2-digit', minute: '2-digit', hour12: false
         });
+        // Unique key for grouping: Transaction ID + Collection Note (to separate regular sale vs collection)
         const key = `${dateStr}_${item.location}_${item.salesRep}`;
         if (!acc[key]) {
             acc[key] = {
@@ -332,7 +333,16 @@ export default function ReportPage({ user, apiUrl, setPage }) {
         Object.entries(cats).forEach(([label, amount]) => {
             const val = Number(amount) || 0;
             if (val > 0) {
-                groupedSales[key].expenseDetails[label] = (groupedSales[key].expenseDetails[label] || 0) + val;
+                let displayLabel = label;
+                if (label === "貨款" && item.normNote) {
+                    const vendorMatch = item.normNote.match(/\[貨款廠商:\s*(.*?)\]/);
+                    if (vendorMatch) {
+                        displayLabel = `${label} (${vendorMatch[1]})`;
+                    } else if (!item.normNote.includes("修正")) {
+                        displayLabel = `${label} (${item.normNote})`;
+                    }
+                }
+                groupedSales[key].expenseDetails[displayLabel] = (groupedSales[key].expenseDetails[displayLabel] || 0) + val;
             }
         });
     });
@@ -591,6 +601,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                     onClick={() => setViewMode('EXPENSES')}
                                     className={`font-bold flex items-center gap-2 pb-2 border-b-2 transition-colors ${viewMode === 'EXPENSES' ? 'text-rose-600 border-rose-600' : 'text-[var(--text-secondary)] border-transparent hover:text-[var(--text-primary)]'}`}
                                 >
+                                    <FileText size={16} /> 支出明細 ({expenseData.length})
                                 </button>
                             </div>
 
@@ -846,9 +857,18 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                         <div className="pt-2 border-t border-[var(--border-primary)]">
                                                             <p className="text-[10px] uppercase font-bold text-[var(--text-tertiary)] mb-1">支出細項</p>
                                                             <div className="flex flex-wrap gap-1">
-                                                                {cats.map((c, i) => (
-                                                                    <span key={i} className="text-[10px] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] px-1.5 py-0.5 rounded border border-[var(--border-primary)]">{c}</span>
-                                                                ))}
+                                                                {cats.map((c, i) => {
+                                                                    let displayLabel = c;
+                                                                    if (c.startsWith("貨款") && item.normNote) {
+                                                                        const vendorMatch = item.normNote.match(/\[貨款廠商:\s*(.*?)\]/);
+                                                                        if (vendorMatch) {
+                                                                            displayLabel = `貨款 (${vendorMatch[1]}) $${item.goods}`;
+                                                                        } else if (!item.normNote.includes("修正")) {
+                                                                            displayLabel = `貨款 (${item.normNote}) $${item.goods}`;
+                                                                        }
+                                                                    }
+                                                                    return <span key={i} className="text-[10px] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] px-1.5 py-0.5 rounded border border-[var(--border-primary)]">{displayLabel}</span>;
+                                                                })}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -876,7 +896,11 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                     if (item.electricity) cats.push(`電費 $${item.electricity}`);
                                                     if (item.gas) cats.push(`加油 $${item.gas}`);
                                                     if (item.parking) cats.push(`停車 $${item.parking}`);
-                                                    if (item.goods) cats.push(`貨款 $${item.goods}`);
+                                                    if (item.goods) {
+                                                        const vendorMatch = item.normNote?.match(/\[貨款廠商:\s*(.*?)\]/);
+                                                        const vendorInfo = vendorMatch ? `(${vendorMatch[1]})` : (item.normNote && !item.normNote.includes("修正") ? `(${item.normNote})` : "");
+                                                        cats.push(`貨款 ${vendorInfo} $${item.goods}`);
+                                                    }
                                                     if (item.bags) cats.push(`塑膠袋 $${item.bags}`);
                                                     if (item.others) cats.push(`其他 $${item.others}`);
                                                     if (item.linePay) cats.push(`Line Pay $${item.linePay}`);
