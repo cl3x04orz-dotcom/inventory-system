@@ -297,17 +297,17 @@ function getSalesHistory(payload) {
       const pId = String(row[D_IDX_PID] || "").trim();
       const pName = productMap[pId] || pId || '未知商品';
       
-      // 判斷該顯示什麼樣的付款方式
-      // 如果是「今日補收回」，顯示實際收款方式 (如 CASH)
-      // 如果是「今日銷售」，顯示原始付款方式 (賒銷、現金)
+      // 決定顯示的名稱註解與付款方式
+      let collectionNote = "";
       let displayMethod = info.paymentMethod;
-      if (info.isCollectionReportMode && info.actualPaymentMethod) {
-          displayMethod = info.actualPaymentMethod;
+      if (info.isCollectionReportMode) {
+          collectionNote = info.actualPaymentMethod === 'TRANSFER' ? " (匯款補收)" : " (現金補收)";
+          if (info.actualPaymentMethod) displayMethod = info.actualPaymentMethod;
       }
 
       results.push({
         date: info.isCollectionReportMode ? info.paymentDate.toISOString() : info.date.toISOString(),
-        location: info.customer + (info.isCollectionReportMode ? " (補收款)" : ""), 
+        location: info.customer + collectionNote, 
         salesRep: info.salesRep,
         productName: pName,
         soldQty: soldQty,
