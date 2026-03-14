@@ -427,14 +427,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             finalVal = getSafeNum(value);
             handleExpenseChange(key, finalVal);
         }
-
-        // [Modified] 如果支出欄位大於 0，且屬於需要備註的欄位，跳出填寫備註彈窗
-        // 防止重複觸發 (例如移動到下一個欄位時，彈窗 autoFocus 導致下一個欄位 blur)
-        const remarkFields = ['gas', 'parking', 'goods', 'others', 'salary', 'reserveFund', 'vehicleMaintenance'];
-        if (remarkFields.includes(key) && getSafeNum(finalVal) > 0 && !showVendorModal) {
-            setActiveExpenseKey(key);
-            setShowVendorModal(true);
-        }
+        // Removed auto-modal trigger from blur to prevent navigation conflicts
     };
 
     const handleDragEnd = (result) => {
@@ -656,6 +649,30 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 const locationInput = document.getElementById('input-location');
                 if (locationInput) locationInput.focus();
                 return;
+            }
+
+            // [New] 強制驗證支出備註
+            const mandatoryRemarkFields = [
+                { key: 'gas', label: '加油' },
+                { key: 'parking', label: '停車' },
+                { key: 'goods', label: '貨款' },
+                { key: 'others', label: '其他' },
+                { key: 'salary', label: '薪資發放' },
+                { key: 'reserveFund', label: '公積金' },
+                { key: 'vehicleMaintenance', label: '車輛保養' }
+            ];
+
+            for (const field of mandatoryRemarkFields) {
+                const val = getSafeNum(expenses[field.key]);
+                const remarkKey = field.key === 'goods' ? 'goodsVendor' : `${field.key}Remark`;
+                const remark = String(expenses[remarkKey] || '').trim();
+
+                if (val > 0 && !remark) {
+                    alert(`【${field.label}】支出已輸入金額，請務必填寫相關備註資訊！`);
+                    setActiveExpenseKey(field.key);
+                    setShowVendorModal(true);
+                    return; // 中止儲存
+                }
             }
 
             if (!user || !user.username) {
@@ -1426,13 +1443,32 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                                     return (
                                         <div key={key}>
-                                            <label className="text-xs text-[var(--text-secondary)] block mb-1">{label}</label>
+                                            <div className="flex justify-between items-center mb-1 pr-1">
+                                                <label className="text-xs text-[var(--text-secondary)] font-medium">{label}</label>
+                                                {/* Remark Status Indicator / Trigger */}
+                                                {(['gas', 'parking', 'goods', 'others', 'salary', 'reserveFund', 'vehicleMaintenance'].includes(key)) && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setActiveExpenseKey(key);
+                                                            setShowVendorModal(true);
+                                                        }}
+                                                        className={`transition-all ${getSafeNum(expenses[key]) > 0
+                                                            ? (expenses[key === 'goods' ? 'goodsVendor' : `${key}Remark`] ? 'text-green-500 scale-110' : 'text-rose-500 animate-pulse scale-110')
+                                                            : 'text-gray-300 opacity-50 hover:opacity-100'
+                                                            }`}
+                                                        title="點擊填寫備註"
+                                                    >
+                                                        <Save size={12} strokeWidth={3} />
+                                                    </button>
+                                                )}
+                                            </div>
                                             <input
                                                 id={currentId}
                                                 type="text"
                                                 inputMode="decimal"
                                                 autoComplete="off"
-                                                className="input-field text-sm"
+                                                className={`input-field text-sm transition-all ${(['gas', 'parking', 'goods', 'others', 'salary', 'reserveFund', 'vehicleMaintenance'].includes(key)) && getSafeNum(expenses[key]) > 0 && !expenses[key === 'goods' ? 'goodsVendor' : `${key}Remark`] ? 'border-rose-200 bg-rose-50/20' : ''}`}
                                                 value={expenses[key] || ''}
                                                 onChange={(e) => handleExpenseChange(key, e.target.value)}
                                                 onBlur={(e) => handleExpenseBlur(key, e.target.value)}
