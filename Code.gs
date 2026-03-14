@@ -2,7 +2,7 @@
  * Serves the React App
  */
 function doGet() {
-    return HtmlService.createTemplateFromFile('Index')
+    return HtmlService.createTemplateFromFile('Client')
         .evaluate()
         .addMetaTag('viewport', 'width=device-width, initial-scale=1')
         .setTitle('Inventory System')

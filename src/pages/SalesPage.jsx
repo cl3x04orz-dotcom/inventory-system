@@ -20,11 +20,58 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     // Initialize reserve with 5000 for Cash default
     const [reserve, setReserve] = useState(5000);
     const [expenses, setExpenses] = useState({
-        stall: 0, cleaning: 0, electricity: 0, gas: 0, parking: 0,
-        goods: 0, goodsVendor: '', bags: 0, others: 0, linePay: 0, serviceFee: 0,
-        salary: 0, reserveFund: 0, vehicleMaintenance: 0
+        stall: 0, cleaning: 0, electricity: 0, gas: 0, gasRemark: '',
+        parking: 0, parkingRemark: '',
+        goods: 0, goodsVendor: '',
+        bags: 0, others: 0, othersRemark: '',
+        linePay: 0, serviceFee: 0,
+        salary: 0, salaryRemark: '',
+        reserveFund: 0, reserveFundRemark: '',
+        vehicleMaintenance: 0, vehicleMaintenanceRemark: ''
     });
+    const [activeExpenseKey, setActiveExpenseKey] = useState(null); // tracking which expense triggered the modal
     const [showVendorModal, setShowVendorModal] = useState(false);
+
+    // [New] 支出欄位順序定義 (用於導航與自動跳轉)
+    const EXPENSE_CATEGORIES = [
+        { key: 'stall', label: '攤位' },
+        { key: 'cleaning', label: '清潔' },
+        { key: 'electricity', label: '電費' },
+        { key: 'gas', label: '加油' },
+        { key: 'parking', label: '停車' },
+        { key: 'goods', label: '貨款' },
+        { key: 'bags', label: '塑膠袋' },
+        { key: 'others', label: '其他' },
+        { key: 'salary', label: '薪資發放' },
+        { key: 'reserveFund', label: '公積金' },
+        { key: 'vehicleMaintenance', label: '車輛保養' },
+        { key: 'linePay', label: 'Line Pay (收款)' },
+        { key: 'serviceFee', label: '服務費 (扣除)' }
+    ];
+
+    const closeRemarkModal = () => {
+        const currentKey = activeExpenseKey;
+        setShowVendorModal(false);
+        setActiveExpenseKey(null);
+
+        // 自動跳轉到下一個欄位
+        if (currentKey) {
+            const currentIndex = EXPENSE_CATEGORIES.findIndex(c => c.key === currentKey);
+            if (currentIndex !== -1 && currentIndex < EXPENSE_CATEGORIES.length - 1) {
+                const nextKey = EXPENSE_CATEGORIES[currentIndex + 1].key;
+                setTimeout(() => {
+                    const nextInput = document.getElementById(`input-expense-${nextKey}`);
+                    if (nextInput) {
+                        nextInput.focus();
+                        if (nextInput.select) nextInput.select();
+                    }
+                }, 50);
+            } else if (currentIndex === EXPENSE_CATEGORIES.length - 1) {
+                // 最後一個則跳到儲存按鈕
+                setTimeout(() => document.getElementById('btn-save-data')?.focus(), 50);
+            }
+        }
+    };
     const [location, setLocation] = useState(''); // This will be used as "Sales Target"
     const [targetSalesRep, setTargetSalesRep] = useState(''); // [New] 業績歸屬業務員 (修正時保留原始人名)
     const [paymentType, setPaymentType] = useState('CASH');
@@ -381,8 +428,11 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             handleExpenseChange(key, finalVal);
         }
 
-        // [New] 如果是「貨款」且大於 0，跳出填寫廠商彈窗
-        if (key === 'goods' && getSafeNum(finalVal) > 0) {
+        // [Modified] 如果支出欄位大於 0，且屬於需要備註的欄位，跳出填寫備註彈窗
+        // 防止重複觸發 (例如移動到下一個欄位時，彈窗 autoFocus 導致下一個欄位 blur)
+        const remarkFields = ['gas', 'parking', 'goods', 'others', 'salary', 'reserveFund', 'vehicleMaintenance'];
+        if (remarkFields.includes(key) && getSafeNum(finalVal) > 0 && !showVendorModal) {
+            setActiveExpenseKey(key);
             setShowVendorModal(true);
         }
     };
@@ -692,7 +742,6 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     totalCashCalc: totalCashNet,
                     finalTotal: finalTotal,
                     reserve: reserve,
-                    expenses: expenses,
                     expenses: expenses,
                     rows: rows.map(r => ({
                         name: r.name,
@@ -1361,18 +1410,18 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                             <h2 className="text-lg font-bold mb-4 text-rose-500">支出與其他</h2>
                             <div className="grid grid-cols-2 gap-3">
-                                {['stall:攤位', 'cleaning:清潔', 'electricity:電費', 'gas:加油', 'parking:停車', 'goods:貨款', 'bags:塑膠袋', 'others:其他', 'salary:薪資發放', 'reserveFund:公積金', 'vehicleMaintenance:車輛保養', 'linePay:Line Pay (收款)', 'serviceFee:服務費 (扣除)'].map((item, idx, arr) => {
-                                    const [key, label] = item.split(':');
+                                {EXPENSE_CATEGORIES.map((item, idx, arr) => {
+                                    const { key, label } = item;
                                     const currentId = `input-expense-${key}`;
 
                                     // Sequential Navigation
-                                    const nextKey = idx < arr.length - 1 ? arr[idx + 1].split(':')[0] : 'save-data';
+                                    const nextKey = idx < arr.length - 1 ? arr[idx + 1].key : 'save-data';
                                     const nextId = idx < arr.length - 1 ? `input-expense-${nextKey}` : 'btn-save-data';
-                                    const prevId = idx > 0 ? `input-expense-${arr[idx - 1].split(':')[0]}` : 'input-reserve';
+                                    const prevId = idx > 0 ? `input-expense-${arr[idx - 1].key}` : 'input-reserve';
 
                                     // Grid Navigation (2 columns)
-                                    const upKey = idx >= 2 ? arr[idx - 2].split(':')[0] : null;
-                                    const downKey = idx < arr.length - 2 ? arr[idx + 2].split(':')[0] : (idx === arr.length - 1 || idx === arr.length - 2 ? 'save-data' : arr[idx + 1].split(':')[0]);
+                                    const upKey = idx >= 2 ? arr[idx - 2].key : null;
+                                    const downKey = idx < arr.length - 2 ? arr[idx + 2].key : (idx === arr.length - 1 || idx === arr.length - 2 ? 'save-data' : arr[idx + 1].key);
                                     const downId = downKey === 'save-data' ? 'btn-save-data' : `input-expense-${downKey}`;
 
                                     return (
@@ -1474,7 +1523,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 onSearch={() => loadHistoryRecords(historyImportStartDate, historyImportEndDate)}
                 isLoading={isHistoryLoading}
             />
-            {/* Vendor Selection Modal */}
+            {/* Expense Remark Modal */}
             {showVendorModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
                     <div
@@ -1484,27 +1533,46 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                         <div className="bg-gradient-to-r from-rose-500 to-pink-600 p-4 text-white">
                             <h3 className="text-lg font-bold flex items-center gap-2">
                                 <DollarSign size={20} />
-                                填寫貨款廠商
+                                {(() => {
+                                    switch (activeExpenseKey) {
+                                        case 'gas': return '加油備註';
+                                        case 'parking': return '停車備註';
+                                        case 'goods': return '填寫貨款廠商';
+                                        case 'others': return '其他支出備註';
+                                        case 'salary': return '薪資發放備註';
+                                        case 'reserveFund': return '公積金備註';
+                                        case 'vehicleMaintenance': return '車輛保養備註';
+                                        default: return '填寫備註';
+                                    }
+                                })()}
                             </h3>
-                            <p className="text-rose-100 text-xs mt-1">請輸入此筆貨款的對象廠商名稱</p>
+                            <p className="text-rose-100 text-xs mt-1">
+                                {activeExpenseKey === 'goods' ? '請輸入此筆貨款的對象廠商名稱' : '請輸入此筆支出的相關備註資訊'}
+                            </p>
                         </div>
                         <div className="p-6 space-y-4">
                             <div>
-                                <label className="text-sm font-bold text-gray-700 block mb-2">廠商名稱</label>
+                                <label className="text-sm font-bold text-gray-700 block mb-2">備註內容</label>
                                 <input
                                     autoFocus
                                     type="text"
                                     className="w-full h-12 px-4 rounded-xl border-2 border-gray-200 focus:border-rose-500 focus:ring-0 text-lg font-bold transition-all"
-                                    placeholder="例如：小李冷泡茶"
-                                    value={expenses.goodsVendor || ''}
-                                    onChange={(e) => handleExpenseChange('goodsVendor', e.target.value)}
+                                    placeholder={activeExpenseKey === 'goods' ? '例如：小李冷泡茶' : '請輸入備註...'}
+                                    value={(() => {
+                                        const rKey = activeExpenseKey === 'goods' ? 'goodsVendor' : `${activeExpenseKey}Remark`;
+                                        return expenses[rKey] || '';
+                                    })()}
+                                    onChange={(e) => {
+                                        const rKey = activeExpenseKey === 'goods' ? 'goodsVendor' : `${activeExpenseKey}Remark`;
+                                        handleExpenseChange(rKey, e.target.value);
+                                    }}
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter') setShowVendorModal(false);
+                                        if (e.key === 'Enter') closeRemarkModal();
                                     }}
                                 />
                             </div>
                             <button
-                                onClick={() => setShowVendorModal(false)}
+                                onClick={closeRemarkModal}
                                 className="w-full py-4 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-rose-200 transition-all active:scale-[0.98]"
                             >
                                 確認

@@ -78,8 +78,19 @@ function saveSalesService(data, user) {
 
     // 3.2 準備 Expenditures Row (Col 0-18)
     const baseNote = originalDate ? `[修正] 於 ${Utilities.formatDate(new Date(), "GMT+8", "yyyy/MM/dd HH:mm")} 修改，原始 ID: ${data.originalSaleId || 'N/A'}` : "";
-    const vendorNote = expenseData.goodsVendor ? `[貨款廠商: ${expenseData.goodsVendor}] ` : "";
-    const finalNote = (vendorNote + baseNote).trim();
+    
+    // [Modified] 整合多個備註欄位
+    const remarks = [];
+    if (expenseData.goodsVendor) remarks.push(`貨款廠商: ${expenseData.goodsVendor}`);
+    if (expenseData.gasRemark) remarks.push(`加油: ${expenseData.gasRemark}`);
+    if (expenseData.parkingRemark) remarks.push(`停車: ${expenseData.parkingRemark}`);
+    if (expenseData.othersRemark) remarks.push(`其他: ${expenseData.othersRemark}`);
+    if (expenseData.salaryRemark) remarks.push(`薪資: ${expenseData.salaryRemark}`);
+    if (expenseData.reserveFundRemark) remarks.push(`公積金: ${expenseData.reserveFundRemark}`);
+    if (expenseData.vehicleMaintenanceRemark) remarks.push(`保養: ${expenseData.vehicleMaintenanceRemark}`);
+    
+    const combinedRemarks = remarks.length > 0 ? `[${remarks.join(', ')}] ` : "";
+    const finalNote = (combinedRemarks + baseNote).trim();
 
     const newExpRow = [
         saleId, 
@@ -92,7 +103,7 @@ function saveSalesService(data, user) {
         today,                                          // O (14): 時間戳記 ✅
         Number(expenseData.vehicleMaintenance) || 0,    // P (15): 車輛保養 ✅
         Number(expenseData.salary) || 0,                // Q (16): 薪資發放 ✅
-        Number(expenseData.reserve) || 0,               // R (17): 公積金 ✅
+        Number(expenseData.reserveFund) || Number(expenseData.reserve) || 0, // R (17): 公積金 (前端傳入 reserveFund)
         finalNote                                       // S (18): 備註
     ];
     
@@ -609,8 +620,26 @@ function getSaleToCloneService(payload) {
         serviceFee: Number(expData[i][10] || 0),
         vehicleMaintenance: Number(expData[i][15] || 0),
         salary: Number(expData[i][16] || 0),
-        reserveFund: Number(expData[i][17] || 0)
+        reserveFund: Number(expData[i][17] || 0),
+        // [New] 解析備註欄位以還原各項備註 (備註格式為 [貨款廠商: xxx, 加油: xxx, ...])
+        remarksRaw: String(expData[i][18] || "")
       };
+      
+      // 嘗試從備註字串還原備註欄位 (Regex 解析)
+      const parseRemark = (label) => {
+        const regex = new RegExp(`${label}:\\s*([^,\\]]+)`);
+        const match = fetchedExpenses.remarksRaw.match(regex);
+        return match ? match[1].trim() : "";
+      };
+      
+      fetchedExpenses.goodsVendor = parseRemark("貨款廠商");
+      fetchedExpenses.gasRemark = parseRemark("加油");
+      fetchedExpenses.parkingRemark = parseRemark("停車");
+      fetchedExpenses.othersRemark = parseRemark("其他");
+      fetchedExpenses.salaryRemark = parseRemark("薪資");
+      fetchedExpenses.reserveFundRemark = parseRemark("公積金");
+      fetchedExpenses.vehicleMaintenanceRemark = parseRemark("保養");
+      
       break;
     }
   }
@@ -683,8 +712,27 @@ function voidAndFetchSaleService(payload) {
           bags: Number(expData[i][7] || 0),
           others: Number(expData[i][8] || 0),
           linePay: Number(expData[i][9] || 0),
-          serviceFee: Number(expData[i][10] || 0)
+          serviceFee: Number(expData[i][10] || 0),
+          // [New] 解析備註欄位
+          remarksRaw: String(expData[i][18] || "")
       };
+      
+      const parseRemark = (label) => {
+        const regex = new RegExp(`${label}:\\s*([^,\\]]+)`);
+        const match = fetchedExpenses.remarksRaw.match(regex);
+        return match ? match[1].trim() : "";
+      };
+      
+      fetchedExpenses.goodsVendor = parseRemark("貨款廠商");
+      fetchedExpenses.gasRemark = parseRemark("加油");
+      fetchedExpenses.parkingRemark = parseRemark("停車");
+      fetchedExpenses.othersRemark = parseRemark("其他");
+      fetchedExpenses.salaryRemark = parseRemark("薪資");
+      fetchedExpenses.reserveFundRemark = parseRemark("公積金");
+      fetchedExpenses.vehicleMaintenanceRemark = parseRemark("保養");
+      fetchedExpenses.reserveFund = Number(expData[i][17] || 0);
+      fetchedExpenses.vehicleMaintenance = Number(expData[i][15] || 0);
+      fetchedExpenses.salary = Number(expData[i][16] || 0);
 
       const oldNote = String(expData[i][18] || "");
       expSheet.getRange(expRow, 19).setValue("[VOID] " + (oldNote || "")); 
