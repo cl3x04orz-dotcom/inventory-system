@@ -1525,58 +1525,86 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             />
             {/* Expense Remark Modal */}
             {showVendorModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/30 backdrop-blur-md animate-in fade-in duration-500">
                     <div
-                        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-200"
+                        className="bg-white/95 rounded-[2.5rem] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] w-full max-w-3xl overflow-hidden border border-white/40 animate-in slide-in-from-bottom-8 duration-500"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="bg-gradient-to-r from-rose-500 to-pink-600 p-4 text-white">
-                            <h3 className="text-lg font-bold flex items-center gap-2">
-                                <DollarSign size={20} />
-                                {(() => {
-                                    switch (activeExpenseKey) {
-                                        case 'gas': return '加油備註';
-                                        case 'parking': return '停車備註';
-                                        case 'goods': return '填寫貨款廠商';
-                                        case 'others': return '其他支出備註';
-                                        case 'salary': return '薪資發放備註';
-                                        case 'reserveFund': return '公積金備註';
-                                        case 'vehicleMaintenance': return '車輛保養備註';
-                                        default: return '填寫備註';
-                                    }
-                                })()}
-                            </h3>
-                            <p className="text-rose-100 text-xs mt-1">
-                                {activeExpenseKey === 'goods' ? '請輸入此筆貨款的對象廠商名稱' : '請輸入此筆支出的相關備註資訊'}
-                            </p>
-                        </div>
-                        <div className="p-6 space-y-4">
-                            <div>
-                                <label className="text-sm font-bold text-gray-700 block mb-2">備註內容</label>
-                                <input
-                                    autoFocus
-                                    type="text"
-                                    className="w-full h-12 px-4 rounded-xl border-2 border-gray-200 focus:border-rose-500 focus:ring-0 text-lg font-bold transition-all"
-                                    placeholder={activeExpenseKey === 'goods' ? '例如：小李冷泡茶' : '請輸入備註...'}
-                                    value={(() => {
-                                        const rKey = activeExpenseKey === 'goods' ? 'goodsVendor' : `${activeExpenseKey}Remark`;
-                                        return expenses[rKey] || '';
+                        <div className="grid grid-cols-1 md:grid-cols-12">
+                            {/* Left Header Strip (or Top in mobile) */}
+                            <div className="md:col-span-4 bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 p-10 text-white flex flex-col justify-center relative overflow-hidden">
+                                <div className="absolute -right-8 -bottom-8 opacity-10 rotate-12">
+                                    <DollarSign size={160} />
+                                </div>
+                                <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-xl w-fit mb-6 shadow-inner ring-1 ring-white/20">
+                                    <DollarSign size={32} className="text-slate-200" />
+                                </div>
+                                <h3 className="text-3xl font-black tracking-tighter leading-tight">
+                                    {(() => {
+                                        switch (activeExpenseKey) {
+                                            case 'gas': return '加油備註';
+                                            case 'parking': return '停車備註';
+                                            case 'goods': return '貨款對象';
+                                            case 'others': return '其他支出';
+                                            case 'salary': return '薪資發放';
+                                            case 'reserveFund': return '公積金備註';
+                                            case 'vehicleMaintenance': return '車輛保養';
+                                            default: return '填寫備註';
+                                        }
                                     })()}
-                                    onChange={(e) => {
-                                        const rKey = activeExpenseKey === 'goods' ? 'goodsVendor' : `${activeExpenseKey}Remark`;
-                                        handleExpenseChange(rKey, e.target.value);
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') closeRemarkModal();
-                                    }}
-                                />
+                                </h3>
+                                <div className="h-1 w-12 bg-slate-400/50 rounded-full mt-4"></div>
                             </div>
-                            <button
-                                onClick={closeRemarkModal}
-                                className="w-full py-4 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-rose-200 transition-all active:scale-[0.98]"
-                            >
-                                確認
-                            </button>
+
+                            {/* Right Content Area */}
+                            <div className="md:col-span-8 p-10 space-y-8 bg-white flex flex-col justify-center">
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-end mb-2">
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-1">資訊輸入 / Remarks</label>
+                                        <span className="text-[10px] text-slate-300 font-bold italic">Save to Expenditures Sheet</span>
+                                    </div>
+                                    <div className="relative group">
+                                        <input
+                                            autoFocus
+                                            type="text"
+                                            className="w-full h-16 px-8 rounded-[1.25rem] border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-slate-800 focus:ring-8 focus:ring-slate-800/5 text-xl font-bold transition-all placeholder:text-slate-200 shadow-inner"
+                                            placeholder={(() => {
+                                                switch (activeExpenseKey) {
+                                                    case 'gas': return '輸入車牌號碼...';
+                                                    case 'parking': return '輸入車牌號碼...';
+                                                    case 'goods': return '輸入此筆廠商名稱...';
+                                                    case 'others': return '輸入該筆支出用途...';
+                                                    case 'salary': return '輸入發放對象姓名...';
+                                                    case 'vehicleMaintenance': return '輸入維修項目或車號...';
+                                                    case 'reserveFund': return '輸入公積金用途...';
+                                                    default: return '輸入資訊內容...';
+                                                }
+                                            })()}
+                                            value={(() => {
+                                                const rKey = activeExpenseKey === 'goods' ? 'goodsVendor' : `${activeExpenseKey}Remark`;
+                                                return expenses[rKey] || '';
+                                            })()}
+                                            onChange={(e) => {
+                                                const rKey = activeExpenseKey === 'goods' ? 'goodsVendor' : `${activeExpenseKey}Remark`;
+                                                handleExpenseChange(rKey, e.target.value);
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') closeRemarkModal();
+                                            }}
+                                        />
+                                        <div className="absolute left-0 -bottom-6 text-[10px] text-slate-400 font-medium opacity-0 group-focus-within:opacity-100 transition-opacity">
+                                            {activeExpenseKey === 'goods' ? '輸入廠商名稱後按下 Enter 鍵保存' : '輸入備註後按下 Enter 鍵保存'}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={closeRemarkModal}
+                                    className="w-full py-5 bg-slate-900 hover:bg-black text-white rounded-[1.25rem] font-black text-xl shadow-[0_15px_30px_-10px_rgba(0,0,0,0.3)] transition-all active:scale-[0.97] flex items-center justify-center gap-4 group"
+                                >
+                                    <span>保存資訊</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

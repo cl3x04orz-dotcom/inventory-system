@@ -344,10 +344,13 @@ export default function ReportPage({ user, apiUrl, setPage }) {
             const val = Number(item[cat.id]) || 0;
             if (val > 0) {
                 let displayLabel = cat.label;
-                if (cat.remark && item.normNote) {
+                if (item.normNote) {
                     const remarkVal = parseComplexNote(item.normNote, cat.remark);
                     if (remarkVal) {
                         displayLabel = `${cat.label} (${remarkVal})`;
+                    } else if (item.normNote && !item.normNote.includes(':') && !item.normNote.includes('[')) {
+                        // Support plain text remarks from Expenditure Management Page
+                        displayLabel = `${cat.label} (${item.normNote})`;
                     }
                 }
                 groupedSales[key].expenseDetails[displayLabel] = (groupedSales[key].expenseDetails[displayLabel] || 0) + val;
