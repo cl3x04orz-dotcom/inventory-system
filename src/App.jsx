@@ -13,6 +13,7 @@ import ReceivablePage from './pages/ReceivablePage';
 import PayablePage from './pages/PayablePage';
 import SalesRankingPage from './pages/SalesRankingPage';
 import CustomerRankingPage from './pages/CustomerRankingPage';
+import CustomerAnalyticsPage from './pages/CustomerAnalyticsPage';
 import ProfitAnalysisPage from './pages/ProfitAnalysisPage';
 import TurnoverRatePage from './pages/TurnoverRatePage';
 import CostCalculationPage from './pages/CostCalculationPage';
@@ -241,6 +242,8 @@ function AppContent() {
                 return perms.includes('analytics_sales') || perms.includes('analytics');
             case 'customerRanking':
                 return perms.includes('analytics_customer') || perms.includes('analytics');
+            case 'customerAnalytics':
+                return perms.includes('analytics_customer') || perms.includes('analytics');
             case 'profitAnalysis':
                 return perms.includes('analytics_profit') || perms.includes('analytics');
             case 'turnoverRate':
@@ -399,6 +402,7 @@ function AppContent() {
                                     <MobileNavGroup label="數據分析" icon={TrendingUp}>
                                         {checkPermission('salesRanking') && <NavItem label="商品銷售排行" icon={BarChart2} onClick={() => handlePageChange('salesRanking')} active={page === 'salesRanking'} />}
                                         {checkPermission('customerRanking') && <NavItem label="客戶銷售排行" icon={Users} onClick={() => handlePageChange('customerRanking')} active={page === 'customerRanking'} />}
+                                        {checkPermission('customerAnalytics') && <NavItem label="客戶深度分析" icon={Activity} onClick={() => handlePageChange('customerAnalytics')} active={page === 'customerAnalytics'} />}
                                         {checkPermission('profitAnalysis') && <NavItem label="毛利分析報表" icon={TrendingUp} onClick={() => handlePageChange('profitAnalysis')} active={page === 'profitAnalysis'} />}
                                         {checkPermission('turnoverRate') && <NavItem label="庫存周轉率" icon={Activity} onClick={() => handlePageChange('turnoverRate')} active={page === 'turnoverRate'} />}
                                     </MobileNavGroup>
@@ -510,10 +514,11 @@ function AppContent() {
                             icon={TrendingUp}
                             openDropdown={openDropdown}
                             setOpenDropdown={setOpenDropdown}
-                            active={['salesRanking', 'customerRanking', 'profitAnalysis', 'turnoverRate'].includes(page)}
+                            active={['salesRanking', 'customerRanking', 'customerAnalytics', 'profitAnalysis', 'turnoverRate'].includes(page)}
                         >
                             {checkPermission('salesRanking') && <NavItem label="商品銷售排行" icon={BarChart2} onClick={() => handlePageChange('salesRanking')} active={page === 'salesRanking'} />}
                             {checkPermission('customerRanking') && <NavItem label="客戶銷售排行" icon={Users} onClick={() => handlePageChange('customerRanking')} active={page === 'customerRanking'} />}
+                            {checkPermission('customerAnalytics') && <NavItem label="客戶深度分析" icon={Activity} onClick={() => handlePageChange('customerAnalytics')} active={page === 'customerAnalytics'} />}
                             {checkPermission('profitAnalysis') && <NavItem label="毛利分析報表" icon={TrendingUp} onClick={() => handlePageChange('profitAnalysis')} active={page === 'profitAnalysis'} />}
                             {checkPermission('turnoverRate') && <NavItem label="庫存周轉率" icon={Activity} onClick={() => handlePageChange('turnoverRate')} active={page === 'turnoverRate'} />}
                         </NavDropdown>
@@ -570,6 +575,7 @@ function AppContent() {
                         {page === 'payable' && <PayablePage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'salesRanking' && <SalesRankingPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'customerRanking' && <CustomerRankingPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'customerAnalytics' && <CustomerAnalyticsPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'profitAnalysis' && <ProfitAnalysisPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'turnoverRate' && <TurnoverRatePage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'costCalculation' && <CostCalculationPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}

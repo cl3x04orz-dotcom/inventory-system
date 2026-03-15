@@ -4,52 +4,9 @@
  * 包含：銷售排行、毛利分析、客戶排行、週轉率
  */
 
-// ==========================================
 // Helper_Analytics_Commons.gs
 // ==========================================
-function getProductInfoMap_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const prodSheet = ss.getSheetByName('Products');
-  const invSheet = ss.getSheetByName('Inventory');
-  const map = {};
-
-  // 1. 從 Products 表抓取基本資訊 (最準確的名稱與最新成本)
-  if (prodSheet) {
-    const pValues = prodSheet.getDataRange().getValues();
-    const headers = pValues[0];
-    const pidIdx = 0; // Col A
-    const nameIdx = 1; // Col B
-    const costIdx = headers.findIndex(h => h.includes('成本') || h.toLowerCase() === 'cost');
-
-    for (let i = 1; i < pValues.length; i++) {
-      const pid = String(pValues[i][pidIdx] || "").trim();
-      if (pid) {
-        map[pid] = { 
-          name: String(pValues[i][nameIdx] || "").trim(),
-          cost: costIdx !== -1 ? (Number(pValues[i][costIdx]) || 0) : 0,
-          stock: 0 
-        };
-      }
-    }
-  }
-
-  // 2. 從 Inventory 表補充庫存數量
-  if (invSheet) {
-    const iValues = invSheet.getDataRange().getValues();
-    for (let i = 1; i < iValues.length; i++) {
-      const pid = String(iValues[i][1] || "").trim(); // Inventory B 欄是 PID
-      if (pid && pid !== "ProductID") {
-        if (!map[pid]) {
-          const rowName = String(iValues[i][7] || "").trim(); // H 欄是名稱
-          map[pid] = { name: rowName, cost: 0, stock: 0 };
-        }
-        // 累加庫存數量 (C 欄是數量)
-        map[pid].stock += (Number(iValues[i][2]) || 0);
-      }
-    }
-  }
-  return map;
-}
+// 使用 Sales.gs 中定義的 getProductInfoMap_ () 以避免衝突
 
 function parseSheetDate_(val) {
   if (!val) return null;

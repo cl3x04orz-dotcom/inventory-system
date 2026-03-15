@@ -80,6 +80,7 @@ function apiHandler(request) {
         'getSalesRanking': 'analytics_sales',
         'getCustomerRanking': 'analytics_customer',
         'getTurnoverRate': 'analytics_turnover',
+        'getCustomerAnalytics': 'analytics_customer',
         
         // Sales Adjustment (作廢/修正)
         'voidAndFetchSale': 'sales_report',
@@ -167,6 +168,7 @@ function apiHandler(request) {
             case 'generatePdf': return typeof generatePdfService !== 'undefined' ? generatePdfService(payload) : {error: 'Service missing'}; 
             case 'getSalesRanking': return typeof getSalesRanking !== 'undefined' ? getSalesRanking(payload) : {error: 'Service missing'};
             case 'getCustomerRanking': return typeof getCustomerRanking !== 'undefined' ? getCustomerRanking(payload) : {error: 'Service missing'};
+            case 'getCustomerAnalytics': return typeof getCustomerAnalyticsService !== 'undefined' ? getCustomerAnalyticsService(payload) : {error: 'Service missing'};
             case 'getProfitAnalysis': return typeof getProfitAnalysis !== 'undefined' ? getProfitAnalysis(payload) : {error: 'Service missing'};
             case 'getTurnoverRate': return typeof getTurnoverRate !== 'undefined' ? getTurnoverRate(payload) : {error: 'Service missing'};
             
@@ -192,7 +194,16 @@ function apiHandler(request) {
             case 'logActivity': return typeof logActivityService !== 'undefined' ? logActivityService(payload) : {error: 'Service missing'};
             case 'getActivityLogs': return typeof getActivityLogsService !== 'undefined' ? getActivityLogsService(payload, user.role, user.username) : {error: 'Service missing'};
 
-            default: throw new Error('Unknown action: [' + action + '] (length: ' + (action ? action.length : 0) + ')');
+            default: 
+                // [Hex Debug] 若發生未知動作，記錄其 Hex 編碼以檢查有無不可見字元
+                var actionHex = "";
+                if (action) {
+                    for (var i = 0; i < action.length; i++) {
+                        actionHex += action.charCodeAt(i).toString(16) + " ";
+                    }
+                }
+                console.error("Unknown action hex: " + actionHex.trim());
+                throw new Error('Unknown action: [' + action + '] (length: ' + (action ? action.length : 0) + ')');
         }
     } catch (error) {
         return { error: error.message };
