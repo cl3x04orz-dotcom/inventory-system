@@ -80,7 +80,7 @@ function apiHandler(request) {
         'getSalesRanking': 'analytics_sales',
         'getCustomerRanking': 'analytics_customer',
         'getTurnoverRate': 'analytics_turnover',
-        'getCustomerAnalytics': 'analytics_customer',
+        'getCustomerAnalytics': 'analytics_customer_detail',
         
         // Sales Adjustment (作廢/修正)
         'voidAndFetchSale': 'sales_report',

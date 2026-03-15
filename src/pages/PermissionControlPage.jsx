@@ -56,6 +56,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
             items: [
                 { key: 'analytics_sales', label: '商品銷售排行' },
                 { key: 'analytics_customer', label: '客戶銷售排行' },
+                { key: 'analytics_customer_detail', label: '客戶深度分析' },
                 { key: 'analytics_profit', label: '毛利分析報表' },
                 { key: 'analytics_turnover', label: '庫存周轉率' }
             ]
