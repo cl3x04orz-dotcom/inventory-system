@@ -1371,3 +1371,56 @@ function getCustomerAnalyticsService(payload) {
         throw new Error("分析統計過程出錯: " + e.message);
     }
 }
+
+/**
+ * 獲取產品資訊（名稱、成本、庫存）的對照表
+ */
+function getProductInfoMap_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const prodSheet = ss.getSheetByName('Products');
+  const invSheet = ss.getSheetByName('Inventory');
+  const map = {};
+
+  // 1. 從 Products 表抓取基本資訊 (最準確的名稱與最新成本)
+  if (prodSheet) {
+    const pValues = prodSheet.getDataRange().getValues();
+    const headers = pValues[0].map(h => String(h || '').trim().toLowerCase());
+    const pidIdx = headers.findIndex(h => h.includes('id') || h.includes('序號'));
+    const nameIdx = headers.findIndex(h => h.includes('名稱') || h.includes('name'));
+    const costIdx = headers.findIndex(h => h.includes('成本') || h === 'cost' || h === 'unitcost');
+
+    for (let i = 1; i < pValues.length; i++) {
+      const pid = String(pValues[i][pidIdx !== -1 ? pidIdx : 0] || "").trim();
+      if (pid) {
+        map[pid] = { 
+          name: nameIdx !== -1 ? String(pValues[i][nameIdx] || "").trim() : pid,
+          cost: costIdx !== -1 ? (Number(pValues[i][costIdx]) || 0) : 0,
+          stock: 0 
+        };
+      }
+    }
+  }
+
+  // 2. 從 Inventory 表補充庫存數量
+  if (invSheet) {
+    const iValues = invSheet.getDataRange().getValues();
+    const iHeaders = iValues[0].map(h => String(h || '').trim().toLowerCase());
+    const iPidIdx = iHeaders.findIndex(h => h.includes('productid') || h.includes('產品id'));
+    const iQtyIdx = iHeaders.findIndex(h => h.includes('quantity') || h.includes('數量'));
+    const iNameIdx = iHeaders.findIndex(h => h.includes('productname') || h.includes('名稱'));
+
+    for (let i = 1; i < iValues.length; i++) {
+        const pid = iPidIdx !== -1 ? String(iValues[i][iPidIdx] || "").trim() : "";
+        if (pid && pid !== "ProductID") {
+            if (!map[pid]) {
+                const rowName = iNameIdx !== -1 ? String(iValues[i][iNameIdx] || "").trim() : pid;
+                map[pid] = { name: rowName, cost: 0, stock: 0 };
+            }
+            if (iQtyIdx !== -1) {
+                map[pid].stock += (Number(iValues[i][iQtyIdx]) || 0);
+            }
+        }
+    }
+  }
+  return map;
+}
