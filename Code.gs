@@ -61,7 +61,7 @@ function apiHandler(request) {
         'updateProductSortOrder': 'system_config',
         
         // Finance (財務管理)
-        'getExpenditures': 'finance_expenditure',
+        'getExpenditures': null, // [Modification] Anyone can call, filtering happens in service
         'saveExpenditure': 'finance_expenditure',
         'getReceivables': 'finance_receivable',
         'markAsPaid': 'finance_receivable',
@@ -181,7 +181,7 @@ function apiHandler(request) {
             case 'savePayrollToExpenditure': return savePayrollToExpenditureService(payload, user);
 
             // 支出管理
-            case 'getExpenditures': return getExpendituresService(payload);
+            case 'getExpenditures': return getExpendituresService(payload, user);
             case 'saveExpenditure': return saveExpenditureService(payload);
 
             // 帳款管理 (Assuming these are in other files or need to be defined if missing)
@@ -449,7 +449,7 @@ function verifyToken(token) {
 // ----------------------------------------
 // 支出管理
 // ----------------------------------------
-function getExpendituresService(payload) {
+function getExpendituresService(payload, user) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Expenditures');
     if (!sheet) return { error: '找不到名為 Expenditures 的分頁' };
@@ -499,6 +499,11 @@ function getExpendituresService(payload) {
             if (uData[i][0]) userMap[uData[i][0]] = uData[i][1]; // ID -> Name
         }
     }
+    
+    // [Fix] Get current user's display identity for filtering
+    const currentUserDisplay = user.displayName || user.name || user.username || 'Unknown';
+    const hasFinancePerm = user.role === 'BOSS' || 
+                         (user.permissions && user.permissions.some(p => p === 'finance' || p.startsWith('finance_')));
 
     return rows.map(row => {
         let obj = {};
@@ -541,6 +546,13 @@ function getExpendituresService(payload) {
         if (isNaN(itemDate.getTime())) return true;
         if (start && itemDate < start) return false;
         if (end && itemDate > end) return false;
+
+        // [New] Authorization Filter: Only allow viewing own records unless BOSS/Finance
+        if (!hasFinancePerm) {
+          const itemRep = String(item.salesRep || '').trim();
+          if (itemRep !== currentUserDisplay.trim()) return false;
+        }
+
         return true;
     }).reverse();
 }

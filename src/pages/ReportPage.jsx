@@ -42,15 +42,13 @@ export default function ReportPage({ user, apiUrl, setPage }) {
 
         try {
             const payload = { startDate, endDate };
-            const hasFinancePerm = user.role === 'BOSS' ||
-                (user.permissions && user.permissions.some(p => p === 'finance' || p.startsWith('finance_')));
-
-            const promises = [callGAS(apiUrl, 'getSalesHistory', payload, user.token)];
-            if (hasFinancePerm) promises.push(callGAS(apiUrl, 'getExpenditures', payload, user.token));
-
+            const promises = [
+                callGAS(apiUrl, 'getSalesHistory', payload, user.token),
+                callGAS(apiUrl, 'getExpenditures', payload, user.token)
+            ];
             const results = await Promise.all(promises);
             setRawSales(Array.isArray(results[0]) ? results[0] : []);
-            setRawExpenses(hasFinancePerm ? (Array.isArray(results[1]) ? results[1] : []) : []);
+            setRawExpenses(Array.isArray(results[1]) ? results[1] : []);
         } catch (error) {
             console.error(error);
             alert('查詢失敗: ' + error.message);
