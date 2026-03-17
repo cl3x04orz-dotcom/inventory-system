@@ -14,7 +14,7 @@ export default defineConfig({
     },
   },
   define: {
-    // 在 build 時注入當下的 Unix timestamp（毫秒）作為版本號
-    __BUILD_TIME__: JSON.stringify(Date.now().toString()),
+    // 優先使用 CI 傳入的環境變數，確保前後端版本完全同步
+    __BUILD_TIME__: JSON.stringify(process.env.VITE_APP_VERSION || Date.now().toString()),
   },
 })

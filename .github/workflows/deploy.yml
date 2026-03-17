@@ -28,7 +28,7 @@ jobs:
         run: |
           BUILD_TIME=$(node -e "console.log(Date.now())")
           echo "BUILD_TIME=$BUILD_TIME" >> $GITHUB_ENV
-          # 更新 Code.gs 的 APP_VERSION，與前端 __BUILD_TIME__ 完全一致
+          # 更新 Code.gs 的 APP_VERSION
           sed -i "s/const APP_VERSION = '[^']*'/const APP_VERSION = '$BUILD_TIME'/" Code.gs
           echo "✅ APP_VERSION updated to $BUILD_TIME"
 
@@ -36,6 +36,7 @@ jobs:
         run: npm run build
         env:
           VITE_GAS_API_URL: ${{ secrets.VITE_GAS_API_URL }}
+          VITE_APP_VERSION: ${{ env.BUILD_TIME }}
 
       - name: Commit updated Code.gs 📝
         run: |

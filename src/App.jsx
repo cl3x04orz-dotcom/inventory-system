@@ -126,31 +126,41 @@ function AppContent() {
     const [hasUpdate, setHasUpdate] = useState(null); // { local, server }
 
     // 檢查版本更新 (透過 apiHandler: getVersion)
+    const [checkCount, setCheckCount] = useState(0);
+    const [lastCheckTime, setLastCheckTime] = useState(null);
+
     useEffect(() => {
         const checkUpdate = async () => {
+            const count = checkCount + 1;
+            setCheckCount(count);
+            setLastCheckTime(new Date().toLocaleTimeString());
+
             try {
+                console.log(`[VersionCheck #${count}] 開始檢查... 本地:${LOCAL_VERSION}`);
                 // cache-busting: 加 _t 參數避免 GAS response 被快取
-                const response = await fetch(GAS_API_URL, {
+                const response = await fetch(`${GAS_API_URL}?t=${Date.now()}`, {
                     method: 'POST',
                     redirect: 'follow',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({ action: 'getVersion', _t: Date.now() })
                 });
                 const res = await response.json();
-                console.log('--- Version Check ---', { local: LOCAL_VERSION, server: res.version });
+                console.log(`[VersionCheck #${count}] 伺服器回應:`, res.version);
+
                 if (res && res.version && res.version !== LOCAL_VERSION) {
+                    console.warn(`[VersionCheck] 偵測到版本不符! (${LOCAL_VERSION} != ${res.version})`);
                     setHasUpdate({ local: LOCAL_VERSION, server: res.version });
                 }
             } catch (e) {
-                console.warn('Version check failed:', e);
+                console.warn(`[VersionCheck #${count}] 檢查失敗:`, e);
             }
         };
         // 初次 mount 後 2 秒檢查
         const timer = setTimeout(checkUpdate, 2000);
-        // 每 10 分鐘 polling 一次（手機長時間掛著也能被通知）
-        const interval = setInterval(checkUpdate, 10 * 60 * 1000);
+        // 每 5 分鐘 polling 一次 (稍微縮短頻率以利測試)
+        const interval = setInterval(checkUpdate, 5 * 60 * 1000);
         return () => { clearTimeout(timer); clearInterval(interval); };
-    }, []);
+    }, [checkCount]);
 
     // Activity Logger
     const { logActivity, logLogin, logLogout, logPageView } = useActivityLogger({
