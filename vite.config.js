@@ -13,4 +13,8 @@ export default defineConfig({
       ],
     },
   },
+  define: {
+    // 在 build 時注入當下的 Unix timestamp（毫秒）作為版本號
+    __BUILD_TIME__: JSON.stringify(Date.now().toString()),
+  },
 })

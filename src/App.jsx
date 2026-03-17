@@ -34,7 +34,7 @@ import {
 
 // Google Apps Script (GAS) API Endpoint
 const GAS_API_URL = import.meta.env.VITE_GAS_API_URL;
-const LOCAL_VERSION = '2026.03.17.B7';
+const LOCAL_VERSION = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : '2026.03.17.B7';
 
 console.log('--- 系統偵錯資訊 ---');
 console.log('Base URL:', import.meta.env.BASE_URL);
@@ -129,12 +129,12 @@ function AppContent() {
     useEffect(() => {
         const checkUpdate = async () => {
             try {
-                // 使用 GAS 兼容的 fetch 方式 (避免 preflight)
+                // cache-busting: 加 _t 參數避免 GAS response 被快取
                 const response = await fetch(GAS_API_URL, {
                     method: 'POST',
                     redirect: 'follow',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ action: 'getVersion' })
+                    body: JSON.stringify({ action: 'getVersion', _t: Date.now() })
                 });
                 const res = await response.json();
                 console.log('--- Version Check ---', { local: LOCAL_VERSION, server: res.version });
@@ -145,8 +145,11 @@ function AppContent() {
                 console.warn('Version check failed:', e);
             }
         };
+        // 初次 mount 後 2 秒檢查
         const timer = setTimeout(checkUpdate, 2000);
-        return () => clearTimeout(timer);
+        // 每 10 分鐘 polling 一次（手機長時間掛著也能被通知）
+        const interval = setInterval(checkUpdate, 10 * 60 * 1000);
+        return () => { clearTimeout(timer); clearInterval(interval); };
     }, []);
 
     // Activity Logger
