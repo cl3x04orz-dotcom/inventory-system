@@ -123,7 +123,7 @@ function AppContent() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [isOffline, setIsOffline] = useState(false);
     const [sessionManager, setSessionManager] = useState(null);
-    const [hasUpdate, setHasUpdate] = useState(false);
+    const [hasUpdate, setHasUpdate] = useState(null); // { local, server }
 
     // 檢查版本更新 (透過 apiHandler: getVersion)
     useEffect(() => {
@@ -135,7 +135,7 @@ function AppContent() {
                 });
                 const res = await response.json();
                 if (res && res.version && res.version !== LOCAL_VERSION) {
-                    setHasUpdate(true);
+                    setHasUpdate({ local: LOCAL_VERSION, server: res.version });
                 }
             } catch (e) {
                 console.warn('Version check failed:', e);
@@ -358,11 +358,16 @@ function AppContent() {
                             <Activity size={20} className="animate-pulse" />
                             <div>
                                 <p className="font-bold text-sm">系統版本有更新</p>
-                                <p className="text-[10px] opacity-80">請點擊右側按鈕以載入新功能</p>
+                                <p className="text-[9px] opacity-70 font-mono">
+                                    {hasUpdate.local} → {hasUpdate.server}
+                                </p>
                             </div>
                         </div>
                         <button
-                            onClick={() => window.location.reload(true)}
+                            onClick={() => {
+                                // 強制帶參數刷新，破除手機瀏覽器快取
+                                window.location.href = window.location.href.split('?')[0] + '?v=' + Date.now();
+                            }}
                             className="bg-white text-blue-600 px-4 py-1.5 rounded-xl font-bold text-xs hover:bg-blue-50 transition-colors shadow-sm whitespace-nowrap"
                         >
                             立即刷新
