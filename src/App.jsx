@@ -34,7 +34,7 @@ import {
 
 // Google Apps Script (GAS) API Endpoint
 const GAS_API_URL = import.meta.env.VITE_GAS_API_URL;
-const LOCAL_VERSION = "2026.03.17.B6";
+const LOCAL_VERSION = '2026.03.17.B7';
 
 console.log('--- 系統偵錯資訊 ---');
 console.log('Base URL:', import.meta.env.BASE_URL);

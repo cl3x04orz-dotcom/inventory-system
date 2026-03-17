@@ -79,15 +79,16 @@ function getPayablesService(payload) {
       if (!purchaseGroups[groupKey]) {
         purchaseGroups[groupKey] = { uuids: [], date: dateStr, serverTimestamp: rowDate, vendor: vendor, operator: operatorName, amount: 0, items: [] };
       }
-      if (idIdx !== -1 && row[idIdx]) {
-        purchaseGroups[groupKey].uuids.push(String(row[idIdx]));
+      const uuid = (idIdx !== -1 && row[idIdx]) ? String(row[idIdx]) : '';
+      if (uuid) {
+        purchaseGroups[groupKey].uuids.push(uuid);
       }
       const productId = row[productIdIdx];
       const productName = productMap[productId] || productId;
       const qty = Number(row[qtyIdx]) || 0;
       const price = Number(row[priceIdx]) || 0;
       purchaseGroups[groupKey].amount += qty * price;
-      purchaseGroups[groupKey].items.push({ productName, qty, price, subtotal: qty * price });
+      purchaseGroups[groupKey].items.push({ uuid, productName, qty, price, subtotal: qty * price });
     }
   }
   return Object.values(purchaseGroups).reverse();

@@ -389,6 +389,7 @@ function getReceivablesService(payload) {
           if (qty > 0) {
             const pId = detailRows[j][1];
             items.push({
+              saleId: saleId,
               productName: productMap[pId] || pId,
               qty: qty,
               price: Number(detailRows[j][6] || 0),

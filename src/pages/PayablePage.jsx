@@ -1,25 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { Wallet, Search, RefreshCw, ChevronDown, ChevronUp, CheckSquare } from 'lucide-react';
 import { callGAS } from '../utils/api';
-import { getLocalDateString } from '../utils/constants';
+import { getLocalDateString, getFirstDayOfMonthString } from '../utils/constants';
 
 export default function PayablePage({ user, apiUrl }) {
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(false);
 
     // Search Filters
-    const [startDate, setStartDate] = useState(getLocalDateString());
+    const [startDate, setStartDate] = useState(getFirstDayOfMonthString());
     const [endDate, setEndDate] = useState(getLocalDateString());
     const [vendorSearch, setVendorSearch] = useState('');
     const [operatorSearch, setOperatorSearch] = useState('');
 
     const [expandedRows, setExpandedRows] = useState(new Set());
-    // 批次選取：以 index 為 key（對應 filtered 陣列 index）
-    const [selectedGroups, setSelectedGroups] = useState(new Set());
+    // 批次選取：以項目的 UUID 為準
+    const [selectedItemUuids, setSelectedItemUuids] = useState(new Set());
 
     const fetchData = React.useCallback(async () => {
         setLoading(true);
-        setSelectedGroups(new Set()); // 清空選取
+        setSelectedItemUuids(new Set()); // 清空選取
         try {
             const payload = {};
             if (startDate) payload.startDate = startDate;
@@ -41,27 +41,18 @@ export default function PayablePage({ user, apiUrl }) {
         fetchData();
     }, [fetchData]);
 
-    // 批次付款：收集所有選取組別的 uuids 一起送後端
+    // 批次付款：收集所有選取的項目 UUID 一起送後端
     const handleBatchMarkAsPaid = async () => {
-        if (selectedGroups.size === 0) return;
-        if (!confirm(`確定要將選取的 ${selectedGroups.size} 筆帳款標記為已付款嗎？`)) return;
+        if (selectedItemUuids.size === 0) return;
+        if (!confirm(`確定要將選取的 ${selectedItemUuids.size} 項細項標記為已付款嗎？`)) return;
 
-        const allUuids = [];
-        filtered.forEach((r, i) => {
-            if (selectedGroups.has(i) && Array.isArray(r.uuids)) {
-                allUuids.push(...r.uuids);
-            }
-        });
-
-        if (allUuids.length === 0) {
-            alert('選取的帳款無 UUID 資訊，請重新整理後再試。');
-            return;
-        }
+        const allUuids = Array.from(selectedItemUuids);
 
         setLoading(true);
         try {
             await callGAS(apiUrl, 'markPayableAsPaid', { targetUuids: allUuids }, user.token);
-            alert(`成功標記 ${selectedGroups.size} 筆帳款為已付款！`);
+            alert(`成功標記 ${selectedItemUuids.size} 項帳款為已付款！`);
+            setSelectedItemUuids(new Set());
             fetchData();
         } catch (error) {
             console.error('Failed to mark as paid:', error);
@@ -71,9 +62,9 @@ export default function PayablePage({ user, apiUrl }) {
         }
     };
 
-    // 單筆付款（保留相容）
+    // 單筆付款（原本組別付款）
     const handleMarkAsPaid = async (r) => {
-        if (!confirm('確定要將此筆帳款標記為已付款嗎？')) return;
+        if (!confirm('確定要將此「整組」帳款標記為已付款嗎？')) return;
         setLoading(true);
         try {
             const uuids = Array.isArray(r.uuids) ? r.uuids : [];
@@ -88,17 +79,52 @@ export default function PayablePage({ user, apiUrl }) {
         }
     };
 
+    // [New] 特對單一細項付款
+    const handleSingleItemPaid = async (item) => {
+        if (!item.uuid) return alert('找不到該項目的唯一標記');
+        if (!confirm(`確定要單獨將 [${item.productName}] 標記為已付款嗎？`)) return;
+        setLoading(true);
+        try {
+            await callGAS(apiUrl, 'markPayableAsPaid', { targetUuids: [item.uuid] }, user.token);
+            alert('細項更新成功！');
+            fetchData();
+        } catch (error) {
+            console.error('Failed to mark item as paid:', error);
+            alert('更新失敗: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const toggleRow = (index) => {
         const next = new Set(expandedRows);
         next.has(index) ? next.delete(index) : next.add(index);
         setExpandedRows(next);
     };
 
-    const toggleSelect = (e, index) => {
+    // 整組勾選邏輯：點擊組別勾選框，切換該組內所有細項
+    const toggleGroupSelect = (e, r) => {
         e.stopPropagation();
-        const next = new Set(selectedGroups);
-        next.has(index) ? next.delete(index) : next.add(index);
-        setSelectedGroups(next);
+        const itemUuids = (r.items || []).map(item => item.uuid).filter(Boolean);
+        const next = new Set(selectedItemUuids);
+
+        // 檢查是否該組內所有項目都已選中
+        const allInGroupSelected = itemUuids.every(uuid => next.has(uuid));
+
+        if (allInGroupSelected) {
+            itemUuids.forEach(uuid => next.delete(uuid));
+        } else {
+            itemUuids.forEach(uuid => next.add(uuid));
+        }
+        setSelectedItemUuids(next);
+    };
+
+    // 單一細項勾選邏輯
+    const toggleItemSelect = (e, uuid) => {
+        e.stopPropagation();
+        const next = new Set(selectedItemUuids);
+        next.has(uuid) ? next.delete(uuid) : next.add(uuid);
+        setSelectedItemUuids(next);
     };
 
     const getOperatorName = (r) => {
@@ -114,21 +140,26 @@ export default function PayablePage({ user, apiUrl }) {
     });
 
     const unpaidFiltered = filtered.filter(r => r.status !== 'PAID');
-    const allSelected = unpaidFiltered.length > 0 && unpaidFiltered.every((r, idx) => {
-        // find the actual index in filtered
-        const fi = filtered.indexOf(r);
-        return selectedGroups.has(fi);
-    });
+    const allUnpaidUuids = unpaidFiltered.flatMap(r => (r.items || []).map(item => item.uuid).filter(Boolean));
+    const allSelected = allUnpaidUuids.length > 0 && allUnpaidUuids.every(uuid => selectedItemUuids.has(uuid));
 
     const toggleSelectAll = (e) => {
         e.stopPropagation();
         if (allSelected) {
-            setSelectedGroups(new Set());
+            setSelectedItemUuids(new Set());
         } else {
-            const next = new Set();
-            filtered.forEach((r, i) => { if (r.status !== 'PAID') next.add(i); });
-            setSelectedGroups(next);
+            setSelectedItemUuids(new Set(allUnpaidUuids));
         }
+    };
+
+    // 判斷組別是否為「部分選中」或「全部選中」狀態
+    const getGroupSelectionState = (r) => {
+        const itemUuids = (r.items || []).map(item => item.uuid).filter(Boolean);
+        if (itemUuids.length === 0) return 'none';
+        const selectedCount = itemUuids.filter(uuid => selectedItemUuids.has(uuid)).length;
+        if (selectedCount === 0) return 'none';
+        if (selectedCount === itemUuids.length) return 'all';
+        return 'partial';
     };
 
     const totalAmount = filtered.reduce((sum, r) => sum + (Number(r.amount) || Number(r.total) || 0), 0);
@@ -144,14 +175,14 @@ export default function PayablePage({ user, apiUrl }) {
                     </h1>
                 </div>
                 <div className="flex items-center gap-3">
-                    {selectedGroups.size > 0 && (
+                    {selectedItemUuids.size > 0 && (
                         <button
                             onClick={handleBatchMarkAsPaid}
                             disabled={loading}
                             className="btn-primary flex items-center gap-2 text-sm px-4 py-2"
                         >
                             <CheckSquare size={16} />
-                            批次確認付款 ({selectedGroups.size})
+                            批次確認付款 ({selectedItemUuids.size})
                         </button>
                     )}
                     <div className="glass-panel px-3 py-2 border-[var(--border-primary)] bg-[var(--bg-secondary)] shrink-0 flex flex-col items-end">
@@ -234,17 +265,22 @@ export default function PayablePage({ user, apiUrl }) {
                             filtered.map((r, i) => (
                                 <React.Fragment key={i}>
                                     <tr
-                                        className={`hover:bg-[var(--bg-secondary)] transition-colors cursor-pointer ${selectedGroups.has(i) ? 'bg-rose-50/30' : ''}`}
+                                        className={`hover:bg-[var(--bg-secondary)] transition-colors cursor-pointer ${getGroupSelectionState(r) !== 'none' ? 'bg-rose-50/30' : ''}`}
                                         onClick={() => toggleRow(i)}
                                     >
                                         <td className="p-4" onClick={(e) => e.stopPropagation()}>
                                             {r.status !== 'PAID' && (
-                                                <input
-                                                    type="checkbox"
-                                                    className="w-4 h-4 rounded cursor-pointer accent-rose-500"
-                                                    checked={selectedGroups.has(i)}
-                                                    onChange={(e) => toggleSelect(e, i)}
-                                                />
+                                                <div className="relative flex items-center justify-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        className={`w-4 h-4 rounded cursor-pointer accent-rose-500 ${getGroupSelectionState(r) === 'partial' ? 'opacity-50' : ''}`}
+                                                        checked={getGroupSelectionState(r) === 'all'}
+                                                        onChange={(e) => toggleGroupSelect(e, r)}
+                                                    />
+                                                    {getGroupSelectionState(r) === 'partial' && (
+                                                        <div className="absolute w-2 h-0.5 bg-white pointer-events-none"></div>
+                                                    )}
+                                                </div>
                                             )}
                                         </td>
                                         <td className="p-4 text-[var(--text-tertiary)]">
@@ -284,20 +320,38 @@ export default function PayablePage({ user, apiUrl }) {
                                                     <table className="w-full text-sm">
                                                         <thead>
                                                             <tr className="bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-b border-[var(--border-primary)]">
+                                                                <th className="py-2 px-4 w-10"></th>
                                                                 <th className="py-2 px-4 text-left font-medium">業務員</th>
                                                                 <th className="py-2 px-4 text-left font-medium">產品</th>
                                                                 <th className="py-2 px-4 text-right font-medium">單價</th>
                                                                 <th className="py-2 px-4 text-center font-medium">數量</th>
+                                                                <th className="py-2 px-4 text-center font-medium w-24">操作</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody className="divide-y divide-[var(--border-primary)]">
                                                             {(r.items || r.products || []).length > 0 ? (
                                                                 (r.items || r.products || []).map((item, idx) => (
-                                                                    <tr key={idx} className="hover:bg-[var(--bg-secondary)]">
+                                                                    <tr key={idx} className={`hover:bg-[var(--bg-secondary)] ${selectedItemUuids.has(item.uuid) ? 'bg-rose-50/50' : ''}`}>
+                                                                        <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                className="w-3.5 h-3.5 rounded cursor-pointer accent-rose-500"
+                                                                                checked={selectedItemUuids.has(item.uuid)}
+                                                                                onChange={(e) => toggleItemSelect(e, item.uuid)}
+                                                                            />
+                                                                        </td>
                                                                         <td className="py-3 px-4 text-[var(--text-secondary)]">{getOperatorName(r)}</td>
                                                                         <td className="py-3 px-4 text-[var(--text-primary)] font-medium">{item.productName || item.name || '-'}</td>
                                                                         <td className="py-3 px-4 text-right text-[var(--text-secondary)] font-mono">${(Number(item.price) || Number(item.unitPrice) || 0).toLocaleString()}</td>
                                                                         <td className="py-3 px-4 text-center text-[var(--text-secondary)] font-mono">{item.qty || item.quantity || 1}</td>
+                                                                        <td className="py-3 px-4 text-center">
+                                                                            <button
+                                                                                onClick={() => handleSingleItemPaid(item)}
+                                                                                className="px-2 py-1 text-[10px] bg-rose-50 text-rose-600 border border-rose-200 rounded hover:bg-rose-100 transition-colors"
+                                                                            >
+                                                                                確認付款
+                                                                            </button>
+                                                                        </td>
                                                                     </tr>
                                                                 ))
                                                             ) : (
@@ -321,14 +375,14 @@ export default function PayablePage({ user, apiUrl }) {
             {/* Mobile Card View */}
             <div className="md:hidden space-y-4">
                 {/* 批次按鈕（手機版） */}
-                {selectedGroups.size > 0 && (
+                {selectedItemUuids.size > 0 && (
                     <button
                         onClick={handleBatchMarkAsPaid}
                         disabled={loading}
                         className="btn-primary w-full flex items-center justify-center gap-2 py-2.5"
                     >
                         <CheckSquare size={16} />
-                        批次確認付款 ({selectedGroups.size})
+                        批次確認付款 ({selectedItemUuids.size})
                     </button>
                 )}
                 {loading ? (
@@ -337,18 +391,25 @@ export default function PayablePage({ user, apiUrl }) {
                     filtered.map((r, i) => (
                         <div
                             key={i}
-                            className={`bg-[var(--bg-primary)] rounded-xl border p-4 shadow-sm transition-colors ${selectedGroups.has(i) ? 'border-rose-400' : 'border-[var(--border-primary)]'}`}
+                            className={`bg-[var(--bg-primary)] rounded-xl border p-4 shadow-sm transition-colors ${getGroupSelectionState(r) !== 'none' ? 'border-rose-400' : 'border-[var(--border-primary)]'}`}
                             onClick={() => toggleRow(i)}
                         >
                             <div className="flex justify-between items-start mb-3">
                                 <div className="flex items-start gap-3">
                                     {r.status !== 'PAID' && (
-                                        <input
-                                            type="checkbox"
-                                            className="w-4 h-4 mt-1 rounded cursor-pointer accent-rose-500 shrink-0"
-                                            checked={selectedGroups.has(i)}
-                                            onChange={(e) => toggleSelect(e, i)}
-                                        />
+                                        <div className="relative shrink-0 pt-0.5">
+                                            <input
+                                                type="checkbox"
+                                                className={`w-4 h-4 rounded cursor-pointer accent-rose-500 ${getGroupSelectionState(r) === 'partial' ? 'opacity-50' : ''}`}
+                                                checked={getGroupSelectionState(r) === 'all'}
+                                                onChange={(e) => toggleGroupSelect(e, r)}
+                                            />
+                                            {getGroupSelectionState(r) === 'partial' && (
+                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                    <div className="w-2 h-0.5 bg-white"></div>
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                     <div>
                                         <div className="text-xs text-[var(--text-tertiary)] mb-1">
@@ -395,11 +456,30 @@ export default function PayablePage({ user, apiUrl }) {
                             {expandedRows.has(i) && (
                                 <div className="mt-3 bg-[var(--bg-secondary)] rounded-lg p-3 text-sm space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
                                     {(r.items || r.products || []).map((item, idx) => (
-                                        <div key={idx} className="flex justify-between items-center border-b border-[var(--border-primary)] last:border-0 pb-2 last:pb-0">
-                                            <span className="text-[var(--text-primary)]">{item.productName || item.name}</span>
-                                            <div className="text-right">
-                                                <div className="text-[var(--text-primary)] font-mono">${(Number(item.price) || 0).toLocaleString()} x {item.qty || 1}</div>
+                                        <div
+                                            key={idx}
+                                            className={`flex items-center gap-3 border-b border-[var(--border-primary)] last:border-0 pb-2 last:pb-0 ${selectedItemUuids.has(item.uuid) ? 'text-rose-600' : ''}`}
+                                            onClick={(e) => toggleItemSelect(e, item.uuid)}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                className="w-3.5 h-3.5 rounded cursor-pointer accent-rose-500 shrink-0"
+                                                checked={selectedItemUuids.has(item.uuid)}
+                                                onChange={(e) => toggleItemSelect(e, item.uuid)}
+                                            />
+                                            <div className="flex-1">
+                                                <div className="text-[var(--text-primary)] font-medium">{item.productName || item.name}</div>
+                                                <div className="text-[var(--text-tertiary)] text-[10px] font-mono">${(Number(item.price) || 0).toLocaleString()} x {item.qty || 1}</div>
                                             </div>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleSingleItemPaid(item);
+                                                }}
+                                                className="px-2 py-1 text-[10px] bg-rose-50 text-rose-600 border border-rose-200 rounded"
+                                            >
+                                                確認細項
+                                            </button>
                                         </div>
                                     ))}
                                     {(!r.items && !r.products) && <div className="text-[var(--text-tertiary)] text-center py-2 italic">無產品明細</div>}

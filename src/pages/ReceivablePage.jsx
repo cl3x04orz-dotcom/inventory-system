@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Wallet, RefreshCw, ChevronDown, ChevronUp, CheckSquare, Banknote, CreditCard, X } from 'lucide-react';
 import { callGAS } from '../utils/api';
-import { getLocalDateString } from '../utils/constants';
+import { getLocalDateString, getFirstDayOfMonthString } from '../utils/constants';
 
 export default function ReceivablePage({ user, apiUrl }) {
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    const [startDate, setStartDate] = useState(getLocalDateString());
+    const [startDate, setStartDate] = useState(getFirstDayOfMonthString());
     const [endDate, setEndDate] = useState(getLocalDateString());
     const [clientSearch, setClientSearch] = useState('');
     const [operatorSearch, setOperatorSearch] = useState('');
 
     const [expandedRows, setExpandedRows] = useState(new Set());
-    const [selectedGroups, setSelectedGroups] = useState(new Set());
+    const [selectedItemUuids, setSelectedItemUuids] = useState(new Set());
 
     // Modal state
     const [showModal, setShowModal] = useState(false);
@@ -21,7 +21,7 @@ export default function ReceivablePage({ user, apiUrl }) {
 
     const fetchData = React.useCallback(async () => {
         setLoading(true);
-        setSelectedGroups(new Set());
+        setSelectedItemUuids(new Set()); // 清空選取
         try {
             const payload = {};
             if (startDate) payload.startDate = startDate;
@@ -46,11 +46,9 @@ export default function ReceivablePage({ user, apiUrl }) {
         const allUuids = [];
 
         if (type === 'batch') {
-            filtered.forEach((r, i) => {
-                if (selectedGroups.has(i) && Array.isArray(r.uuids)) {
-                    allUuids.push(...r.uuids);
-                }
-            });
+            // 從合成 ID (saleId-index) 提取原始 saleId
+            const rawUuids = Array.from(selectedItemUuids).map(u => String(u).split('-')[0]);
+            allUuids.push(...Array.from(new Set(rawUuids)));
         } else if (type === 'single' && record) {
             allUuids.push(...(Array.isArray(record.uuids) ? record.uuids : []));
         }
@@ -80,7 +78,7 @@ export default function ReceivablePage({ user, apiUrl }) {
     };
 
     const handleBatchMarkAsPaid = () => {
-        if (selectedGroups.size === 0) return;
+        if (selectedItemUuids.size === 0) return;
         setModalData({ type: 'batch', record: null });
         setShowModal(true);
     };
@@ -96,11 +94,26 @@ export default function ReceivablePage({ user, apiUrl }) {
         setExpandedRows(next);
     };
 
-    const toggleSelect = (e, index) => {
+    const toggleGroupSelect = (e, r) => {
         e.stopPropagation();
-        const next = new Set(selectedGroups);
-        next.has(index) ? next.delete(index) : next.add(index);
-        setSelectedGroups(next);
+        const next = new Set(selectedItemUuids);
+        const itemRows = (r.items || r.products || r.salesData || []);
+        const itemSyntheticIds = itemRows.map((_, idx) => `${r.saleId}-${idx}`);
+
+        const allSelected = itemSyntheticIds.every(id => next.has(id));
+        if (allSelected) {
+            itemSyntheticIds.forEach(id => next.delete(id));
+        } else {
+            itemSyntheticIds.forEach(id => next.add(id));
+        }
+        setSelectedItemUuids(next);
+    };
+
+    const toggleItemSelect = (e, syntheticId) => {
+        e.stopPropagation();
+        const next = new Set(selectedItemUuids);
+        next.has(syntheticId) ? next.delete(syntheticId) : next.add(syntheticId);
+        setSelectedItemUuids(next);
     };
 
     const getOperatorName = (r) => {
@@ -117,20 +130,31 @@ export default function ReceivablePage({ user, apiUrl }) {
     });
 
     const unpaidFiltered = filtered.filter(r => r.status !== 'PAID');
-    const allSelected = unpaidFiltered.length > 0 && unpaidFiltered.every(r => {
-        const fi = filtered.indexOf(r);
-        return selectedGroups.has(fi);
+    // 全選時改為收集所有項目的合成 ID
+    const allUnpaidItemIds = unpaidFiltered.flatMap(r => {
+        const itemRows = (r.items || r.products || r.salesData || []);
+        return itemRows.map((_, idx) => `${r.saleId}-${idx}`);
     });
+    const allSelected = allUnpaidItemIds.length > 0 && allUnpaidItemIds.every(u => selectedItemUuids.has(u));
 
     const toggleSelectAll = (e) => {
         e.stopPropagation();
         if (allSelected) {
-            setSelectedGroups(new Set());
+            setSelectedItemUuids(new Set());
         } else {
-            const next = new Set();
-            filtered.forEach((r, i) => { if (r.status !== 'PAID') next.add(i); });
-            setSelectedGroups(next);
+            setSelectedItemUuids(new Set(allUnpaidItemIds));
         }
+    };
+
+    const getGroupSelectionState = (r) => {
+        const itemRows = (r.items || r.products || r.salesData || []);
+        const itemSyntheticIds = itemRows.map((_, idx) => `${r.saleId}-${idx}`);
+        if (itemSyntheticIds.length === 0) return 'none';
+
+        const selCount = itemSyntheticIds.filter(id => selectedItemUuids.has(id)).length;
+        if (selCount === 0) return 'none';
+        if (selCount === itemSyntheticIds.length) return 'all';
+        return 'partial';
     };
 
     const totalAmount = filtered.reduce((sum, r) => sum + (Number(r.amount) || Number(r.total) || 0), 0);
@@ -146,14 +170,14 @@ export default function ReceivablePage({ user, apiUrl }) {
                     </h1>
                 </div>
                 <div className="flex items-center gap-3">
-                    {selectedGroups.size > 0 && (
+                    {selectedItemUuids.size > 0 && (
                         <button
                             onClick={handleBatchMarkAsPaid}
                             disabled={loading}
                             className="btn-primary flex items-center gap-2 text-sm px-4 py-2"
                         >
                             <CheckSquare size={16} />
-                            批次確認收款 ({selectedGroups.size})
+                            批次確認收款 ({selectedItemUuids.size})
                         </button>
                     )}
                     <div className="glass-panel px-3 py-2 border-[var(--border-primary)] bg-[var(--bg-secondary)] shrink-0 flex flex-col items-end">
@@ -214,17 +238,22 @@ export default function ReceivablePage({ user, apiUrl }) {
                             filtered.map((r, i) => (
                                 <React.Fragment key={i}>
                                     <tr
-                                        className={`hover:bg-[var(--bg-secondary)] transition-colors cursor-pointer ${selectedGroups.has(i) ? 'bg-emerald-50/20' : ''}`}
+                                        className={`hover:bg-[var(--bg-secondary)] transition-colors cursor-pointer ${getGroupSelectionState(r) !== 'none' ? 'bg-emerald-50/20' : ''}`}
                                         onClick={() => toggleRow(i)}
                                     >
                                         <td className="p-4" onClick={(e) => e.stopPropagation()}>
                                             {r.status !== 'PAID' && (
-                                                <input
-                                                    type="checkbox"
-                                                    className="w-4 h-4 rounded cursor-pointer accent-emerald-500"
-                                                    checked={selectedGroups.has(i)}
-                                                    onChange={(e) => toggleSelect(e, i)}
-                                                />
+                                                <div className="relative flex items-center justify-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        className={`w-4 h-4 rounded cursor-pointer accent-emerald-500 ${getGroupSelectionState(r) === 'partial' ? 'opacity-50' : ''}`}
+                                                        checked={getGroupSelectionState(r) === 'all'}
+                                                        onChange={(e) => toggleGroupSelect(e, r)}
+                                                    />
+                                                    {getGroupSelectionState(r) === 'partial' && (
+                                                        <div className="absolute w-2 h-0.5 bg-white pointer-events-none"></div>
+                                                    )}
+                                                </div>
                                             )}
                                         </td>
                                         <td className="p-4 text-[var(--text-tertiary)]">
@@ -260,22 +289,43 @@ export default function ReceivablePage({ user, apiUrl }) {
                                                     <table className="w-full text-sm">
                                                         <thead>
                                                             <tr className="bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-b border-[var(--border-primary)]">
+                                                                <th className="py-2 px-4 w-10"></th>
                                                                 <th className="py-2 px-4 text-left font-medium">業務員</th>
                                                                 <th className="py-2 px-4 text-left font-medium">產品</th>
                                                                 <th className="py-2 px-4 text-right font-medium">單價</th>
                                                                 <th className="py-2 px-4 text-center font-medium">數量</th>
+                                                                <th className="py-2 px-4 text-center font-medium w-24">操作</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody className="divide-y divide-[var(--border-primary)]">
                                                             {(r.items || r.products || r.salesData || []).length > 0 ? (
-                                                                (r.items || r.products || r.salesData || []).map((item, idx) => (
-                                                                    <tr key={idx} className="hover:bg-[var(--bg-secondary)]">
-                                                                        <td className="py-3 px-4 text-[var(--text-secondary)]">{getOperatorName(r)}</td>
-                                                                        <td className="py-3 px-4 text-[var(--text-primary)] font-medium">{item.productName || item.name || '-'}</td>
-                                                                        <td className="py-3 px-4 text-right text-[var(--text-secondary)] font-mono">${(Number(item.price) || Number(item.unitPrice) || 0).toLocaleString()}</td>
-                                                                        <td className="py-3 px-4 text-center text-[var(--text-secondary)] font-mono">{item.qty || item.soldQty || 1}</td>
-                                                                    </tr>
-                                                                ))
+                                                                (r.items || r.products || r.salesData || []).map((item, idx) => {
+                                                                    const syntheticId = `${r.saleId}-${idx}`;
+                                                                    return (
+                                                                        <tr key={idx} className={`hover:bg-[var(--bg-secondary)] ${selectedItemUuids.has(syntheticId) ? 'bg-emerald-50/30 text-emerald-700' : ''}`}>
+                                                                            <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    className="w-3.5 h-3.5 rounded cursor-pointer accent-emerald-500"
+                                                                                    checked={selectedItemUuids.has(syntheticId)}
+                                                                                    onChange={(e) => toggleItemSelect(e, syntheticId)}
+                                                                                />
+                                                                            </td>
+                                                                            <td className="py-3 px-4 text-[var(--text-secondary)]">{getOperatorName(r)}</td>
+                                                                            <td className="py-3 px-4 text-[var(--text-primary)] font-medium">{item.productName || item.name || '-'}</td>
+                                                                            <td className="py-3 px-4 text-right text-[var(--text-secondary)] font-mono">${(Number(item.price) || Number(item.unitPrice) || 0).toLocaleString()}</td>
+                                                                            <td className="py-3 px-4 text-center text-[var(--text-secondary)] font-mono">{item.qty || item.soldQty || 1}</td>
+                                                                            <td className="py-3 px-4 text-center">
+                                                                                <button
+                                                                                    onClick={() => handleMarkAsPaid(r)}
+                                                                                    className="px-2 py-1 text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-200 rounded hover:bg-emerald-100 transition-colors"
+                                                                                >
+                                                                                    確認收款
+                                                                                </button>
+                                                                            </td>
+                                                                        </tr>
+                                                                    );
+                                                                })
                                                             ) : (
                                                                 <tr><td colSpan="4" className="py-4 text-center text-[var(--text-secondary)] italic">無產品明細</td></tr>
                                                             )}
@@ -296,10 +346,10 @@ export default function ReceivablePage({ user, apiUrl }) {
 
             {/* Mobile Card View */}
             <div className="md:hidden space-y-4">
-                {selectedGroups.size > 0 && (
+                {selectedItemUuids.size > 0 && (
                     <button onClick={handleBatchMarkAsPaid} disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 py-2.5">
                         <CheckSquare size={16} />
-                        批次確認收款 ({selectedGroups.size})
+                        批次確認收款 ({selectedItemUuids.size})
                     </button>
                 )}
                 {loading ? (
@@ -308,18 +358,25 @@ export default function ReceivablePage({ user, apiUrl }) {
                     filtered.map((r, i) => (
                         <div
                             key={i}
-                            className={`bg-[var(--bg-primary)] rounded-xl border p-4 shadow-sm transition-colors ${selectedGroups.has(i) ? 'border-emerald-400' : 'border-[var(--border-primary)]'}`}
+                            className={`bg-[var(--bg-primary)] rounded-xl border p-4 shadow-sm transition-colors ${getGroupSelectionState(r) !== 'none' ? 'border-emerald-400' : 'border-[var(--border-primary)]'}`}
                             onClick={() => toggleRow(i)}
                         >
                             <div className="flex justify-between items-start mb-3">
                                 <div className="flex items-start gap-3">
                                     {r.status !== 'PAID' && (
-                                        <input
-                                            type="checkbox"
-                                            className="w-4 h-4 mt-1 rounded cursor-pointer accent-emerald-500 shrink-0"
-                                            checked={selectedGroups.has(i)}
-                                            onChange={(e) => toggleSelect(e, i)}
-                                        />
+                                        <div className="relative shrink-0 pt-0.5">
+                                            <input
+                                                type="checkbox"
+                                                className={`w-4 h-4 rounded cursor-pointer accent-emerald-500 ${getGroupSelectionState(r) === 'partial' ? 'opacity-50' : ''}`}
+                                                checked={getGroupSelectionState(r) === 'all'}
+                                                onChange={(e) => toggleGroupSelect(e, r)}
+                                            />
+                                            {getGroupSelectionState(r) === 'partial' && (
+                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                    <div className="w-2 h-0.5 bg-white"></div>
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                     <div>
                                         <div className="text-xs text-[var(--text-tertiary)] mb-1">
@@ -356,12 +413,36 @@ export default function ReceivablePage({ user, apiUrl }) {
 
                             {expandedRows.has(i) && (
                                 <div className="mt-3 bg-[var(--bg-secondary)] rounded-lg p-3 text-sm space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                                    {(r.items || r.products || r.salesData || []).map((item, idx) => (
-                                        <div key={idx} className="flex justify-between items-center border-b border-[var(--border-primary)] last:border-0 pb-2 last:pb-0">
-                                            <span className="text-[var(--text-primary)]">{item.productName || item.name}</span>
-                                            <div className="text-[var(--text-primary)] font-mono">${(Number(item.price) || 0).toLocaleString()} x {item.qty || 1}</div>
-                                        </div>
-                                    ))}
+                                    {(r.items || r.products || r.salesData || []).map((item, idx) => {
+                                        const syntheticId = `${r.saleId}-${idx}`;
+                                        return (
+                                            <div
+                                                key={idx}
+                                                className={`flex items-center gap-3 border-b border-[var(--border-primary)] last:border-0 pb-2 last:pb-0 ${selectedItemUuids.has(syntheticId) ? 'text-emerald-700' : ''}`}
+                                                onClick={(e) => toggleItemSelect(e, syntheticId)}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    className="w-3.5 h-3.5 rounded cursor-pointer accent-emerald-500 shrink-0"
+                                                    checked={selectedItemUuids.has(syntheticId)}
+                                                    onChange={(e) => toggleItemSelect(e, syntheticId)}
+                                                />
+                                                <div className="flex-1">
+                                                    <div className="text-[var(--text-primary)] font-medium">{item.productName || item.name}</div>
+                                                    <div className="text-[var(--text-tertiary)] text-[10px] font-mono">${(Number(item.price) || 0).toLocaleString()} x {item.qty || 1}</div>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleMarkAsPaid(r);
+                                                    }}
+                                                    className="px-2 py-1 text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-200 rounded"
+                                                >
+                                                    確認細項
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
                                     {(!r.items && !r.products && !r.salesData) && <div className="text-[var(--text-tertiary)] text-center py-2 italic">無產品明細</div>}
                                 </div>
                             )}

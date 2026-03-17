@@ -1,7 +1,8 @@
 /**
  * Serves the React App
  */
-const APP_VERSION = "2026.03.17.B6"; // 版本號：B6 3/17
+const APP_VERSION = '2026.03.17.B7';
+ // 版本號：B7 3/17
 
 function doGet() {
     return HtmlService.createTemplateFromFile('Client')
