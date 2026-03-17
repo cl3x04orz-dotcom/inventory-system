@@ -34,6 +34,7 @@ import {
 
 // Google Apps Script (GAS) API Endpoint
 const GAS_API_URL = import.meta.env.VITE_GAS_API_URL;
+const LOCAL_VERSION = "2026.03.17.B6";
 
 console.log('--- 系統偵錯資訊 ---');
 console.log('Base URL:', import.meta.env.BASE_URL);
@@ -122,6 +123,27 @@ function AppContent() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [isOffline, setIsOffline] = useState(false);
     const [sessionManager, setSessionManager] = useState(null);
+    const [hasUpdate, setHasUpdate] = useState(false);
+
+    // 檢查版本更新 (透過 apiHandler: getVersion)
+    useEffect(() => {
+        const checkUpdate = async () => {
+            try {
+                const response = await fetch(GAS_API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'getVersion' })
+                });
+                const res = await response.json();
+                if (res && res.version && res.version !== LOCAL_VERSION) {
+                    setHasUpdate(true);
+                }
+            } catch (e) {
+                console.warn('Version check failed:', e);
+            }
+        };
+        const timer = setTimeout(checkUpdate, 3000);
+        return () => clearTimeout(timer);
+    }, []);
 
     // Activity Logger
     const { logActivity, logLogin, logLogout, logPageView } = useActivityLogger({
@@ -325,6 +347,27 @@ function AppContent() {
                 <div className="bg-yellow-500 text-white text-center py-2 text-sm font-medium flex items-center justify-center gap-2">
                     <WifiOff size={16} />
                     網路已離線,部分功能可能無法使用
+                </div>
+            )}
+
+            {/* 版本更新通知 */}
+            {hasUpdate && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] w-[90%] max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div className="bg-blue-600 text-white p-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 border border-blue-400">
+                        <div className="flex items-center gap-3">
+                            <Activity size={20} className="animate-pulse" />
+                            <div>
+                                <p className="font-bold text-sm">系統版本有更新</p>
+                                <p className="text-[10px] opacity-80">請點擊右側按鈕以載入新功能</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => window.location.reload(true)}
+                            className="bg-white text-blue-600 px-4 py-1.5 rounded-xl font-bold text-xs hover:bg-blue-50 transition-colors shadow-sm whitespace-nowrap"
+                        >
+                            立即刷新
+                        </button>
+                    </div>
                 </div>
             )}
 

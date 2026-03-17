@@ -1,6 +1,8 @@
 /**
  * Serves the React App
  */
+const APP_VERSION = "2026.03.17.B6"; // 版本號：B6 3/17
+
 function doGet() {
     return HtmlService.createTemplateFromFile('Client')
         .evaluate()
@@ -10,12 +12,15 @@ function doGet() {
 }
 
 /**
- * Main API Router - 實作 RBAC 硬性校驗 (邏輯與功能保持不動，已修正細分權限)
+ * Main API Router
  */
 function apiHandler(request) {
     let { action, payload } = request;
     if (action) action = action.trim();
     
+    // 版本檢查 (免 Token)
+    if (action === 'getVersion') return { version: APP_VERSION };
+
     // 檢查 Token (存在於 root 或 payload)
     const token = request.token || (payload && payload.token);
     const user = (typeof verifyToken !== 'undefined' && token) ? verifyToken(token) : null;
