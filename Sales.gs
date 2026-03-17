@@ -1231,10 +1231,36 @@ function backfillSalesDetailsUnitCosts() {
  * 針對特定銷售對象獲取月度對比數據分析
  * @param {Object} payload { customer, baseMonth (YYYY-MM), compareMonth (YYYY-MM) }
  */
+/**
+ * 針對特定銷售對象獲取深度數據分析 (支援週、月、年對比及 RFM 指標)
+ * @param {Object} payload { customer, baseStart, baseEnd, compStart, compEnd, mode }
+ */
 function getCustomerAnalyticsService(payload) {
-    const { customer, baseMonth, compareMonth } = payload;
+    const { customer, baseStart, baseEnd, compStart, compEnd, mode } = payload;
     if (!customer) throw new Error("未選取銷售對象");
-    if (!baseMonth || !compareMonth) throw new Error("月份參數缺失");
+    
+    // 兼容舊版參數
+    let bStart = baseStart ? new Date(baseStart) : null;
+    let bEnd = baseEnd ? new Date(baseEnd) : null;
+    let cStart = compStart ? new Date(compStart) : null;
+    let cEnd = compEnd ? new Date(compEnd) : null;
+
+    // 修正：如果是單日或特定日期參數，確保 End 是該日深夜 23:59:59
+    if (bEnd) bEnd.setHours(23, 59, 59, 999);
+    if (cEnd) cEnd.setHours(23, 59, 59, 999);
+
+    if (!bStart && payload.baseMonth) {
+        const [y, m] = payload.baseMonth.split('-').map(Number);
+        bStart = new Date(y, m - 1, 1);
+        bEnd = new Date(y, m, 0, 23, 59, 59, 999);
+    }
+    if (!cStart && payload.compareMonth) {
+        const [y, m] = payload.compareMonth.split('-').map(Number);
+        cStart = new Date(y, m - 1, 1);
+        cEnd = new Date(y, m, 0, 23, 59, 59, 999);
+    }
+
+    if (!bStart || !bEnd || !cStart || !cEnd) throw new Error("日期區間參數缺失");
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const salesSheet = ss.getSheetByName('Sales');
@@ -1251,8 +1277,6 @@ function getCustomerAnalyticsService(payload) {
         const h = productValues[0].map(v => String(v || '').trim().toLowerCase());
         const pidIdx = h.findIndex(v => v.includes('id') || v.includes('序號') || v.includes('uuid'));
         const nameIdx = h.findIndex(v => v.includes('名稱') || v.includes('name') || v.includes('品項') || v.includes('品名') || v.includes('product'));
-        
-        // 尋找「排序權重」欄位 (優先匹配標題，其次預設 index 6 = G 欄)
         let weightIdx = h.indexOf('排序權重');
         if (weightIdx === -1) weightIdx = h.indexOf('sortweight');
         if (weightIdx === -1) weightIdx = 6; 
@@ -1261,7 +1285,6 @@ function getCustomerAnalyticsService(payload) {
             const pid = pidIdx !== -1 ? String(productValues[i][pidIdx] || "").trim() : "";
             if (pid) {
                 products[pid] = nameIdx !== -1 ? String(productValues[i][nameIdx] || "").trim() : pid;
-                // 儲存權重數值，若為空則給予極大值排最後
                 const weight = productValues[i][weightIdx];
                 productOrder[pid] = (weight !== "" && weight !== null && !isNaN(weight)) ? Number(weight) : 99999 + i;
             }
@@ -1273,13 +1296,14 @@ function getCustomerAnalyticsService(payload) {
 
     if (salesRows.length < 2) return { error: "暫無銷售紀錄" };
 
-    // Helper: 獲取特定月份的統計數據
-    const getMonthStats = (targetMonth) => {
+    // RFM: 最近一次進貨日期
+    let lastPurchaseDay = null;
+
+    // Helper: 獲取特定時間區間的統計數據
+    const getRangeStats = (start, end) => {
         const stats = { revenue: 0, transactions: 0, returns: 0, products: {} };
-        const [year, month] = targetMonth.split('-').map(Number);
-        
-        // 1. 找出該月該客戶的所有交易 ID
         const matchedIds = new Set();
+        
         for (let i = 1; i < salesRows.length; i++) {
             const rowDate = salesRows[i][1];
             if (!(rowDate instanceof Date)) continue;
@@ -1287,18 +1311,17 @@ function getCustomerAnalyticsService(payload) {
             const rowCust = String(salesRows[i][6] || '').trim();
             const status = String(salesRows[i][9] || '').toUpperCase();
 
-            // 精確日期比對 (忽略時區偏差)
-            if (status !== 'VOID' && 
-                rowCust === customer &&
-                rowDate.getFullYear() === year && 
-                (rowDate.getMonth() + 1) === month) {
-                
-                matchedIds.add(String(salesRows[i][0]));
-                stats.transactions++;
+            if (status !== 'VOID' && rowCust === customer) {
+                // 更新全局最後進貨日
+                if (!lastPurchaseDay || rowDate > lastPurchaseDay) lastPurchaseDay = rowDate;
+
+                if (rowDate >= start && rowDate <= end) {
+                    matchedIds.add(String(salesRows[i][0]));
+                    stats.transactions++;
+                }
             }
         }
 
-        // 2. 統計明細數據
         const productStats = {};
         for (let i = 1; i < detailRows.length; i++) {
             const saleId = String(detailRows[i][0]);
@@ -1321,8 +1344,8 @@ function getCustomerAnalyticsService(payload) {
     };
 
     try {
-        const baseStats = getMonthStats(baseMonth);
-        const compStats = getMonthStats(compareMonth);
+        const baseStats = getRangeStats(bStart, bEnd);
+        const compStats = getRangeStats(cStart, cEnd);
 
         // 計算消長對比
         const productDiff = [];
@@ -1344,10 +1367,19 @@ function getCustomerAnalyticsService(payload) {
             });
         });
 
+        // RFM: 計算最近購置隔天數
+        let recencyDays = -1;
+        if (lastPurchaseDay) {
+            const now = new Date();
+            recencyDays = Math.floor((now - lastPurchaseDay) / (1000 * 60 * 60 * 24));
+        }
+
         return {
             customer,
-            baseMonth,
-            compareMonth,
+            mode,
+            baseRange: { start: bStart, end: bEnd },
+            compRange: { start: cStart, end: cEnd },
+            recencyDays,
             kpi: {
                 revenue: {
                     current: baseStats.revenue,
@@ -1365,7 +1397,7 @@ function getCustomerAnalyticsService(payload) {
                     diff: baseStats.returns - compStats.returns
                 }
             },
-            productTrends: productDiff // Return unsorted for frontend to decide
+            productTrends: productDiff
         };
     } catch (e) {
         throw new Error("分析統計過程出錯: " + e.message);

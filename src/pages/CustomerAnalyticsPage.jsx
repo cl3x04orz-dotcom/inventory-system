@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Users, TrendingUp, TrendingDown, Package, DollarSign, Activity, Search, ArrowUpRight, ArrowDownRight, RefreshCw } from 'lucide-react';
+import { Users, TrendingUp, TrendingDown, Package, DollarSign, Activity, Search, ArrowUpRight, ArrowDownRight, RefreshCw, Calendar, Heart, AlertCircle } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import { getLocalDateString } from '../utils/constants';
 
 export default function CustomerAnalyticsPage({ user, apiUrl }) {
     const [customers, setCustomers] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState('');
+    const [mode, setMode] = useState('monthly'); // 'daily' | 'weekly' | 'monthly'
+
+    // Monthly States
     const [baseMonth, setBaseMonth] = useState(() => {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -16,11 +19,19 @@ export default function CustomerAnalyticsPage({ user, apiUrl }) {
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     });
 
+    // Weekly/Daily States
+    const [baseDate, setBaseDate] = useState(getLocalDateString(new Date()));
+    const [compareDate, setCompareDate] = useState(() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 7);
+        return getLocalDateString(d);
+    });
+
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState(null);
-    const [sortBy, setSortBy] = useState('order'); // Default to 'order'
+    const [sortBy, setSortBy] = useState('order');
 
-    // Generate month options (last 36 months)
+    // Generate month options
     const monthOptions = (() => {
         const options = [];
         const d = new Date();
@@ -56,16 +67,46 @@ export default function CustomerAnalyticsPage({ user, apiUrl }) {
         if (user?.token) loadCustomers();
     }, [apiUrl, user.token]);
 
+    const getWeekRange = (dateStr) => {
+        const d = new Date(dateStr);
+        const day = d.getDay() || 7; // 1-7
+        const monday = new Date(d);
+        monday.setDate(d.getDate() - day + 1);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        return { start: getLocalDateString(monday), end: getLocalDateString(sunday) };
+    };
+
     const fetchData = async () => {
         if (!selectedCustomer) return;
         setLoading(true);
-        try {
-            const res = await callGAS(apiUrl, 'getCustomerAnalytics', {
-                customer: selectedCustomer,
-                baseMonth,
-                compareMonth
-            }, user.token);
 
+        let payload = { customer: selectedCustomer, mode };
+
+        if (mode === 'monthly') {
+            const [bY, bM] = baseMonth.split('-').map(Number);
+            payload.baseStart = getLocalDateString(new Date(bY, bM - 1, 1));
+            payload.baseEnd = getLocalDateString(new Date(bY, bM, 0));
+
+            const [cY, cM] = compareMonth.split('-').map(Number);
+            payload.compStart = getLocalDateString(new Date(cY, cM - 1, 1));
+            payload.compEnd = getLocalDateString(new Date(cY, cM, 0));
+        } else if (mode === 'daily') {
+            payload.baseStart = baseDate;
+            payload.baseEnd = baseDate;
+            payload.compStart = compareDate;
+            payload.compEnd = compareDate;
+        } else {
+            const bRange = getWeekRange(baseDate);
+            const cRange = getWeekRange(compareDate);
+            payload.baseStart = bRange.start;
+            payload.baseEnd = bRange.end;
+            payload.compStart = cRange.start;
+            payload.compEnd = cRange.end;
+        }
+
+        try {
+            const res = await callGAS(apiUrl, 'getCustomerAnalytics', payload, user.token);
             if (res && res.error) {
                 alert(`分析失敗: ${res.error}`);
             } else {
@@ -81,7 +122,7 @@ export default function CustomerAnalyticsPage({ user, apiUrl }) {
 
     useEffect(() => {
         if (selectedCustomer) fetchData();
-    }, [selectedCustomer, baseMonth, compareMonth]);
+    }, [selectedCustomer, baseMonth, compareMonth, baseDate, compareDate, mode]);
 
     const sortedTrends = useMemo(() => {
         if (!data?.productTrends) return [];
@@ -90,6 +131,22 @@ export default function CustomerAnalyticsPage({ user, apiUrl }) {
             return a.order - b.order;
         });
     }, [data, sortBy]);
+
+    const HealthBadge = ({ recencyDays }) => {
+        if (recencyDays === -1) return null;
+        let status = { label: '未進貨', color: 'bg-slate-100 text-slate-500', icon: AlertCircle };
+        if (recencyDays <= 3) status = { label: '熱絡', color: 'bg-emerald-100 text-emerald-600', icon: Heart };
+        else if (recencyDays <= 7) status = { label: '穩定', color: 'bg-blue-100 text-blue-600', icon: Activity };
+        else if (recencyDays <= 14) status = { label: '轉冷', color: 'bg-amber-100 text-amber-600', icon: AlertCircle };
+        else status = { label: '流失預警', color: 'bg-rose-100 text-rose-600', icon: AlertCircle };
+
+        const Icon = status.icon;
+        return (
+            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${status.color} border border-current opacity-90`}>
+                <Icon size={14} /> {status.label} ({recencyDays}天待進貨)
+            </div>
+        );
+    };
 
     const KPICard = ({ title, current, previous, growth, type = 'currency' }) => {
         const isPositive = growth > 0;
@@ -122,51 +179,118 @@ export default function CustomerAnalyticsPage({ user, apiUrl }) {
     };
 
     return (
-        <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6 flex flex-col min-h-[calc(100vh-6rem)]">
+        <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6 flex flex-col min-h-[calc(10vh-6rem)] pb-10">
             {/* Header section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
-                        <Users className="text-blue-600" /> 客戶深度分析
+                        <Users className="text-blue-600" /> 客戶分析 Pro
                     </h1>
-                    <p className="text-[var(--text-secondary)] text-sm mt-1">對比特定客戶不同月份的採購表現與商品變化</p>
+                    <p className="text-[var(--text-secondary)] text-sm mt-1">支援單日/週/月彈性比較與客戶健康預警系統</p>
                 </div>
+                {data && <HealthBadge recencyDays={data.recencyDays} />}
             </div>
 
             {/* Filter bar */}
-            <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shadow-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                <div className="space-y-1.5 lg:col-span-2">
-                    <label className="text-xs font-bold text-[var(--text-tertiary)] uppercase ml-1">選擇分析對象</label>
-                    <select
-                        className="input-field px-4 w-full bg-[var(--bg-tertiary)] text-sm font-bold cursor-pointer"
-                        value={selectedCustomer}
-                        onChange={(e) => setSelectedCustomer(e.target.value)}
-                    >
-                        <option value="">選擇銷售對象...</option>
-                        {customers.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shadow-sm flex flex-col gap-4">
+                <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex-1 min-w-[300px]">
+                        <label className="text-xs font-bold text-[var(--text-tertiary)] uppercase ml-1 block mb-1">分析對象</label>
+                        <select
+                            className="input-field px-4 w-full bg-[var(--bg-tertiary)] text-sm font-bold cursor-pointer"
+                            value={selectedCustomer}
+                            onChange={(e) => setSelectedCustomer(e.target.value)}
+                        >
+                            <option value="">選擇銷售對象...</option>
+                            {customers.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold text-[var(--text-tertiary)] uppercase ml-1 block mb-1">分析維度</label>
+                        <div className="flex items-center gap-1 p-1 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-primary)]">
+                            <button
+                                onClick={() => setMode('daily')}
+                                className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-2 ${mode === 'daily' ? 'bg-[var(--bg-secondary)] text-blue-600 shadow-sm' : 'text-[var(--text-tertiary)]'}`}
+                            >
+                                <Calendar size={14} /> 單日
+                            </button>
+                            <button
+                                onClick={() => setMode('weekly')}
+                                className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-2 ${mode === 'weekly' ? 'bg-[var(--bg-secondary)] text-blue-600 shadow-sm' : 'text-[var(--text-tertiary)]'}`}
+                            >
+                                <Calendar size={14} /> 週度
+                            </button>
+                            <button
+                                onClick={() => setMode('monthly')}
+                                className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-2 ${mode === 'monthly' ? 'bg-[var(--bg-secondary)] text-blue-600 shadow-sm' : 'text-[var(--text-tertiary)]'}`}
+                            >
+                                <Activity size={14} /> 月度
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="space-y-1.5 text-center">
-                    <label className="text-xs font-bold text-[var(--text-tertiary)] uppercase leading-none">基準月份 (Base)</label>
-                    <select
-                        className="input-field w-full text-sm font-bold bg-[var(--bg-tertiary)] cursor-pointer"
-                        value={baseMonth}
-                        onChange={(e) => setBaseMonth(e.target.value)}
-                    >
-                        {monthOptions.map(m => <option key={m} value={m}>{m}</option>)}
-                    </select>
-                </div>
-
-                <div className="space-y-1.5 text-center">
-                    <label className="text-xs font-bold text-[var(--text-tertiary)] uppercase leading-none">對比月份 (Compare)</label>
-                    <select
-                        className="input-field w-full text-sm font-bold bg-[var(--bg-tertiary)] cursor-pointer"
-                        value={compareMonth}
-                        onChange={(e) => setCompareMonth(e.target.value)}
-                    >
-                        {monthOptions.map(m => <option key={m} value={m}>{m}</option>)}
-                    </select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-[var(--border-primary)] pt-4">
+                    {mode === 'monthly' ? (
+                        <>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-[var(--text-tertiary)] uppercase text-center block">基準月份 (Base)</label>
+                                <select
+                                    className="input-field w-full text-sm font-bold bg-[var(--bg-tertiary)] cursor-pointer"
+                                    value={baseMonth}
+                                    onChange={(e) => setBaseMonth(e.target.value)}
+                                >
+                                    {monthOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-[var(--text-tertiary)] uppercase text-center block">對比月份 (Compare)</label>
+                                <select
+                                    className="input-field w-full text-sm font-bold bg-[var(--bg-tertiary)] cursor-pointer"
+                                    value={compareMonth}
+                                    onChange={(e) => setCompareMonth(e.target.value)}
+                                >
+                                    {monthOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                                </select>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="space-y-1.5 flex flex-col">
+                                <label className="text-xs font-bold text-[var(--text-tertiary)] uppercase text-center block">
+                                    {mode === 'daily' ? '基準日期 (Base)' : '基準日期 (所在週)'}
+                                </label>
+                                <input
+                                    type="date"
+                                    className="input-field w-full text-sm font-bold bg-[var(--bg-tertiary)]"
+                                    value={baseDate}
+                                    onChange={(e) => setBaseDate(e.target.value)}
+                                />
+                                {mode === 'weekly' && (
+                                    <div className="text-[10px] text-blue-500 font-bold text-center mt-1 bg-blue-50/50 py-1 rounded">
+                                        包含範圍：{getWeekRange(baseDate).start} ~ {getWeekRange(baseDate).end}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="space-y-1.5 flex flex-col">
+                                <label className="text-xs font-bold text-[var(--text-tertiary)] uppercase text-center block">
+                                    {mode === 'daily' ? '對比日期 (Compare)' : '對比日期 (所在週)'}
+                                </label>
+                                <input
+                                    type="date"
+                                    className="input-field w-full text-sm font-bold bg-[var(--bg-tertiary)]"
+                                    value={compareDate}
+                                    onChange={(e) => setCompareDate(e.target.value)}
+                                />
+                                {mode === 'weekly' && (
+                                    <div className="text-[10px] text-blue-500 font-bold text-center mt-1 bg-blue-50/50 py-1 rounded">
+                                        包含範圍：{getWeekRange(compareDate).start} ~ {getWeekRange(compareDate).end}
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -179,20 +303,20 @@ export default function CustomerAnalyticsPage({ user, apiUrl }) {
                 <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <KPICard
-                            title="總銷售額 / Total Revenue"
+                            title="區域採購額 / Revenue"
                             current={data.kpi.revenue.current}
                             previous={data.kpi.revenue.previous}
                             growth={data.kpi.revenue.growth}
                         />
                         <KPICard
-                            title="交易次數 / Total Transactions"
+                            title="採購次數 / Frequency"
                             current={data.kpi.transactions.current}
                             previous={data.kpi.transactions.previous}
                             growth={data.kpi.transactions.growth}
                             type="count"
                         />
                         <KPICard
-                            title="退貨總量 / Product Returns"
+                            title="退貨數據 / Returns"
                             current={data.kpi.returns.current}
                             previous={data.kpi.returns.previous}
                             growth={data.kpi.returns.diff === 0 ? 0 : (data.kpi.returns.diff > 0 ? -1 : 1)}
@@ -203,8 +327,10 @@ export default function CustomerAnalyticsPage({ user, apiUrl }) {
                     <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] overflow-hidden shadow-sm flex flex-col">
                         <div className="p-5 border-b border-[var(--border-primary)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[var(--bg-tertiary)]/50">
                             <div>
-                                <h3 className="font-bold text-[var(--text-primary)]">商品消長排行 / Product Variance</h3>
-                                <p className="text-[10px] text-[var(--text-tertiary)] font-bold uppercase italic mt-0.5">顯示銷量對比變化</p>
+                                <h3 className="font-bold text-[var(--text-primary)]">
+                                    {mode === 'weekly' ? '週度' : mode === 'daily' ? '單日' : '月度'} 商品消長排行
+                                </h3>
+                                <p className="text-[10px] text-[var(--text-tertiary)] font-bold uppercase italic mt-0.5">對比商品銷量變化量</p>
                             </div>
 
                             <div className="flex flex-wrap items-center gap-3">
@@ -213,17 +339,17 @@ export default function CustomerAnalyticsPage({ user, apiUrl }) {
                                         onClick={() => setSortBy('diff')}
                                         className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${sortBy === 'diff' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}
                                     >
-                                        按變化量排序
+                                        按變化量
                                     </button>
                                     <button
                                         onClick={() => setSortBy('order')}
                                         className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${sortBy === 'order' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}
                                     >
-                                        按商品順序
+                                        按權重
                                     </button>
                                 </div>
                                 <div className="h-4 w-[1px] bg-[var(--border-primary)] hidden sm:block" />
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 text-[var(--text-primary)]">
                                     <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold">
                                         <TrendingUp size={12} /> 成長
                                     </div>
@@ -239,9 +365,9 @@ export default function CustomerAnalyticsPage({ user, apiUrl }) {
                                 <thead className="bg-[var(--bg-tertiary)]/30 text-[var(--text-tertiary)] text-[11px] font-bold uppercase border-b border-[var(--border-primary)]">
                                     <tr>
                                         <th className="p-4 pl-6">商品名稱</th>
-                                        <th className="p-4 text-center">{compareMonth} 銷量</th>
-                                        <th className="p-4 text-center font-bold text-[var(--text-primary)]">{baseMonth} 銷量</th>
-                                        <th className="p-4 text-right pr-6">變化量 / 幅度</th>
+                                        <th className="p-4 text-center">前期 銷量</th>
+                                        <th className="p-4 text-center font-bold text-[var(--text-primary)]">本期 銷量</th>
+                                        <th className="p-4 text-right pr-6">變化</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-[var(--border-primary)]">
