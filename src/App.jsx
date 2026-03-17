@@ -129,11 +129,15 @@ function AppContent() {
     useEffect(() => {
         const checkUpdate = async () => {
             try {
+                // 使用 GAS 兼容的 fetch 方式 (避免 preflight)
                 const response = await fetch(GAS_API_URL, {
                     method: 'POST',
+                    redirect: 'follow',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({ action: 'getVersion' })
                 });
                 const res = await response.json();
+                console.log('--- Version Check ---', { local: LOCAL_VERSION, server: res.version });
                 if (res && res.version && res.version !== LOCAL_VERSION) {
                     setHasUpdate({ local: LOCAL_VERSION, server: res.version });
                 }
@@ -141,7 +145,7 @@ function AppContent() {
                 console.warn('Version check failed:', e);
             }
         };
-        const timer = setTimeout(checkUpdate, 3000);
+        const timer = setTimeout(checkUpdate, 2000);
         return () => clearTimeout(timer);
     }, []);
 
