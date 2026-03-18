@@ -53,6 +53,25 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
                         };
                     }
                 });
+
+                // Load Draft from LocalStorage
+                const savedDraft = localStorage.getItem('stocktake_draft');
+                if (savedDraft) {
+                    try {
+                        const parsed = JSON.parse(savedDraft);
+                        Object.keys(parsed).forEach(key => {
+                            if (initialData[key]) {
+                                // Only restore items that actually have inputs
+                                if (parsed[key].physicalQty !== '' || parsed[key].reason || parsed[key].accountability) {
+                                    initialData[key] = { ...initialData[key], ...parsed[key] };
+                                }
+                            }
+                        });
+                    } catch (e) {
+                        console.error('Failed to parse draft', e);
+                    }
+                }
+
                 setStocktakeData(initialData);
             }
         } catch (error) {
@@ -73,13 +92,39 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
     }, [user.token, fetchInventory]);
 
     const handleInputChange = (id, field, value) => {
-        setStocktakeData(prev => ({
-            ...prev,
-            [id]: {
-                ...prev[id],
-                [field]: value
+        setStocktakeData(prev => {
+            const newData = {
+                ...prev,
+                [id]: {
+                    ...prev[id],
+                    [field]: value
+                }
+            };
+            // 即時存檔
+            localStorage.setItem('stocktake_draft', JSON.stringify(newData));
+            return newData;
+        });
+    };
+
+    const handleBlurOrCalculate = (id, value) => {
+        if (!value || typeof value !== 'string') return;
+        
+        // 如果以 = 開頭，則進行計算 (像 Excel 一樣)
+        if (value.trim().startsWith('=')) {
+            try {
+                // 移除 =, 並只保留數字、運算符號與小數點/括號
+                const expression = value.substring(1).replace(/[^0-9+\-*/.()]/g, '');
+                if (expression) {
+                    // eslint-disable-next-line no-new-func
+                    const result = new Function(`return ${expression}`)();
+                    if (!isNaN(result)) {
+                        handleInputChange(id, 'physicalQty', result);
+                    }
+                }
+            } catch (e) {
+                // Ignore calculation errors leaving previous malformed string untouched
             }
-        }));
+        }
     };
 
     const focusAndSelect = (id) => {
@@ -134,7 +179,7 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
     };
 
     const calculateDiff = (bookQty, physicalQty) => {
-        if (physicalQty === '' || physicalQty === undefined) return 0;
+        if (physicalQty === '' || physicalQty === undefined || isNaN(Number(physicalQty))) return 0;
         return Number(physicalQty) - Number(bookQty);
     };
 
@@ -233,7 +278,8 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
             }
 
             alert('盤點資料提交成功！');
-            // Reset and reload
+            // Reset and load
+            localStorage.removeItem('stocktake_draft');
             setStocktakeData({});
             await fetchInventory();
         } catch (error) {
@@ -314,13 +360,17 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
                                                 <td className="p-4">
                                                     <input
                                                         id={`qty-${rowKey}`}
-                                                        type="number"
+                                                        type="text"
+                                                        inputMode="decimal"
                                                         className={`input-field w-full text-right font-mono ${diff !== 0 && entry.physicalQty !== '' ? 'border-red-500 text-red-500' : ''}`}
-                                                        placeholder="0"
+                                                        placeholder="例: =10+5"
                                                         value={entry.physicalQty}
                                                         onChange={(e) => handleInputChange(rowKey, 'physicalQty', e.target.value)}
-                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'qty', items)}
-                                                        onWheel={(e) => e.target.blur()}
+                                                        onBlur={(e) => handleBlurOrCalculate(rowKey, e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') handleBlurOrCalculate(rowKey, e.target.value);
+                                                            handleKeyDown(e, idx, 'qty', items);
+                                                        }}
                                                     />
                                                 </td>
                                                 <td className="p-4 text-center">
@@ -411,12 +461,17 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
                                             <label className="text-sm font-bold text-[var(--text-secondary)] min-w-[70px]">實盤數量:</label>
                                             <input
                                                 id={`m-qty-${rowKey}`}
-                                                type="number"
+                                                type="text"
+                                                inputMode="decimal"
                                                 className={`input-field flex-1 text-right font-mono py-2 ${hasDiff ? 'border-red-500 text-red-500' : ''}`}
-                                                placeholder="輸入數量"
+                                                placeholder="=10+5"
                                                 value={entry.physicalQty}
                                                 onChange={(e) => handleInputChange(rowKey, 'physicalQty', e.target.value)}
-                                                onKeyDown={(e) => handleKeyDown(e, idx, 'qty', items, true)}
+                                                onBlur={(e) => handleBlurOrCalculate(rowKey, e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') handleBlurOrCalculate(rowKey, e.target.value);
+                                                    handleKeyDown(e, idx, 'qty', items, true);
+                                                }}
                                             />
                                             {/* Diff Indicator */}
                                             <div className="w-12 text-right">
