@@ -363,7 +363,7 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
                                                         type="text"
                                                         inputMode="decimal"
                                                         className={`input-field w-full text-right font-mono ${diff !== 0 && entry.physicalQty !== '' ? 'border-red-500 text-red-500' : ''}`}
-                                                        placeholder="例: =10+5"
+                                                        placeholder=""
                                                         value={entry.physicalQty}
                                                         onChange={(e) => handleInputChange(rowKey, 'physicalQty', e.target.value)}
                                                         onBlur={(e) => handleBlurOrCalculate(rowKey, e.target.value)}
@@ -464,7 +464,7 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
                                                 type="text"
                                                 inputMode="decimal"
                                                 className={`input-field flex-1 text-right font-mono py-2 ${hasDiff ? 'border-red-500 text-red-500' : ''}`}
-                                                placeholder="=10+5"
+                                                placeholder=""
                                                 value={entry.physicalQty}
                                                 onChange={(e) => handleInputChange(rowKey, 'physicalQty', e.target.value)}
                                                 onBlur={(e) => handleBlurOrCalculate(rowKey, e.target.value)}
