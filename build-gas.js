@@ -29,3 +29,15 @@ const output = `<!DOCTYPE html>
 
 fs.writeFileSync('Client.html', output);
 console.log('Successfully generated Client.html for GAS');
+
+// ====== Update Code.gs APP_VERSION ======
+const codeGsPath = './Code.gs';
+if (fs.existsSync(codeGsPath)) {
+  let codeGs = fs.readFileSync(codeGsPath, 'utf8');
+  const nowStr = process.env.VITE_APP_VERSION || Date.now().toString();
+  codeGs = codeGs.replace(/const\s+APP_VERSION\s*=\s*['"](.*?)['"];/, `const APP_VERSION = '${nowStr}';`);
+  fs.writeFileSync(codeGsPath, codeGs);
+  console.log(`Successfully updated APP_VERSION in Code.gs to ${nowStr}`);
+} else {
+  console.warn('Code.gs not found. Could not update APP_VERSION.');
+}

@@ -126,13 +126,13 @@ function AppContent() {
     const [hasUpdate, setHasUpdate] = useState(null); // { local, server }
 
     // 檢查版本更新 (透過 apiHandler: getVersion)
-    const [checkCount, setCheckCount] = useState(0);
+    const checkCountRef = React.useRef(0);
     const [lastCheckTime, setLastCheckTime] = useState(null);
 
     useEffect(() => {
         const checkUpdate = async () => {
-            const count = checkCount + 1;
-            setCheckCount(count);
+            checkCountRef.current += 1;
+            const count = checkCountRef.current;
             setLastCheckTime(new Date().toLocaleTimeString());
 
             try {
@@ -147,20 +147,62 @@ function AppContent() {
                 const res = await response.json();
                 console.log(`[VersionCheck #${count}] 伺服器回應:`, res.version);
 
-                if (res && res.version && res.version !== LOCAL_VERSION) {
-                    console.warn(`[VersionCheck] 偵測到版本不符! (${LOCAL_VERSION} != ${res.version})`);
-                    setHasUpdate({ local: LOCAL_VERSION, server: res.version });
+                if (res && res.version && String(res.version) !== String(LOCAL_VERSION)) {
+                    const serverVer = Number(res.version);
+                    const localVer = Number(LOCAL_VERSION);
+                    
+                    if (!isNaN(serverVer) && !isNaN(localVer)) {
+                        if (serverVer > localVer) {
+                            console.warn(`[VersionCheck] 偵測到新版本! (${LOCAL_VERSION} -> ${res.version})`);
+                            setHasUpdate({ local: LOCAL_VERSION, server: res.version });
+                        } else {
+                            console.log(`[VersionCheck] 本地版本較新或相同，無需更新 (${LOCAL_VERSION} >= ${res.version})`);
+                        }
+                    } else {
+                        console.warn(`[VersionCheck] 偵測到版本字串不符! (${LOCAL_VERSION} != ${res.version})`);
+                        setHasUpdate({ local: LOCAL_VERSION, server: res.version });
+                    }
                 }
             } catch (e) {
                 console.warn(`[VersionCheck #${count}] 檢查失敗:`, e);
             }
         };
-        // 初次 mount 後 2 秒檢查
+
+        // 初次檢查
         const timer = setTimeout(checkUpdate, 2000);
-        // 每 5 分鐘 polling 一次 (稍微縮短頻率以利測試)
-        const interval = setInterval(checkUpdate, 5 * 60 * 1000);
-        return () => { clearTimeout(timer); clearInterval(interval); };
-    }, [checkCount]);
+
+        // 定期檢查機制
+        let interval;
+        const startPolling = () => {
+            if (!interval) interval = setInterval(checkUpdate, 5 * 60 * 1000);
+        };
+        const stopPolling = () => {
+            if (interval) {
+                clearInterval(interval);
+                interval = null;
+            }
+        };
+
+        startPolling();
+
+        // 智慧型輪詢：根據視窗可見度切換
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                checkUpdate(); // 切回畫面時立刻檢查一次
+                startPolling(); // 恢復輪詢
+            } else {
+                stopPolling(); // 隱藏時暫停，節省 API 額度
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            clearTimeout(timer);
+            stopPolling();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, []);
 
     // Activity Logger
     const { logActivity, logLogin, logLogout, logPageView } = useActivityLogger({
