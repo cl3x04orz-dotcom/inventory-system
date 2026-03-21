@@ -361,7 +361,7 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
                                                     <input
                                                         id={`qty-${rowKey}`}
                                                         type="text"
-                                                        inputMode="decimal"
+                                                        inputMode="text"
                                                         className={`input-field w-full text-right font-mono ${diff !== 0 && entry.physicalQty !== '' ? 'border-red-500 text-red-500' : ''}`}
                                                         placeholder=""
                                                         value={entry.physicalQty}
@@ -462,7 +462,7 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
                                             <input
                                                 id={`m-qty-${rowKey}`}
                                                 type="text"
-                                                inputMode="decimal"
+                                                inputMode="text"
                                                 className={`input-field flex-1 text-right font-mono py-2 ${hasDiff ? 'border-red-500 text-red-500' : ''}`}
                                                 placeholder=""
                                                 value={entry.physicalQty}
