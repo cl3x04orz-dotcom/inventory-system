@@ -127,10 +127,15 @@ function AppContent() {
 
     // 檢查版本更新 (透過 apiHandler: getVersion)
     const checkCountRef = React.useRef(0);
+    const lastCheckTimeRef = React.useRef(0);
     const [lastCheckTime, setLastCheckTime] = useState(null);
 
     useEffect(() => {
         const checkUpdate = async () => {
+            const now = Date.now();
+            if (now - lastCheckTimeRef.current < 5000) return; // 防抖 5 秒內不重複檢查
+            lastCheckTimeRef.current = now;
+
             checkCountRef.current += 1;
             const count = checkCountRef.current;
             setLastCheckTime(new Date().toLocaleTimeString());
@@ -195,12 +200,23 @@ function AppContent() {
             }
         };
 
+        const handleFocus = () => {
+            if (document.visibilityState === 'visible') {
+                checkUpdate();
+                startPolling();
+            }
+        };
+
         document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('focus', handleFocus);
+        window.addEventListener('pageshow', handleFocus);
 
         return () => {
             clearTimeout(timer);
             stopPolling();
             document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('focus', handleFocus);
+            window.removeEventListener('pageshow', handleFocus);
         };
     }, []);
 
