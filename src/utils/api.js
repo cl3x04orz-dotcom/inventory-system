@@ -26,6 +26,9 @@ export const callGAS = async (apiUrl, action, payload, token = null) => {
 
         const data = await response.json();
         if (data.error) {
+            if (data.error === 'TokenExpired' || data.error.includes('Unauthorized')) {
+                window.dispatchEvent(new CustomEvent('auth_expired'));
+            }
             throw new Error(data.error);
         }
         return data;

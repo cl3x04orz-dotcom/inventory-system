@@ -35,6 +35,21 @@ function apiHandler(request) {
     if (!user) {
         return { error: 'Unauthorized: No valid token provided' };
     }
+    if (user.__expired) {
+        return { error: 'TokenExpired' }; // 特殊錯誤碼讓前端強制登出
+    }
+
+    // Token 展延機制
+    if (action === 'renewToken') {
+        var newTokenPayload = {
+            username: user.username,
+            role: user.role,
+            permissions: user.permissions || [],
+            timestamp: new Date().getTime(),
+            exp: new Date().getTime() + (30 * 60 * 1000)
+        };
+        return { success: true, token: createJWT(newTokenPayload) };
+    }
 
     // --- RBAC 細分化權限映射表 (後端最終防線) ---
     // 已更新為細分權限 ID (例如 sales -> sales_entry, sales_report)
@@ -286,7 +301,7 @@ function login(payload) {
                     permissions: permissions 
                 };
                 
-                var token = Utilities.base64Encode(Utilities.newBlob(JSON.stringify(tokenPayload)).getBytes());
+                var token = createJWT(tokenPayload);
                 
                 return { 
                     success: true, 
@@ -439,19 +454,71 @@ function updateUserStatusService(payload) {
 }
 
 /**
- * [Helper] 驗證 Token (確保回傳 permissions)
+ * [Helper] 獲取伺服器隨機 JWT 密鑰
+ */
+function getJwtSecret() {
+    var props = PropertiesService.getScriptProperties();
+    var secret = props.getProperty('JWT_SECRET');
+    if (!secret) {
+        secret = Utilities.getUuid();
+        props.setProperty('JWT_SECRET', secret);
+    }
+    return secret;
+}
+
+/**
+ * [Helper] 建立具有防偽簽章的 JWT Token
+ */
+function createJWT(payload) {
+    var header = { alg: "HS256", typ: "JWT" };
+    var encHeader = Utilities.base64EncodeWebSafe(JSON.stringify(header)).replace(/=+$/, '');
+    
+    // 設定 30 分鐘有效期限
+    if (!payload.exp) {
+        payload.exp = new Date().getTime() + (30 * 60 * 1000);
+    }
+    var encPayload = Utilities.base64EncodeWebSafe(JSON.stringify(payload)).replace(/=+$/, '');
+    
+    var signatureInput = encHeader + "." + encPayload;
+    var signature = Utilities.computeHmacSha256Signature(signatureInput, getJwtSecret());
+    var encSignature = Utilities.base64EncodeWebSafe(signature).replace(/=+$/, '');
+    
+    return signatureInput + "." + encSignature;
+}
+
+/**
+ * [Helper] 驗證 Token (包含過期檢查與 HMAC 簽章檢查)
  */
 function verifyToken(token) {
     try {
-        var json = Utilities.newBlob(Utilities.base64Decode(token)).getDataAsString();
+        var parts = token.split('.');
+        
+        // 舊版 Token 相容性或非 JWT 格式拒絕
+        if (parts.length !== 3) return null; 
+        
+        var signatureInput = parts[0] + "." + parts[1];
+        var signature = Utilities.computeHmacSha256Signature(signatureInput, getJwtSecret());
+        var expectedSignature = Utilities.base64EncodeWebSafe(signature).replace(/=+$/, '');
+        
+        if (expectedSignature !== parts[2]) {
+            return null; // 簽章不符，表示被竄改或偽造
+        }
+        
+        var json = Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[1])).getDataAsString();
         var user = JSON.parse(json);
+        
         if (!user.permissions) user.permissions = [];
+        
+        // 嚴格檢查是否過期
+        if (user.exp && new Date().getTime() > user.exp) {
+            return { __expired: true }; 
+        }
+        
         return user;
     } catch (e) {
         return null;
     }
 }
-
 // ----------------------------------------
 // 支出管理
 // ----------------------------------------

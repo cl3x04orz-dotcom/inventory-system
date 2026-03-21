@@ -253,6 +253,43 @@ function AppContent() {
         }
     }, [user]);
 
+    // Global Auth Expiration Listener
+    useEffect(() => {
+        const handleAuthExpired = () => {
+            if (user) {
+                sessionStorage.removeItem('inventory_user');
+                setUser(null);
+                alert('登入憑證已過期，請重新登入！');
+            }
+        };
+        window.addEventListener('auth_expired', handleAuthExpired);
+        return () => window.removeEventListener('auth_expired', handleAuthExpired);
+    }, [user]);
+
+    // 伺服器端 Token 展延心跳
+    useEffect(() => {
+        if (!user || !sessionManager) return;
+
+        const heartbeatInterval = setInterval(async () => {
+            // 如果這 5 分鐘內有操作過，才發送展延請求 (IdleTime < 5.5分)
+            if (sessionManager.checkOnlineStatus() && sessionManager.getIdleTime() < 5.5 * 60 * 1000) {
+                try {
+                    const res = await callGAS(GAS_API_URL, 'renewToken', {}, user.token);
+                    if (res && res.success && res.token) {
+                        const updatedUser = { ...user, token: res.token };
+                        sessionStorage.setItem('inventory_user', JSON.stringify(updatedUser));
+                        setUser(updatedUser);
+                        console.log('[Heartbeat] Token successfully renewed');
+                    }
+                } catch (e) {
+                    console.log('[Heartbeat] Renew token failed', e);
+                }
+            }
+        }, 5 * 60 * 1000); // 每 5 分鐘觸發
+
+        return () => clearInterval(heartbeatInterval);
+    }, [user, sessionManager]);
+
     // Check for saved user session on component mount
     useEffect(() => {
         const savedUser = sessionStorage.getItem('inventory_user');
