@@ -37,7 +37,7 @@ function getDataWithNormalizedHeaders_(sheetName) {
   return data;
 }
 
-function getValidSalesMap_(startDateStr, endDateStr) {
+function getValidSalesMap_(startDateStr, endDateStr, customer) {
   const start = parseLocalYMD_(startDateStr); start.setHours(0,0,0,0);
   const end = parseLocalYMD_(endDateStr); end.setHours(23,59,59,999);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -52,7 +52,12 @@ function getValidSalesMap_(startDateStr, endDateStr) {
     const status = String(values[i][9] || "").toUpperCase(); 
     if (status === 'VOID') continue;
 
-    if (dVal && sid && dVal >= start && dVal <= end) map[sid] = true;
+    const rowCustomer = String(values[i][6] || "").trim(); // Col G
+
+    if (dVal && sid && dVal >= start && dVal <= end) {
+      if (customer && rowCustomer !== customer.trim()) continue;
+      map[sid] = true;
+    }
   }
   return map;
 }
@@ -85,8 +90,8 @@ function getSalesRanking(payload) {
 }
 
 function getProfitAnalysis(payload) {
-  const { startDate, endDate } = payload;
-  const validSales = getValidSalesMap_(startDate, endDate);
+  const { startDate, endDate, customer } = payload;
+  const validSales = getValidSalesMap_(startDate, endDate, customer);
   const productMap = getProductInfoMap_(); 
   const detailsData = getDataWithNormalizedHeaders_('SalesDetails');
   const stats = {};
