@@ -37,14 +37,18 @@ function getDataWithNormalizedHeaders_(sheetName) {
   return data;
 }
 
-function getValidSalesMap_(startDateStr, endDateStr, customer) {
+function getValidSalesMap_(startDateStr, endDateStr, customer, includeStats = false) {
   const start = parseLocalYMD_(startDateStr); start.setHours(0,0,0,0);
   const end = parseLocalYMD_(endDateStr); end.setHours(23,59,59,999);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Sales');
-  if (!sheet) return {};
+  if (!sheet) return includeStats ? { map: {}, visitCount: 0, totalOrderValue: 0, lastVisitDate: null } : {};
   const values = sheet.getDataRange().getValues();
   const map = {};
+  
+  let totalOrderValue = 0;
+  let maxDate = null;
+  
   for (let i = 1; i < values.length; i++) {
     const dVal = parseSheetDate_(values[i][1]); 
     const sid = String(values[i][0]).trim();
@@ -57,8 +61,23 @@ function getValidSalesMap_(startDateStr, endDateStr, customer) {
     if (dVal && sid && dVal >= start && dVal <= end) {
       if (customer && rowCustomer !== customer.trim()) continue;
       map[sid] = true;
+      
+      if (includeStats) {
+         totalOrderValue += Number(values[i][3] || 0); // Index 3 = TotalCash (Column D)
+         if (!maxDate || dVal > maxDate) maxDate = dVal;
+      }
     }
   }
+  
+  if (includeStats) {
+     return {
+       map,
+       visitCount: Object.keys(map).length,
+       totalOrderValue,
+       lastVisitDate: maxDate ? Utilities.formatDate(maxDate, "GMT+8", "yyyy-MM-dd") : null
+     };
+  }
+  
   return map;
 }
 
@@ -91,7 +110,21 @@ function getSalesRanking(payload) {
 
 function getProfitAnalysis(payload) {
   const { startDate, endDate, customer } = payload;
-  const validSales = getValidSalesMap_(startDate, endDate, customer);
+  let validSales;
+  let customerStats = null;
+  
+  if (customer) {
+    const statsResult = getValidSalesMap_(startDate, endDate, customer, true);
+    validSales = statsResult.map;
+    customerStats = {
+      visitCount: statsResult.visitCount,
+      totalOrderValue: statsResult.totalOrderValue,
+      lastVisitDate: statsResult.lastVisitDate
+    };
+  } else {
+    validSales = getValidSalesMap_(startDate, endDate, null, false);
+  }
+  
   const productMap = getProductInfoMap_(); 
   const detailsData = getDataWithNormalizedHeaders_('SalesDetails');
   const stats = {};
@@ -119,7 +152,17 @@ function getProfitAnalysis(payload) {
       }
     }
   });
-  return Object.values(stats).sort((a, b) => (b.revenue - b.cost) - (a.revenue - a.cost));
+  
+  const sortedArray = Object.values(stats).sort((a, b) => (b.revenue - b.cost) - (a.revenue - a.cost));
+  
+  if (customer) {
+    return {
+      products: sortedArray,
+      customerStats: customerStats
+    };
+  }
+  
+  return sortedArray;
 }
 
 function getCustomerRanking(payload) {
@@ -159,4 +202,24 @@ function getTurnoverRate(payload) {
     const rateB = b.avgInventory > 0 ? b.cogs / b.avgInventory : 0;
     return rateB - rateA;
   });
+}
+
+// 新增：取得歷史不重複客用單單
+function getCustomersList() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Sales');
+  if (!sheet) return [];
+  const values = sheet.getDataRange().getValues();
+  const set = new Set();
+  
+  for (let i = 1; i < values.length; i++) {
+    const status = String(values[i][9] || "").toUpperCase(); 
+    if (status === 'VOID') continue;
+    
+    // 客戶名稱在 Col G (index 6)
+    const c = String(values[i][6] || "").trim();
+    if(c && c !== '未指定') set.add(c);
+  }
+  
+  return Array.from(set).sort();
 }

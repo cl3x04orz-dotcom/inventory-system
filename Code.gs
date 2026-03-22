@@ -89,6 +89,7 @@ function apiHandler(request) {
         'getPayables': 'finance_payable',
         'markPayableAsPaid': 'finance_payable',
         'getProfitAnalysis': 'analytics_profit', // 毛利分析歸類於數據分析
+        'getCustomersList': 'analytics_profit',  // 提供給毛利分析的自動完成清單
 
         // Payroll (薪資管理) - 新增
         'getPayrollData': 'finance_payroll',
@@ -192,6 +193,7 @@ function apiHandler(request) {
             case 'getCustomerAnalytics': return typeof getCustomerAnalyticsService !== 'undefined' ? getCustomerAnalyticsService(payload) : {error: 'Service missing'};
             case 'getProfitAnalysis': return typeof getProfitAnalysis !== 'undefined' ? getProfitAnalysis(payload) : {error: 'Service missing'};
             case 'getTurnoverRate': return typeof getTurnoverRate !== 'undefined' ? getTurnoverRate(payload) : {error: 'Service missing'};
+            case 'getCustomersList': return typeof getCustomersList !== 'undefined' ? getCustomersList(payload) : {error: 'Service missing'};
             
             // Payroll
             case 'getPayrollData': return getPayrollDataService(payload, user);
