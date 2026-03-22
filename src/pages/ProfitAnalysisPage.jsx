@@ -99,7 +99,7 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
     const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
 
     return (
-        <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-4 md:space-y-6 flex flex-col h-[calc(100vh-6rem)]">
+        <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-4 md:space-y-6 flex flex-col min-h-[calc(100vh-6rem)]">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
                 <div>
                     <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
@@ -216,7 +216,7 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
                 </div>
             )}
 
-            <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] overflow-hidden flex-1 flex flex-col shadow-sm">
+            <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] overflow-hidden flex-1 flex flex-col shadow-sm min-h-[500px]">
                 <div className="overflow-y-auto flex-1">
                     {/* Desktop View */}
                     <table className="hidden md:table w-full text-left text-sm border-collapse">
