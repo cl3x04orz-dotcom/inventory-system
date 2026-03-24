@@ -479,7 +479,7 @@ function createJWT(payload) {
     if (!payload.exp) {
         payload.exp = new Date().getTime() + (30 * 60 * 1000);
     }
-    var encPayload = Utilities.base64EncodeWebSafe(JSON.stringify(payload)).replace(/=+$/, '');
+    var encPayload = Utilities.base64EncodeWebSafe(Utilities.newBlob(JSON.stringify(payload), "UTF-8").getBytes()).replace(/=+$/, '');
     
     var signatureInput = encHeader + "." + encPayload;
     var signature = Utilities.computeHmacSha256Signature(signatureInput, getJwtSecret());
@@ -506,7 +506,7 @@ function verifyToken(token) {
             return null; // 簽章不符，表示被竄改或偽造
         }
         
-        var json = Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[1])).getDataAsString();
+        var json = Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[1])).getDataAsString("UTF-8");
         var user = JSON.parse(json);
         
         if (!user.permissions) user.permissions = [];
