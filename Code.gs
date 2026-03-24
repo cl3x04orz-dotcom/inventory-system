@@ -1,8 +1,8 @@
 /**
  * Serves the React App
  */
-const APP_VERSION = '1774359800096';
- // 版本號：b8:3/18
+const APP_VERSION = '1774364229370';
+ // 版本號：A2:3/24
 
 function doGet() {
     return HtmlService.createTemplateFromFile('Client')
@@ -37,6 +37,12 @@ function apiHandler(request) {
     }
     if (user.__expired) {
         return { error: 'TokenExpired' }; // 特殊錯誤碼讓前端強制登出
+    }
+    
+    // [Fix] 抗體機制：一旦發現 Token 內帶有不合法的亂碼名稱 (如 ???)，視為壞死通行證，強制前端登出洗掉 Token
+    if (user.username && user.username.includes('?')) {
+        console.warn(`[Security] 偵測到壞死 Token (使用者: ${user.username})，已觸發強制登出。`);
+        return { error: 'TokenExpired' }; 
     }
 
     // Token 展延機制
