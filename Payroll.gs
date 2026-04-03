@@ -643,6 +643,8 @@ function savePayrollToExpenditureService(payload, user) {
  * [診斷] 直接在 GAS 編輯器執行：
  * 選取此函數 → 點「執行」→ 看「執行記錄 (Logs)」
  */
+// A1 4/3 - 最終部署確認版
+// A2 4/3 - 全新 GAS ID 501 部署與 GitHub Secrets 同步版
 function debugPayrollIssues() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
