@@ -89,12 +89,24 @@ function getPayrollDataService(payload, user) {
         // 抓取 F 欄位 (FinalTotal / 結算) 做為金額落差來源
         const sFinalIdx = findIdx(sHeaders, ['finaltotal', '結算'], ['cash', '實收', '現金']);
         const sCashIdx = findIdx(sHeaders, ['totalcash', '實收', '現金', 'cash']);
-
+        
         const validSalesMap = {}; 
         if (sDateIdx !== -1 && sUserIdx !== -1) {
             for (let i = 1; i < salesRows.length; i++) {
                 const row = salesRows[i];
                 if (!row[sDateIdx]) continue;
+
+                // [終極防禦] 不要依賴特定欄位 index。逐格掃描整個 row，只要有 VOID 就跳過，避免任何試算表欄位偏移
+                let isRowVoid = false;
+                for (let c = 0; c < row.length; c++) {
+                    const cellTxt = String(row[c] || '').trim().toUpperCase();
+                    if (cellTxt === 'VOID' || cellTxt.includes('[VOID]')) {
+                        isRowVoid = true;
+                        break;
+                    }
+                }
+                if (isRowVoid) continue;
+
                 const d = (row[sDateIdx] instanceof Date) ? row[sDateIdx] : new Date(row[sDateIdx]);
                 if (isNaN(d.getTime())) continue;
 
@@ -111,16 +123,12 @@ function getPayrollDataService(payload, user) {
                         // [直接抓取 F 欄位數值]
                         if (sFinalIdx !== -1) {
                             const val = parseMoney(row[sFinalIdx]);
-                            // 判斷是否要計入虧損 (只有負數才扣除)
+                            // 判斷是否要顯示備註 (不再扣減員工薪資，只留備註)
                             if (Math.abs(val) > 0.01) {
                                 if (!dailyRecords[dateKey]) dailyRecords[dateKey] = {};
                                 
-                                // 只有負數才加進虧損總額
-                                if (val < 0) {
-                                    const lossAmt = Math.abs(val);
-                                    dailyRecords[dateKey].loss = (dailyRecords[dateKey].loss || 0) + lossAmt;
-                                    salesShortage += lossAmt;
-                                }
+                                // (使用者要求：徹底刪除把負資金當作盤損的懲罰邏輯)
+                                // 所以不再處理 val < 0 時增加 loss / salesShortage
                                 
                                 // 不論正負都紀錄在備註中供參考
                                 const noteTxt = "[結算:" + val.toFixed(1) + "]";
