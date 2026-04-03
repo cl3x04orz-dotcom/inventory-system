@@ -350,7 +350,7 @@ function getPayrollDataService(payload, user) {
         }
     }
 
-    return { config, summary, dailyData, dailyRecords, isBirthdayMonth, totalSpecialLeaveUsed };
+    return { config, summary, dailyData, dailyRecords, isBirthdayMonth, totalSpecialLeaveUsed, _gsVersion: 'V_VOID_FIXED_494' };
 }
 
 /**
@@ -638,3 +638,45 @@ function savePayrollToExpenditureService(payload, user) {
     }
 }
 
+
+/**
+ * [診斷] 直接在 GAS 編輯器執行：
+ * 選取此函數 → 點「執行」→ 看「執行記錄 (Logs)」
+ */
+function debugPayrollIssues() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // 1. 檢查 Daily_Records LOSS 記錄
+  const recSheet = ss.getSheetByName('Daily_Records');
+  if (recSheet) {
+    const rows = recSheet.getDataRange().getValues();
+    const lossRows = rows.filter((r, i) => i > 0 && String(r[2]).trim() === 'LOSS');
+    console.log('=== Daily_Records LOSS 共 ' + lossRows.length + ' 筆 ===');
+    lossRows.forEach(r => {
+      console.log('  日期=' + r[0] + ' 使用者=' + r[1] + ' 值=' + r[3] + ' 備註=' + r[4]);
+    });
+  }
+
+  // 2. 檢查 Sales 表 VOID 統計
+  const salesSheet = ss.getSheetByName('Sales');
+  if (salesSheet) {
+    const sRows = salesSheet.getDataRange().getValues();
+    let voidCount = 0, nonVoidCount = 0;
+    sRows.slice(1).forEach(row => {
+      let isVoid = false;
+      for (let c = 0; c < row.length; c++) {
+        const t = String(row[c] || '').trim().toUpperCase();
+        if (t === 'VOID' || t.includes('[VOID]')) { isVoid = true; break; }
+      }
+      isVoid ? voidCount++ : nonVoidCount++;
+    });
+    console.log('=== Sales：VOID 行=' + voidCount + '，正常行=' + nonVoidCount + ' ===');
+  }
+
+  // 3. 印出 Sales Headers 確認欄位
+  if (salesSheet) {
+    const hdrs = salesSheet.getRange(1, 1, 1, salesSheet.getLastColumn()).getValues()[0];
+    console.log('=== Sales Headers ===');
+    hdrs.forEach((h, i) => console.log('  [' + i + '] ' + h));
+  }
+}
