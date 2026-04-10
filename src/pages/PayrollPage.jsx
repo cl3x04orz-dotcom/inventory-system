@@ -23,7 +23,7 @@ export default function PayrollPage({ user, apiUrl }) {
     // State for Settings Modal
     const [showSettings, setShowSettings] = useState(false);
     const [settingsForm, setSettingsForm] = useState({
-        baseSalary: 0, attendanceBonus: 0, insurance: 0, monthlyOffDays: 8, bonusTiers: '[]'
+        baseSalary: 0, attendanceBonus: 0, insurance: 0, monthlyOffDays: 8, bonusTiers: '[]', empType: 'FULL_TIME', hourlyWage: 0, commissionRate: 0.5
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -76,7 +76,10 @@ export default function PayrollPage({ user, apiUrl }) {
                 if (result.config) {
                     setSettingsForm({
                         ...result.config,
-                        bonusTiers: JSON.stringify(result.config.bonusTiers || [])
+                        bonusTiers: JSON.stringify(result.config.bonusTiers || []),
+                        commissionRate: result.config.commissionRate != null
+                            ? (result.config.commissionRate * 100) // 轉換為百分比顯示 (0.005 -> 0.5)
+                            : 0.5
                     });
                 }
             } else {
@@ -188,7 +191,10 @@ export default function PayrollPage({ user, apiUrl }) {
                 attendanceBonus: Number(settingsForm.attendanceBonus),
                 insurance: Number(settingsForm.insurance),
                 monthlyOffDays: Number(settingsForm.monthlyOffDays),
-                bonusTiers: parsedTiers
+                bonusTiers: parsedTiers,
+                empType: settingsForm.empType,
+                hourlyWage: Number(settingsForm.hourlyWage),
+                commissionRate: Number(settingsForm.commissionRate) / 100 // 將 % 轉小數儲存 (0.5 -> 0.005)
             }, user.token);
 
             setShowSettings(false);
@@ -489,13 +495,37 @@ export default function PayrollPage({ user, apiUrl }) {
             {/* --- Summary Cards (Mobile One-Line 4-Cols) --- */}
             {/* Row 4: Base / Perf / Ins / Net */}
             <div className="grid grid-cols-4 gap-2 px-1 md:hidden">
-                <SummaryCard title="底薪" amount={data?.config?.baseSalary} color="text-[var(--text-primary)]" isMobile />
-                <SummaryCard
-                    title="業績獎金"
-                    amount={0}
-                    color="text-indigo-600"
-                    isMobile
-                />
+                {data?.config?.empType === 'PART_TIME' ? (
+                    <SummaryCard 
+                        title="時薪小計" 
+                        amount={summary.calculatedBase} 
+                        color="text-amber-700" 
+                        isMobile 
+                        hoverContent={
+                            <div className="flex flex-col items-end">
+                                <p className="text-[10px] text-[var(--text-tertiary)] leading-none mb-0.5">總工時</p>
+                                <p className="text-xs font-bold text-amber-600">{summary.totalWorkHours || 0} hr</p>
+                            </div>
+                        } 
+                    />
+                ) : (
+                    <SummaryCard title="底薪" amount={data?.config?.baseSalary} color="text-[var(--text-primary)]" isMobile />
+                )}
+                {data?.config?.empType === 'PART_TIME' ? (
+                    <SummaryCard
+                        title="業績抽成"
+                        amount={0}
+                        color="text-amber-700"
+                        isMobile
+                    />
+                ) : (
+                    <SummaryCard
+                        title="業績獎金"
+                        amount={0}
+                        color="text-indigo-600"
+                        isMobile
+                    />
+                )}
                 <SummaryCard
                     title="勞健保"
                     amount={summary.insurance}
@@ -517,7 +547,6 @@ export default function PayrollPage({ user, apiUrl }) {
                 />
             </div>
 
-            {/* Row 5: Attend / Normal / Special / Sick */}
             <div className="grid grid-cols-4 gap-2 px-1 mt-2 md:hidden">
                 <SummaryCard
                     title="全勤"
@@ -531,55 +560,72 @@ export default function PayrollPage({ user, apiUrl }) {
                         </div>
                     }
                 />
-                <SummaryCard
-                    title="一般休假"
-                    amount={generalLeaveDaysCount}
-                    isCurrency={false}
-                    suffix="天"
-                    color="text-[var(--text-secondary)]"
-                    isMobile
-                    hoverContent={
-                        <div className="flex flex-col items-end gap-1">
-                            <p className="text-[10px] text-[var(--text-tertiary)] leading-none">補貼</p>
-                            <p className={`text-xs font-bold ${(summary.leaveCompensation || 0) >= 0 ? 'text-[var(--accent-blue)]' : 'text-red-600'}`}>
-                                ${(summary.leaveCompensation || 0).toLocaleString()}
-                            </p>
-                        </div>
-                    }
-                />
-                <SummaryCard
-                    title="特休紀錄"
-                    amount={specialLeaveDaysCount}
-                    isCurrency={false}
-                    suffix="天"
-                    color="text-emerald-500"
-                    isMobile
-                />
-                <SummaryCard
-                    title="病假紀錄"
-                    amount={sickLeaveDaysCount}
-                    isCurrency={false}
-                    suffix="天"
-                    color="text-amber-500"
-                    isMobile
-                    hoverContent={
-                        <div className="flex flex-col items-end">
-                            <p className="text-[10px] text-[var(--text-tertiary)] leading-none">扣款</p>
-                            <p className="text-xs font-bold text-red-600">-${(sickLeaveDaysCount * 500).toLocaleString()}</p>
-                        </div>
-                    }
-                />
+                {data?.config?.empType !== 'PART_TIME' && (
+                    <>
+                        <SummaryCard
+                            title="一般休假"
+                            amount={generalLeaveDaysCount}
+                            isCurrency={false}
+                            suffix="天"
+                            color="text-[var(--text-secondary)]"
+                            isMobile
+                            hoverContent={
+                                <div className="flex flex-col items-end gap-1">
+                                    <p className="text-[10px] text-[var(--text-tertiary)] leading-none">補貼</p>
+                                    <p className={`text-xs font-bold ${(summary.leaveCompensation || 0) >= 0 ? 'text-[var(--accent-blue)]' : 'text-red-600'}`}>
+                                        ${(summary.leaveCompensation || 0).toLocaleString()}
+                                    </p>
+                                </div>
+                            }
+                        />
+                        <SummaryCard
+                            title="特休紀錄"
+                            amount={specialLeaveDaysCount}
+                            isCurrency={false}
+                            suffix="天"
+                            color="text-emerald-500"
+                            isMobile
+                        />
+                        <SummaryCard
+                            title="病假紀錄"
+                            amount={sickLeaveDaysCount}
+                            isCurrency={false}
+                            suffix="天"
+                            color="text-amber-500"
+                            isMobile
+                            hoverContent={
+                                <div className="flex flex-col items-end">
+                                    <p className="text-[10px] text-[var(--text-tertiary)] leading-none">扣款</p>
+                                    <p className="text-xs font-bold text-red-600">-${(sickLeaveDaysCount * 500).toLocaleString()}</p>
+                                </div>
+                            }
+                        />
+                    </>
+                )}
             </div>
 
             {/* Desktop Summary Cards (Original Layout) */}
             <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-4 px-2">
-                <SummaryCard title="底薪" amount={data?.config?.baseSalary} color="text-[var(--text-primary)]" />
-                <SummaryCard
-                    title="業績獎金"
-                    amount={0} // Changed to 0 as requested
-                    subtext={`業績總額: $${(summary.sales || 0).toLocaleString()}`}
-                    color="text-indigo-600"
-                />
+                {data?.config?.empType === 'PART_TIME' ? (
+                    <SummaryCard title={`時薪小計 (共 ${summary.totalWorkHours || 0} hr)`} amount={summary.calculatedBase} color="text-amber-700" />
+                ) : (
+                    <SummaryCard title="底薪" amount={data?.config?.baseSalary} color="text-[var(--text-primary)]" />
+                )}
+                {data?.config?.empType === 'PART_TIME' ? (
+                    <SummaryCard
+                        title="業績抽成"
+                        amount={0}
+                        subtext={`業績 $${(summary.sales || 0).toLocaleString()}`}
+                        color="text-amber-700"
+                    />
+                ) : (
+                    <SummaryCard
+                        title="業績獎金"
+                        amount={0}
+                        subtext={`業績總額: $${(summary.sales || 0).toLocaleString()}`}
+                        color="text-indigo-600"
+                    />
+                )}
                 <SummaryCard
                     title="勞健保 (扣除)"
                     amount={summary.insurance}
@@ -591,7 +637,7 @@ export default function PayrollPage({ user, apiUrl }) {
                         </div>
                     }
                 />
-                <SummaryCard title="實領薪資" amount={summary.finalSalary} color="text-[var(--accent-blue)]" subtext="含獎金/扣除保險與扣款" />
+                <SummaryCard title="實領薪資" amount={summary.finalSalary} color="text-[var(--accent-blue)]" />
             </div>
 
             <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4 px-2">
@@ -606,41 +652,45 @@ export default function PayrollPage({ user, apiUrl }) {
                         </div>
                     }
                 />
-                <SummaryCard
-                    title="一般休假"
-                    amount={generalLeaveDaysCount}
-                    isCurrency={false}
-                    suffix=" 天"
-                    color="text-[var(--text-secondary)]"
-                    hoverContent={
-                        <div className="flex flex-col items-end gap-1">
-                            <div>
-                                <p className="text-[10px] text-[var(--text-tertiary)] font-medium leading-none mb-1">月休天數標準</p>
-                                <p className="text-sm font-bold text-emerald-500 font-mono">{data?.config?.monthlyOffDays || 0} 天</p>
-                            </div>
-                            <div className="w-full border-t border-emerald-100 pt-1 mt-0.5">
-                                <p className="text-[10px] text-[var(--text-tertiary)] font-medium leading-none mb-1">補：</p>
-                                <p className={`text-sm font-bold font-mono ${(summary.leaveCompensation || 0) >= 0 ? 'text-[var(--accent-blue)]' : 'text-red-600'}`}>
-                                    {(summary.leaveCompensation || 0) >= 0 ? '+' : '-'}${Math.abs(summary.leaveCompensation || 0).toLocaleString()}
-                                </p>
-                            </div>
-                        </div>
-                    }
-                />
-                <SummaryCard title="特休紀錄" amount={specialLeaveDaysCount} isCurrency={false} suffix=" 天" color="text-emerald-500" />
-                <SummaryCard
-                    title="病假紀錄"
-                    amount={sickLeaveDaysCount}
-                    isCurrency={false}
-                    suffix=" 天"
-                    color="text-amber-500"
-                    hoverContent={
-                        <div className="flex flex-col items-end">
-                            <p className="text-[10px] text-[var(--text-tertiary)] font-medium leading-none mb-1">扣款：</p>
-                            <p className="text-sm font-bold text-red-600 font-mono">-${(sickLeaveDaysCount * 500).toLocaleString()}</p>
-                        </div>
-                    }
-                />
+                {data?.config?.empType !== 'PART_TIME' && (
+                    <>
+                        <SummaryCard
+                            title="一般休假"
+                            amount={generalLeaveDaysCount}
+                            isCurrency={false}
+                            suffix=" 天"
+                            color="text-[var(--text-secondary)]"
+                            hoverContent={
+                                <div className="flex flex-col items-end gap-1">
+                                    <div>
+                                        <p className="text-[10px] text-[var(--text-tertiary)] font-medium leading-none mb-1">月休天數標準</p>
+                                        <p className="text-sm font-bold text-emerald-500 font-mono">{data?.config?.monthlyOffDays || 0} 天</p>
+                                    </div>
+                                    <div className="w-full border-t border-emerald-100 pt-1 mt-0.5">
+                                        <p className="text-[10px] text-[var(--text-tertiary)] font-medium leading-none mb-1">補：</p>
+                                        <p className={`text-sm font-bold font-mono ${(summary.leaveCompensation || 0) >= 0 ? 'text-[var(--accent-blue)]' : 'text-red-600'}`}>
+                                            {(summary.leaveCompensation || 0) >= 0 ? '+' : '-'}${Math.abs(summary.leaveCompensation || 0).toLocaleString()}
+                                        </p>
+                                    </div>
+                                </div>
+                            }
+                        />
+                        <SummaryCard title="特休紀錄" amount={specialLeaveDaysCount} isCurrency={false} suffix=" 天" color="text-emerald-500" />
+                        <SummaryCard
+                            title="病假紀錄"
+                            amount={sickLeaveDaysCount}
+                            isCurrency={false}
+                            suffix=" 天"
+                            color="text-amber-500"
+                            hoverContent={
+                                <div className="flex flex-col items-end">
+                                    <p className="text-[10px] text-[var(--text-tertiary)] font-medium leading-none mb-1">扣款：</p>
+                                    <p className="text-sm font-bold text-red-600 font-mono">-${(sickLeaveDaysCount * 500).toLocaleString()}</p>
+                                </div>
+                            }
+                        />
+                    </>
+                )}
             </div>
 
             <div className="px-1 md:px-2 mt-2 md:mt-4">
@@ -876,14 +926,52 @@ export default function PayrollPage({ user, apiUrl }) {
                             <h3 className="text-xl font-bold mb-4">薪資參數設定 - {targetUser}</h3>
 
                             <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4 border-b border-[var(--border-primary)] pb-4">
+                                    <div className="col-span-2">
+                                        <label className="label">員工類型</label>
+                                        <div className="flex bg-[var(--bg-tertiary)] rounded-lg p-1 border border-[var(--border-primary)]">
+                                            <button
+                                                onClick={() => setSettingsForm({ ...settingsForm, empType: 'FULL_TIME' })}
+                                                className={`flex-1 py-1 text-sm font-bold rounded-md transition-all ${settingsForm.empType !== 'PART_TIME'
+                                                    ? 'bg-blue-500 text-white shadow-sm'
+                                                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                                                    }`}
+                                            >
+                                                正職人員
+                                            </button>
+                                            <button
+                                                onClick={() => setSettingsForm({ ...settingsForm, empType: 'PART_TIME' })}
+                                                className={`flex-1 py-1 text-sm font-bold rounded-md transition-all ${settingsForm.empType === 'PART_TIME'
+                                                    ? 'bg-amber-500 text-white shadow-sm'
+                                                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                                                    }`}
+                                            >
+                                                工讀人員
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="label">底薪</label>
-                                        <input type="number" className="input-field w-full"
-                                            ref={settingRefs.baseSalary}
-                                            value={settingsForm.baseSalary}
-                                            onChange={e => setSettingsForm({ ...settingsForm, baseSalary: e.target.value })}
-                                            onKeyDown={e => handleSettingKeyDown(e, 'baseSalary')} />
+                                        {settingsForm.empType === 'PART_TIME' ? (
+                                            <>
+                                                <label className="label text-amber-700">時薪 (Hourly Wage)</label>
+                                                <input type="number" className="input-field w-full border-amber-300 focus:ring-amber-500"
+                                                    value={settingsForm.hourlyWage}
+                                                    onChange={e => setSettingsForm({ ...settingsForm, hourlyWage: e.target.value })}
+                                                />
+                                            </>
+                                        ) : (
+                                            <>
+                                                <label className="label">底薪 (Base Salary)</label>
+                                                <input type="number" className="input-field w-full"
+                                                    ref={settingRefs.baseSalary}
+                                                    value={settingsForm.baseSalary}
+                                                    onChange={e => setSettingsForm({ ...settingsForm, baseSalary: e.target.value })}
+                                                    onKeyDown={e => handleSettingKeyDown(e, 'baseSalary')} />
+                                            </>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="label">全勤獎金</label>
@@ -914,18 +1002,40 @@ export default function PayrollPage({ user, apiUrl }) {
                                     </div>
                                 </div>
 
-                                <div>
-                                    <label className="label">業績獎金級距 (JSON)</label>
-                                    <textarea
-                                        className="input-field w-full font-mono text-xs h-32"
-                                        ref={settingRefs.bonusTiers}
-                                        value={settingsForm.bonusTiers}
-                                        onChange={e => setSettingsForm({ ...settingsForm, bonusTiers: e.target.value })}
-                                        onKeyDown={e => handleSettingKeyDown(e, 'bonusTiers')}
-                                        placeholder='[{"threshold": 50000, "bonus": 1000}]'
-                                    />
-                                    <p className="text-xs text-[var(--text-tertiary)] mt-1">{"格式: `[{\"threshold\": 目標金額, \"bonus\": 獎金 }]` (按 Enter 儲存)"}</p>
-                                </div>
+                                {settingsForm.empType === 'PART_TIME' ? (
+                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+                                        <label className="label text-amber-800">業績抽成比率 (%)</label>
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                min="0"
+                                                max="100"
+                                                className="input-field w-28 text-center text-lg font-bold text-amber-900 border-amber-300 focus:ring-amber-500"
+                                                value={settingsForm.commissionRate}
+                                                onChange={e => setSettingsForm({ ...settingsForm, commissionRate: e.target.value })}
+                                            />
+                                            <span className="text-amber-700 font-bold text-lg">%</span>
+                                            <span className="text-xs text-amber-600 ml-2">
+                                                業績抽成 = 當月總業績 × {settingsForm.commissionRate || 0}%
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-amber-500">工讀生不使用級距制，改以固定比率計算業績獎金</p>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <label className="label">業績獎金級距 (正職專用)</label>
+                                        <textarea
+                                            className="input-field w-full font-mono text-xs h-32"
+                                            ref={settingRefs.bonusTiers}
+                                            value={settingsForm.bonusTiers}
+                                            onChange={e => setSettingsForm({ ...settingsForm, bonusTiers: e.target.value })}
+                                            onKeyDown={e => handleSettingKeyDown(e, 'bonusTiers')}
+                                            placeholder='[{"threshold": 50000, "bonus": 1000}]'
+                                        />
+                                        <p className="text-xs text-[var(--text-tertiary)] mt-1">{"格式: `[{\"threshold\": 目標金額, \"bonus\": 獎金 }]`"}</p>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex gap-3 mt-6">

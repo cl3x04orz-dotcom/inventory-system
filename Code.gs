@@ -103,6 +103,7 @@ function apiHandler(request) {
         'savePayrollSettings': 'finance_payroll',
         'getEmployeeProfile': 'finance_payroll',
         'saveEmployeeProfile': 'finance_payroll',
+        'getEmpType': null, // 任何登入使用者都可查詢自己的員工類型
         
         // Analytics (數據分析)
         'getSalesRanking': 'analytics_sales',
@@ -208,6 +209,7 @@ function apiHandler(request) {
             case 'getEmployeeProfile': return getEmployeeProfileService(payload, user);
             case 'saveEmployeeProfile': return saveEmployeeProfileService(payload, user);
             case 'savePayrollToExpenditure': return savePayrollToExpenditureService(payload, user);
+            case 'getEmpType': return getEmpTypeService(payload, user);
 
             // 支出管理
             case 'getExpenditures': return getExpendituresService(payload, user);

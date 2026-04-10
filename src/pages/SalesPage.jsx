@@ -78,6 +78,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [originalDate, setOriginalDate] = useState(null); // [New] 保留原始單據日期
     const [originalSaleId, setOriginalSaleId] = useState(null); // [New] 保留原始單據 ID 用於備註
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [workHours, setWorkHours] = useState(''); // [New] 工讀生工時輸入
+    const [isPartTime, setIsPartTime] = useState(false); // [New] 是否為工讀生
     // [New] 防止重複提交的 ID
     const [submissionId, setSubmissionId] = useState(() => `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
 
@@ -192,6 +194,10 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
     const load = useCallback(async () => {
         try {
+            // [New] 查詢員工類型，決定是否顯示工時輸入欄
+            const empTypeRes = await callGAS(apiUrl, 'getEmpType', { targetUser: user.username }, user.token);
+            setIsPartTime(empTypeRes?.empType === 'PART_TIME');
+
             const data = await callGAS(apiUrl, 'getProducts', {}, user.token);
             console.log('Sales Page - Raw Products Data:', data);
 
@@ -251,6 +257,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                         }
                         if (cloned.originalDate) setOriginalDate(cloned.originalDate);
                         if (cloned.originalSaleId) setOriginalSaleId(cloned.originalSaleId);
+                        if (cloned.workHours) setWorkHours(cloned.workHours);
 
                         // Merge Rows
                         finalRows = finalRows.map(row => {
@@ -666,6 +673,13 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 }
             }
 
+            // [New] 工讀生必填工時
+            if (isPartTime && (!workHours || Number(workHours) <= 0)) {
+                alert('您的帳號為工讀人員，送出前請填寫「今日工時」！');
+                document.getElementById('input-work-hours')?.focus();
+                return;
+            }
+
             if (!user || !user.username) {
                 console.error('User info missing:', user);
                 alert('使用者資訊遺失，請重新登入');
@@ -694,7 +708,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 cashCounts: cashCounts, // [New] Pass detailed cash counts
                 submissionId: submissionId, // [New] 防止重複存檔的唯一辨識碼
                 originalDate: originalDate, // [New] 傳回原始日期
-                originalSaleId: originalSaleId // [New] 傳回原始 ID 用於備註
+                originalSaleId: originalSaleId, // [New] 傳回原始 ID 用於備註
+                workHours: workHours // [New] 工時
             };
 
             setIsSubmitting(true);
@@ -1023,11 +1038,17 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
                                                 e.preventDefault();
-                                                focusAndSelect('input-m-0-picked') || focusAndSelect('input-0-picked');
+                                                if (isPartTime) {
+                                                    focusAndSelect('input-work-hours');
+                                                } else {
+                                                    focusAndSelect('input-m-0-picked') || focusAndSelect('input-0-picked');
+                                                }
                                             }
                                         }}
                                     />
                                 </div>
+
+
 
                                 {/* [New] Sales Rep Override - Only show during correction */}
                                 {availableUsers.length > 0 && originalSaleId && (
@@ -1106,6 +1127,48 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                         </div>
                     </div>
+
+                    {/* [New] Part-time Work Hours Banner - 工讀生工時輸入區（獨立一行） */}
+                    {isPartTime && (
+                        <div className="flex items-center gap-3 mb-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200">
+                            <span className="text-base">⏱️</span>
+                            <span className="text-sm font-bold text-amber-800">工讀計時</span>
+                            <span className="text-xs text-amber-600">請輸入今日實際工作時數：</span>
+                            <input
+                                id="input-work-hours"
+                                type="number"
+                                step="0.5"
+                                min="0"
+                                required
+                                className={`bg-white border-2 text-amber-900 text-base font-bold rounded-lg px-3 py-1 w-20 text-center focus:ring-2 focus:ring-amber-400 outline-none transition-colors ${
+                                    !workHours || Number(workHours) <= 0
+                                        ? 'border-red-300 bg-red-50'
+                                        : 'border-amber-300'
+                                }`}
+                                placeholder="0.5"
+                                value={workHours}
+                                onChange={(e) => setWorkHours(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        focusAndSelect('input-m-0-picked') || focusAndSelect('input-0-picked');
+                                    }
+                                }}
+                            />
+                            <span className="text-sm text-amber-700 font-medium">小時</span>
+                            {workHours && Number(workHours) > 0 && (
+                                <span className="ml-auto text-xs text-amber-600 font-bold bg-amber-100 px-2 py-0.5 rounded-full">
+                                    ✓ 已填寫 {workHours} hr
+                                </span>
+                            )}
+                            {(!workHours || Number(workHours) <= 0) && (
+                                <span className="ml-auto text-xs text-red-500 font-bold bg-red-50 px-2 py-0.5 rounded-full animate-pulse">
+                                    ！未填寫（必填）
+                                </span>
+                            )}
+                        </div>
+                    )}
+
                     <div className="flex-1 overflow-auto">
                         {/* Mobile Card View (Visible on < md) */}
                         <DragDropContext onDragEnd={handleDragEnd}>

@@ -60,7 +60,7 @@ function saveSalesService(data, user) {
     const finalSalesRep = salesRep || (user ? (user.displayName || user.name || user.username) : 'Unknown');
     const finalOperator = operator || (user ? (user.displayName || user.name || user.username) : 'Unknown');
     
-    // 3.1 準備 Sales Row (Col 0-11)
+    // 3.1 準備 Sales Row (Col 0-12)
     const newSalesRow = [
         saleId, 
         today, 
@@ -73,7 +73,10 @@ function saveSalesService(data, user) {
         method,            
         status,
         JSON.stringify(data.cashCounts || {}), // Col 10: Cash Breakdown Details
-        finalOperator                          // Col 11 (L 欄): 實際操作者
+        finalOperator,                         // Col 11 (L 欄): 實際操作者
+        '',                                    // Col 12 (M 欄): 保留
+        '',                                    // Col 13 (N 欄): 保留
+        data.workHours || ''                   // Col 14 (O 欄): 工讀生工時
     ];
 
     // 3.2 準備 Expenditures Row (Col 0-18)
@@ -656,7 +659,8 @@ function getSaleToCloneService(payload) {
       expenses: fetchedExpenses,
       cashCounts: (originalSaleData[10] && String(originalSaleData[10]).startsWith('{')) ? JSON.parse(originalSaleData[10]) : {},
       originalDate: originalSaleData[1], // 新增：檢索原始日期
-      originalSaleId: saleId            // 新增：紀錄來源 ID
+      originalSaleId: saleId,            // 新增：紀錄來源 ID
+      workHours: originalSaleData[14] || '' // 新增：工讀生工時 (O欄)
     }
   };
 }
@@ -824,7 +828,8 @@ function voidAndFetchSaleService(payload) {
       expenses: fetchedExpenses,
       cashCounts: (originalSaleData[10] && String(originalSaleData[10]).startsWith('{')) ? JSON.parse(originalSaleData[10]) : {},
       originalDate: originalSaleData[1], // 新增：檢索原始日期
-      originalSaleId: saleId            // 新增：紀錄來源 ID
+      originalSaleId: saleId,            // 新增：紀錄來源 ID
+      workHours: originalSaleData[14] || '' // 新增：工讀生工時 (O欄)
     }
   };
 
@@ -996,6 +1001,7 @@ function getSalesByDateRange(payload) {
   const IDX_REP2 = 7;
   const IDX_METHOD = 8;
   const IDX_STATUS = 9;
+  const IDX_WORKHOURS = 14; // O 欄：工時
   
   for (let i = 1; i < salesData.length; i++) {
     const row = salesData[i];
@@ -1009,6 +1015,7 @@ function getSalesByDateRange(payload) {
     const paymentMethod = String(row[IDX_METHOD] || 'CASH');
     const status = String(row[IDX_STATUS] || '').toUpperCase();
     const totalAmount = Number(row[IDX_TOTAL] || 0);
+    const workHours = Number(row[IDX_WORKHOURS] || 0); // 取出工時
     
     // 過濾條件：日期範圍、非作廢
     if (isNaN(saleDate.getTime()) || saleDate < start || saleDate > end) continue;
@@ -1048,6 +1055,7 @@ function getSalesByDateRange(payload) {
       salesRep: rowRep,
       paymentMethod: paymentMethod,
       totalAmount: totalAmount,
+      workHours: workHours,
       salesData: salesDetails
     });
   }

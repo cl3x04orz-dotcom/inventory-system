@@ -33,8 +33,8 @@ function getPayrollDataService(payload, user) {
     };
 
     // 1. 取得設定
-    let config = { baseSalary: 30000, attendanceBonus: 0, insurance: 0, monthlyOffDays: 8, bonusTiers: [] };
-    const settingsSheet = initPayrollSheet_('Payroll_Settings', ['Username', 'BaseSalary', 'AttendanceBonus', 'Insurance', 'OffDaysStandard', 'BonusTiersJson']);
+    let config = { baseSalary: 30000, attendanceBonus: 0, insurance: 0, monthlyOffDays: 8, bonusTiers: [], empType: 'FULL_TIME', hourlyWage: 0, commissionRate: 0 };
+    const settingsSheet = initPayrollSheet_('Payroll_Settings', ['Username', 'BaseSalary', 'AttendanceBonus', 'Insurance', 'OffDaysStandard', 'BonusTiersJson', 'EmpType', 'HourlyWage', 'CommissionRate']);
     const settingsData = settingsSheet.getDataRange().getValues();
     for (let i = 1; i < settingsData.length; i++) {
         if (settingsData[i][0] === targetUser) {
@@ -43,7 +43,10 @@ function getPayrollDataService(payload, user) {
                 attendanceBonus: Number(settingsData[i][2]),
                 insurance: Number(settingsData[i][3]),
                 monthlyOffDays: Number(settingsData[i][4]),
-                bonusTiers: JSON.parse(settingsData[i][5] || '[]')
+                bonusTiers: JSON.parse(settingsData[i][5] || '[]'),
+                empType: String(settingsData[i][6] || 'FULL_TIME'),
+                hourlyWage: Number(settingsData[i][7] || 0),
+                commissionRate: Number(settingsData[i][8] || 0) // Col 8: 抽成比率 (小數，如 0.005 = 0.5%)
             };
             break;
         }
@@ -125,12 +128,16 @@ function getPayrollDataService(payload, user) {
                             const val = parseMoney(row[sFinalIdx]);
                             // 判斷是否要顯示備註 (不再扣減員工薪資，只留備註)
                             if (Math.abs(val) > 0.01) {
-                                if (!dailyRecords[dateKey]) dailyRecords[dateKey] = {};
-                                
-                                // (使用者要求：徹底刪除把負資金當作盤損的懲罰邏輯)
-                                // 所以不再處理 val < 0 時增加 loss / salesShortage
+                                // (使用者要求：重新啟用盤損計算邏輯)
+                                if (val < 0) {
+                                    const absLoss = Math.abs(val);
+                                    salesShortage += absLoss;
+                                    if (!dailyRecords[dateKey]) dailyRecords[dateKey] = {};
+                                    dailyRecords[dateKey].loss = (dailyRecords[dateKey].loss || 0) + absLoss;
+                                }
                                 
                                 // 不論正負都紀錄在備註中供參考
+                                if (!dailyRecords[dateKey]) dailyRecords[dateKey] = {};
                                 const noteTxt = "[結算:" + val.toFixed(1) + "]";
                                 dailyRecords[dateKey].note = (dailyRecords[dateKey].note ? dailyRecords[dateKey].note + " " : "") + noteTxt;
                             }
@@ -142,6 +149,14 @@ function getPayrollDataService(payload, user) {
                            const rowAmt = parseMoney(row[sTotalIdx]);
                            dailyData[dateKey] = (dailyData[dateKey] || 0) + rowAmt;
                            totalSales += rowAmt;
+                        }
+                        
+                        // [New] 累加當日工時
+                        const sWorkHoursIdx = 14; // O 欄位: 工時
+                        const wHours = Number(row[sWorkHoursIdx]) || 0;
+                        if (wHours > 0) {
+                            if (!dailyRecords[dateKey]) dailyRecords[dateKey] = {};
+                            dailyRecords[dateKey].workHours = (dailyRecords[dateKey].workHours || 0) + wHours;
                         }
                     }
                 }
@@ -237,8 +252,9 @@ function getPayrollDataService(payload, user) {
                 dailyRecords[dateKey].isSickLeave = true;
                 sickLeaveDays++;
             } else if (type === 'LOSS') {
-                dailyRecords[dateKey].loss = (dailyRecords[dateKey].loss || 0) + val;
-                manualLoss += val;
+                const absLoss = Math.abs(val);
+                dailyRecords[dateKey].loss = (dailyRecords[dateKey].loss || 0) + absLoss;
+                manualLoss += absLoss;
             }
             
             if (rec.note) {
@@ -268,42 +284,72 @@ function getPayrollDataService(payload, user) {
         }
     }
 
-    // 4. 計算獎金
+    // 4. 計算獎金 (依員工類型分流)
+    const isPartTimeCalc = config.empType === 'PART_TIME';
     let bonus = 0;
-    const sortedTiers = (config.bonusTiers || []).sort((a, b) => b.threshold - a.threshold);
-    for (const tier of sortedTiers) {
-        if (totalSales >= tier.threshold) {
-             bonus = tier.bonus;
-             break;
+    let commissionAmount = 0; // 抽成金額 (工讀生專用)
+
+    if (isPartTimeCalc) {
+        // 工讀生：業績 × 抽成比率
+        commissionAmount = totalSales * (config.commissionRate || 0);
+        bonus = commissionAmount;
+    } else {
+        // 正職：業績達標級距獎金
+        const sortedTiers = (config.bonusTiers || []).sort((a, b) => b.threshold - a.threshold);
+        for (const tier of sortedTiers) {
+            if (totalSales >= tier.threshold) {
+                bonus = tier.bonus;
+                break;
+            }
         }
     }
 
     // 5. 總結
     const finalLoss = manualLoss + salesShortage;
     
-    // [修正] 業績獎金 = 級距獎金 - 盤損/扣款合計
-    // 這樣前端「業績獎金」欄位會顯示淨值 (例如 500 - 365160 = -364660)
-    bonus = bonus - finalLoss;
+    // [修正] 保持數據獨立，不要在此預扣盤損，否則前端欄位會變成 0
+    // 實領薪資計算時才會進行最後加計與扣除
+
+    // 計算總工時
+    let totalWorkHours = 0;
+    for (const key in dailyRecords) {
+        if (dailyRecords[key].workHours) {
+            totalWorkHours += dailyRecords[key].workHours;
+        }
+    }
+
+    const isPartTime = config.empType === 'PART_TIME';
+    const calculatedBase = isPartTime ? (totalWorkHours * (config.hourlyWage || 0)) : config.baseSalary;
 
     // 全勤獎金邏輯：一般休假天數在月休標準內（含）即可領取；特休與病假不影響全勤
     const hasAttendanceBonus = (generalLeaveDays <= config.monthlyOffDays);
-    // 出勤補貼：少休補錢，多休扣錢 (標準天數 - 實際休假天數) × 1000
-    const leaveCompensation = (config.monthlyOffDays - generalLeaveDays) * 1000;
+    // 出勤補貼：少休補錢，多休扣錢 (標準天數 - 實際休假天數) × 1000 (僅正職適用)
+    const leaveCompensation = isPartTime ? 0 : (config.monthlyOffDays - generalLeaveDays) * 1000;
     
-    const sickLeaveDeduction = (sickLeaveDays * 500);
+    const sickLeaveDeduction = isPartTime ? 0 : (sickLeaveDays * 500);
+    // 只扣勞健保
+    const finalInsurance = config.insurance || 0;
+
+    // 盤損/扣款 扣 業績獎金
+    const finalBonus = Math.max(0, bonus - finalLoss);
+
     const summary = {
         sales: totalSales,
-        bonus: bonus,
+        bonus: finalBonus,
+        commissionAmount: commissionAmount,   // 工讀生：純抽成金額（未扣盤損）
+        commissionRate: config.commissionRate, // 工讀生：抽成比率
         generalLeaveDays: generalLeaveDays,
         specialLeaveDays: specialLeaveDays,
         sickLeaveDays: sickLeaveDays,
         attendanceBonus: hasAttendanceBonus ? config.attendanceBonus : 0,
         leaveCompensation: leaveCompensation,
         sickLeaveDeduction: sickLeaveDeduction,
-        insurance: config.insurance,
+        insurance: finalInsurance,
         loss: finalLoss,
-        // finalSalary: 不包含業績獎金 (也不扣除盤損)，只計算底薪與出勤相關
-        finalSalary: config.baseSalary + (hasAttendanceBonus ? config.attendanceBonus : 0) + leaveCompensation - config.insurance - sickLeaveDeduction
+        totalWorkHours: totalWorkHours,
+        calculatedBase: calculatedBase,
+        // finalSalary: 底薪/時薪小計 + 全勤 + 補貼，並扣除保險與病假扣款 (不扣盤損，不加業績獎金)
+        finalSalary: calculatedBase + (hasAttendanceBonus ? config.attendanceBonus : 0) + leaveCompensation - finalInsurance - sickLeaveDeduction
     };
 
     // [新增] 生日月份提醒檢查 (強化版：同時支援日期格式與字串格式，並統一帳號比對)
@@ -388,6 +434,22 @@ function saveDailyRecordService(payload, user) {
 }
 
 /**
+ * [Service] 取得員工類型 (輕量查詢，供銷售頁面決定是否顯示工時輸入欄)
+ * 任何登入的員工都可以查詢自己的類型
+ */
+function getEmpTypeService(payload, user) {
+    const targetUser = payload.targetUser || user.username;
+    const sheet = initPayrollSheet_('Payroll_Settings', ['Username', 'BaseSalary', 'AttendanceBonus', 'Insurance', 'OffDaysStandard', 'BonusTiersJson', 'EmpType', 'HourlyWage']);
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+        if (String(data[i][0]).trim() === String(targetUser).trim()) {
+            return { empType: String(data[i][6] || 'FULL_TIME') };
+        }
+    }
+    return { empType: 'FULL_TIME' }; // 預設正職
+}
+
+/**
  * [Service] 儲存薪資參數設定
  */
 function savePayrollSettingsService(payload, user) {
@@ -396,8 +458,8 @@ function savePayrollSettingsService(payload, user) {
         throw new Error('權限不足：您沒有權限修改薪資設定');
     }
 
-    const { targetUser, baseSalary, attendanceBonus, insurance, monthlyOffDays, bonusTiers } = payload;
-    const sheet = initPayrollSheet_('Payroll_Settings', ['Username', 'BaseSalary', 'AttendanceBonus', 'Insurance', 'OffDaysStandard', 'BonusTiersJson']);
+    const { targetUser, baseSalary, attendanceBonus, insurance, monthlyOffDays, bonusTiers, empType, hourlyWage, commissionRate } = payload;
+    const sheet = initPayrollSheet_('Payroll_Settings', ['Username', 'BaseSalary', 'AttendanceBonus', 'Insurance', 'OffDaysStandard', 'BonusTiersJson', 'EmpType', 'HourlyWage', 'CommissionRate']);
     const data = sheet.getDataRange().getValues();
     let foundRow = -1;
     for (let i = 1; i < data.length; i++) {
@@ -406,9 +468,12 @@ function savePayrollSettingsService(payload, user) {
             break;
         }
     }
-    const rowValue = [targetUser, baseSalary, attendanceBonus, insurance, monthlyOffDays, JSON.stringify(bonusTiers)];
+    const finalEmpType = empType || 'FULL_TIME';
+    const finalHourlyWage = Number(hourlyWage) || 0;
+    const finalCommissionRate = Number(commissionRate) || 0; // 儲存為小數 (0.005 = 0.5%)
+    const rowValue = [targetUser, baseSalary, attendanceBonus, insurance, monthlyOffDays, JSON.stringify(bonusTiers), finalEmpType, finalHourlyWage, finalCommissionRate];
     if (foundRow > 0) {
-        sheet.getRange(foundRow, 1, 1, 6).setValues([rowValue]);
+        sheet.getRange(foundRow, 1, 1, 9).setValues([rowValue]);
     } else {
         sheet.appendRow(rowValue);
     }
