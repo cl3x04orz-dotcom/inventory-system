@@ -531,26 +531,17 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         const sequence = ['picked', 'original', 'returns', 'price'];
         const colIdx = sequence.indexOf(field);
 
-        // Enter Logic
+        // Enter Logic (Modified: Move down in the same column)
         if (e.key === 'Enter') {
             e.preventDefault();
-            // User requested sequence: picked -> original -> returns -> price -> Next Row picked
-            const enterSequence = ['picked', 'original', 'returns', 'price'];
-            const currentFieldIdx = enterSequence.indexOf(field);
-
-            if (currentFieldIdx < enterSequence.length - 1 && currentFieldIdx !== -1) {
-                // Next field in same row
-                const nextField = enterSequence[currentFieldIdx + 1];
-                focusAndSelect(`${prefix}${idx}-${nextField}`);
+            let targetId = null;
+            if (idx < rows.length - 1) {
+                targetId = `${prefix}${idx + 1}-${field}`;
             } else {
-                // If it's price (or beyond), move to next row first field
-                if (idx < rows.length - 1) {
-                    focusAndSelect(`${prefix}${idx + 1}-picked`);
-                } else {
-                    // Last row last col -> Jump to Sidebar (1000 cash)
-                    focusAndSelect('input-cash-1000');
-                }
+                // 最後一列跳到側邊欄 (與 ArrowDown 一致)
+                targetId = 'input-cash-1000';
             }
+            if (targetId) focusAndSelect(targetId);
             return;
         }
 

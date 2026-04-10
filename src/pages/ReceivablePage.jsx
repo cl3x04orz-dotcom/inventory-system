@@ -46,9 +46,18 @@ export default function ReceivablePage({ user, apiUrl }) {
         const allUuids = [];
 
         if (type === 'batch') {
-            // 從合成 ID (saleId-index) 提取原始 saleId
-            const rawUuids = Array.from(selectedItemUuids).map(u => String(u).split('-')[0]);
-            allUuids.push(...Array.from(new Set(rawUuids)));
+            const batchUuids = [];
+            Array.from(selectedItemUuids).forEach(syntheticId => {
+                const parts = String(syntheticId).split('-');
+                const idxStr = parts.pop();
+                const saleId = parts.join('-');
+                const idx = parseInt(idxStr, 10);
+                const rec = records.find(r => String(r.saleId) === saleId);
+                if (rec && rec.uuids && rec.uuids[idx]) {
+                    batchUuids.push(rec.uuids[idx]);
+                }
+            });
+            allUuids.push(...Array.from(new Set(batchUuids)));
         } else if (type === 'single' && record) {
             allUuids.push(...(Array.isArray(record.uuids) ? record.uuids : []));
         }

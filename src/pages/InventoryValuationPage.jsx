@@ -197,7 +197,7 @@ export default function InventoryValuationPage({ user, apiUrl }) {
                                     </div>
                                     <div className="bg-[var(--bg-tertiary)] p-2 rounded-lg">
                                         <div className="text-xs text-[var(--text-tertiary)] mb-1">單位成本</div>
-                                        <div className="font-mono text-[var(--text-secondary)]">${unitCost.toFixed(0)}</div>
+                                        <div className="font-mono text-[var(--text-secondary)]">${unitCost.toFixed(1)}</div>
                                     </div>
                                     <div className="bg-[var(--bg-tertiary)] p-2 rounded-lg">
                                         <div className="text-xs text-[var(--text-tertiary)] mb-1">價值佔比</div>
