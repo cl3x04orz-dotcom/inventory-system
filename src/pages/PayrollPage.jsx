@@ -701,140 +701,186 @@ export default function PayrollPage({ user, apiUrl }) {
             </div>
 
             {/* Calendar Table (Desktop) */}
-            <div className="hidden md:block glass-panel overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                    <thead className="bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-sm">
-                        <tr>
-                            <th className="p-4 w-32">日期</th>
-                            <th className="p-4 w-24 text-center">星期</th>
-                            <th className="p-4 text-right">當日業績</th>
-                            <th className="p-4 text-center">出勤狀態</th>
-                            <th className="p-4 text-right">虧損/其他</th>
-                            <th className="p-4 text-center">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--border-primary)]">
-                        {days.map((dayItem) => {
-                            const dateStr = dayItem.date;
-                            const sales = data?.dailyData?.[dateStr] || 0;
-                            const record = data?.dailyRecords?.[dateStr] || {};
-                            const hasSales = sales > 0;
+            <div className="hidden md:block glass-panel overflow-hidden p-6">
+                <div className="grid grid-cols-7 gap-px bg-[var(--border-primary)] rounded-xl overflow-hidden border border-[var(--border-primary)] shadow-sm">
+                    {/* Weekday Headers */}
+                    {['日', '一', '二', '三', '四', '五', '六'].map((day, idx) => (
+                        <div key={day} className={`bg-[var(--bg-secondary)] text-center py-2.5 text-sm font-bold ${idx === 0 || idx === 6 ? 'text-red-500' : 'text-[var(--text-secondary)]'}`}>
+                            {day}
+                        </div>
+                    ))}
 
-                            let status = '休假';
-                            let statusColor = 'text-yellow-500 bg-yellow-500/10 px-2 rounded font-medium';
+                    {/* Empty Slots */}
+                    {Array.from({ length: new Date(year, month - 1, 1).getDay() }).map((_, i) => (
+                        <div key={`empty-${i}`} className="bg-[var(--bg-secondary)]/30 min-h-[110px]"></div>
+                    ))}
 
-                            if (hasSales) {
-                                status = '出勤 (有業績)';
-                                statusColor = 'text-green-400 font-bold';
-                            } else if (record.isLeave) {
-                                status = '休假';
-                                statusColor = 'text-yellow-500 bg-yellow-500/10 px-2 rounded font-medium';
-                            } else if (record.isSpecialLeave) {
-                                status = '特休';
-                                statusColor = 'text-emerald-500 bg-emerald-500/10 px-2 rounded font-medium';
-                            } else if (record.isSickLeave) {
-                                status = '病假';
-                                statusColor = 'text-amber-500 bg-amber-500/10 px-2 rounded font-medium';
-                            }
+                    {/* Day Cells */}
+                    {days.map((dayItem) => {
+                        const dateStr = dayItem.date;
+                        const sales = data?.dailyData?.[dateStr] || 0;
+                        const record = data?.dailyRecords?.[dateStr] || {};
+                        const hasSales = sales > 0;
 
-                            const isWeekend = dayItem.weekday === '六' || dayItem.weekday === '日';
+                        let status = '休假';
+                        let statusStyle = 'bg-yellow-50 text-yellow-600 border-yellow-200';
 
-                            return (
-                                <tr key={dateStr} className={`hover:bg-[var(--bg-secondary)] transition-colors ${isWeekend ? 'bg-[var(--bg-secondary)]/50' : ''}`}>
-                                    <td className="p-4 font-mono text-[var(--text-secondary)]">{dateStr}</td>
-                                    <td className={`p-4 text-center ${dayItem.weekday === '日' ? 'text-red-600' : 'text-[var(--text-secondary)]'}`}>
-                                        {dayItem.weekday}
-                                    </td>
-                                    <td className="p-4 text-right font-mono text-emerald-500">
-                                        {Math.abs(sales) > 0.01 ? `$${sales.toLocaleString()}` : '-'}
-                                    </td>
-                                    <td className="p-4 text-center">
-                                        <span className={`text-sm ${statusColor}`}>{status}</span>
-                                    </td>
-                                    <td className="p-4 text-right font-mono text-red-600">
-                                        {Math.abs(record.loss || 0) > 0.01 ? `-$${Math.abs(record.loss).toLocaleString()}` : ''}
-                                        {record.note && <span className="block text-xs text-[var(--text-secondary)]">{record.note}</span>}
-                                    </td>
-                                    <td className="p-4 text-center">
+                        if (hasSales) {
+                            status = '出勤';
+                            statusStyle = 'bg-emerald-50 text-emerald-600 border-emerald-200';
+                        } else if (record.isLeave) {
+                            status = '休假';
+                            statusStyle = 'bg-yellow-50 text-yellow-600 border-yellow-200';
+                        } else if (record.isSpecialLeave) {
+                            status = '特休';
+                            statusStyle = 'bg-teal-50 text-teal-600 border-teal-200';
+                        } else if (record.isSickLeave) {
+                            status = '病假';
+                            statusStyle = 'bg-amber-50 text-amber-600 border-amber-200';
+                        }
+
+                        const isWeekend = dayItem.weekday === '六' || dayItem.weekday === '日';
+
+                        return (
+                            <div key={dateStr} className={`bg-[var(--bg-primary)] p-2.5 min-h-[110px] flex flex-col gap-1.5 relative group hover:bg-[var(--bg-secondary)] transition-colors ${isWeekend ? 'bg-[var(--bg-secondary)]/20' : ''}`}>
+                                <div className="flex justify-between items-start">
+                                    <span className={`text-base font-bold ${isWeekend ? 'text-red-500' : 'text-[var(--text-primary)]'}`}>
+                                        {dayItem.day}
+                                    </span>
+                                    <div className="flex items-center gap-1">
+                                        {data?.config?.empType === 'PART_TIME' && record.workHours > 0 && (
+                                            <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 shadow-sm">
+                                                {record.workHours}h
+                                            </span>
+                                        )}
                                         {user.role === 'BOSS' && (
                                             <button
                                                 onClick={() => {
                                                     setEditingDay(dayItem);
                                                     setEditType('LEAVE'); // Default
                                                 }}
-                                                className="text-xs btn-ghost text-blue-400 hover:text-blue-300"
+                                                className="opacity-0 group-hover:opacity-100 text-[10px] font-bold bg-blue-50 text-blue-600 px-2 py-0.5 rounded shadow-sm transition-opacity"
                                             >
                                                 編輯
                                             </button>
                                         )}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+                                    </div>
+                                </div>
+                                <div className="flex-1 space-y-1">
+                                    <div className={`text-[10px] px-1.5 py-0.5 rounded border text-center font-bold shadow-sm ${statusStyle}`}>
+                                        {status}
+                                    </div>
+                                    {hasSales && (
+                                        <div className="text-xs font-bold text-emerald-600 text-center font-mono">
+                                            +${sales.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                                        </div>
+                                    )}
+                                    {Math.abs(record.loss || 0) > 0.01 && (
+                                        <div className="text-[11px] font-bold text-red-600 text-center font-mono bg-red-50 rounded py-[1px]">
+                                            -${Math.abs(record.loss).toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                                        </div>
+                                    )}
+                                    {record.note && (
+                                        <div className="text-[10px] text-slate-500 leading-tight mt-1 line-clamp-2" title={record.note}>
+                                            {record.note}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
 
-            {/* --- Mobile Daily Records (Direct Presentation) --- */}
-            <div className="md:hidden space-y-2">
-                {days.map((dayItem) => {
-                    const dateStr = dayItem.date;
-                    const dateParts = dateStr.split('-');
-                    const shortDate = `${dateParts[1]}/${dateParts[2]}`;
-                    const sales = data?.dailyData?.[dateStr] || 0;
-                    const record = data?.dailyRecords?.[dateStr] || {};
-                    const hasSales = sales > 0;
+            {/* --- Mobile Daily Records (Calendar Presentation) --- */}
+            <div className="md:hidden glass-panel overflow-hidden p-2 mt-4">
+                <div className="grid grid-cols-7 gap-px bg-[var(--border-primary)] rounded-lg overflow-hidden border border-[var(--border-primary)] shadow-sm">
+                    {/* Weekday Headers */}
+                    {['日', '一', '二', '三', '四', '五', '六'].map((day, idx) => (
+                        <div key={day} className={`bg-[var(--bg-secondary)] text-center py-1.5 text-[10px] font-bold ${idx === 0 || idx === 6 ? 'text-red-500' : 'text-[var(--text-secondary)]'}`}>
+                            {day}
+                        </div>
+                    ))}
 
-                    let status = '休';
-                    let statusColor = 'bg-yellow-100 text-yellow-700';
-                    if (hasSales) { status = '勤'; statusColor = 'bg-green-100 text-green-700'; }
-                    else if (record.isLeave) { status = '休'; statusColor = 'bg-yellow-100 text-yellow-700'; }
-                    else if (record.isSpecialLeave) { status = '特'; statusColor = 'bg-emerald-100 text-emerald-500'; }
-                    else if (record.isSickLeave) { status = '病'; statusColor = 'bg-amber-100 text-amber-700'; }
+                    {/* Empty Slots */}
+                    {Array.from({ length: new Date(year, month - 1, 1).getDay() }).map((_, i) => (
+                        <div key={`empty-${i}`} className="bg-[var(--bg-secondary)]/30 min-h-[64px]"></div>
+                    ))}
 
-                    const isWeekend = dayItem.weekday === '六' || dayItem.weekday === '日';
+                    {/* Day Cells */}
+                    {days.map((dayItem) => {
+                        const dateStr = dayItem.date;
+                        const sales = data?.dailyData?.[dateStr] || 0;
+                        const record = data?.dailyRecords?.[dateStr] || {};
+                        const hasSales = sales > 0;
 
-                    return (
-                        <div key={dateStr} className={`bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)] p-2 flex items-center shadow-sm text-xs ${isWeekend ? 'bg-[var(--bg-secondary)]/50' : ''}`}>
-                            {/* Date & Week */}
-                            <div className="w-14 items-center flex flex-col justify-center border-r border-[var(--border-primary)] pr-2 mr-2">
-                                <span className={`font-bold text-sm ${dayItem.weekday === '日' ? 'text-rose-500' : 'text-[var(--text-primary)]'}`}>{shortDate}</span>
-                                <span className={`text-[10px] ${dayItem.weekday === '日' ? 'text-rose-400' : 'text-[var(--text-tertiary)]'}`}>週{dayItem.weekday}</span>
-                            </div>
+                        let status = '休';
+                        let statusStyle = 'bg-yellow-50 text-yellow-600';
 
-                            {/* Content Middle */}
-                            <div className="flex-1 grid grid-cols-3 gap-1 items-center">
-                                {/* Sales */}
-                                <div className="text-center">
-                                    <p className="text-[9px] text-[var(--text-tertiary)] mb-0.5">業績</p>
-                                    <p className={`font-bold ${sales > 0 ? 'text-emerald-500' : 'text-slate-300'}`}>{sales > 0 ? `$${sales.toLocaleString()}` : '-'}</p>
+                        if (hasSales) {
+                            status = '勤';
+                            statusStyle = 'bg-emerald-50 text-emerald-600';
+                        } else if (record.isLeave) {
+                            status = '休';
+                            statusStyle = 'bg-yellow-50 text-yellow-600';
+                        } else if (record.isSpecialLeave) {
+                            status = '特';
+                            statusStyle = 'bg-teal-50 text-teal-600';
+                        } else if (record.isSickLeave) {
+                            status = '病';
+                            statusStyle = 'bg-amber-50 text-amber-600';
+                        }
+
+                        const isWeekend = dayItem.weekday === '六' || dayItem.weekday === '日';
+
+                        return (
+                            <div key={dateStr}
+                                 onClick={() => {
+                                     if(user.role === 'BOSS') {
+                                         setEditingDay(dayItem);
+                                         setEditType('LEAVE');
+                                     }
+                                 }}
+                                 className={`bg-[var(--bg-primary)] p-1 min-h-[64px] flex flex-col items-center relative active:bg-[var(--bg-secondary)] transition-colors ${isWeekend ? 'bg-[var(--bg-secondary)]/20' : ''} ${user.role === 'BOSS' ? 'cursor-pointer' : ''}`}>
+                                
+                                <span className={`text-[11px] font-bold ${isWeekend ? 'text-red-500' : 'text-[var(--text-primary)]'} leading-none mb-0.5`}>
+                                    {dayItem.day}
+                                </span>
+                                
+                                <div className={`text-[9px] px-1 py-[2px] rounded text-center font-bold shadow-sm w-full leading-none mb-0.5 ${statusStyle}`}>
+                                    {status}
                                 </div>
-                                {/* Status */}
-                                <div className="text-center">
-                                    <p className="text-[9px] text-[var(--text-tertiary)] mb-0.5">狀態</p>
-                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${statusColor}`}>{status}</span>
-                                </div>
-                                {/* Loss */}
-                                <div className="text-center">
-                                    <p className="text-[9px] text-[var(--text-tertiary)] mb-0.5">虧損</p>
-                                    <p className={`font-bold ${record.loss ? 'text-red-500' : 'text-slate-300'}`}>{record.loss ? `-$${Number(record.loss).toLocaleString()}` : '-'}</p>
-                                </div>
-                            </div>
-
-                            {/* Edit Button Right */}
-                            <div className="pl-2 ml-1 border-l border-[var(--border-primary)]">
-                                {user.role === 'BOSS' && (
-                                    <button
-                                        onClick={() => { setEditingDay(dayItem); setEditType('LEAVE'); }}
-                                        className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] text-[var(--text-tertiary)] hover:bg-[var(--bg-secondary)] hover:text-blue-500"
-                                    >
-                                        <span className="text-[10px]">編輯</span>
-                                    </button>
+                                
+                                {data?.config?.empType === 'PART_TIME' && record.workHours > 0 && (
+                                    <div className="text-[8px] font-bold text-amber-600 text-center tracking-tighter leading-none mb-0.5">
+                                        {record.workHours}h
+                                    </div>
+                                )}
+                                
+                                {hasSales && (
+                                    <div className="text-[8px] font-bold text-emerald-600 text-center tracking-tighter leading-none mb-0.5">
+                                        +{sales.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                                    </div>
+                                )}
+                                
+                                {Math.abs(record.loss || 0) > 0.01 && (
+                                    <div className="text-[8px] font-bold text-red-600 text-center tracking-tighter bg-red-50 rounded w-full leading-none py-[2px]">
+                                        -{Math.abs(record.loss).toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                                    </div>
+                                )}
+                                
+                                {record.note && (
+                                    <div className="absolute top-0 right-0 w-1.5 h-1.5 bg-blue-400 rounded-full m-1 shadow-sm"></div>
                                 )}
                             </div>
-                        </div>
-                    );
-                })}
+                        );
+                    })}
+                </div>
+                {user.role === 'BOSS' && (
+                    <div className="text-center mt-2.5 text-[10px] text-[var(--text-tertiary)] flex items-center justify-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-blue-400 rounded-full inline-block"></span> 有藍點代表該日有備註，點擊日期方格即可編輯
+                    </div>
+                )}
             </div>
 
             {/* Edit Modal (Day) */}
