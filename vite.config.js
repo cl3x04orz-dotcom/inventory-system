@@ -13,7 +13,7 @@ export default defineConfig({
       includeAssets: ['logo.png', 'logo192.png', 'logo512.png'],
       manifest: {
         name: '進銷存與薪資登錄系統',
-        short_name: '進銷存',
+        short_name: 'M.Z.W',
         description: '內部進銷存與薪資查詢系統',
         theme_color: '#ffffff',
         background_color: '#ffffff',
