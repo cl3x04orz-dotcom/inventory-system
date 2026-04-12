@@ -194,9 +194,6 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
     const load = useCallback(async () => {
         try {
-            // [New] 查詢員工類型，決定是否顯示工時輸入欄
-            const empTypeRes = await callGAS(apiUrl, 'getEmpType', { targetUser: user.username }, user.token);
-            setIsPartTime(empTypeRes?.empType === 'PART_TIME');
 
             const data = await callGAS(apiUrl, 'getProducts', {}, user.token);
             console.log('Sales Page - Raw Products Data:', data);
@@ -323,6 +320,22 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             setTargetSalesRep(user.username);
         }
     }, [user, targetSalesRep]);
+
+    // [New] Dynamically update isPartTime based on the selected targetSalesRep
+    useEffect(() => {
+        const fetchEmpType = async () => {
+            const userToCheck = targetSalesRep || user?.username;
+            if (userToCheck && apiUrl && user?.token) {
+                try {
+                    const empTypeRes = await callGAS(apiUrl, 'getEmpType', { targetUser: userToCheck }, user.token);
+                    setIsPartTime(empTypeRes?.empType === 'PART_TIME');
+                } catch (e) {
+                    console.error('Failed to fetch emp type for', userToCheck, e);
+                }
+            }
+        };
+        fetchEmpType();
+    }, [targetSalesRep, user?.username, apiUrl, user?.token]);
 
     // Recalculate row
     const handleRowChange = (id, field, value) => {
