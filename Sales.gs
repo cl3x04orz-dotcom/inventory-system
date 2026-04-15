@@ -244,6 +244,8 @@ function getSalesHistory(payload) {
   const IDX_STATUS = 9; // J欄 (狀態)
   const IDX_PAY_DATE = 12; // M欄 (實際收款日期) - [New]
   const IDX_ACTUAL_METHOD = 13; // N欄 (實際收款方式) - [New]
+  const IDX_WORK_HOURS = 14;    // O欄 (工讀生工時) - [New]
+  const IDX_WEATHER = 15;       // P欄 (天氣狀況) - [New]
 
   const matchedSales = {}; // SaleID -> Info
 
@@ -292,7 +294,9 @@ function getSalesHistory(payload) {
       paymentDate: pDate,
       status: rowStatus,
       operator: String(row[11] || ""),
-      isCollectionReportMode: isCollectionInBatch && !isSaleInBatch // 標註這是補收回的單
+      isCollectionReportMode: isCollectionInBatch && !isSaleInBatch, // 標註這是補收回的單
+      workHours: row[IDX_WORK_HOURS] || "",
+      weather: row[IDX_WEATHER] || "SUNNY"
     };
   }
 
@@ -335,7 +339,9 @@ function getSalesHistory(payload) {
         paymentMethod: displayMethod,
         saleId: dSaleId,
         operator: info.operator,
-        isCollectionReportMode: info.isCollectionReportMode // [New] 務必回傳此標記供前端判斷
+        isCollectionReportMode: info.isCollectionReportMode, // [New] 務必回傳此標記供前端判斷
+        workHours: info.workHours,
+        weather: info.weather
       });
     }
   }
@@ -1564,15 +1570,30 @@ function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOrig
 
   // 3. 計算平均量 + 10% 緩衝 - 目前車上的貨
   const suggestions = {};
+  const productMap = getProductMap_(); // 獲取產品名稱以供判斷包裝
+
   for (const pId in salesStats) {
+    const pName = productMap[pId] || pId;
     const values = salesStats[pId];
     const avg = values.reduce((m, v) => m + v, 0) / values.length;
-    const target = Math.ceil(avg * 1.1); // 加上 10% 緩衝並無條件進位
+    
+    // [New] 判斷包裝基數 (自動補滿邏輯)
+    // 質立、植物優格預設為 2 入一組，其餘為 1
+    let packSize = 1;
+    if (pName.includes("質立") || pName.includes("植物優格")) {
+        packSize = 2;
+    }
+
+    // 加上 10% 緩衝，並根據包裝基數向上取整
+    let target = Math.ceil(avg * 1.1); 
+    target = Math.ceil(target / packSize) * packSize;
     
     const onTruck = Number(currentOriginals[pId] || 0);
-    const needToPick = Math.max(0, target - onTruck);
-    
+    let needToPick = Math.max(0, target - onTruck);
+
+    // 最終建議量也必須符合包裝倍數，避免拆包
     if (needToPick > 0) {
+      needToPick = Math.ceil(needToPick / packSize) * packSize;
       suggestions[pId] = needToPick;
     }
   }

@@ -252,7 +252,9 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                 totalNonCashWithExpenseEntry: 0,
                 rawFinalTotal: 0,
                 totalLinePay: 0,
-                collectionNote: item.collectionNote
+                collectionNote: item.collectionNote,
+                workHours: item.workHours,
+                weather: item.weather
             };
         }
         acc[key].items.push(item);
@@ -620,6 +622,9 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                         <div className="text-xs font-mono text-[var(--text-tertiary)] flex items-center gap-2">
                                                             {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                                             {group.dateDisplay}
+                                                            <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-black ${group.weather === 'SUNNY' ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                                                {group.weather === 'SUNNY' ? '☀️ 晴' : '☔ 雨'}
+                                                            </span>
                                                         </div>
                                                         <div className="flex flex-col items-end gap-2">
                                                             <div className="text-emerald-600 font-bold font-mono text-lg">${(Math.round(group.totalAmount) || 0).toLocaleString()}</div>
@@ -642,10 +647,15 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                                 <div className="text-[10px] text-amber-600 font-medium ml-4">{group.collectionNote}</div>
                                                             )}
                                                         </div>
-                                                        <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-md">
+                                                        <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-md whitespace-nowrap">
                                                             <User size={12} /> <span>{group.salesRep}</span>
                                                             {group.operator && group.operator !== group.salesRep && (
                                                                 <span className="text-[10px] text-amber-600 ml-1">(修正：{group.operator})</span>
+                                                            )}
+                                                            {group.workHours && Number(group.workHours) > 0 && (
+                                                                <span className="ml-1.5 px-1 py-0.5 bg-amber-50 text-amber-700 text-[9px] font-black rounded border border-amber-200">
+                                                                    {group.workHours}h
+                                                                </span>
                                                             )}
                                                         </div>
                                                     </div>
@@ -722,7 +732,12 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                             {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                                                         </td>
                                                         <td className="p-3 text-[var(--text-tertiary)] font-mono text-xs">
-                                                            {group.dateDisplay}
+                                                            <div className="flex items-center gap-2">
+                                                                {group.dateDisplay}
+                                                                <span title={group.weather === 'SUNNY' ? '晴天' : '雨天'} className="text-base cursor-help">
+                                                                    {group.weather === 'SUNNY' ? '☀️' : '☔'}
+                                                                </span>
+                                                            </div>
                                                         </td>
                                                         <td className="p-3">
                                                             <div className="font-bold text-[var(--text-primary)] text-base leading-tight">{group.location}</div>
@@ -731,7 +746,14 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                             )}
                                                         </td>
                                                         <td className="p-3 text-[var(--text-secondary)] text-sm">
-                                                            <div className="font-bold">{group.salesRep}</div>
+                                                            <div className="flex items-center gap-1.5 whitespace-nowrap">
+                                                                <span className="font-bold">{group.salesRep}</span>
+                                                                {group.workHours && Number(group.workHours) > 0 && (
+                                                                    <span className="px-1 py-0.5 bg-amber-50 text-amber-700 text-[9px] font-black rounded border border-amber-200 leading-none">
+                                                                        {group.workHours}h
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                             {group.operator && group.operator !== group.salesRep && (
                                                                 <div className="text-[10px] text-amber-600 font-normal mt-0.5">修正：{group.operator}</div>
                                                             )}
