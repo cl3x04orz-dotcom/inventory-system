@@ -67,6 +67,8 @@ function apiHandler(request) {
         'getSalesByDateRange': 'sales_entry', // Date range records for merge printing
         'getTemplatesList': 'sales_entry', // Allow sales entry to list templates
         'generatePdf': 'sales_entry', // Allow sales entry to generate PDF
+        'getSmartPickSuggestion': 'sales_entry', // [New] AI Replenishment
+        'getAllUniqueCustomers': 'sales_entry', // [New] AI Customer List
         
         // Purchase (進貨管理)
         'addPurchase': 'purchase_entry', 
@@ -192,6 +194,8 @@ function apiHandler(request) {
             case 'getRecentSalesToday': return typeof getRecentSalesToday !== 'undefined' ? getRecentSalesToday(payload) : {error: 'Service missing'};
             case 'getSalesByDateRange': return typeof getSalesByDateRange !== 'undefined' ? getSalesByDateRange(payload) : {error: 'Service missing'};
             case 'getSaleToClone': return typeof getSaleToCloneService !== 'undefined' ? getSaleToCloneService(payload) : {error: 'Service missing'};
+            case 'getSmartPickSuggestion': return typeof getSmartPickSuggestionService !== 'undefined' ? getSmartPickSuggestionService(payload.customer, payload.dayOfWeek, payload.weather, payload.currentOriginals) : {error: 'Service missing'};
+            case 'getAllUniqueCustomers': return typeof getAllUniqueCustomersService !== 'undefined' ? getAllUniqueCustomersService() : {error: 'Service missing'};
             case 'voidAndFetchSale': return typeof voidAndFetchSaleService !== 'undefined' ? voidAndFetchSaleService(payload) : {error: 'Service missing'};
             case 'getTemplatesList': return typeof getTemplatesListService !== 'undefined' ? getTemplatesListService() : {error: 'Service missing'};
             case 'generatePdf': return typeof generatePdfService !== 'undefined' ? generatePdfService(payload) : {error: 'Service missing'}; 

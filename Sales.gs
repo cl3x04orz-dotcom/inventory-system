@@ -76,7 +76,8 @@ function saveSalesService(data, user) {
         finalOperator,                         // Col 11 (L 欄): 實際操作者
         '',                                    // Col 12 (M 欄): 保留
         '',                                    // Col 13 (N 欄): 保留
-        data.workHours || ''                   // Col 14 (O 欄): 工讀生工時
+        data.workHours || '',                  // Col 14 (O 欄): 工讀生工時
+        data.weather || 'SUNNY'                // Col 15 (P 欄): 天氣狀況
     ];
 
     // 3.2 準備 Expenditures Row (Col 0-18)
@@ -1464,4 +1465,128 @@ function getProductInfoMap_() {
     }
   }
   return map;
+}
+
+/**
+ * 取得系統中所有不重複的客戶地點名稱 (供 AI 預測下拉選單使用)
+ */
+function getAllUniqueCustomersService() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const salesSheet = ss.getSheetByName('Sales');
+  if (!salesSheet) return [];
+  
+  const values = salesSheet.getDataRange().getValues();
+  const IDX_CUST = 6; // G 欄
+  const customers = new Set();
+  
+  for (let i = 1; i < values.length; i++) {
+    const cust = String(values[i][IDX_CUST] || "").trim();
+    if (cust && cust !== "客戶/地點") customers.add(cust);
+  }
+  
+  return Array.from(customers).sort();
+}
+
+/**
+ * AI 智慧補貨建議核心邏輯
+ * @param {string} customer 目標客戶/市場
+ * @param {number} dayOfWeek 星期幾 (0-6)
+ * @param {string} weather 預期天氣 (SUNNY/RAINY)
+ * @param {Object} currentOriginals 目前車上剩餘量 { productId: quantity }
+ */
+function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOriginals) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const salesSheet = ss.getSheetByName('Sales');
+  const detailsSheet = ss.getSheetByName('SalesDetails');
+  if (!salesSheet || !detailsSheet) return { success: false, error: "Sheet not found" };
+
+  const salesValues = salesSheet.getDataRange().getValues();
+  const detailsValues = detailsSheet.getDataRange().getValues();
+  
+  const IDX_ID = 0;
+  const IDX_DATE = 1;
+  const IDX_CUST = 6;
+  const IDX_WEATHER = 15; // P 欄
+
+  const targetCustomer = (customer || "").trim().toLowerCase();
+  
+  // 1. 篩選符合條件的提貨單 ID
+  // 優先級：完全匹配 (同星期 + 同天氣) -> 回退 (僅同星期)
+  const tier1Ids = []; // 同星期 + 同天氣
+  const tier2Ids = []; // 同星期
+  
+  for (let i = salesValues.length - 1; i >= 1; i--) {
+    const row = salesValues[i];
+    const sId = String(row[IDX_ID] || "").trim();
+    const rowCust = String(row[IDX_CUST] || "").trim().toLowerCase();
+    const rowStatus = String(row[9] || "").toUpperCase();
+    if (rowStatus === 'VOID') continue;
+    
+    if (rowCust === targetCustomer) {
+      const rowDate = new Date(row[IDX_DATE]);
+      if (rowDate.getDay() === dayOfWeek) {
+        tier2Ids.push(sId);
+        const rowWeather = String(row[IDX_WEATHER] || "SUNNY").toUpperCase();
+        if (rowWeather === weather.toUpperCase()) {
+          tier1Ids.push(sId);
+        }
+      }
+    }
+  }
+
+  // 決定使用的樣本 IDs (取最近 3 次)
+  const finalSampleIds = tier1Ids.length >= 3 ? tier1Ids.slice(0, 3) : tier2Ids.slice(0, 3);
+  const fallbackLevel = tier1Ids.length >= 3 ? "EXACT" : (tier2Ids.length > 0 ? "DOW_ONLY" : "NO_DATA");
+
+  if (finalSampleIds.length === 0) {
+    return { 
+      success: true, 
+      suggestions: {}, 
+      fallbackLevel: "NO_DATA",
+      message: "此星期尚無歷史數據可供分析" 
+    };
+  }
+
+  // 2. 統計樣本中的「銷售量」 (Sold)
+  const salesStats = {}; // productId -> [soldValues]
+  const sampleIdSet = new Set(finalSampleIds);
+  
+  for (let j = 1; j < detailsValues.length; j++) {
+    const dRow = detailsValues[j];
+    const dSaleId = String(dRow[0] || "").trim();
+    if (sampleIdSet.has(dSaleId)) {
+      const pId = String(dRow[1] || "").trim();
+      const sold = Number(dRow[5] || 0); // Sold 欄位在索引 5
+      if (!salesStats[pId]) salesStats[pId] = [];
+      salesStats[pId].push(sold);
+    }
+  }
+
+  // 3. 計算平均量 + 10% 緩衝 - 目前車上的貨
+  const suggestions = {};
+  for (const pId in salesStats) {
+    const values = salesStats[pId];
+    const avg = values.reduce((m, v) => m + v, 0) / values.length;
+    const target = Math.ceil(avg * 1.1); // 加上 10% 緩衝並無條件進位
+    
+    const onTruck = Number(currentOriginals[pId] || 0);
+    const needToPick = Math.max(0, target - onTruck);
+    
+    if (needToPick > 0) {
+      suggestions[pId] = needToPick;
+    }
+  }
+
+  const messageMap = {
+    "EXACT": `已根據過去 5 次「${weather === 'SUNNY' ? '晴天' : '雨天'}的星期${['日','一','二','三','四','五','六'][dayOfWeek]}」數據為您預估。`,
+    "DOW_ONLY": `「${weather === 'SUNNY' ? '晴天' : '雨天'}」記錄較少，已為您改用「歷史所有星期${['日','一','二','三','四','五','六'][dayOfWeek]}」平均值預估。`,
+    "NO_DATA": "尚無符合條件的數據。"
+  };
+
+  return { 
+    success: true, 
+    suggestions, 
+    fallbackLevel,
+    message: messageMap[fallbackLevel]
+  };
 }

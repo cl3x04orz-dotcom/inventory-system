@@ -80,6 +80,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [workHours, setWorkHours] = useState(''); // [New] 工讀生工時輸入
     const [isPartTime, setIsPartTime] = useState(false); // [New] 是否為工讀生
+    const [weather, setWeather] = useState('SUNNY'); // [New] 今日天氣狀況
     // [New] 防止重複提交的 ID
     const [submissionId, setSubmissionId] = useState(() => `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
 
@@ -96,6 +97,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [selectedSaleIds, setSelectedSaleIds] = useState([]);
     const [isMergePrinting, setIsMergePrinting] = useState(false);
     const [allAvailableProducts, setAllAvailableProducts] = useState([]); // All sorted products for merge print reference
+    const [systemCustomers, setSystemCustomers] = useState([]); // [New] 全系統客戶名單快取
 
     // [New] History Import States
     const [showHistoryImportModal, setShowHistoryImportModal] = useState(false);
@@ -312,7 +314,16 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             }
         };
         init();
-    }, [user.token, load]);
+
+        // [New] Preload system-wide unique customers for AI replenishment
+        const fetchSystemCustomers = async () => {
+            try {
+                const res = await callGAS(apiUrl, 'getAllUniqueCustomers', {}, user.token);
+                if (res && Array.isArray(res)) setSystemCustomers(res);
+            } catch (e) { console.error("Failed to fetch system customers", e); }
+        };
+        fetchSystemCustomers();
+    }, [apiUrl, user.token, load]);
 
     // [New] Ensure targetSalesRep is initialized to the current user
     useEffect(() => {
@@ -722,7 +733,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 submissionId: submissionId, // [New] 防止重複存檔的唯一辨識碼
                 originalDate: originalDate, // [New] 傳回原始日期
                 originalSaleId: originalSaleId, // [New] 傳回原始 ID 用於備註
-                workHours: workHours // [New] 工時
+                workHours: workHours, // [New] 工時
+                weather: weather // [New] 天氣
             };
 
             setIsSubmitting(true);
@@ -831,7 +843,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     };
 
     // Merge Print Handler
-    const handleMergePrint = async () => {
+    const handleMergePrint = async (aiSuggestions = null) => {
         if (selectedSaleIds.length === 0) {
             alert('請至少選擇一筆單據');
             return;
@@ -880,11 +892,13 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     displayPrice = row.price || '';
                 }
 
+                const aiQty = aiSuggestions ? aiSuggestions[String(row.id)] : null;
+
                 return {
                     name: row.name,
                     stock: 0, // 合併列印時不顯示庫存
                     originalStock: 0,
-                    picked: p ? p.picked.filter(v => v !== 0 && v !== '0' && v !== '').join(' / ') : '',
+                    picked: aiQty !== null ? aiQty : (p ? p.picked.filter(v => v !== 0 && v !== '0' && v !== '').join(' / ') : ''),
                     original: p ? p.original.filter(v => v !== 0 && v !== '0' && v !== '').join(' / ') : '',
                     returns: p ? p.returns.filter(v => v !== 0 && v !== '0' && v !== '').join(' / ') : '',
                     sold: p ? p.sold.filter(v => v !== 0 && v !== '0' && v !== '').join(' / ') : '',
@@ -1153,11 +1167,10 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 step="0.5"
                                 min="0"
                                 required
-                                className={`bg-white border-2 text-amber-900 text-base font-bold rounded-lg px-3 py-1 w-20 text-center focus:ring-2 focus:ring-amber-400 outline-none transition-colors ${
-                                    !workHours || Number(workHours) <= 0
+                                className={`bg-white border-2 text-amber-900 text-base font-bold rounded-lg px-3 py-1 w-20 text-center focus:ring-2 focus:ring-amber-400 outline-none transition-colors ${!workHours || Number(workHours) <= 0
                                         ? 'border-red-300 bg-red-50'
                                         : 'border-amber-300'
-                                }`}
+                                    }`}
                                 placeholder="0.5"
                                 value={workHours}
                                 onChange={(e) => setWorkHours(e.target.value)}
@@ -1181,6 +1194,43 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             )}
                         </div>
                     )}
+
+                    {/* [New] Weather Selector Banner - 樣式同工讀計時 */}
+                    <div className="flex items-center gap-3 mb-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100">
+                        <span className="text-base">{weather === 'SUNNY' ? '☀️' : '☔'}</span>
+                        <span className="text-sm font-bold text-blue-800">今日天氣</span>
+                        <span className="text-xs text-blue-600">請紀錄當前氣候狀況：</span>
+
+                        <div className="flex bg-white/50 rounded-lg p-1 border border-blue-200 shrink-0 shadow-sm ml-2">
+                            <button
+                                type="button"
+                                onClick={() => setWeather('SUNNY')}
+                                className={`flex items-center gap-2 px-4 py-1.5 text-xs font-black rounded-md transition-all ${weather === 'SUNNY'
+                                        ? 'bg-amber-500 text-white shadow-md'
+                                        : 'text-blue-400 hover:text-blue-600 hover:bg-white'
+                                    }`}
+                            >
+                                ☀️ 晴天
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setWeather('RAINY')}
+                                className={`flex items-center gap-2 px-4 py-1.5 text-xs font-black rounded-md transition-all ${weather === 'RAINY'
+                                        ? 'bg-indigo-600 text-white shadow-md'
+                                        : 'text-blue-400 hover:text-blue-600 hover:bg-white'
+                                    }`}
+                            >
+                                ☔ 雨天
+                            </button>
+                        </div>
+
+                        <span className={`ml-auto text-xs font-bold px-3 py-1 rounded-full transition-all duration-500 ${weather === 'SUNNY'
+                                ? 'bg-amber-100 text-amber-600'
+                                : 'bg-indigo-100 text-indigo-600'
+                            }`}>
+                            {weather === 'SUNNY' ? '✓ 今日為晴天' : '✓ 今日為雨天'}
+                        </span>
+                    </div>
 
                     <div className="flex-1 overflow-auto">
                         {/* Mobile Card View (Visible on < md) */}
@@ -1600,6 +1650,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 }}
                 onMergePrint={handleMergePrint}
                 isPrinting={isMergePrinting}
+                systemCustomers={systemCustomers} // [New] 傳遞全系統客戶名單
             />
 
             {/* History Import Modal */}
