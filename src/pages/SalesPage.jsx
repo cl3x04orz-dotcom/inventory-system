@@ -843,7 +843,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     };
 
     // Merge Print Handler
-    const handleMergePrint = async (aiSuggestions = null) => {
+    const handleMergePrint = async (aiSuggestions = null, aiLocation = null) => {
         if (selectedSaleIds.length === 0) {
             alert('請至少選擇一筆單據');
             return;
@@ -912,7 +912,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 templateId: 'Template_領貨單',
                 data: {
                     date: new Date().toISOString(),
-                    location: `合併列印 (${selectedRecords.length} 筆)`,
+                    location: aiLocation ? `合併列印 (${selectedRecords.length} 筆) - ${aiLocation}` : `合併列印 (${selectedRecords.length} 筆)`,
                     salesRep: user.username,
                     totalSalesAmount: '',
                     totalCashCalc: '',
@@ -1168,8 +1168,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 min="0"
                                 required
                                 className={`bg-white border-2 text-amber-900 text-base font-bold rounded-lg px-3 py-1 w-20 text-center focus:ring-2 focus:ring-amber-400 outline-none transition-colors ${!workHours || Number(workHours) <= 0
-                                        ? 'border-red-300 bg-red-50'
-                                        : 'border-amber-300'
+                                    ? 'border-red-300 bg-red-50'
+                                    : 'border-amber-300'
                                     }`}
                                 placeholder="0.5"
                                 value={workHours}
@@ -1206,8 +1206,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 type="button"
                                 onClick={() => setWeather('SUNNY')}
                                 className={`flex items-center gap-2 px-4 py-1.5 text-xs font-black rounded-md transition-all ${weather === 'SUNNY'
-                                        ? 'bg-amber-500 text-white shadow-md'
-                                        : 'text-blue-400 hover:text-blue-600 hover:bg-white'
+                                    ? 'bg-amber-500 text-white shadow-md'
+                                    : 'text-blue-400 hover:text-blue-600 hover:bg-white'
                                     }`}
                             >
                                 ☀️ 晴天
@@ -1216,8 +1216,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 type="button"
                                 onClick={() => setWeather('RAINY')}
                                 className={`flex items-center gap-2 px-4 py-1.5 text-xs font-black rounded-md transition-all ${weather === 'RAINY'
-                                        ? 'bg-indigo-600 text-white shadow-md'
-                                        : 'text-blue-400 hover:text-blue-600 hover:bg-white'
+                                    ? 'bg-indigo-600 text-white shadow-md'
+                                    : 'text-blue-400 hover:text-blue-600 hover:bg-white'
                                     }`}
                             >
                                 ☔ 雨天
@@ -1225,8 +1225,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                         </div>
 
                         <span className={`ml-auto text-xs font-bold px-3 py-1 rounded-full transition-all duration-500 ${weather === 'SUNNY'
-                                ? 'bg-amber-100 text-amber-600'
-                                : 'bg-indigo-100 text-indigo-600'
+                            ? 'bg-amber-100 text-amber-600'
+                            : 'bg-indigo-100 text-indigo-600'
                             }`}>
                             {weather === 'SUNNY' ? '✓ 今日為晴天' : '✓ 今日為雨天'}
                         </span>

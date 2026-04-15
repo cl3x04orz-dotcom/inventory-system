@@ -99,8 +99,8 @@ export default function MergePrintModal({
 
             if (res.success) {
                 setAiMessage({ type: 'success', text: res.message });
-                // 執行合併列印，並傳入 AI 建議的提貨量作為覆蓋值
-                onMergePrint(res.suggestions);
+                // 執行合併列印，並傳入 AI 建議的提貨量作為覆蓋值，以及預測地點
+                onMergePrint(res.suggestions, aiCustomer);
             } else {
                 alert(res.error || 'AI 預測失敗');
             }
