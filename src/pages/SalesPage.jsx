@@ -844,7 +844,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
     // Merge Print Handler
     const handleMergePrint = async (aiSuggestions = null, aiLocation = null) => {
-        if (selectedSaleIds.length === 0) {
+        if (selectedSaleIds.length === 0 && !aiSuggestions) {
             alert('請至少選擇一筆單據');
             return;
         }
@@ -912,7 +912,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 templateId: 'Template_領貨單',
                 data: {
                     date: new Date().toISOString(),
-                    location: aiLocation ? `合併列印 (${selectedRecords.length} 筆) - ${aiLocation}` : `合併列印 (${selectedRecords.length} 筆)`,
+                    location: aiLocation || '合併列印',
                     salesRep: user.username,
                     totalSalesAmount: '',
                     totalCashCalc: '',

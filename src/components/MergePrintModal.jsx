@@ -68,10 +68,7 @@ export default function MergePrintModal({
         }
 
         const selectedRecords = records.filter(r => selectedIds.includes(r.saleId));
-        if (selectedRecords.length === 0) {
-            alert('請先在下方勾選今日的單據，以計算目前車上剩餘量');
-            return;
-        }
+        // 如果沒選單據，currentOriginals 就會是空物件，表示車上目前沒貨量
 
         // 1. 統計目前選中單據中的 原貨+退貨 (即目前車上有的貨)
         const currentOriginals = {};
@@ -217,8 +214,8 @@ export default function MergePrintModal({
 
                         <button
                             onClick={handleAIReplenish}
-                            disabled={isAiLoading || !aiCustomer || selectedIds.length === 0}
-                            className={`w-full lg:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-black transition-all duration-300 shadow-xl active:scale-95 ${isAiLoading || !aiCustomer || selectedIds.length === 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none' : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:brightness-110 shadow-blue-200'}`}
+                            disabled={isAiLoading || !aiCustomer}
+                            className={`w-full lg:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-black transition-all duration-300 shadow-xl active:scale-95 ${isAiLoading || !aiCustomer ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none' : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:brightness-110 shadow-blue-200'}`}
                         >
                             {isAiLoading ? (
                                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
