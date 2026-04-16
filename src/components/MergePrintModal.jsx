@@ -35,11 +35,33 @@ export default function MergePrintModal({
     const setQuickPrintDate = (offset) => {
         const d = new Date();
         d.setDate(d.getDate() + offset);
-        setPrintDate(d.toISOString().split('T')[0]);
-        // [智慧連動] 如果設為明天，通常預估星期也會想看明天
-        if (offset === 1) setAiDayOfWeek(d.getDay());
-        // 如果設為今天，預估星期通常是看今天
-        if (offset === 0) setAiDayOfWeek(d.getDay());
+        const dateStr = d.toISOString().split('T')[0];
+        setPrintDate(dateStr);
+        // [智慧連動] 點擊快選日期時同步更新 AI 參考星期
+        setAiDayOfWeek(d.getDay());
+    };
+
+    // [New] 當點選歷史星期時，自動推算同週對應日期
+    const handleDOWClick = (idx) => {
+        setAiDayOfWeek(idx);
+        if (printDate) {
+            const d = new Date(printDate);
+            const currentDOW = d.getDay();
+            const diff = idx - currentDOW;
+            d.setDate(d.getDate() + diff);
+            setPrintDate(d.toISOString().split('T')[0]);
+        }
+    };
+
+    // [New] 當手動調整日期時，同步更新 AI 參考星期
+    const handlePrintDateChange = (newDate) => {
+        setPrintDate(newDate);
+        if (newDate) {
+            const d = new Date(newDate);
+            if (!isNaN(d.getTime())) {
+                setAiDayOfWeek(d.getDay());
+            }
+        }
     };
 
     const targetDOW = getDOWString(endDate);
@@ -211,7 +233,7 @@ export default function MergePrintModal({
                                         </label>
                                         <div className="grid grid-cols-7 gap-1 bg-gray-50/50 p-1 rounded-2xl border-2 border-blue-100 h-14">
                                             {['日', '一', '二', '三', '四', '五', '六'].map((day, idx) => (
-                                                <button key={idx} onClick={() => setAiDayOfWeek(idx)} className={`w-full flex items-center justify-center rounded-lg text-[11px] font-black transition-all ${aiDayOfWeek === idx ? 'bg-blue-600 text-white shadow-md' : 'text-blue-300 hover:bg-white/50 hover:text-blue-500'}`}>
+                                                <button key={idx} onClick={() => handleDOWClick(idx)} className={`w-full flex items-center justify-center rounded-lg text-[11px] font-black transition-all ${aiDayOfWeek === idx ? 'bg-blue-600 text-white shadow-md' : 'text-blue-300 hover:bg-white/50 hover:text-blue-500'}`}>
                                                     {day}
                                                 </button>
                                             ))}
@@ -237,7 +259,7 @@ export default function MergePrintModal({
                                             <button onClick={() => setQuickPrintDate(1)} className="px-5 py-2 rounded-xl text-xs font-black text-blue-500 hover:bg-gray-50 transition-all">明天 ▶</button>
                                         </div>
                                         <div className="relative">
-                                            <input type="date" value={printDate} onChange={(e) => setPrintDate(e.target.value)} className="bg-white border-2 border-blue-100 rounded-2xl px-5 py-3 text-sm font-black text-blue-900 outline-none focus:border-blue-400 shadow-sm transition-all" />
+                                            <input type="date" value={printDate} onChange={(e) => handlePrintDateChange(e.target.value)} className="bg-white border-2 border-blue-100 rounded-2xl px-5 py-3 text-sm font-black text-blue-900 outline-none focus:border-blue-400 shadow-sm transition-all" />
                                         </div>
                                         <div className="px-5 py-3 bg-indigo-50 text-indigo-700 rounded-2xl text-[11px] font-black border border-indigo-100 flex items-center gap-2 shadow-sm">
                                             <Sparkles size={14} className="animate-pulse" /> {getDOWString(printDate)}

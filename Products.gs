@@ -61,10 +61,19 @@ function getProductsService() {
         if (!nameCell && !idCell) continue;
         
         var productId = idCell || nameCell;
+        
+        // 讀取 I 欄位作包裝規格 (Index 8)
+        var packSize = 1;
+        if (row.length > 8) {
+            var psVal = Number(row[8]);
+            if (!isNaN(psVal) && psVal > 0) packSize = psVal;
+        }
+
         var p = {
             id: productId,
             name: nameCell,
             price: idxPrice !== -1 ? row[idxPrice] : 0,
+            packSize: packSize,
             stock: 0,
             originalStock: 0,
             _fromSheet: 'Products'

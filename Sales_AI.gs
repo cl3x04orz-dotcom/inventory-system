@@ -105,7 +105,8 @@ function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOrig
   };
 
   for (const pId in salesStatsMap) {
-    const pName = productMap[pId] || pId;
+    const pEntry = productMap[pId];
+    const pName = pEntry ? pEntry.name : pId;
     const itemSalesGrid = salesStatsMap[pId];
     
     const actualValues = finalSampleIds.map(id => itemSalesGrid[id] || 0);
@@ -117,8 +118,8 @@ function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOrig
         weightedAvg += actualValues[i] * activeWeights[i];
     }
     
-    let packSize = 1;
-    if (pName.includes("質立") || pName.includes("植物優格")) packSize = 2;
+    // 從產品主檔讀取包裝規格 (預設為 1)
+    let packSize = (pEntry && pEntry.packSize) ? pEntry.packSize : 1;
 
     let target = Math.ceil(weightedAvg * 1.1); 
     target = Math.ceil(target / packSize) * packSize;

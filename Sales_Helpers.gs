@@ -26,7 +26,17 @@ function getProductMap_() {
     const row = values[i];
     const id = row[idxId];
     if (id) {
-      map[String(id).trim()] = idxName !== -1 ? row[idxName] : id;
+      // 讀取 I 欄位 (Index 8) 作為包裝規格，預設為 1
+      let packSize = 1;
+      if (row.length > 8) {
+        const val = Number(row[8]);
+        if (!isNaN(val) && val > 0) packSize = val;
+      }
+
+      map[String(id).trim()] = {
+        name: idxName !== -1 ? String(row[idxName] || "").trim() : String(id).trim(),
+        packSize: packSize
+      };
     }
   }
   return map;
