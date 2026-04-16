@@ -52,9 +52,10 @@ function getReceivablesService(payload) {
           const qty = Number(detailRows[j][5] || 0);
           if (qty > 0) {
             const pId = detailRows[j][1];
+            const pEntry = productMap[pId];
             items.push({
               saleId: saleId,
-              productName: productMap[pId] || pId,
+              productName: pEntry ? pEntry.name : pId,
               qty: qty,
               price: Number(detailRows[j][6] || 0),
               subtotal: Number(detailRows[j][7] || 0)

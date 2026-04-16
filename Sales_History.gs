@@ -115,7 +115,8 @@ function getSalesHistory(payload) {
       if (soldQty <= 0) continue;
 
       const pId = String(row[D_IDX_PID] || "").trim();
-      const pName = productMap[pId] || pId || '未知商品';
+      const pEntry = productMap[pId];
+      const pName = pEntry ? pEntry.name : (pId || '未知商品');
       
       let collectionNote = "";
       let displayMethod = info.paymentMethod;
@@ -222,9 +223,10 @@ function getRecentSalesToday(payload) {
         const unitPrice = Number(detailsData[j][6] || 0);
         
         if (sold > 0 || picked > 0 || original > 0) {
+          const pEntry = productMap[productId];
           salesDetails.push({
             productId: productId,
-            productName: productMap[productId] || productId,
+            productName: pEntry ? pEntry.name : productId,
             picked: picked,
             original: original,
             returns: returns,
@@ -314,9 +316,10 @@ function getSalesByDateRange(payload) {
         const unitPrice = Number(detailsData[j][6] || 0);
         
         if (sold > 0 || picked > 0 || original > 0) {
+          const pEntry = productMap[productId];
           salesDetails.push({
             productId: productId,
-            productName: productMap[productId] || productId,
+            productName: pEntry ? pEntry.name : productId,
             picked: picked,
             original: original,
             returns: returns,
