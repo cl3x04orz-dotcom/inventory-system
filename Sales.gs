@@ -1504,10 +1504,43 @@ function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOrig
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const salesSheet = ss.getSheetByName('Sales');
   const detailsSheet = ss.getSheetByName('SalesDetails');
+  const invSheet = ss.getSheetByName('Inventory');
   if (!salesSheet || !detailsSheet) return { success: false, error: "Sheet not found" };
 
   const salesValues = salesSheet.getDataRange().getValues();
   const detailsValues = detailsSheet.getDataRange().getValues();
+  
+  // [New] 讀取倉庫庫存地圖 (僅計算 STOCK 與 VOID_REFUND)
+  const warehouseStockMap = {};
+  if (invSheet) {
+    const invData = invSheet.getDataRange().getValues();
+    const h = invData[0].map(v => String(v || '').trim().toLowerCase());
+    
+    // 嚴格尋找 ProductID 與 Quantity 欄位
+    let pidIdx = h.indexOf('productid');
+    if (pidIdx === -1) pidIdx = h.findIndex(v => v.includes('產品id') || v.includes('商品id'));
+    if (pidIdx === -1) pidIdx = 1; // 預設 B 欄
+
+    let qtyIdx = h.indexOf('quantity');
+    if (qtyIdx === -1) qtyIdx = h.findIndex(v => v.includes('數量') || v.includes('庫存量'));
+    if (qtyIdx === -1) qtyIdx = 2; // 預設 C 欄
+    
+    // 尋找 Type 欄位 (預設 F 欄)
+    let typeIdx = h.indexOf('type');
+    if (typeIdx === -1) typeIdx = h.findIndex(v => v.includes('類') || v.includes('型'));
+    if (typeIdx === -1) typeIdx = 5;
+
+    for (let i = 1; i < invData.length; i++) {
+        const pid = String(invData[i][pidIdx] || "").trim();
+        const qty = Number(invData[i][qtyIdx]) || 0;
+        const type = String(invData[i][typeIdx] || "").trim().toUpperCase();
+        
+        // [Fix] 核心修正：只採計 STOCK 與 VOID_REFUND 作為「倉庫可領取現貨」
+        if (pid && (type === 'STOCK' || type === 'VOID_REFUND')) {
+            warehouseStockMap[pid] = (warehouseStockMap[pid] || 0) + qty;
+        }
+    }
+  }
   
   const IDX_ID = 0;
   const IDX_DATE = 1;
@@ -1517,7 +1550,6 @@ function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOrig
   const targetCustomer = (customer || "").trim().toLowerCase();
   
   // 1. 篩選符合條件的提貨單 ID
-  // 優先級：完全匹配 (同星期 + 同天氣) -> 回退 (僅同星期)
   const tier1Ids = []; // 同星期 + 同天氣
   const tier2Ids = []; // 同星期
   
@@ -1540,29 +1572,21 @@ function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOrig
     }
   }
 
-  // 決定使用的樣本 IDs (取最近 3 次)
   const finalSampleIds = tier1Ids.length >= 3 ? tier1Ids.slice(0, 3) : tier2Ids.slice(0, 3);
   const fallbackLevel = tier1Ids.length >= 3 ? "EXACT" : (tier2Ids.length > 0 ? "DOW_ONLY" : "NO_DATA");
 
   if (finalSampleIds.length === 0) {
-    return { 
-      success: true, 
-      suggestions: {}, 
-      fallbackLevel: "NO_DATA",
-      message: "此星期尚無歷史數據可供分析" 
-    };
+    return { success: true, suggestions: {}, fallbackLevel: "NO_DATA", message: "此星期尚無歷史數據可供分析" };
   }
 
-  // 2. 統計樣本中的「銷售量」 (Sold)
-  const salesStats = {}; // productId -> [soldValues]
+  const salesStats = {}; 
   const sampleIdSet = new Set(finalSampleIds);
   
   for (let j = 1; j < detailsValues.length; j++) {
     const dRow = detailsValues[j];
-    const dSaleId = String(dRow[0] || "").trim();
-    if (sampleIdSet.has(dSaleId)) {
+    if (sampleIdSet.has(String(dRow[0] || "").trim())) {
       const pId = String(dRow[1] || "").trim();
-      const sold = Number(dRow[5] || 0); // Sold 欄位在索引 5
+      const sold = Number(dRow[5] || 0); 
       if (!salesStats[pId]) salesStats[pId] = [];
       salesStats[pId].push(sold);
     }
@@ -1570,44 +1594,55 @@ function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOrig
 
   // 3. 計算平均量 + 10% 緩衝 - 目前車上的貨
   const suggestions = {};
-  const productMap = getProductMap_(); // 獲取產品名稱以供判斷包裝
+  const productMap = getProductMap_(); 
+  let hasStockShortage = false;
 
   for (const pId in salesStats) {
     const pName = productMap[pId] || pId;
     const values = salesStats[pId];
     const avg = values.reduce((m, v) => m + v, 0) / values.length;
     
-    // [New] 判斷包裝基數 (自動補滿邏輯)
-    // 質立、植物優格預設為 2 入一組，其餘為 1
     let packSize = 1;
-    if (pName.includes("質立") || pName.includes("植物優格")) {
-        packSize = 2;
-    }
+    if (pName.includes("質立") || pName.includes("植物優格")) packSize = 2;
 
-    // 加上 10% 緩衝，並根據包裝基數向上取整
     let target = Math.ceil(avg * 1.1); 
     target = Math.ceil(target / packSize) * packSize;
     
     const onTruck = Number(currentOriginals[pId] || 0);
     let needToPick = Math.max(0, target - onTruck);
 
-    // 最終建議量也必須符合包裝倍數，避免拆包
     if (needToPick > 0) {
+      // 套用包裝基數
       needToPick = Math.ceil(needToPick / packSize) * packSize;
-      suggestions[pId] = needToPick;
+      
+      // [New] 庫存感知限制：不可超過倉庫現貨
+      const currentWarehouseQty = warehouseStockMap[pId] || 0;
+      if (needToPick > currentWarehouseQty) {
+          needToPick = currentWarehouseQty;
+          hasStockShortage = true;
+      }
+
+      if (needToPick > 0) {
+        suggestions[pId] = needToPick;
+      }
     }
   }
 
   const messageMap = {
-    "EXACT": `已根據過去 5 次「${weather === 'SUNNY' ? '晴天' : '雨天'}的星期${['日','一','二','三','四','五','六'][dayOfWeek]}」數據為您預估。`,
-    "DOW_ONLY": `「${weather === 'SUNNY' ? '晴天' : '雨天'}」記錄較少，已為您改用「歷史所有星期${['日','一','二','三','四','五','六'][dayOfWeek]}」平均值預估。`,
+    "EXACT": `已根據過去數據分析為您預估。`,
+    "DOW_ONLY": `已為您根據歷史同期平均值預估。`,
     "NO_DATA": "尚無符合條件的數據。"
   };
+
+  let finalMessage = messageMap[fallbackLevel];
+  if (hasStockShortage) {
+      finalMessage = `⚠️ 部分品項因中心倉庫存不足，已自動調整為最大可領取數量。${finalMessage}`;
+  }
 
   return { 
     success: true, 
     suggestions, 
-    fallbackLevel,
-    message: messageMap[fallbackLevel]
+    fallbackLevel: hasStockShortage ? "SHORTAGE" : fallbackLevel,
+    message: finalMessage
   };
 }
