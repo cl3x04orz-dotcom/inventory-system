@@ -1579,43 +1579,60 @@ function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOrig
     return { success: true, suggestions: {}, fallbackLevel: "NO_DATA", message: "此星期尚無歷史數據可供分析" };
   }
 
-  const salesStats = {}; 
+  // 2. 統計樣本中的「銷售量」 (Sold)，需保留與 ID 的對應關係以利加權
+  const salesStatsMap = {}; // productId -> { saleId: soldValue }
   const sampleIdSet = new Set(finalSampleIds);
   
   for (let j = 1; j < detailsValues.length; j++) {
-    const dRow = detailsValues[j];
-    if (sampleIdSet.has(String(dRow[0] || "").trim())) {
-      const pId = String(dRow[1] || "").trim();
-      const sold = Number(dRow[5] || 0); 
-      if (!salesStats[pId]) salesStats[pId] = [];
-      salesStats[pId].push(sold);
+    const dSaleId = String(detailsValues[j][0] || "").trim();
+    if (sampleIdSet.has(dSaleId)) {
+      const pId = String(detailsValues[j][1] || "").trim();
+      const sold = Number(detailsValues[j][5] || 0); 
+      if (!salesStatsMap[pId]) salesStatsMap[pId] = {};
+      salesStatsMap[pId][dSaleId] = sold;
     }
   }
 
-  // 3. 計算平均量 + 10% 緩衝 - 目前車上的貨
+  // 3. 計算「趨勢加權平均 (WMA)」 + 10% 緩衝 - 目前車上的貨
   const suggestions = {};
   const productMap = getProductMap_(); 
   let hasStockShortage = false;
 
-  for (const pId in salesStats) {
+  // 權重配置 (由新到舊)
+  const weightsConfig = {
+    1: [1.0],
+    2: [0.6, 0.4],
+    3: [0.5, 0.3, 0.2]
+  };
+
+  for (const pId in salesStatsMap) {
     const pName = productMap[pId] || pId;
-    const values = salesStats[pId];
-    const avg = values.reduce((m, v) => m + v, 0) / values.length;
+    const itemSalesGrid = salesStatsMap[pId];
+    
+    // 依據 finalSampleIds (從新到舊) 抓取數值
+    const actualValues = finalSampleIds.map(id => itemSalesGrid[id] || 0);
+    const count = actualValues.length;
+    const activeWeights = weightsConfig[count] || [1 / count];
+    
+    // 執行加權計算
+    let weightedAvg = 0;
+    for (let i = 0; i < count; i++) {
+        weightedAvg += actualValues[i] * activeWeights[i];
+    }
     
     let packSize = 1;
     if (pName.includes("質立") || pName.includes("植物優格")) packSize = 2;
 
-    let target = Math.ceil(avg * 1.1); 
+    // 使用加權平均值加上 10% 緩衝
+    let target = Math.ceil(weightedAvg * 1.1); 
     target = Math.ceil(target / packSize) * packSize;
     
     const onTruck = Number(currentOriginals[pId] || 0);
     let needToPick = Math.max(0, target - onTruck);
 
     if (needToPick > 0) {
-      // 套用包裝基數
       needToPick = Math.ceil(needToPick / packSize) * packSize;
       
-      // [New] 庫存感知限制：不可超過倉庫現貨
       const currentWarehouseQty = warehouseStockMap[pId] || 0;
       if (needToPick > currentWarehouseQty) {
           needToPick = currentWarehouseQty;
