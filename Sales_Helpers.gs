@@ -26,16 +26,35 @@ function getProductMap_() {
     const row = values[i];
     const id = row[idxId];
     if (id) {
-      // 讀取 I 欄位 (Index 8) 作為包裝規格，預設為 1
+      // 讀取 I 欄位 (Index 8) 作為基礎單位，預設 1
       let packSize = 1;
       if (row.length > 8) {
         const val = Number(row[8]);
         if (!isNaN(val) && val > 0) packSize = val;
       }
 
+      // 讀取 J 欄位 (Index 9) 作為發貨階梯，格式例如 "28,42,70"
+      let dispatchSteps = [];
+      if (row.length > 9 && String(row[9] || "").trim()) {
+        dispatchSteps = String(row[9])
+          .split(/[,,，]/)
+          .map(s => Number(s.trim()))
+          .filter(n => !isNaN(n) && n > 0)
+          .sort((a, b) => a - b);
+      }
+
+      // 讀取 K 欄位 (Index 10) 作為進位門檻，預設 5
+      let roundThreshold = 5;
+      if (row.length > 10) {
+        const val = Number(row[10]);
+        if (!isNaN(val) && val > 0) roundThreshold = val;
+      }
+
       map[String(id).trim()] = {
         name: idxName !== -1 ? String(row[idxName] || "").trim() : String(id).trim(),
-        packSize: packSize
+        packSize: packSize,
+        dispatchSteps: dispatchSteps,
+        roundThreshold: roundThreshold
       };
     }
   }

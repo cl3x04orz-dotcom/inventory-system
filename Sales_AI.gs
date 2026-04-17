@@ -4,6 +4,13 @@
  */
 
 /**
+ * 全域設定：領貨進位門檻 (Threshold)
+ * 當需求量 >= 此數值時，自動進位到整箱 (packSize)
+ * 當需求量 < 此數值時，維持精準領貨量 (不進位)
+ */
+const PICK_ROUND_THRESHOLD = 5;
+
+/**
  * AI 智慧補貨建議核心邏輯 執行加權計算與庫存截切
  */
 function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOriginals) {
@@ -118,17 +125,38 @@ function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOrig
         weightedAvg += actualValues[i] * activeWeights[i];
     }
     
-    // 從產品主檔讀取包裝規格 (預設為 1)
+    // 從產品主檔讀取包裝規格、階梯與門檻 (預設為 1 與 5)
     let packSize = (pEntry && pEntry.packSize) ? pEntry.packSize : 1;
+    let dispatchSteps = pEntry ? pEntry.dispatchSteps : [];
+    let currentThreshold = (pEntry && pEntry.roundThreshold) ? pEntry.roundThreshold : PICK_ROUND_THRESHOLD;
 
     let target = Math.ceil(weightedAvg * 1.1); 
-    target = Math.ceil(target / packSize) * packSize;
+    
+    // 如果有定義發貨階梯，則使用階梯對齊；否則使用 packSize 倍數對齊 (套用各產品門檻)
+    if (dispatchSteps && dispatchSteps.length > 0) {
+      target = snapToDispatchSteps_(target, dispatchSteps);
+    } else {
+      if (target >= currentThreshold) {
+        target = Math.ceil(target / packSize) * packSize;
+      } else {
+        target = Math.ceil(target); // 低於門檻，領精準值
+      }
+    }
     
     const onTruck = Number(currentOriginals[pId] || 0);
     let needToPick = Math.max(0, target - onTruck);
 
     if (needToPick > 0) {
-      needToPick = Math.ceil(needToPick / packSize) * packSize;
+      if (dispatchSteps && dispatchSteps.length > 0) {
+        needToPick = snapToDispatchSteps_(needToPick, dispatchSteps);
+      } else {
+        // 領貨量的點位進位邏輯也同步
+        if (needToPick >= currentThreshold) {
+          needToPick = Math.ceil(needToPick / packSize) * packSize;
+        } else {
+          needToPick = Math.ceil(needToPick);
+        }
+      }
       
       const currentWarehouseQty = warehouseStockMap[pId] || 0;
       if (needToPick > currentWarehouseQty) {
@@ -174,4 +202,30 @@ function getAllUniqueCustomersService() {
   }
   
   return Array.from(customers).sort();
+}
+
+/**
+ * 輔助函式：將數值吸附到指定的發貨階梯 (支援循環累加)
+ * @param {number} target 目標量
+ * @param {number[]} steps 階梯數組 (如 [28, 42, 70])
+ */
+function snapToDispatchSteps_(target, steps) {
+  if (!steps || steps.length === 0) return target;
+  
+  // 確保降序排列以便處理
+  const sortedSteps = [...steps].sort((a, b) => a - b);
+  const maxStep = sortedSteps[sortedSteps.length - 1];
+  const minStep = sortedSteps[0];
+  
+  if (target <= 0) return 0;
+  
+  if (target <= maxStep) {
+    // 尋找第一個大於等於 target 的階梯
+    const matched = sortedSteps.find(s => s >= target);
+    return matched || maxStep;
+  } else {
+    // 超過最大上限時，先填滿一個最大規格，剩下的循環找最小階梯
+    // 基於使用者要求：超過 70 之後是在回到 28, 42
+    return maxStep + snapToDispatchSteps_(target - maxStep, sortedSteps);
+  }
 }
