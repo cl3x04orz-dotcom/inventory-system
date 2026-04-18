@@ -8,7 +8,7 @@
  * 當需求量 >= 此數值時，自動進位到整箱 (packSize)
  * 當需求量 < 此數值時，維持精準領貨量 (不進位)
  */
-const PICK_ROUND_THRESHOLD = 5;
+const PICK_ROUND_THRESHOLD = 6;
 
 /**
  * AI 智慧補貨建議核心邏輯 執行加權計算與庫存截切
@@ -136,10 +136,13 @@ function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOrig
     if (dispatchSteps && dispatchSteps.length > 0) {
       target = snapToDispatchSteps_(target, dispatchSteps);
     } else {
-      if (target >= currentThreshold) {
-        target = Math.ceil(target / packSize) * packSize;
+      // 切換至方案 B：僅針對尾數判斷進位
+      const fullBoxes = Math.floor(target / packSize);
+      const remainder = target % packSize;
+      if (remainder >= currentThreshold) {
+        target = (fullBoxes + 1) * packSize;
       } else {
-        target = Math.ceil(target); // 低於門檻，領精準值
+        target = (fullBoxes * packSize) + Math.ceil(remainder);
       }
     }
     
@@ -150,11 +153,13 @@ function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOrig
       if (dispatchSteps && dispatchSteps.length > 0) {
         needToPick = snapToDispatchSteps_(needToPick, dispatchSteps);
       } else {
-        // 領貨量的點位進位邏輯也同步
-        if (needToPick >= currentThreshold) {
-          needToPick = Math.ceil(needToPick / packSize) * packSize;
+        // 領貨量的進位邏輯也同步切換為方案 B
+        const pickFullBoxes = Math.floor(needToPick / packSize);
+        const pickRemainder = needToPick % packSize;
+        if (pickRemainder >= currentThreshold) {
+          needToPick = (pickFullBoxes + 1) * packSize;
         } else {
-          needToPick = Math.ceil(needToPick);
+          needToPick = (pickFullBoxes * packSize) + Math.ceil(pickRemainder);
         }
       }
       

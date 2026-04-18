@@ -43,8 +43,8 @@ function getProductMap_() {
           .sort((a, b) => a - b);
       }
 
-      // 讀取 K 欄位 (Index 10) 作為進位門檻，預設 5
-      let roundThreshold = 5;
+      // 讀取 K 欄位 (Index 10) 作為進位門檻，預設 6
+      let roundThreshold = 6;
       if (row.length > 10) {
         const val = Number(row[10]);
         if (!isNaN(val) && val > 0) roundThreshold = val;
