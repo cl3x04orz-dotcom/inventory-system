@@ -197,23 +197,87 @@ function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOrig
 }
 
 /**
- * 取得系統中所有不重複的客戶地點名稱 (供 AI 預測下拉選單使用)
+ * 取得系統中心所有不重複的客戶地點名稱 (供 AI 預測下拉選單使用)
+ * [策略 3.5]：智慧排程 - 讀取 Customers 表中的星期勾選
  */
 function getAllUniqueCustomersService() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const salesSheet = ss.getSheetByName('Sales');
-  if (!salesSheet) return [];
+  let custSheet = ss.getSheetByName('Customers');
+  const DAYS = ['日', '一', '二', '三', '四', '五', '六'];
   
-  const values = salesSheet.getDataRange().getValues();
-  const IDX_CUST = 6; 
-  const customers = new Set();
+  // 如果找不到 Customers 分頁，則自動建立並初始化 (含排程推算)
+  if (!custSheet) {
+    custSheet = ss.insertSheet('Customers');
+    const headers = ['地點名稱', 'AI 開啟', ...DAYS];
+    custSheet.appendRow(headers);
+    custSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#f3f3f3').setHorizontalAlignment('center');
+    custSheet.setFrozenRows(1);
+    
+    // 初始化：抓取最近 90 天內的地點及其星期分佈
+    const salesSheet = ss.getSheetByName('Sales');
+    if (salesSheet) {
+      const salesValues = salesSheet.getDataRange().getValues();
+      const cutoff = new Date().getTime() - (90 * 24 * 60 * 60 * 1000);
+      const customerStats = {}; // { name: { count: total, dow: { 0: c0, 1: c1 ... } } }
+      
+      for (let i = 1; i < salesValues.length; i++) {
+        const dVal = parseSheetDate_(salesValues[i][1]);
+        const cust = String(salesValues[i][6] || "").trim();
+        const status = String(salesValues[i][9] || "").toUpperCase();
+        
+        if (status !== 'VOID' && dVal && dVal.getTime() >= cutoff && cust && cust !== '未指定' && cust !== '客戶/地點') {
+          if (!customerStats[cust]) {
+            customerStats[cust] = { total: 0, dow: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 } };
+          }
+          customerStats[cust].total++;
+          customerStats[cust].dow[dVal.getDay()]++;
+        }
+      }
+      
+      const initList = Object.keys(customerStats).sort();
+      if (initList.length > 0) {
+        const rows = initList.map(name => {
+          const stats = customerStats[name];
+          const row = [name, 'Y'];
+          // 如果該星期出現次數 >= 2 或者佔該店總次數 20% 以上，就自動勾選
+          for (let d = 0; d < 7; d++) {
+            const countOnDay = stats.dow[d];
+            if (countOnDay >= 2 || (stats.total > 0 && (countOnDay / stats.total) >= 0.2)) {
+              row.push('Y');
+            } else {
+              row.push('');
+            }
+          }
+          return row;
+        });
+        custSheet.getRange(2, 1, rows.length, 9).setValues(rows);
+      }
+    }
+  }
+
+  // 讀取目前的白名單與排程
+  const values = custSheet.getDataRange().getValues();
+  const customerList = [];
   
   for (let i = 1; i < values.length; i++) {
-    const cust = String(values[i][IDX_CUST] || "").trim();
-    if (cust && cust !== "客戶/地點") customers.add(cust);
+    const name = String(values[i][0] || "").trim();
+    const isAiEnabled = String(values[i][1] || "").trim().toUpperCase() === 'Y';
+    
+    if (name && isAiEnabled) {
+      const schedule = [];
+      for (let d = 0; d < 7; d++) {
+        if (String(values[i][d + 2] || "").trim().toUpperCase() === 'Y') {
+          schedule.push(d);
+        }
+      }
+      customerList.push({
+        name: name,
+        schedule: schedule
+      });
+    }
   }
   
-  return Array.from(customers).sort();
+  return customerList.sort((a, b) => a.name.localeCompare(b.name, 'zh-TW'));
 }
 
 /**

@@ -24,6 +24,7 @@ export default function MergePrintModal({
     const [printDate, setPrintDate] = useState(new Date().toISOString().split('T')[0]);
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [aiMessage, setAiMessage] = useState(null);
+    const [showAllLocations, setShowAllLocations] = useState(false); // [New] 是否顯示全部地點
 
     // [New] 自動推算當前日期的星期幾
     const getDOWString = (dateStr) => {
@@ -205,12 +206,29 @@ export default function MergePrintModal({
                                                 onChange={(e) => setAiCustomer(e.target.value)}
                                             >
                                                 <option value="">請點擊選取地點...</option>
-                                                {systemCustomers.map(c => <option key={c} value={c}>{c}</option>)}
+                                                {systemCustomers
+                                                    .filter(c => {
+                                                        if (showAllLocations) return true;
+                                                        // 支援舊版字串與新版物件格式
+                                                        if (typeof c === 'string') return true;
+                                                        return c.schedule && c.schedule.includes(aiDayOfWeek);
+                                                    })
+                                                    .map(c => {
+                                                        const name = typeof c === 'string' ? c : c.name;
+                                                        return <option key={name} value={name}>{name}</option>;
+                                                    })
+                                                }
                                             </select>
                                             <div className="absolute right-5 pointer-events-none text-blue-300">
                                                 <ChevronDown size={18} />
                                             </div>
                                         </div>
+                                        <button 
+                                            onClick={() => setShowAllLocations(!showAllLocations)}
+                                            className={`text-[10px] font-bold mt-1 px-2 py-1 rounded-md self-end transition-all ${showAllLocations ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'}`}
+                                        >
+                                            {showAllLocations ? '預覽當日排程' : '顯示全部地點'}
+                                        </button>
                                     </div>
 
                                     <div className="flex flex-col gap-3">
