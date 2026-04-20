@@ -34,6 +34,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     const [viewMode, setViewMode] = useState('SALES'); // 'SALES' or 'EXPENSES'
     const [isVoiding, setIsVoiding] = useState(false); // [New] Loading state for voiding
     const [expandedGroups, setExpandedGroups] = useState({}); // [New] Track expanded transactions
+    const [category, setCategory] = useState('全部'); // [New] 類別過濾 (市場 / 批發)
 
     // 1. Fetch Data from Server (Only on Date Change)
     const fetchData = useCallback(async () => {
@@ -41,7 +42,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
         setLoading(true);
 
         try {
-            const payload = { startDate, endDate };
+            const payload = { startDate, endDate, category };
             const promises = [
                 callGAS(apiUrl, 'getSalesHistory', payload, user.token),
                 callGAS(apiUrl, 'getExpenditures', payload, user.token)
@@ -55,7 +56,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
         } finally {
             setLoading(false);
         }
-    }, [startDate, endDate, user.token, apiUrl]);
+    }, [startDate, endDate, category, user.token, apiUrl]);
 
     // 2. Perform Local Filtering (Instant Response)
     React.useEffect(() => {
@@ -401,6 +402,24 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                         </h1>
                         <p className="text-[var(--text-secondary)] text-sm mt-1">查詢特定日期、銷售對象或業務的銷售紀錄</p>
                     </div>
+
+                    {/* [新增] 類別切換功能 (只限老闆) */}
+                    {user.role === 'BOSS' && (
+                        <div className="flex bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-primary)] shadow-inner">
+                            {['全部', '市場', '批發'].map((cat) => (
+                                <button
+                                    key={cat}
+                                    onClick={() => setCategory(cat)}
+                                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${category === cat
+                                        ? 'bg-blue-600 text-white shadow-md'
+                                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                        }`}
+                                >
+                                    {cat}
+                                </button>
+                            ))}
+                        </div>
+                    )}
 
                     {/* Summary Stats (Integrated in Header) */}
                     {reportData && (

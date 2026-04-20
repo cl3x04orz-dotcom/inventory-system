@@ -92,8 +92,12 @@ function getPayrollDataService(payload, user) {
         // 抓取 F 欄位 (FinalTotal / 結算) 做為金額落差來源
         const sFinalIdx = findIdx(sHeaders, ['finaltotal', '結算'], ['cash', '實收', '現金']);
         const sCashIdx = findIdx(sHeaders, ['totalcash', '實收', '現金', 'cash']);
+        const sCustIdx = findIdx(sHeaders, ['客戶', '地點', 'location', 'customer']);
+        
+        const categoryMap = typeof getCustomerCategoryMap_ !== 'undefined' ? getCustomerCategoryMap_() : {};
         
         const validSalesMap = {}; 
+        const excludedSalesMap = {}; // 用於記錄哪些單據屬於批發，明細表處理時也需排除
         if (sDateIdx !== -1 && sUserIdx !== -1) {
             for (let i = 1; i < salesRows.length; i++) {
                 const row = salesRows[i];
@@ -121,6 +125,14 @@ function getPayrollDataService(payload, user) {
                     if (rowUser === matchUser || (matchId && rowUser === matchId)) {
                         const dateKey = Utilities.formatDate(d, ssTimezone, "yyyy-MM-dd");
                         const sid = sIdIdx !== -1 ? String(row[sIdIdx]).trim() : ("ROW_" + i);
+                        
+                        // [新增] 檢查客戶類別，若是「批發」則排除在業績之外
+                        const customerName = sCustIdx !== -1 ? String(row[sCustIdx] || "").trim() : "";
+                        if (categoryMap[customerName] === '批發') {
+                           excludedSalesMap[sid] = true;
+                           continue; 
+                        }
+
                         validSalesMap[sid] = dateKey;
                         
                         // [直接抓取 F 欄位數值]

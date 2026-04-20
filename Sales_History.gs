@@ -7,7 +7,9 @@
 // 1. 銷售報表查詢 (Get Sales History)
 // ===========================================
 function getSalesHistory(payload) {
-  const { startDate, endDate, customer, salesRep, token } = payload;
+  const { startDate, endDate, customer, salesRep, token, category } = payload;
+  
+  const categoryMap = typeof getCustomerCategoryMap_ !== 'undefined' ? getCustomerCategoryMap_() : {};
   
   let currentUser = null;
   if (token && typeof verifyToken !== 'undefined') {
@@ -68,6 +70,12 @@ function getSalesHistory(payload) {
     
     const rowCust = String(row[IDX_CUST] || "").trim();
     if (qCust && !rowCust.toLowerCase().includes(qCust)) continue;
+
+    // [新增] 類別過濾 (市場 / 批發)
+    if (category && category !== '全部') {
+        const cat = categoryMap[rowCust] || '市場';
+        if (cat !== category) continue;
+    }
 
     let rowRep = String(row[IDX_REP2] || "").trim();
     if (!rowRep || rowRep === '???') rowRep = String(row[IDX_REP1] || "").trim();

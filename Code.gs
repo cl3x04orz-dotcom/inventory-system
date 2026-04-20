@@ -1,7 +1,7 @@
 /**
  * Serves the React App
  */
-const APP_VERSION = '1776689351044';
+const APP_VERSION = '1776694802252';
  // 版本號：A2:3/24
 
 function doGet() {
@@ -638,6 +638,15 @@ function getExpendituresService(payload, user) {
         if (!hasFinancePerm) {
           const itemRep = String(item.salesRep || '').trim();
           if (itemRep !== currentUserDisplay.trim()) return false;
+        }
+
+        // [新增] 類別過濾 (市場 / 批發)
+        const category = payload.category;
+        if (category && category !== '全部') {
+            const categoryMap = typeof getCustomerCategoryMap_ !== 'undefined' ? getCustomerCategoryMap_() : {};
+            const itemCust = String(item.customer || "").trim();
+            const cat = categoryMap[itemCust] || '市場';
+            if (cat !== category) return false;
         }
 
         return true;

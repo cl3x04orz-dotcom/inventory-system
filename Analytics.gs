@@ -37,10 +37,13 @@ function getDataWithNormalizedHeaders_(sheetName) {
   return data;
 }
 
-function getValidSalesMap_(startDateStr, endDateStr, customer, includeStats = false) {
+function getValidSalesMap_(startDateStr, endDateStr, customer, includeStats = false, category = null) {
   const start = parseLocalYMD_(startDateStr); start.setHours(0,0,0,0);
   const end = parseLocalYMD_(endDateStr); end.setHours(23,59,59,999);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  const categoryMap = typeof getCustomerCategoryMap_ !== 'undefined' ? getCustomerCategoryMap_() : {};
+
   const sheet = ss.getSheetByName('Sales');
   if (!sheet) return includeStats ? { map: {}, visitCount: 0, totalOrderValue: 0, lastVisitDate: null } : {};
   const values = sheet.getDataRange().getValues();
@@ -60,6 +63,13 @@ function getValidSalesMap_(startDateStr, endDateStr, customer, includeStats = fa
 
     if (dVal && sid && dVal >= start && dVal <= end) {
       if (customer && rowCustomer !== customer.trim()) continue;
+      
+      // [新增] 類別過濾 (市場 / 批發)
+      if (category && category !== '全部') {
+        const cat = categoryMap[rowCustomer] || '市場';
+        if (cat !== category) continue;
+      }
+
       map[sid] = true;
       
       if (includeStats) {
@@ -85,8 +95,8 @@ function getValidSalesMap_(startDateStr, endDateStr, customer, includeStats = fa
 // Service_Analytics.gs
 // ==========================================
 function getSalesRanking(payload) {
-  const { startDate, endDate } = payload;
-  const validSales = getValidSalesMap_(startDate, endDate);
+  const { startDate, endDate, category } = payload;
+  const validSales = getValidSalesMap_(startDate, endDate, null, false, category);
   const productMap = getProductInfoMap_();
   const detailsData = getDataWithNormalizedHeaders_('SalesDetails');
   const stats = {};
@@ -109,12 +119,12 @@ function getSalesRanking(payload) {
 }
 
 function getProfitAnalysis(payload) {
-  const { startDate, endDate, customer } = payload;
+  const { startDate, endDate, customer, category } = payload;
   let validSales;
   let customerStats = null;
   
   if (customer) {
-    const statsResult = getValidSalesMap_(startDate, endDate, customer, true);
+    const statsResult = getValidSalesMap_(startDate, endDate, customer, true, category);
     validSales = statsResult.map;
     customerStats = {
       visitCount: statsResult.visitCount,
@@ -122,7 +132,7 @@ function getProfitAnalysis(payload) {
       lastVisitDate: statsResult.lastVisitDate
     };
   } else {
-    validSales = getValidSalesMap_(startDate, endDate, null, false);
+    validSales = getValidSalesMap_(startDate, endDate, null, false, category);
   }
   
   const productMap = getProductInfoMap_(); 
@@ -166,13 +176,22 @@ function getProfitAnalysis(payload) {
 }
 
 function getCustomerRanking(payload) {
-  const { startDate, endDate } = payload;
+  const { startDate, endDate, category } = payload;
   const salesData = getDataWithNormalizedHeaders_('Sales');
+  
+  const categoryMap = typeof getCustomerCategoryMap_ !== 'undefined' ? getCustomerCategoryMap_() : {};
+
   const start = parseLocalYMD_(startDate); start.setHours(0,0,0,0);
   const end = parseLocalYMD_(endDate); end.setHours(23,59,59,999);
   const stats = {};
 
   salesData.forEach(row => {
+    // [新增] 類別過濾
+    if (category && category !== '全部') {
+      const custName = String(row['location'] || row['customer'] || row[6] || '未指定').trim();
+      const cat = categoryMap[custName] || '市場';
+      if (cat !== category) return;
+    }
     // [Fix] Check Status
     const status = String(row['status'] || row[9] || "").toUpperCase();
     if (status === 'VOID') return;

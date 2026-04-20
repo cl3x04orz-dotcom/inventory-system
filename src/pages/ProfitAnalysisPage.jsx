@@ -14,6 +14,7 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
     const [customersList, setCustomersList] = useState([]);
     const [customerStats, setCustomerStats] = useState(null);
     const [sortConfig, setSortConfig] = useState({ key: 'profit', direction: 'desc' });
+    const [category, setCategory] = useState('全部'); // 全部, 市場, 批發
 
     const fetchData = async () => {
         setLoading(true);
@@ -25,7 +26,7 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
                 setProductMap(pMap);
             }
 
-            const response = await callGAS(apiUrl, 'getProfitAnalysis', { startDate, endDate, customer: customerFilter }, user.token);
+            const response = await callGAS(apiUrl, 'getProfitAnalysis', { startDate, endDate, customer: customerFilter, category }, user.token);
             if (Array.isArray(response)) {
                 setData(response);
                 setCustomerStats(null);
@@ -47,6 +48,11 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
     useEffect(() => {
         if (user?.token) {
             fetchData();
+        }
+    }, [user.token, apiUrl, startDate, endDate, category, customerFilter]);
+
+    useEffect(() => {
+        if (user?.token) {
             callGAS(apiUrl, 'getCustomersList', {}, user.token)
                 .then(res => { if (Array.isArray(res)) setCustomersList(res); })
                 .catch(err => console.error("Failed to fetch customers list:", err));
@@ -156,6 +162,28 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
                     <input type="text" placeholder="在下方結果中搜尋產品..." className="input-field pl-9 w-full text-sm bg-[var(--bg-tertiary)]" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
             </div>
+
+            {/* 權限控制：只有老闆可以切換類別 */}
+            {user.role === 'BOSS' && (
+                <div className="bg-[var(--bg-secondary)] p-2 rounded-xl border border-[var(--border-primary)] shadow-sm flex items-center gap-3">
+                    <span className="text-xs font-bold text-[var(--text-secondary)] whitespace-nowrap ml-2">數據類別分流:</span>
+                    <div className="flex gap-2 flex-1 md:flex-initial md:w-72">
+                        {['全部', '市場', '批發'].map(cat => (
+                            <button
+                                key={cat}
+                                onClick={() => setCategory(cat)}
+                                className={`flex-1 py-1.5 px-3 rounded-md text-xs font-bold transition-all ${
+                                    category === cat 
+                                    ? 'bg-emerald-600 text-white shadow-sm' 
+                                    : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                                }`}
+                            >
+                                {cat}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* 客製化 KPI 與圖表區塊 */}
             {customerStats && (

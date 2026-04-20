@@ -208,7 +208,7 @@ function getAllUniqueCustomersService() {
   // 如果找不到 Customers 分頁，則自動建立並初始化 (含排程推算)
   if (!custSheet) {
     custSheet = ss.insertSheet('Customers');
-    const headers = ['地點名稱', 'AI 開啟', ...DAYS];
+    const headers = ['地點名稱', 'AI 開啟', ...DAYS, '類別'];
     custSheet.appendRow(headers);
     custSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#f3f3f3').setHorizontalAlignment('center');
     custSheet.setFrozenRows(1);
@@ -248,14 +248,18 @@ function getAllUniqueCustomersService() {
               row.push('');
             }
           }
+          row.push('市場'); // 預設類別為 市場
           return row;
         });
-        custSheet.getRange(2, 1, rows.length, 9).setValues(rows);
+        custSheet.getRange(2, 1, rows.length, 10).setValues(rows);
       }
     }
   }
 
   // 讀取目前的白名單與排程
+  if (custSheet && custSheet.getLastColumn() < 10) {
+    custSheet.getRange(1, 10).setValue('類別').setFontWeight('bold').setBackground('#f3f3f3').setHorizontalAlignment('center');
+  }
   const values = custSheet.getDataRange().getValues();
   const customerList = [];
   

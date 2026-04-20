@@ -326,3 +326,29 @@ function backfillSalesDetailsUnitCosts() {
   }
   return "無須更新";
 }
+
+/**
+ * 取得客戶類別地圖 (名稱 -> 類別)
+ * 用於區分 市場 (有分紅) 或 批發 (無分紅)
+ */
+function getCustomerCategoryMap_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Customers');
+  if (!sheet) return {};
+  
+  const values = sheet.getDataRange().getValues();
+  const map = {};
+  
+  // 第一列標題不計。第 1 欄 (A) 是名稱，第 10 欄 (J) 是類別
+  for (let i = 1; i < values.length; i++) {
+    const name = String(values[i][0] || "").trim();
+    // 預設為市場，若欄位存在則取欄位值
+    let category = "市場";
+    if (values[i].length >= 10) {
+      category = String(values[i][9] || "市場").trim();
+    }
+    if (name) map[name] = category;
+  }
+  return map;
+}
+

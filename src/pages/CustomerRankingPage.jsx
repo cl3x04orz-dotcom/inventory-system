@@ -9,11 +9,12 @@ export default function CustomerRankingPage({ user, apiUrl }) {
     const [startDate, setStartDate] = useState(getLocalDateString());
     const [endDate, setEndDate] = useState(getLocalDateString());
     const [searchTerm, setSearchTerm] = useState('');
+    const [category, setCategory] = useState('全部'); // 全部, 市場, 批發
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            const response = await callGAS(apiUrl, 'getCustomerRanking', { startDate, endDate }, user.token);
+            const response = await callGAS(apiUrl, 'getCustomerRanking', { startDate, endDate, category }, user.token);
             if (Array.isArray(response)) {
                 setData(response);
             } else {
@@ -29,7 +30,7 @@ export default function CustomerRankingPage({ user, apiUrl }) {
 
     useEffect(() => {
         if (user?.token && startDate && endDate) fetchData();
-    }, [user.token, apiUrl, startDate, endDate]);
+    }, [user.token, apiUrl, startDate, endDate, category]);
 
     const filteredData = data.filter(item =>
         String(item.customerName || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -62,6 +63,27 @@ export default function CustomerRankingPage({ user, apiUrl }) {
                         onChange={e => setSearchTerm(e.target.value)}
                     />
                 </div>
+                {/* 權限控制：只有老闆可以切換類別 */}
+                {user.role === 'BOSS' && (
+                    <div className="md:col-span-2 flex items-center gap-3 bg-[var(--bg-tertiary)] p-2 rounded-lg border border-[var(--border-primary)] shadow-sm">
+                        <span className="text-xs font-bold text-[var(--text-secondary)] whitespace-nowrap ml-2">數據範圍:</span>
+                        <div className="flex gap-2 flex-1">
+                            {['全部', '市場', '批發'].map(cat => (
+                                <button
+                                    key={cat}
+                                    onClick={() => setCategory(cat)}
+                                    className={`flex-1 py-1.5 px-3 rounded-md text-xs font-bold transition-all ${
+                                        category === cat 
+                                        ? 'bg-purple-600 text-white shadow-sm' 
+                                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                                    }`}
+                                >
+                                    {cat}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] overflow-hidden flex-1 flex flex-col shadow-sm">
