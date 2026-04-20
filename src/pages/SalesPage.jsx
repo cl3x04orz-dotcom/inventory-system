@@ -898,7 +898,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     name: row.name,
                     stock: 0, // 合併列印時不顯示庫存
                     originalStock: 0,
-                    picked: aiQty !== null ? aiQty : (p ? p.picked.filter(v => v !== 0 && v !== '0' && v !== '').join(' / ') : ''),
+                    picked: aiSuggestions ? (aiQty !== null ? aiQty : 0) : '',
                     original: p ? p.original.filter(v => v !== 0 && v !== '0' && v !== '').join(' / ') : '',
                     returns: p ? p.returns.filter(v => v !== 0 && v !== '0' && v !== '').join(' / ') : '',
                     sold: p ? p.sold.filter(v => v !== 0 && v !== '0' && v !== '').join(' / ') : '',
