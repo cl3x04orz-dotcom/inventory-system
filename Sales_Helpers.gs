@@ -50,11 +50,18 @@ function getProductMap_() {
         if (!isNaN(val) && val > 0) roundThreshold = val;
       }
 
+      // 讀取 L 欄位 (Index 11) 作為智慧抑制開關，不為空即視為開啟
+      let autoSuppress = false;
+      if (row.length > 11 && String(row[11] || "").trim()) {
+        autoSuppress = true;
+      }
+
       map[String(id).trim()] = {
         name: idxName !== -1 ? String(row[idxName] || "").trim() : String(id).trim(),
         packSize: packSize,
         dispatchSteps: dispatchSteps,
-        roundThreshold: roundThreshold
+        roundThreshold: roundThreshold,
+        autoSuppress: autoSuppress
       };
     }
   }

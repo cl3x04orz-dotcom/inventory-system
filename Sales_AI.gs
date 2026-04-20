@@ -147,9 +147,16 @@ function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOrig
     }
     
     const onTruck = Number(currentOriginals[pId] || 0);
-    let needToPick = Math.max(0, target - onTruck);
+    const rawNeed = target - onTruck;
+    let needToPick = 0;
 
-    if (needToPick > 0) {
+    if (rawNeed <= 0) {
+      needToPick = 0;
+    } else if (pEntry && pEntry.autoSuppress && rawNeed < currentThreshold && onTruck >= (packSize / 2)) {
+      // [智慧抑制] 雖有缺口但身上還有一半貨，且缺口很小，建議不領
+      needToPick = 0;
+    } else {
+      needToPick = rawNeed;
       if (dispatchSteps && dispatchSteps.length > 0) {
         needToPick = snapToDispatchSteps_(needToPick, dispatchSteps);
       } else {
@@ -162,6 +169,7 @@ function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOrig
           needToPick = (pickFullBoxes * packSize) + Math.ceil(pickRemainder);
         }
       }
+    }
       
       const currentWarehouseQty = warehouseStockMap[pId] || 0;
       if (needToPick > currentWarehouseQty) {
@@ -173,7 +181,6 @@ function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOrig
         suggestions[pId] = needToPick;
       }
     }
-  }
 
   const messageMap = {
     "EXACT": `已根據過去同一星期及相同天氣環境為您預估${hasStockShortage ? " (⚠️ 部分品項庫存不足)" : ""}。`,
