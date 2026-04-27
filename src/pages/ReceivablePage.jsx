@@ -168,6 +168,19 @@ export default function ReceivablePage({ user, apiUrl }) {
 
     const totalAmount = filtered.reduce((sum, r) => sum + (Number(r.amount) || Number(r.total) || 0), 0);
 
+    // [New] 計算選取項目的總金額
+    const selectedAmount = filtered.reduce((sum, r) => {
+        const itemRows = (r.items || r.products || r.salesData || []);
+        const itemSum = itemRows.reduce((iSum, item, idx) => {
+            const syntheticId = `${r.saleId}-${idx}`;
+            if (selectedItemUuids.has(syntheticId)) {
+                return iSum + (Number(item.price) || Number(item.unitPrice) || 0) * (Number(item.qty) || Number(item.soldQty) || 1);
+            }
+            return iSum;
+        }, 0);
+        return sum + itemSum;
+    }, 0);
+
     return (
         <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
             {/* Header */}
@@ -188,6 +201,14 @@ export default function ReceivablePage({ user, apiUrl }) {
                             <CheckSquare size={16} />
                             批次確認收款 ({selectedItemUuids.size})
                         </button>
+                    )}
+                    {selectedAmount > 0 && (
+                        <div className="glass-panel px-3 py-2 border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-500/10 shrink-0 flex flex-col items-end animate-in fade-in zoom-in-95 duration-200">
+                            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider">已選取金額</p>
+                            <p className="text-lg md:text-xl font-black text-emerald-600 dark:text-emerald-400">
+                                ${selectedAmount.toLocaleString()}
+                            </p>
+                        </div>
                     )}
                     <div className="glass-panel px-3 py-2 border-[var(--border-primary)] bg-[var(--bg-secondary)] shrink-0 flex flex-col items-end">
                         <p className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider">總應收金額</p>

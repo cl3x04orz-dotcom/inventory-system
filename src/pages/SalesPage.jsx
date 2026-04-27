@@ -884,13 +884,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             const mergedRows = rows.map(row => {
                 const p = productDataMap[String(row.id)];
 
-                // 決定單價：優先取自單據，若無則採用主表格目前的單價 (考慮了 PRICE_MAP 與 LocalStorage)
-                let displayPrice = '';
-                if (p && p.price.length > 0) {
-                    displayPrice = p.price[0];
-                } else {
-                    displayPrice = row.price || '';
-                }
+                // [Modified] 一律採用主表格目前的單價，不使用舊單據的歷史單價
+                const displayPrice = row.price || '';
 
                 const aiQty = aiSuggestions ? aiSuggestions[String(row.id)] : null;
 
