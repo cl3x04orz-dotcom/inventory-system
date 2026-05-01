@@ -8,7 +8,7 @@
  * 當需求量 >= 此數值時，自動進位到整箱 (packSize)
  * 當需求量 < 此數值時，維持精準領貨量 (不進位)
  */
-const PICK_ROUND_THRESHOLD = 6;
+const PICK_ROUND_THRESHOLD = 0;
 
 /**
  * AI 智慧補貨建議核心邏輯 執行加權計算與庫存截切
@@ -128,7 +128,7 @@ function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOrig
     // 從產品主檔讀取包裝規格、階梯與門檻 (預設為 1 與 5)
     let packSize = (pEntry && pEntry.packSize) ? pEntry.packSize : 1;
     let dispatchSteps = pEntry ? pEntry.dispatchSteps : [];
-    let currentThreshold = (pEntry && pEntry.roundThreshold) ? pEntry.roundThreshold : PICK_ROUND_THRESHOLD;
+    let currentThreshold = (pEntry && typeof pEntry.roundThreshold !== 'undefined') ? pEntry.roundThreshold : PICK_ROUND_THRESHOLD;
 
     let target = Math.ceil(weightedAvg * 1.1); 
     
