@@ -907,7 +907,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 templateId: 'Template_領貨單',
                 data: {
                     date: customPrintDate || new Date().toISOString(),
-                    location: aiLocation || '合併列印',
+                    location: aiLocation || (selectedRecords.length > 0 ? selectedRecords[0].customer : '未定義地點'),
                     salesRep: user.username,
                     totalSalesAmount: '',
                     totalCashCalc: '',

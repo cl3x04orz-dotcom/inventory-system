@@ -263,7 +263,20 @@ function AppContent() {
             }
         };
         window.addEventListener('auth_expired', handleAuthExpired);
-        return () => window.removeEventListener('auth_expired', handleAuthExpired);
+        
+        // [New] Token 續約監聽：當 api.js 自動續約成功時，同步更新 React State
+        const handleTokenRenewed = (e) => {
+            if (e.detail) {
+                setUser(e.detail);
+                console.log('[App] State synchronized with renewed token');
+            }
+        };
+        window.addEventListener('token_renewed', handleTokenRenewed);
+
+        return () => {
+            window.removeEventListener('auth_expired', handleAuthExpired);
+            window.removeEventListener('token_renewed', handleTokenRenewed);
+        };
     }, [user]);
 
     // 伺服器端 Token 展延心跳
@@ -271,8 +284,8 @@ function AppContent() {
         if (!user || !sessionManager) return;
 
         const heartbeatInterval = setInterval(async () => {
-            // 如果這 5 分鐘內有操作過，才發送展延請求 (IdleTime < 5.5分)
-            if (sessionManager.checkOnlineStatus() && sessionManager.getIdleTime() < 5.5 * 60 * 1000) {
+            // [Relaxed] 只要有連線且沒閒置太誇張 (Idle < 25分)，就嘗試續約
+            if (sessionManager.checkOnlineStatus() && sessionManager.getIdleTime() < 25 * 60 * 1000) {
                 try {
                     const res = await callGAS(GAS_API_URL, 'renewToken', {}, user.token);
                     if (res && res.success && res.token) {
@@ -282,10 +295,10 @@ function AppContent() {
                         console.log('[Heartbeat] Token successfully renewed');
                     }
                 } catch (e) {
-                    console.log('[Heartbeat] Renew token failed', e);
+                    console.warn('[Heartbeat] Renew token failed', e);
                 }
             }
-        }, 5 * 60 * 1000); // 每 5 分鐘觸發
+        }, 10 * 60 * 1000); // 每 10 分鐘檢查一次即可 (因為 Token 現在有 12 小時)
 
         return () => clearInterval(heartbeatInterval);
     }, [user, sessionManager]);

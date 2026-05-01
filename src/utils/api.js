@@ -25,14 +25,48 @@ export const callGAS = async (apiUrl, action, payload, token = null) => {
         }
 
         const data = await response.json();
-        if (data.error) {
-            if (data.error === 'TokenExpired' || data.error.includes('Unauthorized')) {
-                window.dispatchEvent(new CustomEvent('auth_expired'));
+        
+        // 檢查 Token 是否過期
+        if (data.error && (data.error === 'TokenExpired' || data.error.includes('Unauthorized'))) {
+            // 如果當前動作不是 renewToken，則嘗試自動續約並重試
+            if (action !== 'renewToken' && token) {
+                console.warn(`[API] Token 過期，嘗試自動續約: ${action}`);
+                try {
+                    const renewRes = await callGAS(apiUrl, 'renewToken', {}, token);
+                    if (renewRes && renewRes.success && renewRes.token) {
+                        console.log('[API] 自動續約成功，重試原始請求');
+                        
+                        // 更新本地存儲的 token (給下次其他請求用)
+                        const savedUser = sessionStorage.getItem('inventory_user');
+                        if (savedUser) {
+                            const userData = JSON.parse(savedUser);
+                            userData.token = renewRes.token;
+                            sessionStorage.setItem('inventory_user', JSON.stringify(userData));
+                            
+                            // 這裡我們發出一個事件，讓 App.jsx 知道要更新 state 中的 user
+                            window.dispatchEvent(new CustomEvent('token_renewed', { detail: userData }));
+                        }
+
+                        // 使用新 Token 重試原始請求
+                        return await callGAS(apiUrl, action, payload, renewRes.token);
+                    }
+                } catch (renewError) {
+                    console.error('[API] 自動續約失敗:', renewError);
+                }
             }
+            
+            // 如果續約失敗或沒提供 token，才丟出事件讓 App.jsx 跳出登入頁
+            window.dispatchEvent(new CustomEvent('auth_expired'));
             throw new Error(data.error);
         }
+
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
         return data;
     } catch (error) {
+        // ... (保持原有錯誤處理)
         console.error(`API Error [${action}]:`, error);
 
         if (error.name === 'AbortError') {

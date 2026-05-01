@@ -52,7 +52,7 @@ function apiHandler(request) {
             role: user.role,
             permissions: user.permissions || [],
             timestamp: new Date().getTime(),
-            exp: new Date().getTime() + (30 * 60 * 1000)
+            exp: new Date().getTime() + (12 * 60 * 60 * 1000) // 12 小時
         };
         return { success: true, token: createJWT(newTokenPayload) };
     }
@@ -489,7 +489,7 @@ function createJWT(payload) {
     
     // 設定 30 分鐘有效期限
     if (!payload.exp) {
-        payload.exp = new Date().getTime() + (30 * 60 * 1000);
+        payload.exp = new Date().getTime() + (12 * 60 * 60 * 1000); // 12 小時
     }
     var encPayload = Utilities.base64EncodeWebSafe(Utilities.newBlob(JSON.stringify(payload), "UTF-8").getBytes()).replace(/=+$/, '');
     

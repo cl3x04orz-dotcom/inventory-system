@@ -377,7 +377,7 @@ export default function MergePrintModal({
                             </button>
                         )}
                         <button
-                            onClick={() => onMergePrint(null, null, printDate)}
+                            onClick={() => onMergePrint(null, aiCustomer, printDate)}
                             disabled={isPrinting || selectedIds.length === 0}
                             className={`px-8 h-12 rounded-xl font-black text-sm flex items-center gap-2 transition-all ${isPrinting || selectedIds.length === 0 ? 'bg-gray-100 text-gray-300' : 'bg-gray-900 text-white hover:bg-black shadow-lg shadow-gray-200'}`}
                         >
