@@ -226,19 +226,28 @@ function getTurnoverRate(payload) {
 // 新增：取得歷史不重複客用單單
 function getCustomersList() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Sales');
-  if (!sheet) return [];
-  const values = sheet.getDataRange().getValues();
   const set = new Set();
-  
-  for (let i = 1; i < values.length; i++) {
-    const status = String(values[i][9] || "").toUpperCase(); 
-    if (status === 'VOID') continue;
-    
-    // 客戶名稱在 Col G (index 6)
-    const c = String(values[i][6] || "").trim();
-    if(c && c !== '未指定') set.add(c);
+
+  // 1. 從歷史銷售紀錄抓取
+  const salesSheet = ss.getSheetByName('Sales');
+  if (salesSheet) {
+    const v = salesSheet.getDataRange().getValues();
+    for (let i = 1; i < v.length; i++) {
+      if (String(v[i][9]).toUpperCase() === 'VOID') continue;
+      const c = String(v[i][6] || "").trim();
+      if (c && c !== '未指定') set.add(c);
+    }
+  }
+
+  // 2. 從 Customers 資料庫抓取 (確保手動新增但尚未交易的也能顯示)
+  const custSheet = ss.getSheetByName('Customers');
+  if (custSheet) {
+    const v = custSheet.getDataRange().getValues();
+    for (let i = 1; i < v.length; i++) {
+      const c = String(v[i][0] || "").trim();
+      if (c) set.add(c);
+    }
   }
   
-  return Array.from(set).sort();
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-TW'));
 }

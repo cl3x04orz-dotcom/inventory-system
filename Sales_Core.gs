@@ -172,6 +172,11 @@ function saveSalesService(data, user) {
         }
     }
 
+    // [New] 自動將新客戶加入 Customers 資料庫並更新排程
+    if (customer && customer !== '未指定') {
+        ensureCustomerInList_(customer, today);
+    }
+
     SpreadsheetApp.flush(); // 強制寫入
     return { success: true };
 
@@ -428,4 +433,41 @@ function voidAndFetchSaleService(payload) {
   } finally {
     lock.releaseLock(); 
   }
+}
+
+/**
+ * [Helper] 確保客戶存在於 Customers 資料庫中，並更新其營業排程
+ */
+function ensureCustomerInList_(customer, saleDate) {
+    if (!customer) return;
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let custSheet = ss.getSheetByName('Customers');
+    if (!custSheet) return; 
+
+    const customerName = String(customer).trim();
+    const data = custSheet.getDataRange().getValues();
+    const dow = (saleDate || new Date()).getDay(); // 0-6
+
+    let exists = false;
+    let rowIndex = -1;
+    for (let i = 1; i < data.length; i++) {
+        if (String(data[i][0]).trim() === customerName) {
+            exists = true;
+            rowIndex = i + 1;
+            break;
+        }
+    }
+
+    if (!exists) {
+        // 新增客戶：預設開啟 AI，並勾選當天排程
+        const newRow = [customerName, 'Y', '', '', '', '', '', '', '', '市場'];
+        newRow[dow + 2] = 'Y';
+        custSheet.appendRow(newRow);
+    } else {
+        // 已存在客戶：若當天排程未勾選，則自動補勾 (確保 AI 預測能選到)
+        const currentVal = String(data[rowIndex - 1][dow + 2] || '').trim().toUpperCase();
+        if (currentVal !== 'Y') {
+            custSheet.getRange(rowIndex, dow + 3).setValue('Y');
+        }
+    }
 }

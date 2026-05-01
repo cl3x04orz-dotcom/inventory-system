@@ -100,18 +100,42 @@ export default function CostCalculationPage({ user, apiUrl }) {
                     <p className="text-[9px] md:text-[10px] text-[var(--text-secondary)] uppercase font-bold text-center leading-tight">總營運成本</p>
                     <p className="text-xs md:text-xl font-bold text-rose-500 text-center text-nowrap mt-0.5 md:mt-1">${totalOperationalCost.toLocaleString()}</p>
                 </div>
-                <div className="glass-panel px-1 py-1.5 md:px-4 bg-[var(--bg-secondary)] border-[var(--border-primary)] flex flex-col justify-center items-center">
-                    <p className="text-[9px] md:text-[10px] text-[var(--text-secondary)] uppercase font-bold text-center leading-tight">貨款</p>
-                    <p className="text-xs md:text-xl font-bold text-emerald-500 text-center text-nowrap mt-0.5 md:mt-1">${summary.goods.toLocaleString()}</p>
-                </div>
-                <div className="glass-panel px-1 py-1.5 md:px-4 bg-[var(--bg-secondary)] border-[var(--border-primary)] flex flex-col justify-center items-center">
-                    <p className="text-[9px] md:text-[10px] text-[var(--text-secondary)] uppercase font-bold text-center leading-tight">公積金</p>
-                    <p className="text-xs md:text-xl font-bold text-emerald-500 text-center text-nowrap mt-0.5 md:mt-1">${summary.reserve.toLocaleString()}</p>
-                </div>
-                <div className="glass-panel px-1 py-1.5 md:px-4 bg-[var(--bg-secondary)] border-[var(--border-primary)] flex flex-col justify-center items-center">
-                    <p className="text-[9px] md:text-[10px] text-[var(--text-secondary)] uppercase font-bold text-center leading-tight">Line Pay</p>
-                    <p className="text-xs md:text-xl font-bold text-[var(--text-primary)] text-center text-nowrap mt-0.5 md:mt-1">${summary.linePay.toLocaleString()}</p>
-                </div>
+                
+                <button 
+                    onClick={() => setActiveCategory(activeCategory === 'goods' ? null : 'goods')}
+                    className={`glass-panel px-1 py-1.5 md:px-4 flex flex-col justify-center items-center transition-all hover:scale-105 active:scale-95 ${
+                        activeCategory === 'goods' 
+                        ? 'bg-rose-50 border-rose-400 ring-2 ring-rose-200' 
+                        : 'bg-[var(--bg-secondary)] border-[var(--border-primary)]'
+                    }`}
+                >
+                    <p className={`text-[9px] md:text-[10px] uppercase font-bold text-center leading-tight ${activeCategory === 'goods' ? 'text-rose-600' : 'text-[var(--text-secondary)]'}`}>貨款</p>
+                    <p className={`text-xs md:text-xl font-bold text-center text-nowrap mt-0.5 md:mt-1 ${activeCategory === 'goods' ? 'text-rose-700' : 'text-emerald-500'}`}>${summary.goods.toLocaleString()}</p>
+                </button>
+
+                <button 
+                    onClick={() => setActiveCategory(activeCategory === 'reserve' ? null : 'reserve')}
+                    className={`glass-panel px-1 py-1.5 md:px-4 flex flex-col justify-center items-center transition-all hover:scale-105 active:scale-95 ${
+                        activeCategory === 'reserve' 
+                        ? 'bg-rose-50 border-rose-400 ring-2 ring-rose-200' 
+                        : 'bg-[var(--bg-secondary)] border-[var(--border-primary)]'
+                    }`}
+                >
+                    <p className={`text-[9px] md:text-[10px] uppercase font-bold text-center leading-tight ${activeCategory === 'reserve' ? 'text-rose-600' : 'text-[var(--text-secondary)]'}`}>公積金</p>
+                    <p className={`text-xs md:text-xl font-bold text-center text-nowrap mt-0.5 md:mt-1 ${activeCategory === 'reserve' ? 'text-rose-700' : 'text-emerald-500'}`}>${summary.reserve.toLocaleString()}</p>
+                </button>
+
+                <button 
+                    onClick={() => setActiveCategory(activeCategory === 'linePay' ? null : 'linePay')}
+                    className={`glass-panel px-1 py-1.5 md:px-4 flex flex-col justify-center items-center transition-all hover:scale-105 active:scale-95 ${
+                        activeCategory === 'linePay' 
+                        ? 'bg-rose-50 border-rose-400 ring-2 ring-rose-200' 
+                        : 'bg-[var(--bg-secondary)] border-[var(--border-primary)]'
+                    }`}
+                >
+                    <p className={`text-[9px] md:text-[10px] uppercase font-bold text-center leading-tight ${activeCategory === 'linePay' ? 'text-rose-600' : 'text-[var(--text-secondary)]'}`}>Line Pay</p>
+                    <p className={`text-xs md:text-xl font-bold text-center text-nowrap mt-0.5 md:mt-1 ${activeCategory === 'linePay' ? 'text-rose-700' : 'text-[var(--text-primary)]'}`}>${summary.linePay.toLocaleString()}</p>
+                </button>
             </div>
 
             <div className="p-3 shrink-0 grid grid-cols-1 md:grid-cols-2 gap-3 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">
@@ -221,9 +245,9 @@ export default function CostCalculationPage({ user, apiUrl }) {
                                         {/* 金流與服務費 */}
                                         <td className="px-2 py-4 text-right align-top">
                                             <div className="flex flex-col gap-1.5 items-end">
-                                                <div className="flex justify-between w-28 bg-[var(--bg-secondary)] px-2 py-0.5 rounded border border-emerald-100">
-                                                    <span className="text-[9px] text-emerald-500/70 uppercase font-bold">LP 收款</span>
-                                                    <span className="text-[11px] font-bold text-emerald-500">+${Number(item.linePay || 0).toLocaleString()}</span>
+                                                <div className={`flex justify-between w-28 px-2 py-0.5 rounded border ${activeCategory === 'linePay' ? 'bg-amber-100 border-amber-300 ring-1 ring-amber-200' : 'bg-[var(--bg-secondary)] border-emerald-100'}`}>
+                                                    <span className={`text-[9px] uppercase font-bold ${activeCategory === 'linePay' ? 'text-amber-700' : 'text-emerald-500/70'}`}>LP 收款</span>
+                                                    <span className={`text-[11px] font-bold ${activeCategory === 'linePay' ? 'text-amber-800' : 'text-emerald-500'}`}>+${Number(item.linePay || 0).toLocaleString()}</span>
                                                 </div>
                                                 <div className={`flex justify-between w-28 px-2 py-0.5 rounded border ${activeCategory === 'serviceFee' ? 'bg-amber-100 border-amber-300 ring-1 ring-amber-200' : 'bg-rose-50 border-rose-100'}`}>
                                                     <span className="text-[9px] text-rose-600/70 uppercase font-bold">服務費</span>
@@ -237,7 +261,7 @@ export default function CostCalculationPage({ user, apiUrl }) {
                                             <div className="flex flex-col gap-1 text-xs items-end">
                                                 <span className={`text-[var(--text-secondary)] ${activeCategory === 'vehicleMaintenance' ? 'bg-amber-100 px-1 rounded ring-1 ring-amber-200' : ''}`}>車輛保養: <span className="text-indigo-600 font-bold">${Number(item.vehicleMaintenance || 0).toLocaleString()}</span></span>
                                                 <span className={`text-[var(--text-secondary)] ${activeCategory === 'salary' ? 'bg-amber-100 px-1 rounded ring-1 ring-amber-200' : ''}`}>薪資發放: <span className="text-amber-500 font-bold">${Number(item.salary || 0).toLocaleString()}</span></span>
-                                                <span className="text-[var(--text-secondary)]">公積金: <span className="text-purple-600 font-bold">${Number(item.reserve || 0).toLocaleString()}</span></span>
+                                                <span className={`text-[var(--text-secondary)] ${activeCategory === 'reserve' ? 'bg-amber-100 px-1 rounded ring-1 ring-amber-200' : ''}`}>公積金: <span className="text-purple-600 font-bold">${Number(item.reserve || 0).toLocaleString()}</span></span>
                                             </div>
                                         </td>
                                     </tr>
@@ -301,10 +325,10 @@ export default function CostCalculationPage({ user, apiUrl }) {
                                         <div className="space-y-1.5">
                                             <p className="text-[10px] text-[var(--text-tertiary)] font-bold uppercase">金流服務</p>
                                             <div className="space-y-1">
-                                                <div className="flex justify-between items-center text-emerald-500 bg-[var(--bg-secondary)] px-1.5 py-0.5 rounded">
+                                                <div className={`flex justify-between items-center px-1.5 py-0.5 rounded ${activeCategory === 'linePay' ? 'bg-amber-100 text-amber-700 ring-1 ring-amber-200' : 'text-emerald-500 bg-[var(--bg-secondary)]'}`}>
                                                     <span>LP</span> <span className="font-bold">+${Number(item.linePay || 0).toLocaleString()}</span>
                                                 </div>
-                                                <div className="flex justify-between items-center text-rose-500 bg-[var(--bg-secondary)] px-1.5 py-0.5 rounded">
+                                                <div className={`flex justify-between items-center px-1.5 py-0.5 rounded ${activeCategory === 'serviceFee' ? 'bg-amber-100 text-amber-700 ring-1 ring-amber-200' : 'text-rose-500 bg-[var(--bg-secondary)]'}`}>
                                                     <span>服務</span> <span className="font-bold">-${Number(item.serviceFee || 0).toLocaleString()}</span>
                                                 </div>
                                             </div>
@@ -314,7 +338,7 @@ export default function CostCalculationPage({ user, apiUrl }) {
                                             <div className="space-y-0.5 text-[var(--text-secondary)]">
                                                 <div className={`flex justify-between ${activeCategory === 'vehicleMaintenance' ? 'bg-amber-100 px-1 rounded ring-1 ring-amber-200' : ''}`}><span className="text-indigo-600">保養</span> <span className="font-bold text-indigo-600">${Number(item.vehicleMaintenance || 0).toLocaleString()}</span></div>
                                                 <div className={`flex justify-between ${activeCategory === 'salary' ? 'bg-amber-100 px-1 rounded ring-1 ring-amber-200' : ''}`}><span className="text-amber-500">薪資</span> <span className="font-bold text-amber-500">${Number(item.salary || 0).toLocaleString()}</span></div>
-                                                <div className="flex justify-between"><span className="text-purple-600">公積</span> <span className="font-bold text-purple-600">${Number(item.reserve || 0).toLocaleString()}</span></div>
+                                                <div className={`flex justify-between ${activeCategory === 'reserve' ? 'bg-amber-100 px-1 rounded ring-1 ring-amber-200' : ''}`}><span className="text-purple-600">公積</span> <span className="font-bold text-purple-600">${Number(item.reserve || 0).toLocaleString()}</span></div>
                                             </div>
                                         </div>
                                     </div>

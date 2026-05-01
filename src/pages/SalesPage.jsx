@@ -1053,6 +1053,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                         id="input-location"
                                         type="text"
                                         autoComplete="off"
+                                        list="system-customers-list"
                                         className="input-field py-1 px-3 w-full md:w-40 lg:w-48"
                                         placeholder="輸入銷售對象..."
                                         value={location}
@@ -1645,8 +1646,16 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 }}
                 onMergePrint={handleMergePrint}
                 isPrinting={isMergePrinting}
-                systemCustomers={systemCustomers} // [New] 傳遞全系統客戶名單
+                systemCustomers={systemCustomers}
             />
+
+            {/* [New] 銷售對象自動完成清單 */}
+            <datalist id="system-customers-list">
+                {systemCustomers.map(c => {
+                    const name = typeof c === 'string' ? c : c.name;
+                    return <option key={name} value={name} />;
+                })}
+            </datalist>
 
             {/* History Import Modal */}
             <HistoryImportModal

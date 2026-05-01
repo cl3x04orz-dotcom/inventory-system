@@ -266,8 +266,9 @@ function getAllUniqueCustomersService() {
   for (let i = 1; i < values.length; i++) {
     const name = String(values[i][0] || "").trim();
     const isAiEnabled = String(values[i][1] || "").trim().toUpperCase() === 'Y';
+    const category = String(values[i][9] || "市場").trim();
     
-    if (name && isAiEnabled) {
+    if (name) {
       const schedule = [];
       for (let d = 0; d < 7; d++) {
         if (String(values[i][d + 2] || "").trim().toUpperCase() === 'Y') {
@@ -276,7 +277,9 @@ function getAllUniqueCustomersService() {
       }
       customerList.push({
         name: name,
-        schedule: schedule
+        isAiEnabled: isAiEnabled,
+        schedule: schedule,
+        category: category
       });
     }
   }
