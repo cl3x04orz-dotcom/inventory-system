@@ -446,28 +446,19 @@ function ensureCustomerInList_(customer, saleDate) {
 
     const customerName = String(customer).trim();
     const data = custSheet.getDataRange().getValues();
-    const dow = (saleDate || new Date()).getDay(); // 0-6
 
     let exists = false;
-    let rowIndex = -1;
     for (let i = 1; i < data.length; i++) {
         if (String(data[i][0]).trim() === customerName) {
             exists = true;
-            rowIndex = i + 1;
             break;
         }
     }
 
     if (!exists) {
-        // 新增客戶：預設開啟 AI，並勾選當天排程
-        const newRow = [customerName, 'Y', '', '', '', '', '', '', '', '市場'];
-        newRow[dow + 2] = 'Y';
+        // 新增客戶：僅填入名稱與類別，AI 開啟與星期排程維持空白供手動填入
+        const newRow = [customerName, '', '', '', '', '', '', '', '', '市場'];
         custSheet.appendRow(newRow);
-    } else {
-        // 已存在客戶：若當天排程未勾選，則自動補勾 (確保 AI 預測能選到)
-        const currentVal = String(data[rowIndex - 1][dow + 2] || '').trim().toUpperCase();
-        if (currentVal !== 'Y') {
-            custSheet.getRange(rowIndex, dow + 3).setValue('Y');
-        }
     }
+    // 已存在客戶則不作任何動作，維持原本手動設定的排程
 }
