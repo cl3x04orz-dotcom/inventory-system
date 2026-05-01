@@ -8,7 +8,7 @@
  * 當需求量 >= 此數值時，自動進位到整箱 (packSize)
  * 當需求量 < 此數值時，維持精準領貨量 (不進位)
  */
-const PICK_ROUND_THRESHOLD = 0;
+const PICK_ROUND_THRESHOLD = 99;
 
 /**
  * AI 智慧補貨建議核心邏輯 執行加權計算與庫存截切
