@@ -56,12 +56,20 @@ function getProductMap_() {
         autoSuppress = true;
       }
 
+      // 讀取 M 欄位 (Index 12) 作為最大建議量上限
+      let maxSuggestion = 0;
+      if (row.length > 12) {
+        const val = Number(row[12]);
+        if (!isNaN(val) && val > 0) maxSuggestion = val;
+      }
+
       map[String(id).trim()] = {
         name: idxName !== -1 ? String(row[idxName] || "").trim() : String(id).trim(),
         packSize: packSize,
         dispatchSteps: dispatchSteps,
         roundThreshold: roundThreshold,
-        autoSuppress: autoSuppress
+        autoSuppress: autoSuppress,
+        maxSuggestion: maxSuggestion
       };
     }
   }

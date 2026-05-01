@@ -178,6 +178,10 @@ function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOrig
       }
 
       if (needToPick > 0) {
+        // [新增] 執行最大建議量上限 (Max Cap)
+        if (pEntry && pEntry.maxSuggestion > 0 && needToPick > pEntry.maxSuggestion) {
+          needToPick = pEntry.maxSuggestion;
+        }
         suggestions[pId] = needToPick;
       }
     }
