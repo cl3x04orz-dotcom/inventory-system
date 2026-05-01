@@ -174,6 +174,9 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
         const fieldIdx = fields.indexOf(field);
 
         if (e.key === 'Enter') {
+            // [Fix] 避免在輸入中文選字時 (IME) 按下 Enter 直接跳格
+            if (e.nativeEvent.isComposing) return;
+            
             e.preventDefault();
             // [Modified] Enter on Price -> New Row
             if (field === 'price') {
