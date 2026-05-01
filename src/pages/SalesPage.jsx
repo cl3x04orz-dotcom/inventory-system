@@ -1059,7 +1059,10 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                         value={location}
                                         onChange={(e) => setLocation(e.target.value)}
                                         onKeyDown={(e) => {
+                                            // [Fix] 避免在輸入中文選字時 (IME) 按下 Enter 直接跳格
                                             if (e.key === 'Enter') {
+                                                if (e.nativeEvent.isComposing) return;
+                                                
                                                 e.preventDefault();
                                                 if (isPartTime) {
                                                     focusAndSelect('input-work-hours');
