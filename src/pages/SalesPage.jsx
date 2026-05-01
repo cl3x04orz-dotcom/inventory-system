@@ -1649,9 +1649,9 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 systemCustomers={systemCustomers}
             />
 
-            {/* [New] 銷售對象自動完成清單 */}
+            {/* [New] 銷售對象自動完成清單 (僅在有輸入時顯示建議) */}
             <datalist id="system-customers-list">
-                {systemCustomers.map(c => {
+                {location.trim().length > 0 && systemCustomers.map(c => {
                     const name = typeof c === 'string' ? c : c.name;
                     return <option key={name} value={name} />;
                 })}
