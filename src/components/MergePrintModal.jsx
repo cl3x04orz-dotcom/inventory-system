@@ -208,6 +208,9 @@ export default function MergePrintModal({
                                                 <option value="">請點擊選取地點...</option>
                                                 {systemCustomers
                                                     .filter(c => {
+                                                        // [Fix] 尊重 AI 開啟開關，若未開啟則不顯示於預測名單
+                                                        if (typeof c === 'object' && c.isAiEnabled === false) return false;
+                                                        
                                                         if (showAllLocations) return true;
                                                         // 支援舊版字串與新版物件格式
                                                         if (typeof c === 'string') return true;
