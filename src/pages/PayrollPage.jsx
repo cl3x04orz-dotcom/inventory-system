@@ -422,7 +422,9 @@ export default function PayrollPage({ user, apiUrl }) {
                 <div className="flex flex-wrap justify-center gap-2 px-1 text-[10px]">
                     <span className="bg-[var(--bg-secondary)] text-[var(--accent-blue)] px-2 py-0.5 rounded border border-[var(--border-primary)]">到職: {profileData.profile.joinedDate || '-'}</span>
                     <span className="bg-[var(--bg-secondary)] text-indigo-500 px-2 py-0.5 rounded border border-[var(--border-primary)]">年資: {profileData.seniorityText}</span>
+                {data?.config?.empType !== 'PART_TIME' && (
                     <span className="bg-[var(--bg-secondary)] text-emerald-500 px-2 py-0.5 rounded border border-[var(--border-primary)]">剩餘特休: {(profileData.estimatedLeaveDays - (data?.totalSpecialLeaveUsed || 0))}天</span>
+                )}
                 </div>
             </div>
 
@@ -474,9 +476,11 @@ export default function PayrollPage({ user, apiUrl }) {
                 <div className="flex items-center gap-2 bg-[var(--bg-secondary)] text-indigo-500 px-3 py-1.5 rounded-full text-sm font-medium border border-[var(--border-primary)]">
                     <User size={14} /> 年資: {profileData.seniorityText}
                 </div>
-                <div className="flex items-center gap-2 bg-[var(--bg-secondary)] text-emerald-500 px-3 py-1.5 rounded-full text-sm font-medium border border-[var(--border-primary)]">
-                    <CheckCircle size={14} /> 特休狀況: 預估總額 {profileData.estimatedLeaveDays} 天 / 已請 {data?.totalSpecialLeaveUsed || 0} 天 / 剩餘 {(profileData.estimatedLeaveDays - (data?.totalSpecialLeaveUsed || 0))} 天
-                </div>
+                {data?.config?.empType !== 'PART_TIME' && (
+                    <div className="flex items-center gap-2 bg-[var(--bg-secondary)] text-emerald-500 px-3 py-1.5 rounded-full text-sm font-medium border border-[var(--border-primary)]">
+                        <CheckCircle size={14} /> 特休狀況: 預估總額 {profileData.estimatedLeaveDays} 天 / 已請 {data?.totalSpecialLeaveUsed || 0} 天 / 剩餘 {(profileData.estimatedLeaveDays - (data?.totalSpecialLeaveUsed || 0))} 天
+                    </div>
+                )}
             </div>
 
             {/* Birthday Reminder */}
