@@ -27,6 +27,13 @@ export default function PayrollPage({ user, apiUrl }) {
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // State for Payroll Disbursement Modal
+    const [showPayrollModal, setShowPayrollModal] = useState(false);
+    const [payrollModalForm, setPayrollModalForm] = useState({
+        paymentMethod: 'CASH',
+        paymentDate: new Date().toISOString().split('T')[0]
+    });
+
     // State for Basic Profile Modal
     const [showProfile, setShowProfile] = useState(false);
     const [profileData, setProfileData] = useState({
@@ -105,26 +112,35 @@ export default function PayrollPage({ user, apiUrl }) {
         }
     }, [targetUser, user.token, apiUrl]);
 
-    // Save Payroll to Expenditures
+    // Save Payroll to Expenditures — step 1: open modal
     const handleSavePayroll = async () => {
         if (!data || !data.summary) {
             alert('請先計算薪資資料');
             return;
         }
+        // Reset modal form to today's date
+        setPayrollModalForm({
+            paymentMethod: 'CASH',
+            paymentDate: new Date().toISOString().split('T')[0]
+        });
+        setShowPayrollModal(true);
+    };
 
-        const confirmMsg = `確定要將 ${targetUser} 的薪資存檔至支出表嗎？\n\n實領薪資: $${(data.summary.finalSalary || 0).toLocaleString()}\n月份: ${year}年${month}月`;
-        if (!confirm(confirmMsg)) return;
-
+    // step 2: actually call API
+    const handleConfirmSavePayroll = async () => {
+        setShowPayrollModal(false);
         setIsSubmitting(true);
         try {
-            await callGAS(apiUrl, 'savePayrollToExpenditure', {
+            const result = await callGAS(apiUrl, 'savePayrollToExpenditure', {
                 targetUser,
                 year,
                 month,
-                finalSalary: data.summary.finalSalary
+                finalSalary: data.summary.finalSalary,
+                paymentMethod: payrollModalForm.paymentMethod,
+                paymentDate: payrollModalForm.paymentDate
             }, user.token);
-
-            alert('薪資存檔成功！');
+            const methodLabel = payrollModalForm.paymentMethod === 'CASH' ? '現金' : '匯款';
+            alert(`薪資存檔成功！\n\n👤 ${targetUser}\n💰 $${(data.summary.finalSalary || 0).toLocaleString()}\n📅 記帳月份：${year}年${month}月\n💳 付款方式：${methodLabel}\n\n※ 記帳日期為 ${year}年${month}月底，請在支出管理或銷售查詢中選擇該月份即可看到此筆記錄。`);
         } catch (error) {
             console.error('Save payroll failed:', error);
             alert('存檔失敗: ' + error.message);
@@ -886,6 +902,74 @@ export default function PayrollPage({ user, apiUrl }) {
                     </div>
                 )}
             </div>
+
+            {/* Payroll Disbursement Modal */}
+            {showPayrollModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="glass-panel w-full max-w-sm p-6 animate-fadeIn space-y-5">
+                        <h3 className="text-xl font-bold text-[var(--text-primary)]">💰 薪資發放確認</h3>
+                        <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)] space-y-1">
+                            <p className="text-xs text-[var(--text-tertiary)] uppercase font-bold">發放對象 / 月份</p>
+                            <p className="text-lg font-bold text-[var(--text-primary)]">{targetUser} — {year}年{month}月</p>
+                            <p className="text-2xl font-bold text-blue-600">${(data?.summary?.finalSalary || 0).toLocaleString()}</p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-[var(--text-secondary)] mb-2">付款方式</label>
+                                <div className="flex gap-2">
+                                    {[{ val: 'CASH', label: '💵 現金' }, { val: 'TRANSFER', label: '🏦 匯款' }].map(opt => (
+                                        <button
+                                            key={opt.val}
+                                            onClick={() => setPayrollModalForm(f => ({ ...f, paymentMethod: opt.val }))}
+                                            className={`flex-1 py-2 rounded-lg font-bold text-sm border transition-all ${
+                                                payrollModalForm.paymentMethod === opt.val
+                                                    ? 'bg-blue-600 text-white border-blue-600 shadow-md'
+                                                    : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-blue-400'
+                                            }`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-[var(--text-secondary)] mb-2">
+                                    實際付款日期
+                                    <span className="ml-2 text-xs text-amber-500 font-normal">
+                                        ({payrollModalForm.paymentMethod === 'CASH' ? '現金幾號出去的？' : '幾號轉帳成功的？'})
+                                    </span>
+                                </label>
+                                <input
+                                    type="date"
+                                    className="input-field w-full"
+                                    value={payrollModalForm.paymentDate}
+                                    onChange={e => setPayrollModalForm(f => ({ ...f, paymentDate: e.target.value }))}
+                                />
+                                <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                                    帳目歸入 {year}年{month}月（損益），但現金流追蹤以此付款日為準
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                onClick={() => setShowPayrollModal(false)}
+                                className="flex-1 btn-secondary py-2"
+                            >
+                                取消
+                            </button>
+                            <button
+                                onClick={handleConfirmSavePayroll}
+                                className="flex-1 btn-primary py-2"
+                            >
+                                確認存檔
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Edit Modal (Day) */}
             {

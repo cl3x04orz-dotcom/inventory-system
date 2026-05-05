@@ -22,6 +22,7 @@ import ExpenditureManagementPage from './pages/ExpenditureManagementPage';
 import PermissionControlPage from './pages/PermissionControlPage';
 import PayrollPage from './pages/PayrollPage';
 import ActivityLogPage from './pages/ActivityLogPage';
+import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './contexts/ThemeContext';
 import ThemeToggle from './components/ThemeToggle';
 import SessionManager from './utils/SessionManager';
@@ -738,7 +739,11 @@ function AppContent() {
                         {page === 'sales' && <SalesPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'inventory' && <InventoryPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'purchase' && <PurchasePage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'report' && <ReportPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} setPage={handlePageChange} />}
+                        {page === 'report' && (
+                            <ErrorBoundary>
+                                <ReportPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} setPage={handlePageChange} />
+                            </ErrorBoundary>
+                        )}
                         {page === 'purchaseHistory' && <PurchaseHistoryPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} setPage={handlePageChange} />}
                         {page === 'adjustHistory' && <AdjustmentHistoryPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'valuation' && <InventoryValuationPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}

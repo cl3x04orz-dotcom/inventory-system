@@ -571,6 +571,8 @@ function getExpendituresService(payload, user) {
         "車輛保養": "vehicleMaintenance",
         "薪資發放": "salary",
         "公積金": "reserve",
+        "支付方式": "paymentMethod",
+        "付款日期": "paymentDate",
         "serverTimestamp": "serverTimestamp"
     };
 
@@ -592,7 +594,7 @@ function getExpendituresService(payload, user) {
     const hasFinancePerm = user.role === 'BOSS' || 
                          (user.permissions && user.permissions.some(p => p === 'finance' || p.startsWith('finance_')));
 
-    return rows.map(row => {
+    const allItems = rows.map(row => {
         let obj = {};
         headers.forEach((h, i) => {
             const cleanHeader = String(h || '').trim();
@@ -601,56 +603,75 @@ function getExpendituresService(payload, user) {
         });
         
         // [Fix] 強制指定欄位索引 (確保正確讀取所有欄位)
-        // 根據最新的欄位結構：
-        // A (0) = 空白 (支出登錄) 或 SaleID (銷售登錄)
-        // L (11) = 結算總額
-        // M (12) = 對象
-        // N (13) = 業務
-        // O (14) = 時間戳記
-        // P (15) = 車輛保養 ✅
-        // Q (16) = 薪資發放 ✅
-        // R (17) = 公積金 ✅
-        // S (18) = 備註
-        // U (20) = 操作者 (銷售登錄才有)
-        
         if (row.length > 11) obj['finalTotal'] = row[11];
         if (row.length > 12) obj['customer'] = row[12];
         if (row.length > 13) {
             const rawSales = row[13];
             obj['salesRep'] = userMap[rawSales] || rawSales || '-';
         }
+        if (row.length > 19) obj['paymentMethod'] = row[19] || 'CASH'; // T (19)
         if (row.length > 20) {
             const rawOp = row[20];
             obj['operator'] = userMap[rawOp] || rawOp || '-';
         }
+        if (row.length > 21 && row[21]) obj['paymentDate'] = row[21]; // V (21) 付款日期
         
         return obj;
-    }).filter(item => {
-        // [Fix] Filter out VOID content
-        if (item.note && String(item.note).includes('[VOID]')) return false;
+    });
 
+    // Primary list: 記帳日期在範圍內
+    const primaryItems = allItems.filter(item => {
+        if (item.note && String(item.note).includes('[VOID]')) return false;
         const itemDate = new Date(item.date || item.serverTimestamp);
         if (isNaN(itemDate.getTime())) return true;
         if (start && itemDate < start) return false;
         if (end && itemDate > end) return false;
-
-        // [New] Authorization Filter: Only allow viewing own records unless BOSS/Finance
         if (!hasFinancePerm) {
-          const itemRep = String(item.salesRep || '').trim();
-          if (itemRep !== currentUserDisplay.trim()) return false;
+            const itemRep = String(item.salesRep || '').trim();
+            if (itemRep !== currentUserDisplay.trim()) return false;
         }
-
-        // [新增] 類別過濾 (市場 / 批發)
         const category = payload.category;
         if (category && category !== '全部') {
             const categoryMap = typeof getCustomerCategoryMap_ !== 'undefined' ? getCustomerCategoryMap_() : {};
-            const itemCust = String(item.customer || "").trim();
+            const itemCust = String(item.customer || '').trim();
             const cat = categoryMap[itemCust] || '市場';
             if (cat !== category) return false;
         }
+        return true;
+    }).map(item => {
+        // 對於具有 paymentDate 的 CASH 薪資記錄：標記 excludeFromCashFlow
+        if (item.salary > 0 && item.paymentMethod !== 'TRANSFER' && item.paymentDate) {
+            const pd = new Date(item.paymentDate);
+            if ((start && pd < start) || (end && pd > end)) {
+                return { ...item, excludeFromCashFlow: true };
+            }
+        }
+        return item;
+    });
+
+    // Secondary list: CASH 薪資依「付款日期」變進範圍 (cashFlowOnly)
+    // 用於补足「記帳日期在別月、但現金在本期付出」的記錄
+    const cashFlowItems = allItems.filter(item => {
+        if (!item.paymentDate) return false;
+        if (!item.salary || Number(item.salary) <= 0) return false;
+        if (item.note && String(item.note).includes('[VOID]')) return false;
+
+        // 付款日期在範圍內
+        const pd = new Date(item.paymentDate);
+        if (isNaN(pd.getTime())) return false;
+        if (start && pd < start) return false;
+        if (end && pd > end) return false;
+
+        // 但記帳日期不在範圍內 (否則該筆已在 primaryItems 中)
+        const itemDate = new Date(item.date || item.serverTimestamp);
+        if (!isNaN(itemDate.getTime())) {
+            if ((!start || itemDate >= start) && (!end || itemDate <= end)) return false;
+        }
 
         return true;
-    }).reverse();
+    }).map(item => ({ ...item, cashFlowOnly: true }));
+
+    return [...primaryItems, ...cashFlowItems].reverse();
 }
 
 function saveExpenditureService(payload) {
@@ -664,11 +685,19 @@ function saveExpenditureService(payload) {
                 '(空白)', '攤位', '清潔', '電費', '加油', '停車',
                 '貨款', '塑膠袋', '其他', 'Line Pay', '服務費',
                 '結算總額', '對象', '業務', '時間戳記', '車輛保養',
-                '薪資發放', '公積金', '備註'
+                '薪資發放', '公積金', '備註', '支付方式', '執行人', '付款日期'
             ]);
         }
         
         const timestamp = payload.serverTimestamp || new Date();
+        let dateRecord = payload.customDate || timestamp; // Use custom date if provided (for last month archive)
+
+        // [New] 薪資發放特殊邏輯：強制歸帳於當月月底
+        if (Number(payload.salary) > 0) {
+            const d = new Date(dateRecord);
+            // new Date(y, m+1, 0) 會得到該月最後一天
+            dateRecord = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+        }
         const row = [
             '',                                 // A (0) - 空白
             Number(payload.stall) || 0,         // B (1) - 攤位
@@ -681,14 +710,17 @@ function saveExpenditureService(payload) {
             Number(payload.others) || 0,        // I (8) - 其他
             Number(payload.linePay) || 0,       // J (9) - Line Pay
             Number(payload.serviceFee) || 0,    // K (10) - 服務費
-            0,                                  // L (11) - 結算總額 (固定為 0) ✅
+            0,                                  // L (11) - 結算總額 (固定為 0)
             payload.customer || '',             // M (12) - 對象
             payload.salesRep || payload.operator || '', // N (13) - 業務
-            timestamp,                          // O (14) - 時間戳記 ✅
+            dateRecord,                         // O (14) - 時間戳記 (支援自訂日期)
             Number(payload.vehicleMaintenance) || 0, // P (15) - 車輛保養
-            Number(payload.salary) || 0,        // Q (16) - 薪資發放
-            Number(payload.reserve) || 0,       // R (17) - 公積金
-            payload.note || ''                  // S (18) - 備註 ✅
+            payload.salary || 0,                // Q (16) - 薪資發放
+            payload.reserve || 0,               // R (17) - 公積金
+            payload.note || '',                 // S (18) - 備註
+            payload.paymentMethod || 'CASH',    // T (19) - 支付方式
+            payload.operator || '',             // U (20) - 執行人
+            payload.paymentDate || ''           // V (21) - 付款日期
         ];
         
         sheet.appendRow(row);

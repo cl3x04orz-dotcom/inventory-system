@@ -617,100 +617,86 @@ function initPayrollSheet_(name, headers) {
  * [Service] 將薪資存檔至 Expenditures (薪資發放欄位)
  */
 function savePayrollToExpenditureService(payload, user) {
-    // 權限檢查：只有 BOSS 可以存檔薪資
-    if (user.role !== 'BOSS') {
-        throw new Error('權限不足：只有管理員可以存檔薪資');
-    }
+    if (user.role !== 'BOSS') throw new Error('權限不足：只有管理員可以存檔薪資');
 
-    const { targetUser, year, month, finalSalary } = payload;
-    
-    if (!targetUser || !year || !month || finalSalary === undefined) {
-        throw new Error('缺少必要參數');
-    }
+    const { targetUser, year, month, finalSalary, paymentMethod, paymentDate } = payload;
+    if (!targetUser || !year || !month || finalSalary === undefined) throw new Error('缺少必要參數');
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const expSheet = ss.getSheetByName('Expenditures');
-    
-    if (!expSheet) {
-        throw new Error('找不到 Expenditures 分頁');
-    }
+    if (!expSheet) throw new Error('找不到 Expenditures 分頁');
 
-    // 建立日期 (該月份的第一天)
-    const recordDate = new Date(year, month - 1, 1);
-    
-    // 取得現有資料
+    // 記帳日期 = 該會計月份最後一天
+    const accountingDate = new Date(year, month, 0); // month,0 = last day of month
+    // 實際付款日期
+    const actualPaymentDate = paymentDate ? new Date(paymentDate) : new Date();
+    // 付款方式 (預設現金)
+    const finalPaymentMethod = paymentMethod || 'CASH';
+
     const data = expSheet.getDataRange().getValues();
     const headers = data[0].map(h => String(h || '').trim());
-    
-    // 動態找尋欄位索引
-    const findIndex = (keywords) => {
-        return headers.findIndex(h => keywords.some(k => h.includes(k)));
-    };
-    
-    const idxTime = findIndex(['時間', '戳記']);
-    const idxRep = findIndex(['業務', '人員', 'Operator']);
-    const idxSalary = findIndex(['薪資']);
-    const idxTotal = findIndex(['總額', '結算', 'Total']);
-    const idxCust = findIndex(['對象', '客戶', 'Customer']);
-    const idxId = findIndex(['編號', 'ID']);
-    const idxDate = headers.lastIndexOf('日期'); // 通常最後一欄是純日期
 
-    // 檢查基本欄位是否存在
-    if (idxSalary === -1) {
-        throw new Error('Expenditures 表中找不到「薪資發放」欄位，請確認表頭設定');
-    }
+    const findIdx = (keywords) => headers.findIndex(h => keywords.some(k => h.includes(k)));
+
+    const idxTime    = findIdx(['時間', '戳記', '日期']);
+    const idxRep     = findIdx(['業務', '人員', 'Operator']);
+    const idxSalary  = findIdx(['薪資']);
+    const idxTotal   = findIdx(['總額', '結算', 'Total']);
+    const idxCust    = findIdx(['對象', '客戶', 'Customer']);
+    const idxId      = findIdx(['編號', 'ID']);
+    const idxNote    = findIdx(['備註', 'Note']);
+    // T欄(19)=付款方式, V欄(21)=付款日期
+    const idxPayMethod  = 19; // T
+    const idxPayDate    = 21; // V (新增欄位)
+
+    if (idxSalary === -1) throw new Error('Expenditures 表中找不到「薪資發放」欄位');
 
     const currentTimestamp = new Date();
-    
-    // 定義覆蓋的關鍵字 (根據使用者需求: YYYY年MM月薪資結算)
     const targetNote = year + '年' + month + '月薪資結算';
-    
-    // 備註欄位索引
-    const idxNote = findIndex(['備註', 'Note']);
-    
-    // [修改] 搜尋是否已有該月份的薪資紀錄 (比對 備註 + 人員)
-    // 這樣可以確保同一個月同一個人只會有一筆結算紀錄，避免重複
+
+    // 搜尋是否已有該月同人的薪資記錄
     let foundRowIndex = -1;
-    
     if (idxNote !== -1 && idxRep !== -1) {
         for (let i = 1; i < data.length; i++) {
-            const row = data[i];
-            const rowNote = String(row[idxNote] || '').trim();
-            const rowRep = String(row[idxRep] || '').trim();
-            
-            // 嚴格比對備註文字與人員名稱
-            if (rowNote === targetNote && rowRep === targetUser) {
-                foundRowIndex = i + 1; // 轉為 1-based index (Spreadsheet row)
+            if (String(data[i][idxNote] || '').trim() === targetNote &&
+                String(data[i][idxRep]  || '').trim() === targetUser) {
+                foundRowIndex = i + 1;
                 break;
             }
         }
     }
 
     if (foundRowIndex > 0) {
-        // [覆蓋模式] 更新現有資料
-        // 更新時間、薪資金額 (其餘欄位如日期若需更新也可在此加入，目前僅更新核心資訊)
-        if (idxTime !== -1) expSheet.getRange(foundRowIndex, idxTime + 1).setValue(currentTimestamp);
+        // 覆蓋模式
+        if (idxTime   !== -1) expSheet.getRange(foundRowIndex, idxTime   + 1).setValue(currentTimestamp);
         if (idxSalary !== -1) expSheet.getRange(foundRowIndex, idxSalary + 1).setValue(finalSalary);
-        
+        // 同步更新付款方式與付款日期
+        expSheet.getRange(foundRowIndex, idxPayMethod + 1).setValue(finalPaymentMethod);
+        // 確保 V 欄存在 (若欄數不足則先補空欄)
+        if (expSheet.getLastColumn() <= idxPayDate) {
+            expSheet.getRange(foundRowIndex, idxPayDate + 1).setValue(actualPaymentDate);
+        } else {
+            expSheet.getRange(foundRowIndex, idxPayDate + 1).setValue(actualPaymentDate);
+        }
         return { success: true, message: '已更新 ' + year + '/' + month + ' 薪資記錄 (覆蓋舊檔)' };
     } else {
-        // [新增模式] 建立新的一列
-        const newRow = new Array(headers.length).fill('');
-        
-        // 填入已知欄位
-        if (idxId !== -1) newRow[idxId] = ''; // 銷售編號固定空白
-        if (idxTime !== -1) newRow[idxTime] = currentTimestamp;
-        if (idxCust !== -1) newRow[idxCust] = targetUser;
-        if (idxRep !== -1) newRow[idxRep] = targetUser;
+        // 新增模式：補足欄位到 V 欄(22 欄)
+        const colCount = Math.max(headers.length, 22);
+        const newRow = new Array(colCount).fill('');
+
+        if (idxId     !== -1) newRow[idxId]     = '';
+        if (idxTime   !== -1) newRow[idxTime]   = currentTimestamp;
+        if (idxCust   !== -1) newRow[idxCust]   = targetUser;
+        if (idxRep    !== -1) newRow[idxRep]    = targetUser;
         if (idxSalary !== -1) newRow[idxSalary] = finalSalary;
-        if (idxTotal !== -1) newRow[idxTotal] = 0; // 本筆總支出金額固定為 0
-        if (idxDate !== -1) newRow[idxDate] = currentTimestamp;
-        
-        // 寫入關鍵備註，供下次覆蓋比對使用
-        if (idxNote !== -1) newRow[idxNote] = targetNote;
-    
+        if (idxTotal  !== -1) newRow[idxTotal]  = 0;
+        if (idxNote   !== -1) newRow[idxNote]   = targetNote;
+        // 記帳日期寫到第一個「時間/日期」欄
+        if (idxTime !== -1) newRow[idxTime] = accountingDate;
+        newRow[idxPayMethod] = finalPaymentMethod; // T(19)
+        newRow[idxPayDate]   = actualPaymentDate;  // V(21)
+
         expSheet.appendRow(newRow);
-        
         return { success: true, message: '薪資記錄已新增至 Expenditures' };
     }
 }

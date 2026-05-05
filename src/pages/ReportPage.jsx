@@ -65,14 +65,14 @@ export default function ReportPage({ user, apiUrl, setPage }) {
         const prodTerm = productTerm.trim().toLowerCase();
 
         // Filter Sales
-        let filteredSales = [...rawSales];
+        let filteredSales = rawSales.filter(item => item != null);
         if (locTerm) filteredSales = filteredSales.filter(item => String(item.location || '').toLowerCase().includes(locTerm));
         if (repTerm) filteredSales = filteredSales.filter(item => String(item.salesRep || '').toLowerCase().includes(repTerm));
         if (prodTerm) filteredSales = filteredSales.filter(item => String(item.productName || '').toLowerCase().includes(prodTerm));
         setReportData(filteredSales);
 
         // Filter Expenses
-        let filteredExpenses = rawExpenses.map(item => ({
+        let filteredExpenses = rawExpenses.filter(item => item != null).map(item => ({
             ...item,
             linePayAmount: Number(item.linePay || 0),
             rowTotal: Number(item.stall || 0) + Number(item.cleaning || 0) + Number(item.electricity || 0) +
@@ -80,10 +80,10 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                 Number(item.bags || 0) + Number(item.others || 0) + Number(item.vehicleMaintenance || 0) +
                 Number(item.salary || 0) + Number(item.serviceFee || 0) + Number(item.reserve || 0),
             salaryAmount: Number(item.salary || 0),
-            normCustomer: item.customer || item['對象/備註'] || item['對象'] || '',
-            normSalesRep: item.salesRep || item['業務'] || '',
-            normNote: item.note || item['備註'] || '',
-            displayFinalTotal: Number(item[Object.keys(item).find(k => ['finaltotal', '結算', '结算', '總支出金額', '总支出金额'].some(term => k.toLowerCase().includes(term)))] || item.finalTotal || 0)
+            normCustomer: String(item.customer || item['對象/備註'] || item['對象'] || ''),
+            normSalesRep: String(item.salesRep || item['業務'] || ''),
+            normNote: String(item.note || item['備註'] || ''),
+            displayFinalTotal: Number(item[Object.keys(item || {}).find(k => ['finaltotal', '結算', '结算', '總支出金額', '总支出金额'].some(term => String(k).toLowerCase().includes(term)))] || item.finalTotal || 0)
         }));
 
         if (locTerm) {
@@ -156,7 +156,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
 
     // 定義非現金付款方式判斷
     const isNonCashMethod = (method) => {
-        const m = (method || '').trim().toUpperCase();
+        const m = String(method || '').trim().toUpperCase();
         return ['CREDIT', 'TRANSFER', '賒帳', '賒銷', '匯款'].includes(m);
     };
 
@@ -170,8 +170,8 @@ export default function ReportPage({ user, apiUrl, setPage }) {
 
     // [Fix] 計算「今日補收到的現金」 (排除匯款補收)
     const totalCollectionCash = reportData?.reduce((acc, item) => {
-        if (item.isCollectionReportMode && !isNonCashMethod(item.paymentMethod)) {
-            return acc + (Number(item.totalAmount) || 0);
+        if (item?.isCollectionReportMode && !isNonCashMethod(item?.paymentMethod)) {
+            return acc + (Number(item?.totalAmount) || 0);
         }
         return acc;
     }, 0) || 0;
@@ -179,11 +179,11 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     // [Fix] 計算「有支出分錄的非現金銷售額」 (用於扣除結算總額)
     // 只有「賒帳 (CREDIT)」會在錄入時產生對沖需求。
     const totalNonCashWithExpenseEntry = reportData?.reduce((acc, item) => {
-        const m = (item.paymentMethod || '').trim().toUpperCase();
+        const m = String(item?.paymentMethod || '').trim().toUpperCase();
         const isCredit = ['CREDIT', '賒帳', '賒銷'].includes(m);
 
-        if (isCredit && !item.isCollectionReportMode) {
-            return acc + (Number(item.totalAmount) || 0);
+        if (isCredit && !item?.isCollectionReportMode) {
+            return acc + (Number(item?.totalAmount) || 0);
         }
         return acc;
     }, 0) || 0;
@@ -192,35 +192,51 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     // (今日總銷售 - 今日非現金銷售) + 今日補收現金
     const totalCashSales = (totalSales - totalNonCashSales) + totalCollectionCash;
 
-    // [Fix] 總支出計算邏輯更新：薪資（應叫金）統一視為現金支出（需扣除）
+    // [Fix] 總支出計算：cashFlowOnly 的項目不計入支出總額顯示（避免重複）
     const totalExpenses = expenseData?.reduce((acc, item) => {
-        let expense = item.rowTotal || 0;
-        return acc + expense;
+        if (item?.cashFlowOnly) return acc;
+        return acc + (item?.rowTotal || 0);
+    }, 0) || 0;
+
+    // [Fix] 計算現金支出：排除 TRANSFER、並依 paymentDate 判斷現金流時間
+    const totalCashExpenses = expenseData?.reduce((acc, item) => {
+        // 匯款轉帳一律不算現金
+        if (item?.paymentMethod === 'TRANSFER') return acc;
+
+        // cashFlowOnly = 記帳月份在別月，但付款日期在本期 (ex: 4月薪資，5/5付款，查5/5時)
+        if (item?.cashFlowOnly) return acc + (Number(item?.salary) || 0);
+
+        // 有設定付款日期的 CASH 薪資：以 paymentDate 判斷是否在本查詢期間
+        if (Number(item?.salary) > 0 && item?.paymentDate && item?.excludeFromCashFlow) {
+            return acc; // 付款日不在本期，不列入現金扣除
+        }
+
+        return acc + (item?.rowTotal || 0);
     }, 0) || 0;
 
     // 計算總 Line Pay 金額 (用於應繳回扣除)
-    const totalLinePay = expenseData?.reduce((acc, item) => acc + (item.linePayAmount || 0), 0) || 0;
+    const totalLinePay = expenseData?.reduce((acc, item) => acc + (item?.linePayAmount || 0), 0) || 0;
 
     // 原始結算金額 (從支出表讀取的前端輸入值)
-    const rawFinalTotal = expenseData?.reduce((acc, item) => acc + (Number(item.displayFinalTotal) || 0), 0) || 0;
+    const rawFinalTotal = expenseData?.reduce((acc, item) => acc + (Number(item?.displayFinalTotal) || 0), 0) || 0;
 
     // [Adjustment] 結算金額補正：需扣除「有支出分錄的非現金銷售額」
     const totalFinalTotal = rawFinalTotal - totalNonCashWithExpenseEntry;
 
-    // 應繳回 = 現金銷售 - 現金支出 - Line Pay(非現金收入/已入帳) + 結算(找零/補錢 - 賒帳已扣除)
-    const totalReturnAmount = totalCashSales - totalExpenses - totalLinePay + totalFinalTotal;
+    // 應繳回 = 現金銷售 - 現金支出(扣除匯款) - Line Pay(非現金收入/已入帳) + 結算(找零/補錢 - 賒帳已扣除)
+    const totalReturnAmount = totalCashSales - totalCashExpenses - totalLinePay + totalFinalTotal;
 
     // Group by Product for summary table
     const productSummary = reportData?.reduce((acc, item) => {
         // [Fix] 排除「補收款」模式，避免重複計入商品銷量與金額 (已在原單計入)
         if (item.isCollectionReportMode) return acc;
 
-        const id = item.productName; // Use name as key for simplicity in display
+        const id = item.productName || '未知商品'; // Use name as key for simplicity in display
         if (!acc[id]) {
-            acc[id] = { name: item.productName, qty: 0, amount: 0 };
+            acc[id] = { name: item.productName || '未知商品', qty: 0, amount: 0 };
         }
-        acc[id].qty += item.soldQty;
-        acc[id].amount += item.totalAmount;
+        acc[id].qty += (Number(item.soldQty) || 0);
+        acc[id].amount += (Number(item.totalAmount) || 0);
         return acc;
     }, {});
 
@@ -228,7 +244,8 @@ export default function ReportPage({ user, apiUrl, setPage }) {
 
     // [New] Group Sales by Transaction (Date + Location + SalesRep)
     const groupedSales = (reportData || []).reduce((acc, item) => {
-        const dateStr = new Date(item.date).toLocaleString('zh-TW', {
+        const d = new Date(item.date);
+        const dateStr = isNaN(d.getTime()) ? '未知時間' : d.toLocaleString('zh-TW', {
             year: 'numeric', month: '2-digit', day: '2-digit',
             hour: '2-digit', minute: '2-digit', hour12: false
         });
@@ -268,7 +285,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
         if (!item.isCollectionReportMode) {
             if (isNonCash) {
                 acc[key].totalNonCashSales += amount;
-                const m = (item.paymentMethod || '').trim().toUpperCase();
+                const m = String(item.paymentMethod || '').trim().toUpperCase();
                 if (['CREDIT', '賒帳', '賒銷'].includes(m)) {
                     acc[key].totalNonCashWithExpenseEntry += amount;
                 }
@@ -285,7 +302,8 @@ export default function ReportPage({ user, apiUrl, setPage }) {
 
     // [New] Add Expenses to the same groups
     (expenseData || []).forEach(item => {
-        const dateStr = new Date(item.date).toLocaleString('zh-TW', {
+        const d = new Date(item.date);
+        const dateStr = isNaN(d.getTime()) ? '未知時間' : d.toLocaleString('zh-TW', {
             year: 'numeric', month: '2-digit', day: '2-digit',
             hour: '2-digit', minute: '2-digit', hour12: false
         });
@@ -319,7 +337,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
         const parseComplexNote = (note, label) => {
             if (!note) return "";
             const regex = new RegExp(`${label}:\\s*([^,\\]]+)`);
-            const match = note.match(regex);
+            const match = String(note).match(regex);
             return match ? match[1].trim() : "";
         };
 
@@ -708,11 +726,11 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                                 <div key={i} className="flex justify-between items-center text-sm pb-2 border-b border-[var(--border-primary)]/30 last:border-0 last:pb-0">
                                                                     <div>
                                                                         <div className="font-bold text-[var(--text-primary)] text-base">{it.productName}</div>
-                                                                        <div className="text-[var(--text-tertiary)] text-base">單價: ${(it.totalAmount / it.soldQty).toLocaleString()}</div>
+                                                                        <div className="text-[var(--text-tertiary)] text-base">單價: ${(Number(it.totalAmount) / Number(it.soldQty) || 0).toLocaleString()}</div>
                                                                     </div>
                                                                     <div className="text-right">
                                                                         <div className="font-bold text-blue-600 text-base">x {it.soldQty}</div>
-                                                                        <div className="font-mono text-[var(--text-secondary)] text-sm">${it.totalAmount.toLocaleString()}</div>
+                                                                        <div className="font-mono text-[var(--text-secondary)] text-sm">${(Number(it.totalAmount) || 0).toLocaleString()}</div>
                                                                     </div>
                                                                 </div>
                                                             ))}
@@ -827,8 +845,8 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                                                     <tr key={i} className="hover:bg-white/70 transition-colors">
                                                                                         <td className="px-4 py-3 text-[var(--text-primary)] font-bold text-base">{it.productName}</td>
                                                                                         <td className="px-4 py-3 text-right font-bold text-blue-600 text-lg">{it.soldQty}</td>
-                                                                                        <td className="px-4 py-3 text-right text-[var(--text-secondary)] text-lg">${(it.totalAmount / it.soldQty).toLocaleString()}</td>
-                                                                                        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-800 text-lg">${it.totalAmount.toLocaleString()}</td>
+                                                                                        <td className="px-4 py-3 text-right text-[var(--text-secondary)] text-lg">${(Number(it.totalAmount) / Number(it.soldQty) || 0).toLocaleString()}</td>
+                                                                                        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-800 text-lg">${(Number(it.totalAmount) || 0).toLocaleString()}</td>
                                                                                     </tr>
                                                                                 ))}
                                                                             </tbody>

@@ -107,7 +107,8 @@ function saveSalesService(data, user) {
         Number(expenseData.vehicleMaintenance) || 0,    // P (15): 車輛保養 ✅
         Number(expenseData.salary) || 0,                // Q (16): 薪資發放 ✅
         Number(expenseData.reserveFund) || Number(expenseData.reserve) || 0, // R (17): 公積金 (前端傳入 reserveFund)
-        finalNote                                       // S (18): 備註
+        finalNote,                                      // S (18): 備註
+        "CASH"                                          // T (19): 支付方式 (銷售支出預設為現金)
     ];
     
     // 3.3 處理庫存邏輯 (只修改記憶體 invData)

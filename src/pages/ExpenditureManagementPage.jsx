@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Save, DollarSign, Truck, Users, CreditCard, Clipboard, PiggyBank, Settings } from 'lucide-react';
+import { Save, DollarSign, Truck, Users, CreditCard, Clipboard, PiggyBank, Settings, Calendar } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
 export default function ExpenditureManagementPage({ user, apiUrl }) {
@@ -21,7 +21,28 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
     });
     const [note, setNote] = useState('');
 
-    const handleSubmit = async () => {
+    // Modal state for salary confirmation
+    const [users, setUsers] = useState([]);
+    const [showSalaryModal, setShowSalaryModal] = useState(false);
+    const [salaryConfig, setSalaryConfig] = useState({ 
+        method: 'TRANSFER', 
+        archive: 'LAST_MONTH',
+        recipient: '',
+        paymentDate: new Date().toISOString().split('T')[0]
+    });
+
+    // Fetch users for recipient list
+    React.useEffect(() => {
+        const fetchUsers = async () => {
+            try {
+                const data = await callGAS(apiUrl, 'getUsers', {}, user.token);
+                if (Array.isArray(data)) setUsers(data);
+            } catch (e) { console.error('Fetch users failed', e); }
+        };
+        fetchUsers();
+    }, [apiUrl, user.token]);
+
+    const handleSubmit = async (bypassModal = false) => {
         if (!note.trim()) {
             alert('請輸入備註！');
             const el = document.getElementById('input-expense-note');
@@ -29,6 +50,12 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                 el.focus();
                 el.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
+            return;
+        }
+
+        // 當薪資大於0且尚未確認過，攔截並顯示對話框
+        if (!bypassModal && Number(expenses.salary) > 0) {
+            setShowSalaryModal(true);
             return;
         }
 
@@ -50,21 +77,30 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
 
         const payload = {
             note: note,
-            salesRep: user.username,
+            salesRep: user.username || user.name || 'Unknown',
             ...expenses,
-            finalTotal: finalTotal
+            finalTotal: finalTotal,
+            paymentMethod: salaryConfig.method,
+            customer: Number(expenses.salary) > 0 ? salaryConfig.recipient : (expenses.customer || ''),
+            paymentDate: Number(expenses.salary) > 0 ? salaryConfig.paymentDate : null,
+            customDate: salaryConfig.archive === 'LAST_MONTH' 
+                ? new Date(new Date().getFullYear(), new Date().getMonth(), 0).toISOString().split('T')[0]
+                : new Date().toISOString().split('T')[0]
         };
 
         setIsSubmitting(true);
         try {
-            await callGAS(apiUrl, 'saveExpenditure', payload, user.token);
-            alert('保存成功！支出資料已寫入 Expenditures 試算表。');
-            setExpenses({
-                stall: 0, cleaning: 0, electricity: 0, gas: 0, parking: 0,
-                goods: 0, bags: 0, others: 0, linePay: 0, serviceFee: 0,
-                vehicleMaintenance: 0, salary: 0, reserve: 0
-            });
-            setNote('');
+            const res = await callGAS(apiUrl, 'saveExpenditure', payload, user.token);
+            if (res.success) {
+                alert('保存成功！支出資料已寫入 Expenditures 試算表。');
+                setExpenses({
+                    stall: 0, cleaning: 0, electricity: 0, gas: 0, parking: 0,
+                    goods: 0, bags: 0, others: 0, linePay: 0, serviceFee: 0,
+                    vehicleMaintenance: 0, salary: 0, reserve: 0
+                });
+                setNote('');
+                setShowSalaryModal(false);
+            }
         } catch (e) {
             alert('保存失敗: ' + e.message);
         } finally {
@@ -308,7 +344,7 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
 
                     {/* Final Action */}
                     <button
-                        onClick={handleSubmit}
+                        onClick={() => handleSubmit(false)}
                         className="btn-primary w-full py-4 text-lg font-black shadow-lg shadow-blue-100 hover:shadow-xl hover:shadow-blue-200 transition-all flex justify-center items-center gap-3 active:scale-95"
                     >
                         <Save size={22} /> 保存今日支出
@@ -319,6 +355,104 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                     </p>
                 </div>
             </div>
+
+            {/* Salary Confirmation Modal */}
+            {showSalaryModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="bg-rose-600 p-6 text-white">
+                            <h3 className="text-xl font-bold flex items-center gap-2">
+                                <DollarSign size={24} /> 薪資發放確認
+                            </h3>
+                            <p className="text-rose-100 text-sm mt-1">請選擇薪資發放方式與歸帳月份</p>
+                        </div>
+                        
+                        <div className="p-6 space-y-6">
+                            {/* Method Choice */}
+                            <div className="space-y-3">
+                                <label className="text-sm font-bold text-gray-500 uppercase tracking-wider">1. 發放方式</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button 
+                                        onClick={() => setSalaryConfig(prev => ({ ...prev, method: 'TRANSFER' }))}
+                                        className={`py-4 rounded-xl font-bold border-2 transition-all flex flex-col items-center gap-1 ${salaryConfig.method === 'TRANSFER' ? 'border-rose-600 bg-rose-50 text-rose-600' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}
+                                    >
+                                        <CreditCard size={20} /> 匯款 (不扣應繳金)
+                                    </button>
+                                    <button 
+                                        onClick={() => setSalaryConfig(prev => ({ ...prev, method: 'CASH' }))}
+                                        className={`py-4 rounded-xl font-bold border-2 transition-all flex flex-col items-center gap-1 ${salaryConfig.method === 'CASH' ? 'border-rose-600 bg-rose-50 text-rose-600' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}
+                                    >
+                                        <DollarSign size={20} /> 現金 (扣除應繳金)
+                                    </button>
+                                </div>
+                            </div>
+
+                             {/* Archive Choice */}
+                            <div className="space-y-3">
+                                <label className="text-sm font-bold text-gray-500 uppercase tracking-wider">2. 歸帳月份 (損益表)</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button 
+                                        onClick={() => setSalaryConfig(prev => ({ ...prev, archive: 'LAST_MONTH' }))}
+                                        className={`py-4 rounded-xl font-bold border-2 transition-all flex flex-col items-center gap-1 ${salaryConfig.archive === 'LAST_MONTH' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}
+                                    >
+                                        <Calendar size={20} /> 上個月底
+                                    </button>
+                                    <button 
+                                        onClick={() => setSalaryConfig(prev => ({ ...prev, archive: 'CURRENT' }))}
+                                        className={`py-4 rounded-xl font-bold border-2 transition-all flex flex-col items-center gap-1 ${salaryConfig.archive === 'CURRENT' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}
+                                    >
+                                        <Save size={20} /> 今天/本月
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Recipient & Payment Date */}
+                            <div className="space-y-4 pt-2 border-t border-gray-100">
+                                <div>
+                                    <label className="text-sm font-bold text-gray-500 uppercase tracking-wider block mb-2">3. 發放對象</label>
+                                    <select 
+                                        className="input-field w-full"
+                                        value={salaryConfig.recipient}
+                                        onChange={(e) => setSalaryConfig(prev => ({ ...prev, recipient: e.target.value }))}
+                                    >
+                                        <option value="">-- 請選擇員工 --</option>
+                                        {users.map(u => (
+                                            <option key={u.username} value={u.username}>{u.username} ({u.role})</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-bold text-gray-500 uppercase tracking-wider block mb-2">4. 實際付款日期</label>
+                                    <input 
+                                        type="date"
+                                        className="input-field w-full"
+                                        value={salaryConfig.paymentDate}
+                                        onChange={(e) => setSalaryConfig(prev => ({ ...prev, paymentDate: e.target.value }))}
+                                    />
+                                    <p className="text-[10px] text-amber-500 mt-1">※ 現金流扣除將以此日期為準</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-6 bg-gray-50 flex gap-3">
+                            <button 
+                                onClick={() => setShowSalaryModal(false)}
+                                className="flex-1 py-3 font-bold text-gray-500 hover:bg-gray-100 rounded-xl transition-colors"
+                            >
+                                取消
+                            </button>
+                            <button 
+                                onClick={() => handleSubmit(true)}
+                                disabled={isSubmitting}
+                                className="flex-[2] py-3 font-bold bg-rose-600 text-white rounded-xl shadow-lg shadow-rose-200 hover:bg-rose-700 active:scale-95 transition-all flex items-center justify-center"
+                            >
+                                {isSubmitting ? '處理中...' : '確認存檔'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
