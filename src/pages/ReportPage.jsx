@@ -465,10 +465,6 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                     <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">應繳回</p>
                                     <p className={`${getDynamicFontSize(totalReturnAmount)} font-bold text-amber-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalReturnAmount)}</p>
                                 </div>
-                                <div className="px-2 md:px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-200/20 shadow-sm">
-                                    <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">匯款支出</p>
-                                    <p className={`${getDynamicFontSize(totalTransferExpenses)} font-bold text-blue-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalTransferExpenses)}</p>
-                                </div>
                                 <div className="px-2 md:px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-200/20 shadow-sm">
                                     <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總銷售</p>
                                     <p className={`${getDynamicFontSize(totalSales)} font-bold text-emerald-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalSales)}</p>
@@ -476,6 +472,10 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                 <div className="px-2 md:px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-200/20 shadow-sm">
                                     <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總支出</p>
                                     <p className={`${getDynamicFontSize(totalExpenses)} font-bold text-rose-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalExpenses)}</p>
+                                </div>
+                                <div className="px-2 md:px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-200/20 shadow-sm">
+                                    <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">匯款支出</p>
+                                    <p className={`${getDynamicFontSize(totalTransferExpenses)} font-bold text-blue-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalTransferExpenses)}</p>
                                 </div>
                             </div>
 
