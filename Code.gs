@@ -692,12 +692,6 @@ function saveExpenditureService(payload) {
         const timestamp = payload.serverTimestamp || new Date();
         let dateRecord = payload.customDate || timestamp; // Use custom date if provided (for last month archive)
 
-        // [New] 薪資發放特殊邏輯：強制歸帳於當月月底
-        if (Number(payload.salary) > 0) {
-            const d = new Date(dateRecord);
-            // new Date(y, m+1, 0) 會得到該月最後一天
-            dateRecord = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-        }
         const row = [
             '',                                 // A (0) - 空白
             Number(payload.stall) || 0,         // B (1) - 攤位

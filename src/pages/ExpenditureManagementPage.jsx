@@ -24,9 +24,10 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
     // Modal state for salary confirmation
     const [users, setUsers] = useState([]);
     const [showSalaryModal, setShowSalaryModal] = useState(false);
+    // 預設設定：付款方式預設為 CASH，記帳月份預設為當月 (今天)
     const [salaryConfig, setSalaryConfig] = useState({ 
-        method: 'TRANSFER', 
-        archive: 'LAST_MONTH',
+        method: 'CASH', 
+        archive: 'CURRENT_MONTH',
         recipient: '',
         paymentDate: new Date().toISOString().split('T')[0]
     });
@@ -200,8 +201,34 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
                             <Clipboard size={18} />
                             <span>基本資訊</span>
                         </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider block mb-1">預設記帳月份 (O欄)</label>
+                                <select 
+                                    className="input-field w-full bg-[var(--bg-primary)] text-sm"
+                                    value={salaryConfig.archive}
+                                    onChange={(e) => setSalaryConfig(prev => ({ ...prev, archive: e.target.value }))}
+                                >
+                                    <option value="CURRENT_MONTH">今日 / 本月月底</option>
+                                    <option value="LAST_MONTH">上月月底 (補帳用)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider block mb-1">預設付款方式 (T欄)</label>
+                                <select 
+                                    className="input-field w-full bg-[var(--bg-primary)] text-sm"
+                                    value={salaryConfig.method}
+                                    onChange={(e) => setSalaryConfig(prev => ({ ...prev, method: e.target.value }))}
+                                >
+                                    <option value="CASH">CASH (現金)</option>
+                                    <option value="TRANSFER">TRANSFER (匯款)</option>
+                                </select>
+                            </div>
+                        </div>
+
                         <div>
-                            <label className="text-xs text-[var(--text-secondary)] font-bold block mb-2">備註 / 說明 *</label>
+                            <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider block mb-1">備註 / 說明 *</label>
                             <input
                                 id="input-expense-note"
                                 type="text"
