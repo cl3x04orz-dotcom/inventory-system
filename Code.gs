@@ -690,6 +690,18 @@ function getExpendituresService(payload, user) {
             if ((!start || itemDate >= start) && (!end || itemDate <= end)) return false;
         }
 
+        // [Fix] 權限與類別過濾 (同步 primaryItems 的邏輯)
+        if (!hasFinancePerm) {
+            const itemRep = String(item.salesRep || '').trim();
+            if (itemRep !== currentUserDisplay.trim()) return false;
+        }
+        
+        if (category && category !== '全部' && categoryMap) {
+            const itemCust = String(item.customer || '').trim();
+            const cat = categoryMap[itemCust] || '市場';
+            if (cat !== category) return false;
+        }
+
         return true;
     }).map(item => ({ ...item, cashFlowOnly: true }));
 
