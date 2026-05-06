@@ -594,30 +594,52 @@ function getExpendituresService(payload, user) {
     const hasFinancePerm = user.role === 'BOSS' || 
                          (user.permissions && user.permissions.some(p => p === 'finance' || p.startsWith('finance_')));
 
+    // [Optimization] 預先計算欄位索引，避免在 map 迴圈內重複尋找 (O(M) instead of O(N*M))
+    const colMap = {};
+    headers.forEach((h, i) => {
+        const cleanHeader = String(h || '').trim();
+        const key = mapping[cleanHeader] || cleanHeader;
+        colMap[key] = i;
+    });
+
     const allItems = rows.map(row => {
-        let obj = {};
-        headers.forEach((h, i) => {
-            const cleanHeader = String(h || '').trim();
-            const key = mapping[cleanHeader] || cleanHeader;
-            obj[key] = row[i];
-        });
+        let obj = {
+            stall: row[colMap['stall']] || 0,
+            cleaning: row[colMap['cleaning']] || 0,
+            electricity: row[colMap['electricity']] || 0,
+            gas: row[colMap['gas']] || 0,
+            parking: row[colMap['parking']] || 0,
+            goods: row[colMap['goods']] || 0,
+            bags: row[colMap['bags']] || 0,
+            others: row[colMap['others']] || 0,
+            linePay: row[colMap['linePay']] || 0,
+            serviceFee: row[colMap['serviceFee']] || 0,
+            finalTotal: row[11],
+            customer: row[12],
+            salesRep: row[13],
+            date: row[14],
+            vehicleMaintenance: row[colMap['vehicleMaintenance']] || 0,
+            salary: row[colMap['salary']] || 0,
+            reserve: row[colMap['reserve']] || 0,
+            paymentMethod: row[19] || 'CASH',
+            operator: row[20] || '-',
+            paymentDate: row[21] || '',
+            note: row[colMap['note']] || '',
+            serverTimestamp: row[colMap['serverTimestamp']] || ''
+        };
         
-        // [Fix] 強制指定欄位索引 (確保正確讀取所有欄位)
-        if (row.length > 11) obj['finalTotal'] = row[11];
-        if (row.length > 12) obj['customer'] = row[12];
-        if (row.length > 13) {
-            const rawSales = row[13];
-            obj['salesRep'] = userMap[rawSales] || rawSales || '-';
-        }
-        if (row.length > 19) obj['paymentMethod'] = row[19] || 'CASH'; // T (19)
-        if (row.length > 20) {
-            const rawOp = row[20];
-            obj['operator'] = userMap[rawOp] || rawOp || '-';
-        }
-        if (row.length > 21 && row[21]) obj['paymentDate'] = row[21]; // V (21) 付款日期
+        // 轉換業務員名稱
+        if (userMap[obj.salesRep]) obj.salesRep = userMap[obj.salesRep];
+        if (userMap[obj.operator]) obj.operator = userMap[obj.operator];
         
         return obj;
     });
+
+    // [Optimization] 把「讀取客戶分類表」的超耗時動作拉到迴圈外面，只跑一次！
+    const category = payload.category;
+    const categoryMap = (category && category !== '全部' && typeof getCustomerCategoryMap_ !== 'undefined') 
+        ? getCustomerCategoryMap_() 
+        : null;
 
     // Primary list: 記帳日期在範圍內
     const primaryItems = allItems.filter(item => {
@@ -630,9 +652,9 @@ function getExpendituresService(payload, user) {
             const itemRep = String(item.salesRep || '').trim();
             if (itemRep !== currentUserDisplay.trim()) return false;
         }
-        const category = payload.category;
-        if (category && category !== '全部') {
-            const categoryMap = typeof getCustomerCategoryMap_ !== 'undefined' ? getCustomerCategoryMap_() : {};
+        
+        // [Optimization] 使用預先抓好的分類表進行 $O(1)$ 查詢
+        if (category && category !== '全部' && categoryMap) {
             const itemCust = String(item.customer || '').trim();
             const cat = categoryMap[itemCust] || '市場';
             if (cat !== category) return false;
