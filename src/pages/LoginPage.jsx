@@ -84,7 +84,7 @@ export default function LoginPage({ onLogin, apiUrl }) {
                     </div>
 
                     {!isRegister && (
-                        <div className="flex items-center">
+                        <div className="flex items-center justify-between px-1">
                             <label className="flex items-center gap-2 cursor-pointer group">
                                 <div className="relative flex items-center">
                                     <input
@@ -93,13 +93,15 @@ export default function LoginPage({ onLogin, apiUrl }) {
                                         checked={rememberMe}
                                         onChange={e => setRememberMe(e.target.checked)}
                                     />
-                                    <div className="w-5 h-5 border-2 border-slate-200 rounded-md bg-white peer-checked:bg-blue-600 peer-checked:border-blue-600 transition-all duration-200"></div>
-                                    <svg className="absolute w-3.5 h-3.5 text-white left-[3px] top-[3px] opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                                    <div className="w-4 h-4 border border-slate-300 rounded-sm bg-white peer-checked:bg-blue-500 peer-checked:border-blue-500 transition-all duration-200"></div>
+                                    <svg className="absolute w-3 h-3 text-white left-[2px] top-[2px] opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
                                         <path d="M5 13l4 4L19 7" />
                                     </svg>
                                 </div>
-                                <span className="text-sm text-slate-600 group-hover:text-blue-500 transition-colors">記住使用者名稱</span>
+                                <span className="text-xs font-medium text-slate-400 group-hover:text-slate-600 transition-colors">記住帳號</span>
                             </label>
+                            {/* 預留一個右側平衡空間，或是未來放忘記密碼 */}
+                            <span className="text-[10px] text-slate-300 select-none">Secure Session</span>
                         </div>
                     )}
 
