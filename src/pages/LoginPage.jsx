@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Lock, User, ArrowRight } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
@@ -6,7 +6,17 @@ export default function LoginPage({ onLogin, apiUrl }) {
     const [isRegister, setIsRegister] = useState(false);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [rememberMe, setRememberMe] = useState(false);
     const [loading, setLoading] = useState(false);
+
+    // [New] 初始化時讀取記住的使用者名稱
+    useEffect(() => {
+        const savedUser = localStorage.getItem('rememberedUsername');
+        if (savedUser) {
+            setUsername(savedUser);
+            setRememberMe(true);
+        }
+    }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -14,13 +24,19 @@ export default function LoginPage({ onLogin, apiUrl }) {
         try {
             const action = isRegister ? 'register' : 'login';
             const result = await callGAS(apiUrl, action, { username, password });
-            console.log('Login API Result:', result); // DEBUG: Check what backend returns
+            console.log('Login API Result:', result);
 
             if (isRegister) {
                 alert('註冊成功！請等待管理員審核，或直接嘗試登入 (若是首位用戶)。');
                 setIsRegister(false);
             } else {
-                onLogin(result); // result should be user object with token
+                // [New] 登入成功後處理記住帳號邏輯
+                if (rememberMe) {
+                    localStorage.setItem('rememberedUsername', username);
+                } else {
+                    localStorage.removeItem('rememberedUsername');
+                }
+                onLogin(result);
             }
         } catch (err) {
             alert(err.message);
@@ -36,15 +52,15 @@ export default function LoginPage({ onLogin, apiUrl }) {
                     <div className="flex justify-center mb-6">
                         <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-20 w-auto object-contain brightness-0 dark:brightness-100" />
                     </div>
-                    <p className="text-slate-500">
+                    <p className="text-slate-500 font-medium">
                         {isRegister ? '建立您的帳戶' : '請登入系統以開始使用'}
                     </p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    <div>
+                    <div className="space-y-4">
                         <div className="relative">
-                            <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                             <input
                                 required
                                 type="text"
@@ -54,10 +70,8 @@ export default function LoginPage({ onLogin, apiUrl }) {
                                 onChange={e => setUsername(e.target.value)}
                             />
                         </div>
-                    </div>
-                    <div>
                         <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                             <input
                                 required
                                 type="password"
@@ -69,17 +83,37 @@ export default function LoginPage({ onLogin, apiUrl }) {
                         </div>
                     </div>
 
+                    {!isRegister && (
+                        <div className="flex items-center">
+                            <label className="flex items-center gap-2 cursor-pointer group">
+                                <div className="relative flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        className="peer hidden"
+                                        checked={rememberMe}
+                                        onChange={e => setRememberMe(e.target.checked)}
+                                    />
+                                    <div className="w-5 h-5 border-2 border-slate-200 rounded-md bg-white peer-checked:bg-blue-600 peer-checked:border-blue-600 transition-all duration-200"></div>
+                                    <svg className="absolute w-3.5 h-3.5 text-white left-[3px] top-[3px] opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                                        <path d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                                <span className="text-sm text-slate-600 group-hover:text-blue-500 transition-colors">記住使用者名稱</span>
+                            </label>
+                        </div>
+                    )}
+
                     <button
                         type="submit"
                         disabled={loading}
-                        className="btn-primary w-full flex justify-center items-center gap-2 py-3"
+                        className="btn-primary w-full flex justify-center items-center gap-2 py-3.5 text-base font-bold shadow-lg shadow-blue-200"
                     >
                         {loading ? '處理中...' : (isRegister ? '註冊' : '登入')} <ArrowRight size={18} />
                     </button>
                 </form>
 
-                <div className="mt-6 text-center text-sm text-slate-500">
-                    <button onClick={() => setIsRegister(!isRegister)} className="hover:text-blue-400 transition-colors">
+                <div className="mt-8 text-center text-sm text-slate-400">
+                    <button onClick={() => setIsRegister(!isRegister)} className="hover:text-blue-500 transition-colors">
                         {isRegister ? '已有帳號？登入' : '沒有帳號？註冊'}
                     </button>
                 </div>
