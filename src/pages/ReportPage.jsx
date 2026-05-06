@@ -214,6 +214,16 @@ export default function ReportPage({ user, apiUrl, setPage }) {
         return acc + (item?.rowTotal || 0);
     }, 0) || 0;
 
+    // [Fix] 計算匯款支出：統計所有在今天付出的 TRANSFER 項目 (包含跨月補發)
+    const totalTransferExpenses = expenseData?.reduce((acc, item) => {
+        if (item?.paymentMethod === 'TRANSFER') {
+            // 如果是跨月補發 (cashFlowOnly)，取 salary 欄位；否則取 rowTotal
+            if (item?.cashFlowOnly) return acc + (Number(item?.salary) || 0);
+            return acc + (item?.rowTotal || 0);
+        }
+        return acc;
+    }, 0) || 0;
+
     // 計算總 Line Pay 金額 (用於應繳回扣除)
     const totalLinePay = expenseData?.reduce((acc, item) => acc + (item?.linePayAmount || 0), 0) || 0;
 
@@ -357,12 +367,13 @@ export default function ReportPage({ user, apiUrl, setPage }) {
             { id: "serviceFee", label: "服務費" }
         ];
 
-
-
         categories.forEach(cat => {
             const val = Number(item[cat.id]) || 0;
             if (val > 0) {
                 let displayLabel = cat.label;
+                // [Adjustment] 支付方式標記邏輯：現金不顯示，匯款顯示標記
+                const methodSuffix = item.paymentMethod === 'TRANSFER' ? '|TRANSFER' : '|CASH';
+
                 if (item.normNote) {
                     const remarkVal = parseComplexNote(item.normNote, cat.remark);
                     if (remarkVal) {
@@ -372,7 +383,10 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                         displayLabel = `${cat.label} (${item.normNote})`;
                     }
                 }
-                groupedSales[key].expenseDetails[displayLabel] = (groupedSales[key].expenseDetails[displayLabel] || 0) + val;
+                
+                // 使用分隔符號儲存標籤與方式，供後續 JSX 渲染使用
+                const finalKey = displayLabel + methodSuffix;
+                groupedSales[key].expenseDetails[finalKey] = (groupedSales[key].expenseDetails[finalKey] || 0) + val;
             }
         });
     });
@@ -393,6 +407,9 @@ export default function ReportPage({ user, apiUrl, setPage }) {
 
         g.balance = val;
     });
+
+    // [Fix] 定義總筆數 (以分組後的單據數量為準)
+    const totalCount = Object.keys(groupedSales).length;
 
     const toggleGroup = (key) => {
         setExpandedGroups(prev => ({
@@ -439,36 +456,47 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                         </div>
                     )}
 
-                    {/* Summary Stats (Integrated in Header) */}
+                    {/* Summary Stats (Two-Row Layout) */}
                     {reportData && (
-                        <div className="grid grid-cols-3 md:grid-cols-7 gap-2 md:gap-3 w-full md:w-auto">
-                            <div className="px-2 md:px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-200/20 shadow-sm">
-                                <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">應繳回</p>
-                                <p className={`${getDynamicFontSize(totalReturnAmount)} font-bold text-amber-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalReturnAmount)}</p>
+                        <div className="flex flex-col gap-3 w-full md:w-[650px]">
+                            {/* Row 1: Core Financials */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
+                                <div className="px-2 md:px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-200/20 shadow-sm">
+                                    <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">應繳回</p>
+                                    <p className={`${getDynamicFontSize(totalReturnAmount)} font-bold text-amber-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalReturnAmount)}</p>
+                                </div>
+                                <div className="px-2 md:px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-200/20 shadow-sm">
+                                    <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">匯款支出</p>
+                                    <p className={`${getDynamicFontSize(totalTransferExpenses)} font-bold text-blue-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalTransferExpenses)}</p>
+                                </div>
+                                <div className="px-2 md:px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-200/20 shadow-sm">
+                                    <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總銷售</p>
+                                    <p className={`${getDynamicFontSize(totalSales)} font-bold text-emerald-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalSales)}</p>
+                                </div>
+                                <div className="px-2 md:px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-200/20 shadow-sm">
+                                    <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總支出</p>
+                                    <p className={`${getDynamicFontSize(totalExpenses)} font-bold text-rose-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalExpenses)}</p>
+                                </div>
                             </div>
-                            <div className="px-2 md:px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-200/20 shadow-sm">
-                                <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總銷售</p>
-                                <p className={`${getDynamicFontSize(totalSales)} font-bold text-emerald-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalSales)}</p>
-                            </div>
-                            <div className="px-2 md:px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-200/20 shadow-sm">
-                                <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總支出</p>
-                                <p className={`${getDynamicFontSize(totalExpenses)} font-bold text-rose-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalExpenses)}</p>
-                            </div>
-                            <div className="px-2 md:px-4 py-2 rounded-xl bg-indigo-500/10 border border-indigo-200/20 shadow-sm">
-                                <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">Line Pay</p>
-                                <p className={`${getDynamicFontSize(totalLinePay)} font-bold text-indigo-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalLinePay)}</p>
-                            </div>
-                            <div className="px-2 md:px-4 py-2 rounded-xl bg-cyan-500/10 border border-cyan-200/20 shadow-sm">
-                                <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">結算</p>
-                                <p className={`${getDynamicFontSize(totalFinalTotal)} font-bold text-cyan-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalFinalTotal)}</p>
-                            </div>
-                            <div className="px-2 md:px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-200/20 shadow-sm">
-                                <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總數量</p>
-                                <p className={`${getDynamicFontSize(totalQty)} font-bold text-blue-700 text-center whitespace-nowrap`}>{formatNumberWithDecimal(totalQty)}</p>
-                            </div>
-                            <div className="px-2 md:px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-200/20 shadow-sm">
-                                <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總筆數</p>
-                                <p className="text-xs md:text-xl font-bold text-purple-700 text-center whitespace-nowrap">{reportData.length}</p>
+
+                            {/* Row 2: Secondary Stats */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
+                                <div className="px-2 md:px-4 py-2 rounded-xl bg-indigo-500/10 border border-indigo-200/20 shadow-sm">
+                                    <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">LINE PAY</p>
+                                    <p className={`${getDynamicFontSize(totalLinePay)} font-bold text-indigo-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalLinePay)}</p>
+                                </div>
+                                <div className="px-2 md:px-4 py-2 rounded-xl bg-cyan-500/10 border border-cyan-200/20 shadow-sm">
+                                    <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">結算</p>
+                                    <p className={`${getDynamicFontSize(totalFinalTotal)} font-bold text-cyan-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalFinalTotal)}</p>
+                                </div>
+                                <div className="px-2 md:px-4 py-2 rounded-xl bg-sky-500/10 border border-sky-200/20 shadow-sm">
+                                    <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總數量</p>
+                                    <p className={`${getDynamicFontSize(totalQty)} font-bold text-sky-700 text-center whitespace-nowrap`}>{totalQty.toLocaleString()}</p>
+                                </div>
+                                <div className="px-2 md:px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-200/20 shadow-sm">
+                                    <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總筆數</p>
+                                    <p className={`${getDynamicFontSize(totalCount)} font-bold text-purple-700 text-center whitespace-nowrap`}>{totalCount.toLocaleString()}</p>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -801,12 +829,18 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                         <td className="p-3 text-right font-mono text-rose-600">
                                                             {Object.keys(group.expenseDetails).length > 0 ? (
                                                                 <div className="flex flex-col items-end gap-1">
-                                                                    {Object.entries(group.expenseDetails).map(([label, amount], idx) => (
-                                                                        <div key={idx} className="flex items-center gap-2 whitespace-nowrap bg-rose-50 px-2 py-0.5 rounded border border-rose-100">
-                                                                            <span className="text-[10px] font-bold opacity-80">{label}</span>
-                                                                            <span className="font-bold text-sm font-mono">${amount.toLocaleString()}</span>
-                                                                        </div>
-                                                                    ))}
+                                                                    {Object.entries(group.expenseDetails).map(([key, amount], idx) => {
+                                                                        const [label, method] = key.split('|');
+                                                                        return (
+                                                                            <div key={idx} className="flex items-center gap-2 whitespace-nowrap bg-rose-50 px-2 py-0.5 rounded border border-rose-100">
+                                                                                <span className="text-[10px] font-bold opacity-80">
+                                                                                    {label}
+                                                                                    {method === 'TRANSFER' && <span className="ml-1 text-blue-600 font-black">(匯)</span>}
+                                                                                </span>
+                                                                                <span className="font-bold text-sm font-mono">${amount.toLocaleString()}</span>
+                                                                            </div>
+                                                                        );
+                                                                    })}
                                                                 </div>
                                                             ) : '-'}
                                                         </td>
