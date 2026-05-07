@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, Search, Calendar, RefreshCw, AlertTriangle, ChevronUp, ChevronDown, Award } from 'lucide-react';
 import { callGAS } from '../utils/api';
-import { getLocalDateString } from '../utils/constants';
+import { getLocalDateString, getFirstDayOfMonthString } from '../utils/constants';
 
 export default function ProfitAnalysisPage({ user, apiUrl }) {
     const [data, setData] = useState([]);
@@ -15,6 +15,24 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
     const [customerStats, setCustomerStats] = useState(null);
     const [sortConfig, setSortConfig] = useState({ key: 'profit', direction: 'desc' });
     const [category, setCategory] = useState('全部'); // 全部, 市場, 批發
+
+    // [新增] 快速日期切換
+    const handleQuickDate = (type) => {
+        const today = new Date();
+        if (type === 'TODAY') {
+            const d = getLocalDateString();
+            setStartDate(d);
+            setEndDate(d);
+        } else if (type === 'THIS_MONTH') {
+            setStartDate(getFirstDayOfMonthString());
+            setEndDate(getLocalDateString());
+        } else if (type === 'LAST_MONTH') {
+            const firstOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+            setStartDate(getLocalDateString(firstOfLastMonth));
+            setEndDate(getLocalDateString(lastOfLastMonth));
+        }
+    };
 
     const fetchData = async () => {
         setLoading(true);
@@ -125,8 +143,17 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
                 </div>
             </div>
 
-            <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shrink-0 flex flex-col xl:flex-row gap-4 shadow-sm">
-                <div className="flex flex-wrap items-center gap-3 xl:flex-nowrap">
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shrink-0 space-y-4 shadow-sm">
+                {/* 快速日期切換 */}
+                <div className="flex gap-2 pb-2 overflow-x-auto no-scrollbar border-b border-dashed border-slate-200">
+                    <span className="text-[10px] font-bold text-slate-400 self-center uppercase tracking-wider mr-2 whitespace-nowrap">快速切換:</span>
+                    <button onClick={() => handleQuickDate('TODAY')} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 whitespace-nowrap active:scale-95 transition-transform">今天</button>
+                    <button onClick={() => handleQuickDate('THIS_MONTH')} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 whitespace-nowrap active:scale-95 transition-transform">本月</button>
+                    <button onClick={() => handleQuickDate('LAST_MONTH')} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 whitespace-nowrap active:scale-95 transition-transform">上月</button>
+                </div>
+
+                <div className="flex flex-col xl:flex-row gap-4">
+                    <div className="flex flex-wrap items-center gap-3 xl:flex-nowrap">
                     <div className="flex items-center gap-2 w-full sm:w-auto">
                         <input type="date" className="input-field flex-1 sm:w-[140px] text-sm bg-[var(--bg-tertiary)]" value={startDate} onChange={e => setStartDate(e.target.value)} />
                         <span className="text-[var(--text-secondary)] font-bold hidden sm:inline">至</span>
@@ -162,6 +189,7 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
                     <input type="text" placeholder="在下方結果中搜尋產品..." className="input-field pl-9 w-full text-sm bg-[var(--bg-tertiary)]" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
             </div>
+        </div>
 
             {/* 權限控制：只有老闆可以切換類別 */}
             {user.role === 'BOSS' && (

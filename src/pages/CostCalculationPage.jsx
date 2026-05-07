@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, Search, Calendar, RefreshCw, Clock } from 'lucide-react';
 import { callGAS } from '../utils/api';
-import { getLocalDateString } from '../utils/constants';
+import { getLocalDateString, getFirstDayOfMonthString } from '../utils/constants';
 
 export default function CostCalculationPage({ user, apiUrl }) {
     const [data, setData] = useState([]);
@@ -10,6 +10,24 @@ export default function CostCalculationPage({ user, apiUrl }) {
     const [endDate, setEndDate] = useState(getLocalDateString());
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState(null); // [New] For category filtering
+
+    // [新增] 快速日期切換
+    const handleQuickDate = (type) => {
+        const today = new Date();
+        if (type === 'TODAY') {
+            const d = getLocalDateString();
+            setStartDate(d);
+            setEndDate(d);
+        } else if (type === 'THIS_MONTH') {
+            setStartDate(getFirstDayOfMonthString());
+            setEndDate(getLocalDateString());
+        } else if (type === 'LAST_MONTH') {
+            const firstOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+            setStartDate(getLocalDateString(firstOfLastMonth));
+            setEndDate(getLocalDateString(lastOfLastMonth));
+        }
+    };
 
     const fetchData = async () => {
         setLoading(true);
@@ -138,9 +156,18 @@ export default function CostCalculationPage({ user, apiUrl }) {
                 </button>
             </div>
 
-            <div className="p-3 shrink-0 grid grid-cols-1 md:grid-cols-2 gap-3 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">
-                {/* Date Inputs: Grid cols 2 on mobile to take only 1 row height */}
-                <div className="grid grid-cols-2 md:flex md:flex-row md:items-center gap-2 w-full">
+            <div className="p-3 shrink-0 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">
+                {/* 快速日期切換 */}
+                <div className="flex gap-2 pb-2 overflow-x-auto no-scrollbar border-b border-dashed border-slate-200 mb-3">
+                    <span className="text-[10px] font-bold text-slate-400 self-center uppercase tracking-wider mr-2">快速切換:</span>
+                    <button onClick={() => handleQuickDate('TODAY')} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 whitespace-nowrap active:scale-95 transition-transform">今天</button>
+                    <button onClick={() => handleQuickDate('THIS_MONTH')} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 whitespace-nowrap active:scale-95 transition-transform">本月</button>
+                    <button onClick={() => handleQuickDate('LAST_MONTH')} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 whitespace-nowrap active:scale-95 transition-transform">上月</button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Date Inputs: Grid cols 2 on mobile to take only 1 row height */}
+                    <div className="grid grid-cols-2 md:flex md:flex-row md:items-center gap-2 w-full">
                     <div className="space-y-1 w-full md:w-auto md:flex-1">
                         <input type="date" className="input-field w-full h-10 appearance-none bg-[var(--bg-primary)] text-[var(--text-primary)] text-xs md:text-sm" value={startDate} onChange={e => setStartDate(e.target.value)} />
                     </div>
@@ -164,6 +191,7 @@ export default function CostCalculationPage({ user, apiUrl }) {
                     )}
                 </div>
             </div>
+        </div>
 
             {/* Compact 5-Col Grid for Expenses on Mobile (2 Rows x 5 Cols = 10 items) */}
             <div className="grid grid-cols-5 md:grid-cols-10 gap-1.5 md:gap-2 shrink-0">
