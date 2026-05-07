@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Search, Calendar, MapPin, User, FileText, TrendingUp, Package, DollarSign, RotateCcw, ChevronDown, ChevronRight } from 'lucide-react';
 import { callGAS } from '../utils/api';
-import { getLocalDateString } from '../utils/constants';
+import { getLocalDateString, getFirstDayOfMonthString } from '../utils/constants';
 
 // 格式化數字：四捨五入到小數點第 1 位
 const formatNumberWithDecimal = (num) => {
@@ -408,8 +408,31 @@ export default function ReportPage({ user, apiUrl, setPage }) {
         g.balance = val;
     });
 
-    // [Fix] 定義總筆數 (以分組後的單據數量為準)
     const totalCount = Object.keys(groupedSales).length;
+
+    // [新增] 快速日期切換
+    const handleQuickDate = (type) => {
+        const today = new Date();
+        if (type === 'TODAY') {
+            const d = getLocalDateString();
+            setStartDate(d);
+            setEndDate(d);
+        } else if (type === 'THIS_MONTH') {
+            setStartDate(getFirstDayOfMonthString());
+            setEndDate(getLocalDateString());
+        } else if (type === 'LAST_MONTH') {
+            const firstOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+            setStartDate(getLocalDateString(firstOfLastMonth));
+            setEndDate(getLocalDateString(lastOfLastMonth));
+        }
+    };
+
+    // [新增] 提取當前資料中的所有業務員
+    const availableReps = React.useMemo(() => {
+        const reps = rawSales.map(s => s.salesRep).filter(Boolean);
+        return Array.from(new Set(reps)).sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+    }, [rawSales]);
 
     const toggleGroup = (key) => {
         setExpandedGroups(prev => ({
@@ -503,7 +526,14 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                 </div>
 
                 {/* Filters - Mobile View (Horizontal, No Border, mimics SalesPage) */}
-                <div className="md:hidden mb-6 space-y-3">
+                <div className="md:hidden mb-6 space-y-4">
+                    {/* 快速日期按鈕 */}
+                    <div className="flex gap-2 pb-1 overflow-x-auto no-scrollbar">
+                        <button onClick={() => handleQuickDate('TODAY')} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 whitespace-nowrap">今天</button>
+                        <button onClick={() => handleQuickDate('THIS_MONTH')} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 whitespace-nowrap">本月</button>
+                        <button onClick={() => handleQuickDate('LAST_MONTH')} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 whitespace-nowrap">上月</button>
+                    </div>
+
                     <div className="flex items-center gap-3">
                         <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">開始日期:</label>
                         <input
@@ -564,10 +594,41 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                             </button>
                         </div>
                     </div>
+
+                    {/* 人員快速篩選 (手機) */}
+                    {availableReps.length > 0 && (
+                        <div className="flex items-center gap-2 pt-2 border-t border-dashed border-slate-200">
+                            <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">人員:</span>
+                            <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
+                                <button 
+                                    onClick={() => setSalesRep('')}
+                                    className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all whitespace-nowrap ${!salesRep ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                >
+                                    全部
+                                </button>
+                                {availableReps.map(name => (
+                                    <button 
+                                        key={name}
+                                        onClick={() => setSalesRep(name)}
+                                        className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all whitespace-nowrap ${salesRep === name ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                    >
+                                        {name}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Filters - Desktop View (Original Grid) */}
                 <div className="hidden md:block mb-6 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] shadow-sm">
+                    <div className="flex gap-3 mb-4 border-b border-slate-100 pb-3">
+                        <span className="text-xs font-bold text-slate-400 self-center uppercase tracking-wider">快速日期:</span>
+                        <button onClick={() => handleQuickDate('TODAY')} className="px-4 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 hover:bg-blue-100 transition-colors">今日</button>
+                        <button onClick={() => handleQuickDate('THIS_MONTH')} className="px-4 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 hover:bg-blue-100 transition-colors">本月</button>
+                        <button onClick={() => handleQuickDate('LAST_MONTH')} className="px-4 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 hover:bg-blue-100 transition-colors">上月</button>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                         <div className="grid grid-cols-2 gap-4 md:contents">
                             <div className="space-y-1">
@@ -622,8 +683,40 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                     onChange={e => setSalesRep(e.target.value)}
                                 />
                             </div>
+                            <button
+                                type="button"
+                                disabled={loading}
+                                className="btn-primary px-4 py-1.5 h-[42px] mt-5 flex items-center justify-center rounded-xl shadow-md active:scale-95 transition-transform"
+                                onClick={fetchData}
+                            >
+                                <Search size={20} />
+                            </button>
                         </div>
                     </div>
+
+                    {/* 人員快速篩選 (桌機) */}
+                    {availableReps.length > 0 && (
+                        <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-100">
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">人員快速點選:</span>
+                            <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
+                                <button 
+                                    onClick={() => setSalesRep('')}
+                                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${!salesRep ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}
+                                >
+                                    全部人員
+                                </button>
+                                {availableReps.map(name => (
+                                    <button 
+                                        key={name}
+                                        onClick={() => setSalesRep(name)}
+                                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${salesRep === name ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}
+                                    >
+                                        {name}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Content Logic */}
