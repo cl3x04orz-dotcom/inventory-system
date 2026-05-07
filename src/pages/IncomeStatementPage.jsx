@@ -43,6 +43,9 @@ export default function IncomeStatementPage({ user, apiUrl }) {
 
             if (Array.isArray(expenseData)) {
                 expenseData.forEach(item => {
+                    // [Fix] 損益表應以「歸帳日期 (O欄)」為準，排除單純為了現金流追蹤的「付款日期 (V欄)」項目
+                    if (item.cashFlowOnly) return;
+
                     expenseCats.stall += Number(item.stall || 0);
                     expenseCats.cleaning += Number(item.cleaning || 0);
                     expenseCats.electricity += Number(item.electricity || 0);
