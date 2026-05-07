@@ -16,6 +16,9 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
         { id: Date.now(), vendor: '', productName: '', quantity: '', unitPrice: '', expiryYear: currentYear, expiryMonth: '', expiryDay: '', paymentMethod: 'CASH' }
     ]);
     const [suggestions, setSuggestions] = useState({ vendors: [], vendorProductMap: {} });
+    const [allProductNames, setAllProductNames] = useState([]); // [新增] 所有已存在的產品名稱
+    const [newProductsToSetup, setNewProductsToSetup] = useState([]); // [新增] 待設定的新產品
+    const [setupData, setSetupData] = useState({}); // [新增] 新產品的設定值
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -23,6 +26,12 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
             try {
                 const data = await callGAS(apiUrl, 'getPurchaseSuggestions', {}, user.token);
                 if (data.vendors) setSuggestions(data);
+                
+                // [新增] 抓取完整的產品主檔清單
+                const products = await callGAS(apiUrl, 'getProducts', {}, user.token);
+                if (Array.isArray(products)) {
+                    setAllProductNames(products.map(p => p.name));
+                }
             } catch (e) {
                 console.error("Failed to fetch suggestions", e);
             }
@@ -220,6 +229,60 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
         }
     };
 
+    const handleSetupKeyDown = (e, pIdx, field) => {
+        const fields = ['packSize', 'dispatchSteps', 'roundThreshold', 'maxSuggestion'];
+        const fIdx = fields.indexOf(field);
+
+        if (e.key === 'Enter') {
+            if (e.nativeEvent.isComposing) return;
+            e.preventDefault();
+            
+            if (fIdx < fields.length - 1) {
+                const nextId = `setup-${pIdx}-${fields[fIdx+1]}`;
+                setTimeout(() => {
+                    const el = document.getElementById(nextId);
+                    if (el) {
+                        el.focus();
+                        if (typeof el.select === 'function') el.select();
+                    }
+                }, 10);
+            } else if (pIdx < newProductsToSetup.length - 1) {
+                const nextId = `setup-${pIdx+1}-${fields[0]}`;
+                setTimeout(() => {
+                    const el = document.getElementById(nextId);
+                    if (el) {
+                        el.focus();
+                        if (typeof el.select === 'function') el.select();
+                    }
+                }, 10);
+            } else {
+                handleSubmit(e);
+            }
+        } else if (e.key === 'ArrowRight') {
+            if (fIdx < fields.length - 1) {
+                const nextId = `setup-${pIdx}-${fields[fIdx+1]}`;
+                document.getElementById(nextId)?.focus();
+            }
+        } else if (e.key === 'ArrowLeft') {
+            if (fIdx > 0) {
+                const prevId = `setup-${pIdx}-${fields[fIdx-1]}`;
+                document.getElementById(prevId)?.focus();
+            }
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (pIdx < newProductsToSetup.length - 1) {
+                const nextId = `setup-${pIdx+1}-${field}`;
+                document.getElementById(nextId)?.focus();
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (pIdx > 0) {
+                const prevId = `setup-${pIdx-1}-${field}`;
+                document.getElementById(prevId)?.focus();
+            }
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -231,6 +294,30 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                 alert(`錯誤：第 ${i + 1} 列資料不完整！\n請確認「廠商」、「產品名稱」、「數量」、「單價」皆已填寫。`);
                 return;
             }
+        }
+
+        // [新增] 偵測新產品
+        const newOnes = items
+            .map(i => i.productName.trim())
+            .filter(name => name && !allProductNames.includes(name));
+        
+        const uniqueNewOnes = Array.from(new Set(newOnes));
+        
+        if (uniqueNewOnes.length > 0 && newProductsToSetup.length === 0) {
+            // 初始化設定資料
+            const initialSetup = {};
+            uniqueNewOnes.forEach(name => {
+                initialSetup[name] = {
+                    packSize: "",
+                    dispatchSteps: "",
+                    roundThreshold: "",
+                    autoSuppress: true,
+                    maxSuggestion: ""
+                };
+            });
+            setSetupData(initialSetup);
+            setNewProductsToSetup(uniqueNewOnes);
+            return; // 暫停提交，等待使用者完成設定
         }
 
         setLoading(true);
@@ -268,7 +355,8 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
             const result = await callGAS(apiUrl, 'addPurchase', {
                 items: payloadItems,
                 operator: user.username,
-                submissionId: submissionId
+                submissionId: submissionId,
+                newProductSettings: setupData // [新增] 傳入新產品設定
             }, user.token);
 
             // Log activity
@@ -289,6 +377,10 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
             alert(`成功進貨 ${result.count} 筆商品！`);
             // Reset
             setItems([{ id: Date.now(), vendor: '', productName: '', quantity: '', unitPrice: '', expiryYear: currentYear, expiryMonth: '', expiryDay: '', paymentMethod: 'CASH' }]);
+            setNewProductsToSetup([]);
+            setSetupData({});
+            // 更新本地產品清單
+            setAllProductNames(prev => [...prev, ...Object.keys(setupData)]);
         } catch (err) {
             alert('進貨失敗: ' + err.message);
         } finally {
@@ -679,6 +771,143 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                     </div>
                 </form>
             </div>
+
+            {/* [新增] 新產品設定彈窗 */}
+            {newProductsToSetup.length > 0 && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col border border-slate-200 animate-in fade-in zoom-in duration-200">
+                        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+                            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500 text-white text-sm">📦</span>
+                                偵測到新產品，請完成初始設定
+                            </h2>
+                            <p className="text-sm text-slate-500 mt-1">這些品項將會自動建立至產品主檔，請填寫 AI 補貨建議所需的參數。</p>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                            {newProductsToSetup.map((name, pIdx) => (
+                                <div key={name} className="p-5 rounded-xl border border-slate-200 bg-slate-50/30 hover:border-emerald-200 transition-colors">
+                                    <h3 className="text-base font-bold text-emerald-700 mb-4 flex items-center gap-2">
+                                        <span className="w-1.5 h-6 bg-emerald-500 rounded-full"></span>
+                                        {name}
+                                    </h3>
+                                    
+                                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
+                                        {/* Pack Size */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">包裝規格 (I)</label>
+                                            <input 
+                                                id={`setup-${pIdx}-packSize`}
+                                                type="number"
+                                                className="input-field w-full py-1.5 text-sm"
+                                                placeholder="填9 4領 5不領"
+                                                autoComplete="off"
+                                                value={setupData[name]?.packSize}
+                                                onChange={e => setSetupData(prev => ({
+                                                    ...prev,
+                                                    [name]: { ...prev[name], packSize: e.target.value }
+                                                }))}
+                                                onKeyDown={e => handleSetupKeyDown(e, pIdx, 'packSize')}
+                                                autoFocus={pIdx === 0}
+                                            />
+                                        </div>
+
+                                        {/* Dispatch Steps */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">發貨階梯 (J)</label>
+                                            <input 
+                                                id={`setup-${pIdx}-dispatchSteps`}
+                                                type="text"
+                                                className="input-field w-full py-1.5 text-sm"
+                                                placeholder="例如: 28, 42"
+                                                autoComplete="off"
+                                                value={setupData[name]?.dispatchSteps}
+                                                onChange={e => setSetupData(prev => ({
+                                                    ...prev,
+                                                    [name]: { ...prev[name], dispatchSteps: e.target.value }
+                                                }))}
+                                                onKeyDown={e => handleSetupKeyDown(e, pIdx, 'dispatchSteps')}
+                                            />
+                                        </div>
+
+                                        {/* Round Threshold */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">領貨門檻 (K)</label>
+                                            <input 
+                                                id={`setup-${pIdx}-roundThreshold`}
+                                                type="number"
+                                                className="input-field w-full py-1.5 text-sm"
+                                                placeholder=""
+                                                autoComplete="off"
+                                                value={setupData[name]?.roundThreshold}
+                                                onChange={e => setSetupData(prev => ({
+                                                    ...prev,
+                                                    [name]: { ...prev[name], roundThreshold: e.target.value }
+                                                }))}
+                                                onKeyDown={e => handleSetupKeyDown(e, pIdx, 'roundThreshold')}
+                                            />
+                                        </div>
+
+                                        {/* Max Suggestion */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">建議上限 (M)</label>
+                                            <input 
+                                                id={`setup-${pIdx}-maxSuggestion`}
+                                                type="number"
+                                                className="input-field w-full py-1.5 text-sm"
+                                                placeholder=""
+                                                autoComplete="off"
+                                                value={setupData[name]?.maxSuggestion}
+                                                onChange={e => setSetupData(prev => ({
+                                                    ...prev,
+                                                    [name]: { ...prev[name], maxSuggestion: e.target.value }
+                                                }))}
+                                                onKeyDown={e => handleSetupKeyDown(e, pIdx, 'maxSuggestion')}
+                                            />
+                                        </div>
+
+                                        {/* Auto Suppress */}
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">智慧抑制 (L)</label>
+                                            <div className="flex items-center gap-3 h-[38px]">
+                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="sr-only peer"
+                                                        checked={setupData[name]?.autoSuppress}
+                                                        onChange={e => setSetupData(prev => ({
+                                                            ...prev,
+                                                            [name]: { ...prev[name], autoSuppress: e.target.checked }
+                                                        }))}
+                                                    />
+                                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex gap-4">
+                            <button 
+                                type="button"
+                                onClick={() => setNewProductsToSetup([])}
+                                className="px-6 py-3 rounded-xl border border-slate-200 text-slate-500 font-bold hover:bg-white transition-all"
+                            >
+                                取消提交
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={(e) => handleSubmit(e)}
+                                className="flex-1 px-6 py-3 rounded-xl bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                            >
+                                完成設定並確認進貨
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

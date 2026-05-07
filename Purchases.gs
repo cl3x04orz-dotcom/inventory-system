@@ -7,7 +7,7 @@
 // 1. 進貨存檔 (Transaction Safe)
 // ===========================================
 function addPurchaseService(data, user) {
-  const { submissionId, items: rawItems, vendor, paymentMethod, serverTimestamp } = data;
+  const { submissionId, items: rawItems, vendor, paymentMethod, serverTimestamp, newProductSettings } = data;
   
   // [防重複存檔]
   if (submissionId) {
@@ -50,10 +50,33 @@ function addPurchaseService(data, user) {
         // Auto-create product if missing (and track it to avoid duplicates in same batch)
         if (!productId && item.productName) {
             productId = Utilities.getUuid();
-            // Add to map immediately for subsequent items in this batch
             productMap[item.productName] = productId;
-            // Add to new products list
-            newProducts.push([productId, item.productName, 'General', item.price, "", 0]);
+            
+            // [新增] 從前端傳入的新產品設定 (I-M 欄位)
+            const settings = (newProductSettings && newProductSettings[item.productName]) ? newProductSettings[item.productName] : {};
+            
+            const packSize = settings.packSize || "";
+            const dispatchSteps = String(settings.dispatchSteps || "").trim();
+            const roundThreshold = settings.roundThreshold || "";
+            const autoSuppress = settings.autoSuppress ? "Y" : "";
+            const maxSuggestion = settings.maxSuggestion || "";
+
+            // 建立完整的產品行 (A-M 欄位，共 13 欄)
+            // A:ID, B:Name, C:Type, D:Price, E:Unit, F:SafeLevel, G:Weight, H:Reserved, I:PackSize, J:Steps, K:Threshold, L:Suppress, M:Max
+            const newRow = new Array(13).fill("");
+            newRow[0] = productId;
+            newRow[1] = item.productName;
+            newRow[2] = 'General';
+            newRow[3] = item.price;
+            newRow[4] = ""; // Unit
+            newRow[5] = 0;  // SafeLevel
+            newRow[8] = packSize;
+            newRow[9] = dispatchSteps;
+            newRow[10] = roundThreshold;
+            newRow[11] = autoSuppress;
+            newRow[12] = maxSuggestion;
+            
+            newProducts.push(newRow);
         }
         
         if (productId) {
