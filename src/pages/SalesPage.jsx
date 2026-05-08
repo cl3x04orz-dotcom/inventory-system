@@ -1156,10 +1156,9 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                     {/* [New] Part-time Work Hours Banner - 工讀生工時輸入區（獨立一行） */}
                     {isPartTime && (
-                        <div className="flex items-center gap-3 mb-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200">
+                        <div className="flex items-center gap-3 mb-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 h-14">
                             <span className="text-base">⏱️</span>
                             <span className="text-sm font-bold text-amber-800">工讀計時</span>
-                            <span className="text-xs text-amber-600">請輸入今日實際工作時數：</span>
                             <input
                                 id="input-work-hours"
                                 type="number"
@@ -1182,20 +1181,15 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             />
                             <span className="text-sm text-amber-700 font-medium">小時</span>
                             {workHours && Number(workHours) > 0 && (
-                                <span className="ml-auto text-xs text-amber-600 font-bold bg-amber-100 px-2 py-0.5 rounded-full">
+                                <span className="ml-auto text-xs text-amber-600 font-bold bg-amber-100 px-3 py-1 rounded-full border border-amber-200">
                                     ✓ 已填寫 {workHours} hr
-                                </span>
-                            )}
-                            {(!workHours || Number(workHours) <= 0) && (
-                                <span className="ml-auto text-xs text-red-500 font-bold bg-red-50 px-2 py-0.5 rounded-full animate-pulse">
-                                    ！未填寫（必填）
                                 </span>
                             )}
                         </div>
                     )}
 
                     {/* [New] Weather Selector Banner - 樣式同工讀計時 */}
-                    <div className="flex items-center gap-3 mb-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100">
+                    <div className="flex items-center gap-3 mb-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 h-14">
                         <span className="text-base">{weather === 'SUNNY' ? '☀️' : '☔'}</span>
                         <span className="text-sm font-bold text-blue-800">今日天氣</span>
 
@@ -1223,9 +1217,9 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             </button>
                         </div>
 
-                        <span className={`ml-auto text-xs font-bold px-3 py-1 rounded-full transition-all duration-500 ${weather === 'SUNNY'
-                            ? 'bg-amber-100 text-amber-600'
-                            : 'bg-indigo-100 text-indigo-600'
+                        <span className={`ml-auto text-xs font-bold px-3 py-1 rounded-full transition-all duration-500 border ${weather === 'SUNNY'
+                            ? 'bg-amber-100 text-amber-600 border-amber-200'
+                            : 'bg-indigo-100 text-indigo-600 border-indigo-200'
                             }`}>
                             {weather === 'SUNNY' ? '✓ 今日為晴天' : '✓ 今日為雨天'}
                         </span>
