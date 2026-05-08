@@ -1198,7 +1198,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     <div className="flex items-center gap-3 mb-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100">
                         <span className="text-base">{weather === 'SUNNY' ? '☀️' : '☔'}</span>
                         <span className="text-sm font-bold text-blue-800">今日天氣</span>
-                        <span className="text-xs text-blue-600">請紀錄當前氣候狀況：</span>
+
 
                         <div className="flex bg-white/50 rounded-lg p-1 border border-blue-200 shrink-0 shadow-sm ml-2">
                             <button
