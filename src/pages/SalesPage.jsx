@@ -1157,8 +1157,10 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     {/* [New] Part-time Work Hours Banner - 工讀生工時輸入區（獨立一行） */}
                     {isPartTime && (
                         <div className="flex items-center gap-3 mb-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 h-14">
-                            <span className="text-base">⏱️</span>
-                            <span className="text-sm font-bold text-amber-800">工讀計時</span>
+                            <span className="text-base shrink-0">⏱️</span>
+                            <span className="text-[10px] font-bold text-amber-800 leading-tight text-center shrink-0">
+                                工讀<br/>計時
+                            </span>
                             <input
                                 id="input-work-hours"
                                 type="number"
@@ -1181,17 +1183,19 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             />
                             <span className="text-sm text-amber-700 font-medium">小時</span>
                             {workHours && Number(workHours) > 0 && (
-                                <span className="ml-auto text-xs text-amber-600 font-bold bg-amber-100 px-3 py-1 rounded-full border border-amber-200">
-                                    ✓ 已填寫 {workHours} hr
-                                </span>
+                                <div className="ml-auto text-[10px] font-bold px-2 py-1 rounded-lg bg-amber-100 text-amber-600 border border-amber-200 leading-tight text-center shrink-0">
+                                    今日<br/>{workHours} hr
+                                </div>
                             )}
                         </div>
                     )}
 
                     {/* [New] Weather Selector Banner - 樣式同工讀計時 */}
                     <div className="flex items-center gap-3 mb-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 h-14">
-                        <span className="text-base">{weather === 'SUNNY' ? '☀️' : '☔'}</span>
-                        <span className="text-sm font-bold text-blue-800">今日天氣</span>
+                        <span className="text-base shrink-0">{weather === 'SUNNY' ? '☀️' : '☔'}</span>
+                        <span className="text-[10px] font-bold text-blue-800 leading-tight text-center shrink-0">
+                            今日<br/>天氣
+                        </span>
 
 
                         <div className="flex bg-white/50 rounded-lg p-1 border border-blue-200 shrink-0 shadow-sm ml-2">
@@ -1217,12 +1221,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             </button>
                         </div>
 
-                        <span className={`ml-auto text-xs font-bold px-3 py-1 rounded-full transition-all duration-500 border ${weather === 'SUNNY'
+                        <div className={`ml-auto text-[10px] font-bold px-2 py-1 rounded-lg transition-all duration-500 border leading-tight text-center shrink-0 ${weather === 'SUNNY'
                             ? 'bg-amber-100 text-amber-600 border-amber-200'
                             : 'bg-indigo-100 text-indigo-600 border-indigo-200'
                             }`}>
-                            {weather === 'SUNNY' ? '✓ 今日為晴天' : '✓ 今日為雨天'}
-                        </span>
+                            今日<br/>{weather === 'SUNNY' ? '晴天' : '雨天'}
+                        </div>
                     </div>
 
                     <div className="flex-1 overflow-auto">
