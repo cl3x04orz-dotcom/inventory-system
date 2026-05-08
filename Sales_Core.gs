@@ -284,9 +284,11 @@ function getSaleToCloneService(payload) {
 /**
  * 銷售作廢與修正核心邏輯
  */
-function voidAndFetchSaleService(payload) {
+function voidAndFetchSaleService(payload, user) {
   const { saleId } = payload;
   if (!saleId) throw new Error("缺少銷售編號");
+
+  const isAdmin = user && (user.role === 'BOSS' || user.role === 'ADMIN');
 
   const lock = LockService.getScriptLock();
   try {
@@ -312,6 +314,19 @@ function voidAndFetchSaleService(payload) {
         }
     }
     if (saleRowIndex === -1) throw new Error("找不到該筆銷售紀錄");
+
+    // [新增] 權限與時間檢查：員工(STAFF) 只能在 2 天內作廢/修正
+    if (!isAdmin) {
+        const saleDate = new Date(originalSaleData[1]);
+        const now = new Date();
+        const diffMs = now.getTime() - saleDate.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        
+        if (diffDays > 2) {
+            throw new Error(`權限限制：此單據日期為 ${Utilities.formatDate(saleDate, "GMT+8", "yyyy-MM-dd")}，已超過 2 天，員工無法自行修改。請聯繫管理員處理。`);
+        }
+    }
+
     salesSheet.getRange(saleRowIndex, 10).setValue('VOID');
 
   let fetchedExpenses = null;

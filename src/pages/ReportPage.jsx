@@ -441,6 +441,21 @@ export default function ReportPage({ user, apiUrl, setPage }) {
         }));
     };
 
+    // [新增] 權限與時間檢查：員工只能修改 2 天內的單據
+    const canEdit = (group) => {
+        if (user.role === 'BOSS' || user.role === 'ADMIN') return true;
+        if (!group.items || group.items.length === 0) return false;
+        
+        const recordDate = new Date(group.items[0].date);
+        if (isNaN(recordDate.getTime())) return false;
+        
+        const now = new Date();
+        const diffMs = now.getTime() - recordDate.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        
+        return diffDays <= 2;
+    };
+
     return (
         <div className="max-w-[90rem] mx-auto p-4 relative">
             {/* Frosted Loading Overlay */}
@@ -786,13 +801,15 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                         </div>
                                                         <div className="flex flex-col items-end gap-2">
                                                             <div className="text-emerald-600 font-bold font-mono text-lg">${(Math.round(group.totalAmount) || 0).toLocaleString()}</div>
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleCorrection(group.saleId); }}
-                                                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-amber-600 border border-amber-200 hover:bg-amber-100 transition-colors text-xs font-bold shadow-sm"
-                                                                title="作廢並修正全單"
-                                                            >
-                                                                <RotateCcw size={12} /> 修正
-                                                            </button>
+                                                            {canEdit(group) && (
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleCorrection(group.saleId); }}
+                                                                    className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-amber-600 border border-amber-200 hover:bg-amber-100 transition-colors text-xs font-bold shadow-sm"
+                                                                    title="作廢並修正全單"
+                                                                >
+                                                                    <RotateCcw size={12} /> 修正
+                                                                </button>
+                                                            )}
                                                             <div className="text-[10px] text-[var(--text-tertiary)] font-bold mt-1">結算: ${(Math.round(group.balance) || 0).toLocaleString()}</div>
                                                         </div>
                                                     </div>
@@ -944,13 +961,19 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                             ${(Math.round(group.balance) || 0).toLocaleString()}
                                                         </td>
                                                         <td className="p-3 text-center">
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleCorrection(group.saleId); }}
-                                                                className="p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors shadow-sm"
-                                                                title="作廢並修正全單"
-                                                            >
-                                                                <RotateCcw size={16} />
-                                                            </button>
+                                                            {canEdit(group) ? (
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleCorrection(group.saleId); }}
+                                                                    className="p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors shadow-sm"
+                                                                    title="作廢並修正全單"
+                                                                >
+                                                                    <RotateCcw size={16} />
+                                                                </button>
+                                                            ) : (
+                                                                <div className="p-2 text-slate-300 cursor-not-allowed" title="超過 2 天，無法修改">
+                                                                    <RotateCcw size={16} className="opacity-50" />
+                                                                </div>
+                                                            )}
                                                         </td>
                                                     </tr>
                                                     {isExpanded && (

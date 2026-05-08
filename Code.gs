@@ -196,7 +196,7 @@ function apiHandler(request) {
             case 'getSaleToClone': return typeof getSaleToCloneService !== 'undefined' ? getSaleToCloneService(payload) : {error: 'Service missing'};
             case 'getSmartPickSuggestion': return typeof getSmartPickSuggestionService !== 'undefined' ? getSmartPickSuggestionService(payload.customer, payload.dayOfWeek, payload.weather, payload.currentOriginals) : {error: 'Service missing'};
             case 'getAllUniqueCustomers': return typeof getAllUniqueCustomersService !== 'undefined' ? getAllUniqueCustomersService() : {error: 'Service missing'};
-            case 'voidAndFetchSale': return typeof voidAndFetchSaleService !== 'undefined' ? voidAndFetchSaleService(payload) : {error: 'Service missing'};
+            case 'voidAndFetchSale': return typeof voidAndFetchSaleService !== 'undefined' ? voidAndFetchSaleService(payload, user) : {error: 'Service missing'};
             case 'getTemplatesList': return typeof getTemplatesListService !== 'undefined' ? getTemplatesListService() : {error: 'Service missing'};
             case 'generatePdf': return typeof generatePdfService !== 'undefined' ? generatePdfService(payload) : {error: 'Service missing'}; 
             case 'getSalesRanking': return typeof getSalesRanking !== 'undefined' ? getSalesRanking(payload) : {error: 'Service missing'};
