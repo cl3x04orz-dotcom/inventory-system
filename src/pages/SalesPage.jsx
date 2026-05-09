@@ -1183,7 +1183,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             />
                             <span className="text-sm text-amber-700 font-medium">小時</span>
                             {workHours && Number(workHours) > 0 && (
-                                <div className="ml-auto text-[10px] font-bold px-2 py-1 rounded-lg bg-amber-100 text-amber-600 border border-amber-200 leading-tight text-center shrink-0">
+                                <div className="ml-auto text-[10px] font-bold py-1 rounded-lg bg-amber-100 text-amber-600 border border-amber-200 leading-tight text-center shrink-0 w-14">
                                     今日<br/>{workHours} hr
                                 </div>
                             )}
@@ -1221,7 +1221,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             </button>
                         </div>
 
-                        <div className={`ml-auto text-[10px] font-bold px-2 py-1 rounded-lg transition-all duration-500 border leading-tight text-center shrink-0 ${weather === 'SUNNY'
+                        <div className={`ml-auto text-[10px] font-bold py-1 rounded-lg transition-all duration-500 border leading-tight text-center shrink-0 w-14 ${weather === 'SUNNY'
                             ? 'bg-amber-100 text-amber-600 border-amber-200'
                             : 'bg-indigo-100 text-indigo-600 border-indigo-200'
                             }`}>
