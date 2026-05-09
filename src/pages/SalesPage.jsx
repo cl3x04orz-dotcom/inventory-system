@@ -1157,8 +1157,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     {/* [New] Part-time Work Hours Banner - 工讀生工時輸入區（獨立一行） */}
                     {isPartTime && (
                         <div className="flex items-center gap-3 mb-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 h-14">
-                            <span className="text-base shrink-0">⏱️</span>
-                            <span className="text-[10px] font-bold text-amber-800 leading-tight text-center shrink-0">
+                            <span className="text-base shrink-0 w-6 flex justify-center">⏱️</span>
+                            <span className="text-[10px] font-bold text-amber-800 leading-tight text-center shrink-0 w-10">
                                 工讀<br/>計時
                             </span>
                             <input
@@ -1192,13 +1192,13 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                     {/* [New] Weather Selector Banner - 樣式同工讀計時 */}
                     <div className="flex items-center gap-3 mb-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 h-14">
-                        <span className="text-base shrink-0">{weather === 'SUNNY' ? '☀️' : '☔'}</span>
-                        <span className="text-[10px] font-bold text-blue-800 leading-tight text-center shrink-0">
+                        <span className="text-base shrink-0 w-6 flex justify-center">{weather === 'SUNNY' ? '☀️' : '☔'}</span>
+                        <span className="text-[10px] font-bold text-blue-800 leading-tight text-center shrink-0 w-10">
                             今日<br/>天氣
                         </span>
 
 
-                        <div className="flex bg-white/50 rounded-lg p-1 border border-blue-200 shrink-0 shadow-sm ml-2">
+                        <div className="flex bg-white/50 rounded-lg p-1 border border-blue-200 shrink-0 shadow-sm">
                             <button
                                 type="button"
                                 onClick={() => setWeather('SUNNY')}
