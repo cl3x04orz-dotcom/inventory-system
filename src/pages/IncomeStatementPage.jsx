@@ -157,10 +157,10 @@ export default function IncomeStatementPage({ user, apiUrl }) {
                         />
                     </div>
                 </div>
-
             </div>
+        </div>
 
-            <div className="bg-[var(--bg-primary)] rounded-xl border border-[var(--border-primary)] shadow-sm">
+        <div className="bg-[var(--bg-primary)] rounded-xl border border-[var(--border-primary)] shadow-sm">
                 <div className="p-3 md:p-6">
                     <div className="space-y-3 md:space-y-5 max-w-2xl mx-auto font-mono text-sm md:text-base">
                         {/* Revenue Section */}
