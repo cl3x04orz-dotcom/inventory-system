@@ -39,7 +39,7 @@ export default function HistoryImportModal({
             <div className="relative w-full max-w-5xl bg-white rounded-[2.5rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.1)] border border-gray-100 overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-500 ease-out">
 
                 {/* Header Section */}
-                <div className="relative bg-white p-4 sm:p-5 text-gray-900 border-b border-gray-100 overflow-hidden shrink-0">
+                <div className="relative bg-white pt-5 pb-4 px-[15px] sm:p-5 text-gray-900 border-b border-gray-100 overflow-hidden shrink-0">
                     <div className="relative flex flex-col w-full">
                         <div className="flex items-center gap-3 w-full">
                             <div className="p-1.5 bg-gray-100 rounded-lg border border-gray-200 shadow-sm shrink-0">
@@ -54,23 +54,25 @@ export default function HistoryImportModal({
                             </button>
                         </div>
                         {/* Search Bar */}
-                        <div className="flex flex-nowrap items-center w-full bg-gray-50 p-1 rounded-lg border border-gray-200 mt-3">
+                        <div className="flex flex-nowrap items-center w-full bg-gray-50 p-1 rounded-lg border border-gray-200 mt-3 overflow-hidden">
                             <div className="flex items-center justify-center pl-2 pr-1 shrink-0">
                                 <Calendar size={14} className="text-gray-400" />
                             </div>
-                            <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => onDateChange('start', e.target.value)}
-                                className="bg-transparent text-xs font-bold text-gray-700 outline-none w-full min-w-0"
-                            />
-                            <span className="text-gray-300 font-bold px-1 text-xs shrink-0">~</span>
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => onDateChange('end', e.target.value)}
-                                className="bg-transparent text-xs font-bold text-gray-700 outline-none w-full min-w-0"
-                            />
+                            <div className="flex-1 flex items-center min-w-0">
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => onDateChange('start', e.target.value)}
+                                    className="bg-transparent text-[10px] sm:text-xs font-bold text-gray-700 outline-none w-full min-w-0"
+                                />
+                                <span className="text-gray-300 font-bold px-1 text-[10px] shrink-0">~</span>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => onDateChange('end', e.target.value)}
+                                    className="bg-transparent text-[10px] sm:text-xs font-bold text-gray-700 outline-none w-full min-w-0"
+                                />
+                            </div>
                             <button
                                 onClick={onSearch}
                                 className="bg-emerald-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-emerald-700 active:scale-95 transition-all whitespace-nowrap shrink-0 ml-1"
@@ -82,14 +84,14 @@ export default function HistoryImportModal({
                 </div>
 
                 {/* Modal Body: List of Records */}
-                <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1 bg-gray-50/30">
+                <div className="py-4 sm:py-5 overflow-y-auto custom-scrollbar flex-1 bg-gray-50/30">
                     {isLoading ? (
-                        <div className="flex flex-col items-center justify-center py-10 text-center">
+                        <div className="flex flex-col items-center justify-center py-10 text-center mx-[15px]">
                             <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mb-3" />
                             <p className="text-gray-400 font-bold text-sm">載入中...</p>
                         </div>
                     ) : records.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-10 text-center">
+                        <div className="flex flex-col items-center justify-center py-10 text-center mx-[15px]">
                             <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm border border-gray-100">
                                 <RotateCcw size={32} className="text-gray-200" />
                             </div>
@@ -101,7 +103,7 @@ export default function HistoryImportModal({
                             {sortedDates.map(dateKey => (
                                 <div key={dateKey}>
                                     {/* Date Header */}
-                                    <div className="flex items-center gap-2 mb-3 sticky top-0 bg-gray-50/95 backdrop-blur-sm z-20 py-1.5 border-b border-gray-100">
+                                    <div className="flex items-center gap-2 mb-3 sticky top-0 bg-gray-50/95 backdrop-blur-sm z-20 py-1.5 border-b border-gray-100 px-[15px]">
                                         <div className="h-5 w-1 bg-emerald-500 rounded-full"></div>
                                         <h4 className="text-sm font-black text-gray-700">{dateKey}</h4>
                                         <span className="text-[10px] font-bold bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full">
@@ -109,7 +111,7 @@ export default function HistoryImportModal({
                                         </span>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mx-[15px]">
                                         {groupedRecords[dateKey].map(record => {
                                             const isSelected = selectedIds.includes(record.saleId);
                                             // Calculate total returns for this record
@@ -171,7 +173,7 @@ export default function HistoryImportModal({
                 </div>
 
                 {/* Footer Section */}
-                <div className="p-4 sm:p-5 bg-white border-t border-gray-100 flex justify-between items-center gap-4 shrink-0">
+                <div className="py-4 px-[15px] sm:p-5 bg-white border-t border-gray-100 flex justify-between items-center gap-4 shrink-0">
                     <div className="text-gray-400 text-xs font-bold italic truncate flex-1">
                         {selectedIds.length > 0 ? `已選 ${selectedIds.length} 筆` : '請勾選紀錄'}
                     </div>
