@@ -1156,76 +1156,95 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                     {/* [New] Part-time Work Hours Banner - 工讀生工時輸入區（獨立一行） */}
                     {isPartTime && (
-                        <div className="flex items-center gap-3 mb-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 h-14">
-                            <span className="text-base shrink-0 w-6 flex justify-center">⏱️</span>
-                            <span className="text-[10px] font-bold text-amber-800 leading-tight text-center shrink-0 w-10">
-                                工讀<br/>計時
-                            </span>
-                            <input
-                                id="input-work-hours"
-                                type="number"
-                                step="0.5"
-                                min="0"
-                                required
-                                className={`bg-white border-2 text-amber-900 text-base font-bold rounded-lg px-3 py-1 w-20 text-center focus:ring-2 focus:ring-amber-400 outline-none transition-colors ${!workHours || Number(workHours) <= 0
-                                    ? 'border-red-300 bg-red-50'
-                                    : 'border-amber-300'
-                                    }`}
-                                placeholder="0.5"
-                                value={workHours}
-                                onChange={(e) => setWorkHours(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        focusAndSelect('input-m-0-picked') || focusAndSelect('input-0-picked');
-                                    }
-                                }}
-                            />
-                            <span className="text-sm text-amber-700 font-medium">小時</span>
-                            {workHours && Number(workHours) > 0 && (
-                                <div className="ml-auto text-[10px] font-bold py-1 rounded-lg bg-amber-100 text-amber-600 border border-amber-200 leading-tight text-center shrink-0 w-14">
-                                    今日<br/>{workHours} hr
-                                </div>
-                            )}
+                        <div className="flex items-center mb-3 px-3 md:px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 h-14">
+                            {/* Left Column */}
+                            <div className="flex items-center gap-2 w-[72px] shrink-0">
+                                <span className="text-base w-5 flex justify-center shrink-0">⏱️</span>
+                                <span className="text-[10px] font-bold text-amber-800 leading-tight shrink-0">
+                                    工讀<br/>計時
+                                </span>
+                            </div>
+
+                            {/* Middle Column */}
+                            <div className="flex items-center gap-2 flex-1 ml-1 md:ml-2">
+                                <input
+                                    id="input-work-hours"
+                                    type="number"
+                                    step="0.5"
+                                    min="0"
+                                    required
+                                    className={`bg-white border-2 text-amber-900 text-base font-bold rounded-lg px-2 py-1 w-16 text-center focus:ring-2 focus:ring-amber-400 outline-none transition-colors ${!workHours || Number(workHours) <= 0
+                                        ? 'border-red-300 bg-red-50'
+                                        : 'border-amber-300'
+                                        }`}
+                                    placeholder="0.5"
+                                    value={workHours}
+                                    onChange={(e) => setWorkHours(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            focusAndSelect('input-m-0-picked') || focusAndSelect('input-0-picked');
+                                        }
+                                    }}
+                                />
+                                <span className="text-xs md:text-sm text-amber-700 font-medium shrink-0">小時</span>
+                            </div>
+
+                            {/* Right Column */}
+                            <div className="w-14 shrink-0 ml-auto flex justify-end">
+                                {workHours && Number(workHours) > 0 && (
+                                    <div className="text-[10px] font-bold py-1 rounded-lg bg-amber-100 text-amber-600 border border-amber-200 leading-tight text-center w-full">
+                                        今日<br/>{workHours} hr
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
 
                     {/* [New] Weather Selector Banner - 樣式同工讀計時 */}
-                    <div className="flex items-center gap-3 mb-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 h-14">
-                        <span className="text-base shrink-0 w-6 flex justify-center">{weather === 'SUNNY' ? '☀️' : '☔'}</span>
-                        <span className="text-[10px] font-bold text-blue-800 leading-tight text-center shrink-0 w-10">
-                            今日<br/>天氣
-                        </span>
-
-
-                        <div className="flex bg-white/50 rounded-lg p-1 border border-blue-200 shrink-0 shadow-sm">
-                            <button
-                                type="button"
-                                onClick={() => setWeather('SUNNY')}
-                                className={`flex items-center gap-2 px-4 py-1.5 text-xs font-black rounded-md transition-all ${weather === 'SUNNY'
-                                    ? 'bg-amber-500 text-white shadow-md'
-                                    : 'text-blue-400 hover:text-blue-600 hover:bg-white'
-                                    }`}
-                            >
-                                ☀️ 晴天
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setWeather('RAINY')}
-                                className={`flex items-center gap-2 px-4 py-1.5 text-xs font-black rounded-md transition-all ${weather === 'RAINY'
-                                    ? 'bg-indigo-600 text-white shadow-md'
-                                    : 'text-blue-400 hover:text-blue-600 hover:bg-white'
-                                    }`}
-                            >
-                                ☔ 雨天
-                            </button>
+                    <div className="flex items-center mb-3 px-3 md:px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 h-14">
+                        {/* Left Column */}
+                        <div className="flex items-center gap-2 w-[72px] shrink-0">
+                            <span className="text-base w-5 flex justify-center shrink-0">{weather === 'SUNNY' ? '☀️' : '☔'}</span>
+                            <span className="text-[10px] font-bold text-blue-800 leading-tight shrink-0">
+                                今日<br/>天氣
+                            </span>
                         </div>
 
-                        <div className={`ml-auto text-[10px] font-bold py-1 rounded-lg transition-all duration-500 border leading-tight text-center shrink-0 w-14 ${weather === 'SUNNY'
-                            ? 'bg-amber-100 text-amber-600 border-amber-200'
-                            : 'bg-indigo-100 text-indigo-600 border-indigo-200'
-                            }`}>
-                            今日<br/>{weather === 'SUNNY' ? '晴天' : '雨天'}
+                        {/* Middle Column */}
+                        <div className="flex items-center flex-1 ml-1 md:ml-2">
+                            <div className="flex w-full max-w-[150px] bg-white/50 rounded-lg p-1 border border-blue-200 shadow-sm">
+                                <button
+                                    type="button"
+                                    onClick={() => setWeather('SUNNY')}
+                                    className={`flex-1 flex justify-center items-center gap-1 px-2 py-1.5 text-[11px] md:text-xs font-black rounded-md transition-all ${weather === 'SUNNY'
+                                        ? 'bg-amber-500 text-white shadow-md'
+                                        : 'text-blue-400 hover:text-blue-600 hover:bg-white'
+                                        }`}
+                                >
+                                    ☀️ 晴天
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setWeather('RAINY')}
+                                    className={`flex-1 flex justify-center items-center gap-1 px-2 py-1.5 text-[11px] md:text-xs font-black rounded-md transition-all ${weather === 'RAINY'
+                                        ? 'bg-indigo-600 text-white shadow-md'
+                                        : 'text-blue-400 hover:text-blue-600 hover:bg-white'
+                                        }`}
+                                >
+                                    ☔ 雨天
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Right Column */}
+                        <div className="w-14 shrink-0 ml-auto flex justify-end">
+                            <div className={`text-[10px] font-bold py-1 rounded-lg transition-all duration-500 border leading-tight text-center w-full ${weather === 'SUNNY'
+                                ? 'bg-amber-100 text-amber-600 border-amber-200'
+                                : 'bg-indigo-100 text-indigo-600 border-indigo-200'
+                                }`}>
+                                今日<br/>{weather === 'SUNNY' ? '晴天' : '雨天'}
+                            </div>
                         </div>
                     </div>
 
