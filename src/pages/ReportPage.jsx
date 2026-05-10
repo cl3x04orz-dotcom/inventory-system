@@ -788,70 +788,82 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                         return (
                                             <div key={group.key} className={`bg-[var(--bg-secondary)] transition-colors ${isExpanded ? 'bg-blue-50/20' : ''}`}>
                                                 <div
-                                                    className="p-4 space-y-3 cursor-pointer"
+                                                    className="p-3 md:p-4 space-y-3 cursor-pointer overflow-hidden"
                                                     onClick={() => toggleGroup(group.key)}
                                                 >
-                                                    <div className="flex justify-between items-start">
-                                                        <div className="text-xs font-mono text-[var(--text-tertiary)] flex items-center gap-2">
-                                                            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                                                            {group.dateDisplay}
-                                                            <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-black ${group.weather === 'SUNNY' ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                                                                {group.weather === 'SUNNY' ? '☀️ 晴' : '☔ 雨'}
-                                                            </span>
+                                                    {/* Top Header Row: Date & Controls */}
+                                                    <div className="flex justify-between items-start gap-2">
+                                                        <div className="flex flex-col gap-2 min-w-0 flex-1">
+                                                            {/* Date & Weather */}
+                                                            <div className="text-[10px] md:text-xs font-mono text-[var(--text-tertiary)] flex items-center gap-1.5 flex-wrap">
+                                                                {isExpanded ? <ChevronDown size={14} className="shrink-0" /> : <ChevronRight size={14} className="shrink-0" />}
+                                                                <span className="leading-none whitespace-nowrap">{group.dateDisplay}</span>
+                                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black shrink-0 ${group.weather === 'SUNNY' ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                                                    {group.weather === 'SUNNY' ? '☀️ 晴' : '☔ 雨'}
+                                                                </span>
+                                                            </div>
+                                                            
+                                                            {/* Tags (Location, Rep, Operator, Hours) - 靠左對齊，置於日期下方 */}
+                                                            <div className="flex flex-wrap gap-1.5 items-center pl-5">
+                                                                <div className="flex items-center gap-1 bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0">
+                                                                    <MapPin size={10} /> <span>{group.location}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-1 bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0">
+                                                                    <User size={10} /> <span>{group.salesRep}</span>
+                                                                    {group.operator && group.operator !== group.salesRep && (
+                                                                        <span className="text-amber-600 ml-0.5">(改:{group.operator})</span>
+                                                                    )}
+                                                                    {group.workHours && Number(group.workHours) > 0 && (
+                                                                        <span className="ml-1 text-amber-700 bg-amber-100 px-1 rounded-sm">{group.workHours}h</span>
+                                                                    )}
+                                                                </div>
+                                                                {group.collectionNote && (
+                                                                    <div className="text-[10px] text-amber-600 font-bold w-full mt-0.5">{group.collectionNote}</div>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                        <div className="flex flex-col items-end gap-2">
-                                                            <div className="text-emerald-600 font-bold font-mono text-lg">${(Math.round(group.totalAmount) || 0).toLocaleString()}</div>
+
+                                                        {/* Right Controls */}
+                                                        <div className="flex flex-col items-end shrink-0">
                                                             {canEdit(group) && (
                                                                 <button
                                                                     onClick={(e) => { e.stopPropagation(); handleCorrection(group.saleId); }}
-                                                                    className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-amber-600 border border-amber-200 hover:bg-amber-100 transition-colors text-xs font-bold shadow-sm"
-                                                                    title="作廢並修正全單"
+                                                                    className="flex items-center gap-1 px-2 py-1 rounded bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100 transition-colors text-[10px] font-bold shadow-sm"
                                                                 >
-                                                                    <RotateCcw size={12} /> 修正
+                                                                    <RotateCcw size={10} /> 修正
                                                                 </button>
                                                             )}
-                                                            <div className="text-[10px] text-[var(--text-tertiary)] font-bold mt-1">結算: ${(Math.round(group.balance) || 0).toLocaleString()}</div>
                                                         </div>
                                                     </div>
-                                                    <div className="flex flex-wrap gap-2 text-sm">
-                                                        <div className="flex flex-col bg-blue-500/10 text-blue-700 px-2 py-0.5 rounded-md">
-                                                            <div className="flex items-center gap-1">
-                                                                <MapPin size={12} /> <span className="font-bold">{group.location}</span>
+
+                                                    {/* Financial Summary Box (Vertical Stacking) */}
+                                                    <div className="bg-[var(--bg-tertiary)]/50 p-2.5 rounded-lg space-y-2 ml-0 md:ml-5 border border-slate-100">
+                                                        <div className="text-[10px] text-[var(--text-tertiary)]">
+                                                            共 {group.items.length} 項商品 / 總數: {group.totalQty}
+                                                        </div>
+                                                        
+                                                        {Object.keys(group.expenseDetails).length > 0 && (
+                                                            <div className="flex flex-col gap-1 border-t border-[var(--border-primary)]/50 pt-2">
+                                                                {Object.entries(group.expenseDetails).map(([label, amount], idx) => {
+                                                                    const cleanLabel = label.replace(/\|CASH/g, ' (CASH)').replace(/\|TRANSFER/g, ' (轉帳)');
+                                                                    return (
+                                                                        <div key={idx} className="flex justify-between items-center text-rose-600">
+                                                                            <span className="text-[10px] font-bold">{cleanLabel}:</span>
+                                                                            <span className="font-mono text-sm font-bold pr-1">-${amount.toLocaleString()}</span>
+                                                                        </div>
+                                                                    );
+                                                                })}
                                                             </div>
-                                                            {group.collectionNote && (
-                                                                <div className="text-[10px] text-amber-600 font-medium ml-4">{group.collectionNote}</div>
-                                                            )}
-                                                        </div>
-                                                        <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] px-2 py-0.5 rounded-md whitespace-nowrap">
-                                                            <User size={12} /> <span>{group.salesRep}</span>
-                                                            {group.operator && group.operator !== group.salesRep && (
-                                                                <span className="text-[10px] text-amber-600 ml-1">(修正：{group.operator})</span>
-                                                            )}
-                                                            {group.workHours && Number(group.workHours) > 0 && (
-                                                                <span className="ml-1.5 px-1 py-0.5 bg-amber-50 text-amber-700 text-[9px] font-black rounded border border-amber-200">
-                                                                    {group.workHours}h
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <div className="bg-[var(--bg-tertiary)]/50 p-3 rounded-md space-y-2">
-                                                        <div className="text-base text-[var(--text-tertiary)] flex justify-between items-center">
-                                                            <span>共 {group.items.length} 項商品 / 總數: {group.totalQty}</span>
-                                                            <div className="flex gap-4">
-                                                                {Object.keys(group.expenseDetails).length > 0 && (
-                                                                    <div className="flex flex-col items-end gap-1">
-                                                                        {Object.entries(group.expenseDetails).map(([label, amount], idx) => (
-                                                                            <div key={idx} className="flex items-center gap-1.5 text-rose-600 font-bold">
-                                                                                <span className="text-sm">{label}:</span>
-                                                                                <span className="font-mono text-base">${amount.toLocaleString()}</span>
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                )}
-                                                                <div className="text-right">
-                                                                    <div className="text-[var(--text-tertiary)] text-[10px] mb-0.5">銷售總額</div>
-                                                                    <span className="text-emerald-700 font-bold font-mono text-xl">${(Math.round(group.totalAmount) || 0).toLocaleString()}</span>
-                                                                </div>
+                                                        )}
+
+                                                        <div className="flex flex-col gap-1 border-t border-[var(--border-primary)]/50 pt-2">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-[10px] text-[var(--text-secondary)] font-bold">銷售總額:</span>
+                                                                <span className="text-emerald-600 font-bold font-mono text-lg pr-1">${(Math.round(group.totalAmount) || 0).toLocaleString()}</span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-[10px] text-[var(--text-secondary)] font-bold">結算金額:</span>
+                                                                <span className="text-slate-500 font-bold font-mono text-sm pr-1">${(Math.round(group.balance) || 0).toLocaleString()}</span>
                                                             </div>
                                                         </div>
                                                     </div>
