@@ -1093,62 +1093,56 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 )}
                             </div>
 
-                            {/* Group 2: Action Buttons (Stacked) */}
-                            <div className="flex flex-col gap-2">
-                                {/* Row 1: Import & Sort */}
-                                <div className="flex flex-row items-center gap-2">
-                                    {/* History Import */}
-                                    <button
-                                        onClick={handleOpenHistoryImport}
-                                        className="flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border whitespace-nowrap transition-all bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]"
-                                    >
-                                        <RefreshCw size={16} className="rotate-180" />
-                                        導入退貨
-                                    </button>
+                            {/* Group 2: Action Buttons (Grid 2x2) */}
+                            <div className="grid grid-cols-2 gap-2 w-full md:w-auto">
+                                {/* Import Returns */}
+                                <button
+                                    onClick={handleOpenHistoryImport}
+                                    className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold rounded-lg border whitespace-nowrap transition-all bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]"
+                                >
+                                    <RefreshCw size={16} className="rotate-180 shrink-0" />
+                                    <span>導入退貨</span>
+                                </button>
 
-                                    {/* Sort */}
-                                    <button
-                                        onClick={toggleSorting}
-                                        className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${isSorting
-                                            ? 'bg-indigo-500 text-white border-indigo-500'
-                                            : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
-                                            }`}
-                                    >
-                                        <ListOrdered size={16} />
-                                        {isSorting ? '儲存順序' : '更改順序'}
-                                    </button>
-                                </div>
+                                {/* Sort */}
+                                <button
+                                    onClick={toggleSorting}
+                                    className={`flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${isSorting
+                                        ? 'bg-indigo-500 text-white border-indigo-500'
+                                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
+                                        }`}
+                                >
+                                    <ListOrdered size={16} className="shrink-0" />
+                                    <span>{isSorting ? '儲存順序' : '更改順序'}</span>
+                                </button>
 
-                                {/* Row 2: Merge & Print */}
-                                <div className="flex flex-row items-center gap-2">
-                                    {/* Merge Print */}
-                                    <button
-                                        onClick={() => {
-                                            setShowMergeModal(!showMergeModal);
-                                            if (!showMergeModal) loadMergeRecords();
-                                        }}
-                                        className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${showMergeModal
-                                            ? 'bg-blue-50 text-blue-600 border-blue-200'
-                                            : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
-                                            }`}
-                                    >
-                                        <Printer size={16} />
-                                        合併列印
-                                    </button>
+                                {/* Merge Print */}
+                                <button
+                                    onClick={() => {
+                                        setShowMergeModal(!showMergeModal);
+                                        if (!showMergeModal) loadMergeRecords();
+                                    }}
+                                    className={`flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${showMergeModal
+                                        ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
+                                        }`}
+                                >
+                                    <Printer size={16} className="shrink-0" />
+                                    <span>合併列印</span>
+                                </button>
 
-                                    {/* Print */}
-                                    <button
-                                        onClick={handlePrint}
-                                        disabled={isPrinting}
-                                        className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${isPrinting
-                                            ? 'bg-gray-400 text-white cursor-not-allowed'
-                                            : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
-                                            }`}
-                                    >
-                                        <Printer size={16} />
-                                        {isPrinting ? '列印中...' : '列印單據'}
-                                    </button>
-                                </div>
+                                {/* Print */}
+                                <button
+                                    onClick={handlePrint}
+                                    disabled={isPrinting}
+                                    className={`flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${isPrinting
+                                        ? 'bg-gray-400 text-white cursor-not-allowed'
+                                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
+                                        }`}
+                                >
+                                    <Printer size={16} className="shrink-0" />
+                                    <span>{isPrinting ? '列印中...' : '列印單據'}</span>
+                                </button>
                             </div>
 
                         </div>
