@@ -122,6 +122,18 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [inputMode, setInputMode] = useState('mouse'); // 'mouse' | 'keyboard'
     const mousePos = React.useRef({ x: 0, y: 0 });
 
+    // [Fix] Modal scroll lock to prevent background scrolling
+    useEffect(() => {
+        if (showVendorModal || showMergeModal || showHistoryImportModal) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [showVendorModal, showMergeModal, showHistoryImportModal]);
+
     useEffect(() => {
         const handleMouseMove = (e) => {
             // Calculate distance to filter out micro-movements or browser-synthesized events

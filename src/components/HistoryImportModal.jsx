@@ -14,6 +14,19 @@ export default function HistoryImportModal({
     onSearch,
     isLoading
 }) {
+    React.useEffect(() => {
+        if (show) {
+            // Lock body scroll
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [show]);
+
     if (!show) return null;
 
     // Group records by date
