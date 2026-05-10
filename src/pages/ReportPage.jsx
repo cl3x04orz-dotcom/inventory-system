@@ -843,27 +843,48 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                         </div>
                                                         
                                                         {Object.keys(group.expenseDetails).length > 0 && (
-                                                            <div className="flex flex-col gap-1 border-t border-[var(--border-primary)]/50 pt-2">
+                                                            <div className="flex flex-col gap-2 border-t border-[var(--border-primary)]/50 pt-3 pb-1">
                                                                 {Object.entries(group.expenseDetails).map(([label, amount], idx) => {
-                                                                    const cleanLabel = label.replace(/\|CASH/g, ' (CASH)').replace(/\|TRANSFER/g, ' (轉帳)');
+                                                                    const isCash = label.includes('|CASH');
+                                                                    const isTransfer = label.includes('|TRANSFER');
+                                                                    const methodText = isCash ? '(CASH)' : (isTransfer ? '(轉帳)' : '');
+                                                                    
+                                                                    let baseLabel = label.replace(/\|CASH|\|TRANSFER/g, '').trim();
+                                                                    let categoryText = baseLabel;
+                                                                    let remarkText = '';
+                                                                    
+                                                                    const firstParenIndex = baseLabel.indexOf('(');
+                                                                    if (firstParenIndex !== -1) {
+                                                                        categoryText = baseLabel.substring(0, firstParenIndex).trim();
+                                                                        remarkText = baseLabel.substring(firstParenIndex).trim();
+                                                                    }
+
                                                                     return (
-                                                                        <div key={idx} className="flex justify-between items-center text-rose-600">
-                                                                            <span className="text-[10px] font-bold">{cleanLabel}:</span>
-                                                                            <span className="font-mono text-sm font-bold pr-1">-${amount.toLocaleString()}</span>
+                                                                        <div key={idx} className="flex justify-between items-start text-rose-600 gap-2">
+                                                                            <div className="flex flex-col flex-1 pr-2 min-w-0">
+                                                                                <div className="flex flex-wrap items-baseline gap-1.5">
+                                                                                    <span className="text-xs md:text-sm font-bold leading-tight">{categoryText}</span>
+                                                                                    <span className="text-[10px] font-bold text-rose-500/70 shrink-0">{methodText}</span>
+                                                                                </div>
+                                                                                {remarkText && (
+                                                                                    <span className="text-[10px] text-rose-400/90 leading-snug mt-0.5 break-words">{remarkText}</span>
+                                                                                )}
+                                                                            </div>
+                                                                            <span className="font-mono text-sm md:text-base font-bold pr-1 shrink-0 text-right min-w-[70px]">-${amount.toLocaleString()}</span>
                                                                         </div>
                                                                     );
                                                                 })}
                                                             </div>
                                                         )}
 
-                                                        <div className="flex flex-col gap-1 border-t border-[var(--border-primary)]/50 pt-2">
-                                                            <div className="flex justify-between items-center">
-                                                                <span className="text-[10px] text-[var(--text-secondary)] font-bold">銷售總額:</span>
-                                                                <span className="text-emerald-600 font-bold font-mono text-lg pr-1">${(Math.round(group.totalAmount) || 0).toLocaleString()}</span>
+                                                        <div className="flex flex-col gap-2 border-t border-[var(--border-primary)]/50 pt-3">
+                                                            <div className="flex justify-between items-center gap-2">
+                                                                <span className="text-[10px] text-[var(--text-secondary)] font-bold shrink-0">銷售總額:</span>
+                                                                <span className="text-emerald-600 font-bold font-mono text-lg pr-1 shrink-0 text-right min-w-[80px]">${(Math.round(group.totalAmount) || 0).toLocaleString()}</span>
                                                             </div>
-                                                            <div className="flex justify-between items-center">
-                                                                <span className="text-[10px] text-[var(--text-secondary)] font-bold">結算金額:</span>
-                                                                <span className="text-slate-500 font-bold font-mono text-sm pr-1">${(Math.round(group.balance) || 0).toLocaleString()}</span>
+                                                            <div className="flex justify-between items-center gap-2">
+                                                                <span className="text-[10px] text-[var(--text-secondary)] font-bold shrink-0">結算金額:</span>
+                                                                <span className="text-slate-500 font-bold font-mono text-sm pr-1 shrink-0 text-right min-w-[80px]">${(Math.round(group.balance) || 0).toLocaleString()}</span>
                                                             </div>
                                                         </div>
                                                     </div>
