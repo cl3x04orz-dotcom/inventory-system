@@ -325,8 +325,11 @@ export default function MergePrintModal({
                         </div>
                     </div>
                     {aiMessage && (
-                        <div className="mt-4 text-center py-2.5 bg-blue-50/50 border border-blue-100 rounded-2xl text-[11px] font-black text-blue-600 animate-in slide-in-from-top-2">
-                            💡 {aiMessage.text}
+                        <div className="mt-4 flex items-start gap-3 px-5 py-4 bg-blue-50/50 border border-blue-100 rounded-2xl animate-in slide-in-from-top-2">
+                            <span className="text-lg shrink-0 mt-0.5">💡</span>
+                            <p className="text-xs sm:text-sm font-black text-blue-600 leading-relaxed">
+                                {aiMessage.text}
+                            </p>
                         </div>
                     )}
                 </div>

@@ -828,17 +828,19 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     <title>PDF 產生中...</title>
                     <style>
                         body { margin:0; display:flex; flex-direction:column; align-items:center;
-                                justify-content:center; height:100vh; font-family:sans-serif;
-                                background:#f8faff; color:#3b4a6b; gap:20px; }
-                        .spinner { width:44px; height:44px; border:4px solid #dbeafe;
+                                justify-content:center; height:100vh; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                                background:#ffffff; color:#1e293b; gap:28px; }
+                        .spinner { width:52px; height:52px; border:5px solid #f1f5f9;
                                    border-top-color:#2563eb; border-radius:50%; animation:spin 0.8s linear infinite; }
                         @keyframes spin { to { transform:rotate(360deg); } }
-                        p { font-size:14px; font-weight:600; letter-spacing:0.05em; }
-                        small { font-size:11px; color:#9ca3af; }
+                        p { font-size:22px; font-weight:800; letter-spacing:-0.02em; margin:0; color:#0f172a; }
+                        small { font-size:14px; color:#94a3b8; font-weight:500; }
                     </style></head><body>
                     <div class="spinner"></div>
-                    <p>PDF 單據產生中，請稍候...</p>
-                    <small>由 AI 補貨系統自動生成</small>
+                    <div style="text-align:center; display:flex; flex-direction:column; gap:8px;">
+                        <p>PDF 單據產生中，請稍候...</p>
+                        <small>由 AI 補貨系統自動生成</small>
+                    </div>
                     </body></html>
                 `);
                 pdfWindow.document.close();
@@ -976,17 +978,19 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     <title>PDF 產生中...</title>
                     <style>
                         body { margin:0; display:flex; flex-direction:column; align-items:center;
-                               justify-content:center; height:100vh; font-family:sans-serif;
-                               background:#f8faff; color:#3b4a6b; gap:20px; }
-                        .spinner { width:44px; height:44px; border:4px solid #dbeafe;
+                                justify-content:center; height:100vh; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                                background:#ffffff; color:#1e293b; gap:28px; }
+                        .spinner { width:52px; height:52px; border:5px solid #f1f5f9;
                                    border-top-color:#2563eb; border-radius:50%; animation:spin 0.8s linear infinite; }
                         @keyframes spin { to { transform:rotate(360deg); } }
-                        p { font-size:14px; font-weight:600; letter-spacing:0.05em; }
-                        small { font-size:11px; color:#9ca3af; }
+                        p { font-size:22px; font-weight:800; letter-spacing:-0.02em; margin:0; color:#0f172a; }
+                        small { font-size:14px; color:#94a3b8; font-weight:500; }
                     </style></head><body>
                     <div class="spinner"></div>
-                    <p>PDF 單據產生中，請稍候...</p>
-                    <small>由 AI 補貨系統自動生成</small>
+                    <div style="text-align:center; display:flex; flex-direction:column; gap:8px;">
+                        <p>PDF 單據產生中，請稍候...</p>
+                        <small>由 AI 補貨系統自動生成</small>
+                    </div>
                     </body></html>
                 `);
                 pdfWindow.document.close();
