@@ -172,9 +172,11 @@ export default function MergePrintModal({
                     </div>
                 </div>
 
-                {/* 2. AI Prediction Panel: Premium Dashboard Layout */}
-                <div className="px-4 sm:px-10 mt-4 sm:mt-6 shrink-0">
-                    <div className="p-5 sm:p-8 bg-gradient-to-br from-indigo-50/40 via-white to-blue-50/40 border border-blue-100 rounded-3xl shadow-sm relative overflow-hidden">
+                {/* Scrollable Content Container */}
+                <div className="overflow-y-auto flex-1 bg-gray-50/30 flex flex-col relative">
+                    {/* 2. AI Prediction Panel: Premium Dashboard Layout */}
+                    <div className="px-4 sm:px-10 mt-4 sm:mt-6 shrink-0">
+                        <div className="p-5 sm:p-8 bg-gradient-to-br from-indigo-50/40 via-white to-blue-50/40 border border-blue-100 rounded-3xl shadow-sm relative overflow-hidden">
                         <div className="relative flex flex-col xl:flex-row items-stretch gap-6 sm:gap-10">
                             
                             {/* LEFT: Branding Side-anchor */}
@@ -307,7 +309,7 @@ export default function MergePrintModal({
                 </div>
 
                 {/* Modal Body */}
-                <div className="py-4 sm:py-6 overflow-y-auto flex-1 bg-gray-50/30">
+                <div className="py-4 sm:py-6 flex-1">
                     {records.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-10 text-center opacity-50 mx-[15px]">
                             <ListOrdered size={32} className="mb-4" />
@@ -354,6 +356,7 @@ export default function MergePrintModal({
                         </div>
                     )}
                 </div>
+            </div>
 
                 {/* Footer Section */}
                 <div className="p-4 sm:p-6 bg-white border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
