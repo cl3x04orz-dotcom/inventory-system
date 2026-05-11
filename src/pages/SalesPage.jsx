@@ -832,27 +832,25 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                         html, body { width:100%; height:100%; }
                         body {
                             display:flex; flex-direction:column; align-items:center;
-                            justify-content:flex-start; padding-top:38vh;
+                            justify-content:center; height:100vh;
                             font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                            background-color:#F8FAFF;
-                            background-image: radial-gradient(#dde6f5 1px, transparent 1px);
-                            background-size: 24px 24px;
+                            background:#ffffff;
                         }
                         .spinner {
-                            width:72px; height:72px;
-                            border:6px solid #DBEAFE;
+                            width:48px; height:48px;
+                            border:4px solid #DBEAFE;
                             border-top-color:#2563EB;
                             border-radius:50%;
-                            animation:spin 0.9s linear infinite;
+                            animation:spin 1s linear infinite;
                         }
                         @keyframes spin { to { transform:rotate(360deg); } }
                         .text-block { text-align:center; margin-top:32px; }
                         .title {
-                            font-size:28px; font-weight:700;
+                            font-size:20px; font-weight:600;
                             color:#111827; letter-spacing:-0.02em; line-height:1.2;
                         }
                         .subtitle {
-                            font-size:18px; color:#4B5563; font-weight:400;
+                            font-size:14px; color:#6B7280; font-weight:400;
                             margin-top:10px; line-height:1.4;
                         }
                         .pill-wrap { margin-top:32px; }
@@ -1036,27 +1034,25 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                         html, body { width:100%; height:100%; }
                         body {
                             display:flex; flex-direction:column; align-items:center;
-                            justify-content:flex-start; padding-top:38vh;
+                            justify-content:center; height:100vh;
                             font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                            background-color:#F8FAFF;
-                            background-image: radial-gradient(#dde6f5 1px, transparent 1px);
-                            background-size: 24px 24px;
+                            background:#ffffff;
                         }
                         .spinner {
-                            width:72px; height:72px;
-                            border:6px solid #DBEAFE;
+                            width:48px; height:48px;
+                            border:4px solid #DBEAFE;
                             border-top-color:#2563EB;
                             border-radius:50%;
-                            animation:spin 0.9s linear infinite;
+                            animation:spin 1s linear infinite;
                         }
                         @keyframes spin { to { transform:rotate(360deg); } }
                         .text-block { text-align:center; margin-top:32px; }
                         .title {
-                            font-size:28px; font-weight:700;
+                            font-size:20px; font-weight:600;
                             color:#111827; letter-spacing:-0.02em; line-height:1.2;
                         }
                         .subtitle {
-                            font-size:18px; color:#4B5563; font-weight:400;
+                            font-size:14px; color:#6B7280; font-weight:400;
                             margin-top:10px; line-height:1.4;
                         }
                         .pill-wrap { margin-top:32px; }
