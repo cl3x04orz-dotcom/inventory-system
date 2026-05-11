@@ -277,29 +277,24 @@ export default function MergePrintModal({
                                     <div className="flex flex-1 flex-col sm:flex-row items-start sm:items-center gap-3 w-full">
                                         {/* Label */}
                                         <div className="flex items-center gap-2 shrink-0">
-                                            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-                                                <Clock size={16} />
+                                            <div className="p-2 lg:p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
+                                                <Clock size={16} className="lg:w-5 lg:h-5" />
                                             </div>
-                                            <h4 className="font-black text-gray-800 text-xs sm:text-sm tracking-tight whitespace-nowrap">PDF 單據顯示日期</h4>
+                                            <h4 className="font-black text-gray-800 text-xs sm:text-sm lg:text-lg tracking-tight whitespace-nowrap">PDF 單據顯示日期</h4>
                                         </div>
                                         {/* Quick buttons + date picker */}
-                                        <div className="flex items-center gap-2 flex-1 w-full sm:w-auto">
-                                            <div className="flex bg-white p-1 rounded-lg border border-blue-100 shadow-sm shrink-0">
-                                                <button onClick={() => setQuickPrintDate(-1)} className="px-2 py-1.5 rounded-md text-[10px] sm:text-xs font-black text-blue-500 hover:bg-gray-50 transition-all">◀昨</button>
-                                                <button onClick={() => setQuickPrintDate(0)}  className="px-2 py-1.5 rounded-md text-[10px] sm:text-xs font-black text-blue-500 hover:bg-gray-50 transition-all">今</button>
-                                                <button onClick={() => setQuickPrintDate(1)}  className="px-2 py-1.5 rounded-md text-[10px] sm:text-xs font-black text-blue-500 hover:bg-gray-50 transition-all">明▶</button>
+                                        <div className="flex items-center gap-2 lg:gap-3 flex-1 w-full sm:w-auto">
+                                            <div className="flex bg-white p-1 lg:p-1.5 rounded-lg border border-blue-100 shadow-sm shrink-0">
+                                                <button onClick={() => setQuickPrintDate(-1)} className="px-2 py-1.5 lg:px-4 lg:py-2 rounded-md text-[10px] sm:text-xs lg:text-sm font-black text-blue-500 hover:bg-gray-50 transition-all">◀昨</button>
+                                                <button onClick={() => setQuickPrintDate(0)}  className="px-2 py-1.5 lg:px-4 lg:py-2 rounded-md text-[10px] sm:text-xs lg:text-sm font-black text-blue-500 hover:bg-gray-50 transition-all">今</button>
+                                                <button onClick={() => setQuickPrintDate(1)}  className="px-2 py-1.5 lg:px-4 lg:py-2 rounded-md text-[10px] sm:text-xs lg:text-sm font-black text-blue-500 hover:bg-gray-50 transition-all">明▶</button>
                                             </div>
                                             <input
                                                 type="date"
                                                 value={printDate}
                                                 onChange={(e) => handlePrintDateChange(e.target.value)}
-                                                className="flex-1 min-w-0 bg-white border-2 border-blue-100 rounded-lg px-2 py-1.5 text-[10px] sm:text-sm font-black text-blue-900 outline-none focus:border-blue-400 shadow-sm transition-all"
+                                                className="flex-1 min-w-0 bg-white border-2 border-blue-100 rounded-lg px-2 py-1.5 lg:px-4 lg:py-2 text-[10px] sm:text-sm lg:text-lg font-black text-blue-900 outline-none focus:border-blue-400 shadow-sm transition-all"
                                             />
-                                        </div>
-                                        {/* AI status badge — fills dead space on wide screens */}
-                                        <div className={`hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-black shrink-0 transition-all ${aiCustomer ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
-                                            <div className={`w-1.5 h-1.5 rounded-full ${aiCustomer ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'}`} />
-                                            {aiCustomer ? `預測目標：${aiCustomer}` : '尚未選擇預測地點'}
                                         </div>
                                     </div>
 
