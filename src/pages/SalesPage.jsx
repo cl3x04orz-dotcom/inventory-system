@@ -825,22 +825,76 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             if (pdfWindow) {
                 pdfWindow.document.write(`
                     <!DOCTYPE html><html><head><meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
                     <title>PDF 產生中...</title>
                     <style>
-                        body { margin:0; display:flex; flex-direction:column; align-items:center;
-                                justify-content:center; height:100vh; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                                background:#ffffff; color:#1e293b; gap:28px; }
-                        .spinner { width:52px; height:52px; border:5px solid #f1f5f9;
-                                   border-top-color:#2563eb; border-radius:50%; animation:spin 0.8s linear infinite; }
+                        * { box-sizing:border-box; margin:0; padding:0; }
+                        html, body { width:100%; height:100%; }
+                        body {
+                            display:flex; flex-direction:column; align-items:center;
+                            justify-content:flex-start; padding-top:38vh;
+                            font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                            background-color:#F8FAFF;
+                            background-image: radial-gradient(#dde6f5 1px, transparent 1px);
+                            background-size: 24px 24px;
+                        }
+                        .spinner {
+                            width:72px; height:72px;
+                            border:6px solid #DBEAFE;
+                            border-top-color:#2563EB;
+                            border-radius:50%;
+                            animation:spin 0.9s linear infinite;
+                        }
                         @keyframes spin { to { transform:rotate(360deg); } }
-                        p { font-size:22px; font-weight:800; letter-spacing:-0.02em; margin:0; color:#0f172a; }
-                        small { font-size:14px; color:#94a3b8; font-weight:500; }
+                        .text-block { text-align:center; margin-top:32px; }
+                        .title {
+                            font-size:28px; font-weight:700;
+                            color:#111827; letter-spacing:-0.02em; line-height:1.2;
+                        }
+                        .subtitle {
+                            font-size:18px; color:#4B5563; font-weight:400;
+                            margin-top:10px; line-height:1.4;
+                        }
+                        .pill-wrap { margin-top:32px; }
+                        .pill {
+                            display:inline-block; padding:8px 20px;
+                            background:#FFFFFF; border:1px solid #E5E7EB;
+                            border-radius:999px; box-shadow:0 1px 4px rgba(0,0,0,0.06);
+                            font-size:15px; color:#3B82F6; font-weight:500;
+                            transition:opacity 0.5s;
+                        }
+                        .dot { display:inline-block; width:7px; height:7px;
+                               background:#3B82F6; border-radius:50%; margin-right:8px;
+                               animation:pulse 1.4s ease-in-out infinite; vertical-align:middle; }
+                        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
                     </style></head><body>
                     <div class="spinner"></div>
-                    <div style="text-align:center; display:flex; flex-direction:column; gap:8px;">
-                        <p>PDF 單據產生中，請稍候...</p>
-                        <small>由 AI 補貨系統自動生成</small>
+                    <div class="text-block">
+                        <h1 class="title">PDF 單據產生中</h1>
+                        <p class="subtitle">AI 智慧補貨系統正在計算</p>
+                        <div class="pill-wrap">
+                            <span class="pill"><span class="dot"></span><span id="dynamic-msg">正在分析歷史銷量數據</span></span>
+                        </div>
                     </div>
+                    <script>
+                        const msgs = [
+                            "正在根據當前天氣調整預測",
+                            "正在計算最優補貨建議",
+                            "正在校對品項庫存狀態",
+                            "正在生成 PDF 排版佈局",
+                            "即將完成，正在準備檔案"
+                        ];
+                        let i = 0;
+                        const el = document.getElementById('dynamic-msg');
+                        setInterval(() => {
+                            el.parentElement.style.opacity = 0;
+                            setTimeout(() => {
+                                i = (i + 1) % msgs.length;
+                                el.innerText = msgs[i];
+                                el.parentElement.style.opacity = 1;
+                            }, 500);
+                        }, 2500);
+                    </script>
                     </body></html>
                 `);
                 pdfWindow.document.close();
@@ -975,22 +1029,76 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             if (pdfWindow) {
                 pdfWindow.document.write(`
                     <!DOCTYPE html><html><head><meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
                     <title>PDF 產生中...</title>
                     <style>
-                        body { margin:0; display:flex; flex-direction:column; align-items:center;
-                                justify-content:center; height:100vh; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                                background:#ffffff; color:#1e293b; gap:28px; }
-                        .spinner { width:52px; height:52px; border:5px solid #f1f5f9;
-                                   border-top-color:#2563eb; border-radius:50%; animation:spin 0.8s linear infinite; }
+                        * { box-sizing:border-box; margin:0; padding:0; }
+                        html, body { width:100%; height:100%; }
+                        body {
+                            display:flex; flex-direction:column; align-items:center;
+                            justify-content:flex-start; padding-top:38vh;
+                            font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                            background-color:#F8FAFF;
+                            background-image: radial-gradient(#dde6f5 1px, transparent 1px);
+                            background-size: 24px 24px;
+                        }
+                        .spinner {
+                            width:72px; height:72px;
+                            border:6px solid #DBEAFE;
+                            border-top-color:#2563EB;
+                            border-radius:50%;
+                            animation:spin 0.9s linear infinite;
+                        }
                         @keyframes spin { to { transform:rotate(360deg); } }
-                        p { font-size:22px; font-weight:800; letter-spacing:-0.02em; margin:0; color:#0f172a; }
-                        small { font-size:14px; color:#94a3b8; font-weight:500; }
+                        .text-block { text-align:center; margin-top:32px; }
+                        .title {
+                            font-size:28px; font-weight:700;
+                            color:#111827; letter-spacing:-0.02em; line-height:1.2;
+                        }
+                        .subtitle {
+                            font-size:18px; color:#4B5563; font-weight:400;
+                            margin-top:10px; line-height:1.4;
+                        }
+                        .pill-wrap { margin-top:32px; }
+                        .pill {
+                            display:inline-block; padding:8px 20px;
+                            background:#FFFFFF; border:1px solid #E5E7EB;
+                            border-radius:999px; box-shadow:0 1px 4px rgba(0,0,0,0.06);
+                            font-size:15px; color:#3B82F6; font-weight:500;
+                            transition:opacity 0.5s;
+                        }
+                        .dot { display:inline-block; width:7px; height:7px;
+                               background:#3B82F6; border-radius:50%; margin-right:8px;
+                               animation:pulse 1.4s ease-in-out infinite; vertical-align:middle; }
+                        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
                     </style></head><body>
                     <div class="spinner"></div>
-                    <div style="text-align:center; display:flex; flex-direction:column; gap:8px;">
-                        <p>PDF 單據產生中，請稍候...</p>
-                        <small>由 AI 補貨系統自動生成</small>
+                    <div class="text-block">
+                        <h1 class="title">PDF 單據產生中</h1>
+                        <p class="subtitle">AI 智慧補貨系統正在計算</p>
+                        <div class="pill-wrap">
+                            <span class="pill"><span class="dot"></span><span id="dynamic-msg">正在分析歷史銷量數據</span></span>
+                        </div>
                     </div>
+                    <script>
+                        const msgs = [
+                            "正在根據當前天氣調整預測",
+                            "正在計算最優補貨建議",
+                            "正在校對品項庫存狀態",
+                            "正在生成 PDF 排版佈局",
+                            "即將完成，正在準備檔案"
+                        ];
+                        let i = 0;
+                        const el = document.getElementById('dynamic-msg');
+                        setInterval(() => {
+                            el.parentElement.style.opacity = 0;
+                            setTimeout(() => {
+                                i = (i + 1) % msgs.length;
+                                el.innerText = msgs[i];
+                                el.parentElement.style.opacity = 1;
+                            }, 500);
+                        }, 2500);
+                    </script>
                     </body></html>
                 `);
                 pdfWindow.document.close();
