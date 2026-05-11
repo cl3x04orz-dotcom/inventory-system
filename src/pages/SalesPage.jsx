@@ -96,6 +96,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [mergeEndDate, setMergeEndDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedSaleIds, setSelectedSaleIds] = useState([]);
     const [isMergePrinting, setIsMergePrinting] = useState(false);
+    const [isMergeSearchLoading, setIsMergeSearchLoading] = useState(false);
     const [allAvailableProducts, setAllAvailableProducts] = useState([]); // All sorted products for merge print reference
     const [systemCustomers, setSystemCustomers] = useState([]); // [New] 全系統客戶名單快取
 
@@ -842,6 +843,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
     // Load Merge Sales Records
     const loadMergeRecords = async (start = mergeStartDate, end = mergeEndDate) => {
+        setIsMergeSearchLoading(true);
         try {
             const records = await callGAS(apiUrl, 'getSalesByDateRange', {
                 startDate: start,
@@ -851,6 +853,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         } catch (error) {
             console.error('載入銷售紀錄失敗:', error);
             alert('載入銷售紀錄失敗: ' + error.message);
+        } finally {
+            setIsMergeSearchLoading(false);
         }
     };
 
@@ -930,6 +934,9 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 }
             };
 
+            // [Fix] 在 async 呼叫之前先開好視窗，避免手機瀏覽器 popup blocker 阻擋
+            const pdfWindow = window.open('', '_blank');
+
             const response = await callGAS(apiUrl, 'generatePdf', printPayload, user.token);
             if (response.success && response.pdfBase64) {
                 const byteCharacters = atob(response.pdfBase64);
@@ -940,8 +947,14 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 const byteArray = new Uint8Array(byteNumbers);
                 const blob = new Blob([byteArray], { type: 'application/pdf' });
                 const blobUrl = URL.createObjectURL(blob);
-                window.open(blobUrl, '_blank');
+                if (pdfWindow) {
+                    pdfWindow.location.href = blobUrl;
+                } else {
+                    // popup 被阻擋時的 fallback
+                    window.location.href = blobUrl;
+                }
             } else {
+                if (pdfWindow) pdfWindow.close();
                 throw new Error(response.error || 'Unknown error');
             }
         } catch (e) {
@@ -1672,6 +1685,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 }}
                 onMergePrint={handleMergePrint}
                 isPrinting={isMergePrinting}
+                isSearchLoading={isMergeSearchLoading}
                 systemCustomers={systemCustomers}
             />
 

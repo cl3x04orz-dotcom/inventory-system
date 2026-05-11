@@ -16,6 +16,7 @@ export default function MergePrintModal({
     endDate,
     onDateChange,
     onSearch,
+    isSearchLoading, // [New] 查詢載入狀態
     systemCustomers = [] // [New] 全系統客戶名單
 }) {
     const [aiCustomer, setAiCustomer] = useState('');
@@ -131,7 +132,8 @@ export default function MergePrintModal({
             if (res.success) {
                 setAiMessage({ type: 'success', text: res.message });
                 // 執行合併列印，並傳入 AI 建議的提貨量作為覆蓋值，以及預測地點、自訂單據日期
-                onMergePrint(res.suggestions, aiCustomer, printDate);
+                // 加入 await 確保流程完整，並提示可能的彈跳視窗阻擋
+                await onMergePrint(res.suggestions, aiCustomer, printDate);
             } else {
                 alert(res.error || 'AI 預測失敗');
             }
@@ -167,7 +169,18 @@ export default function MergePrintModal({
                             <input type="date" value={startDate} onChange={(e) => onDateChange('start', e.target.value)} className="bg-transparent px-2 w-full min-w-0 text-[10px] sm:text-xs font-bold text-gray-700 outline-none" />
                             <span className="text-gray-300 font-bold px-1 shrink-0">~</span>
                             <input type="date" value={endDate} onChange={(e) => onDateChange('end', e.target.value)} className="bg-transparent px-2 w-full min-w-0 text-[10px] sm:text-xs font-bold text-gray-700 outline-none" />
-                            <button onClick={onSearch} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-black transition-all shadow-md shrink-0 ml-1">查詢</button>
+                            <button 
+                                onClick={onSearch} 
+                                disabled={isSearchLoading}
+                                className={`px-3 py-1.5 rounded text-xs font-black transition-all shadow-md shrink-0 ml-1 flex items-center justify-center gap-1 ${isSearchLoading ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white active:scale-95'}`}
+                            >
+                                {isSearchLoading ? (
+                                    <>
+                                        <div className="w-3 h-3 border-2 border-gray-500/30 border-t-gray-500 rounded-full animate-spin" />
+                                        查詢中...
+                                    </>
+                                ) : '查詢'}
+                            </button>
                         </div>
                     </div>
                 </div>
