@@ -818,6 +818,32 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 }
             };
 
+            // [Fix] 在 async 呼叫之前先開好視窗，避免手機瀏覽器 popup blocker 阻擋
+            const pdfWindow = window.open('', '_blank');
+
+            // [Fix] 立刻在空白視窗注入 Loading 畫面，讓使用者知道正在等待，不是當機
+            if (pdfWindow) {
+                pdfWindow.document.write(`
+                    <!DOCTYPE html><html><head><meta charset="UTF-8">
+                    <title>PDF 產生中...</title>
+                    <style>
+                        body { margin:0; display:flex; flex-direction:column; align-items:center;
+                                justify-content:center; height:100vh; font-family:sans-serif;
+                                background:#f8faff; color:#3b4a6b; gap:20px; }
+                        .spinner { width:44px; height:44px; border:4px solid #dbeafe;
+                                   border-top-color:#2563eb; border-radius:50%; animation:spin 0.8s linear infinite; }
+                        @keyframes spin { to { transform:rotate(360deg); } }
+                        p { font-size:14px; font-weight:600; letter-spacing:0.05em; }
+                        small { font-size:11px; color:#9ca3af; }
+                    </style></head><body>
+                    <div class="spinner"></div>
+                    <p>PDF 單據產生中，請稍候...</p>
+                    <small>由 AI 補貨系統自動生成</small>
+                    </body></html>
+                `);
+                pdfWindow.document.close();
+            }
+
             const response = await callGAS(apiUrl, 'generatePdf', printPayload, user.token);
             if (response.success && response.pdfBase64) {
                 // Convert Base64 to Blob and open in new tab
@@ -829,8 +855,14 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 const byteArray = new Uint8Array(byteNumbers);
                 const blob = new Blob([byteArray], { type: 'application/pdf' });
                 const blobUrl = URL.createObjectURL(blob);
-                window.open(blobUrl, '_blank');
+                
+                if (pdfWindow) {
+                    pdfWindow.location.href = blobUrl;
+                } else {
+                    window.location.href = blobUrl;
+                }
             } else {
+                if (pdfWindow) pdfWindow.close();
                 throw new Error(response.error || 'Unknown error');
             }
         } catch (e) {
