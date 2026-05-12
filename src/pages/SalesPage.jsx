@@ -1216,7 +1216,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                         <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full md:w-auto">
 
                             {/* Group 1: Setup & Context (Toggle + Input) */}
-                            <div className="flex flex-row items-center gap-3">
+                            <div className="flex flex-col md:flex-row md:items-center gap-3 w-full md:w-auto">
+                                <div className="flex flex-row items-center gap-3 flex-1 md:flex-none">
                                 {/* Toggle */}
                                 <div className="flex bg-[var(--bg-tertiary)] rounded-lg p-1 border border-[var(--border-primary)] shrink-0">
                                     <button
@@ -1239,8 +1240,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     </button>
                                 </div>
 
-                                {/* Customer Input */}
-                                <div className="flex items-center gap-2 w-full md:w-auto">
+                                    {/* Customer Input */}
+                                    <div className="flex items-center gap-2 flex-1 md:flex-none">
                                     <label className="text-sm text-[var(--text-secondary)] font-bold whitespace-nowrap hidden md:block">銷售對象:</label>
                                     <input
                                         id="input-location"
@@ -1266,8 +1267,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                         }}
                                     />
                                 </div>
-
-
+                            </div>
 
                                 {/* [New] Sales Rep Override - Only show during correction */}
                                 {availableUsers.length > 0 && originalSaleId && (

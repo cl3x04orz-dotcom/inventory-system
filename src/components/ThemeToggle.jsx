@@ -28,8 +28,8 @@ export default function ThemeToggle() {
                         key={value}
                         onClick={() => setTheme(value)}
                         className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${theme === value
-                                ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                            ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                             }`}
                         title={label}
                     >

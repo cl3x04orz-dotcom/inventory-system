@@ -30,7 +30,7 @@ import useActivityLogger from './hooks/useActivityLogger';
 import {
     LayoutDashboard, ShoppingCart, Archive, LogOut, PackagePlus,
     FileText, ClipboardList, DollarSign, CheckSquare, Wallet, ChevronDown,
-    TrendingUp, BarChart2, Users, Activity, PieChart, Shield, WifiOff
+    TrendingUp, BarChart2, Users, Activity, PieChart, Shield, WifiOff, Menu
 } from 'lucide-react';
 
 // Google Apps Script (GAS) API Endpoint
@@ -156,7 +156,7 @@ function AppContent() {
                 if (res && res.version && String(res.version) !== String(LOCAL_VERSION)) {
                     const serverVer = Number(res.version);
                     const localVer = Number(LOCAL_VERSION);
-                    
+
                     if (!isNaN(serverVer) && !isNaN(localVer)) {
                         if (serverVer > localVer) {
                             console.warn(`[VersionCheck] 偵測到新版本! (${LOCAL_VERSION} -> ${res.version})`);
@@ -264,7 +264,7 @@ function AppContent() {
             }
         };
         window.addEventListener('auth_expired', handleAuthExpired);
-        
+
         // [New] Token 續約監聽：當 api.js 自動續約成功時，同步更新 React State
         const handleTokenRenewed = (e) => {
             if (e.detail) {
@@ -503,23 +503,22 @@ function AppContent() {
             )}
 
             {/* Navbar */}
-            <header className="h-16 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)] backdrop-blur-md flex justify-between items-center px-6 sticky top-0 z-[60]">
-                {/* ... Navbar content ... */}
-                <div className="flex items-center gap-2">
-                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-10 w-auto object-contain brightness-0 dark:brightness-100" />
+            <header className="h-20 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]/80 backdrop-blur-xl flex justify-between items-center px-6 sticky top-0 z-[60] shadow-sm">
+                <div className="flex items-center gap-3">
+                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-12 w-auto object-contain brightness-0 dark:brightness-100 transition-transform hover:scale-105 cursor-pointer" onClick={() => handlePageChange('sales')} />
                 </div>
 
                 {/* Mobile Menu Trigger & Dropdown */}
                 <div className="md:hidden relative" onClick={(e) => e.stopPropagation()}>
                     <button
                         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${mobileMenuOpen
-                            ? 'bg-blue-50 border-blue-200 text-blue-600 ring-2 ring-blue-100'
-                            : 'bg-[var(--bg-secondary)] border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all duration-300 ${mobileMenuOpen
+                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg ring-4 ring-blue-100'
+                            : 'bg-white border-slate-200 text-slate-700 hover:border-blue-400 shadow-sm active:scale-95'
                             }`}
                     >
-                        <span className="font-bold text-sm">功能選單</span>
-                        <ChevronDown size={16} className={`transition-transform duration-300 ${mobileMenuOpen ? 'rotate-180' : ''}`} />
+                        <Menu size={18} className={mobileMenuOpen ? 'text-white' : 'text-slate-600'} />
+                        <span className="font-black text-xs tracking-tight">功能</span>
                     </button>
 
                     {/* Mobile Dropdown Panel */}
@@ -714,20 +713,23 @@ function AppContent() {
                     )}
                 </nav>
 
-                <div className="flex items-center gap-3">
-                    {/* Theme Toggle */}
-                    <ThemeToggle />
-
-                    <div className="hidden md:flex flex-col items-end">
-                        <span className="text-xs font-bold text-blue-600 dark:text-blue-400 leading-none">{user.username}</span>
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold tracking-tighter">{user.role}</span>
+                <div className="flex items-center gap-4">
+                    {/* Theme Toggle Wrapper */}
+                    <div className="p-1 bg-slate-100/50 dark:bg-slate-800/50 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
+                        <ThemeToggle />
                     </div>
+
+                    <div className="hidden sm:flex flex-col items-end border-l border-slate-200 dark:border-slate-700 pl-4 h-10 justify-center">
+                        <span className="text-sm font-black text-blue-600 dark:text-blue-400 leading-none">{user.username}</span>
+                        <span className="text-[9px] text-slate-400 dark:text-slate-500 uppercase font-black tracking-widest mt-1">{user.role}</span>
+                    </div>
+
                     <button
                         onClick={handleLogout}
-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all border border-transparent hover:border-red-100 dark:hover:border-red-800"
+                        className="w-11 h-11 rounded-2xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-red-500 transition-all duration-300 border border-slate-200 dark:border-slate-700 hover:border-red-500 shadow-sm active:scale-90"
                         title="登出系統"
                     >
-                        <LogOut size={20} />
+                        <LogOut size={22} />
                     </button>
                 </div>
             </header>

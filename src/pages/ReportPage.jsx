@@ -34,6 +34,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     const [viewMode, setViewMode] = useState('SALES'); // 'SALES' or 'EXPENSES'
     const [isVoiding, setIsVoiding] = useState(false); // [New] Loading state for voiding
     const [expandedGroups, setExpandedGroups] = useState({}); // [New] Track expanded transactions
+    const [activeQuickDate, setActiveQuickDate] = useState('THIS_MONTH'); // 預設選中本月
     const [category, setCategory] = useState('全部'); // [New] 類別過濾 (市場 / 批發)
 
     // 1. Fetch Data from Server (Only on Date Change)
@@ -383,7 +384,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                         displayLabel = `${cat.label} (${item.normNote})`;
                     }
                 }
-                
+
                 // 使用分隔符號儲存標籤與方式，供後續 JSX 渲染使用
                 const finalKey = displayLabel + methodSuffix;
                 groupedSales[key].expenseDetails[finalKey] = (groupedSales[key].expenseDetails[finalKey] || 0) + val;
@@ -413,6 +414,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     // [新增] 快速日期切換
     const handleQuickDate = (type) => {
         const today = new Date();
+        setActiveQuickDate(type);
         if (type === 'TODAY') {
             const d = getLocalDateString();
             setStartDate(d);
@@ -445,14 +447,14 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     const canEdit = (group) => {
         if (user.role === 'BOSS' || user.role === 'ADMIN') return true;
         if (!group.items || group.items.length === 0) return false;
-        
+
         const recordDate = new Date(group.items[0].date);
         if (isNaN(recordDate.getTime())) return false;
-        
+
         const now = new Date();
         const diffMs = now.getTime() - recordDate.getTime();
         const diffDays = diffMs / (1000 * 60 * 60 * 24);
-        
+
         return diffDays <= 2;
     };
 
@@ -473,159 +475,116 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                         <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
                             <FileText className="text-blue-600" /> 銷售查詢報表
                         </h1>
-                        <p className="text-[var(--text-secondary)] text-sm mt-1">查詢特定日期、銷售對象或業務的銷售紀錄</p>
                     </div>
-
-                    {/* [新增] 類別切換功能 (只限老闆) */}
-                    {user.role === 'BOSS' && (
-                        <div className="flex bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-primary)] shadow-inner">
-                            {['全部', '市場', '批發'].map((cat) => (
-                                <button
-                                    key={cat}
-                                    onClick={() => setCategory(cat)}
-                                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${category === cat
-                                        ? 'bg-blue-600 text-white shadow-md'
-                                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                                        }`}
-                                >
-                                    {cat}
-                                </button>
-                            ))}
-                        </div>
-                    )}
 
                     {/* Summary Stats (Two-Row Layout) */}
                     {reportData && (
                         <div className="flex flex-col gap-3 w-full md:w-[650px]">
                             {/* Row 1: Core Financials */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
-                                <div className="px-2 md:px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-200/20 shadow-sm">
-                                    <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">應繳回</p>
-                                    <p className={`${getDynamicFontSize(totalReturnAmount)} font-bold text-amber-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalReturnAmount)}</p>
+                                <div className="px-2 md:px-4 py-3 rounded-2xl bg-slate-50/50 border border-slate-200 shadow-sm transition-all hover:shadow-md">
+                                    <p className="text-[10px] md:text-xs text-slate-400 uppercase font-bold text-center tracking-wider">應繳回</p>
+                                    <p className="text-lg md:text-xl font-black text-emerald-600 text-center whitespace-nowrap mt-1">${Math.round(totalReturnAmount).toLocaleString()}</p>
                                 </div>
-                                <div className="px-2 md:px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-200/20 shadow-sm">
-                                    <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總銷售</p>
-                                    <p className={`${getDynamicFontSize(totalSales)} font-bold text-emerald-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalSales)}</p>
+                                <div className="px-2 md:px-4 py-3 rounded-2xl bg-slate-50/50 border border-slate-200 shadow-sm transition-all hover:shadow-md">
+                                    <p className="text-[10px] md:text-xs text-slate-400 uppercase font-bold text-center tracking-wider">總銷售</p>
+                                    <p className="text-lg md:text-xl font-black text-emerald-600 text-center whitespace-nowrap mt-1">${Math.round(totalSales).toLocaleString()}</p>
                                 </div>
-                                <div className="px-2 md:px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-200/20 shadow-sm">
-                                    <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總支出</p>
-                                    <p className={`${getDynamicFontSize(totalExpenses)} font-bold text-rose-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalExpenses)}</p>
+                                <div className="px-2 md:px-4 py-3 rounded-2xl bg-slate-50/50 border border-slate-200 shadow-sm transition-all hover:shadow-md">
+                                    <p className="text-[10px] md:text-xs text-slate-400 uppercase font-bold text-center tracking-wider">總支出</p>
+                                    <p className="text-lg md:text-xl font-black text-slate-700 text-center whitespace-nowrap mt-1">${Math.round(totalExpenses).toLocaleString()}</p>
                                 </div>
-                                <div className="px-2 md:px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-200/20 shadow-sm">
-                                    <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">匯款支出</p>
-                                    <p className={`${getDynamicFontSize(totalTransferExpenses)} font-bold text-blue-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalTransferExpenses)}</p>
+                                <div className="px-2 md:px-4 py-3 rounded-2xl bg-slate-50/50 border border-slate-200 shadow-sm transition-all hover:shadow-md">
+                                    <p className="text-[10px] md:text-xs text-slate-400 uppercase font-bold text-center tracking-wider">匯款支出</p>
+                                    <p className="text-lg md:text-xl font-black text-slate-700 text-center whitespace-nowrap mt-1">${Math.round(totalTransferExpenses).toLocaleString()}</p>
                                 </div>
                             </div>
 
                             {/* Row 2: Secondary Stats */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
-                                <div className="px-2 md:px-4 py-2 rounded-xl bg-indigo-500/10 border border-indigo-200/20 shadow-sm">
-                                    <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">LINE PAY</p>
-                                    <p className={`${getDynamicFontSize(totalLinePay)} font-bold text-indigo-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalLinePay)}</p>
+                                <div className="px-2 md:px-4 py-3 rounded-2xl bg-slate-50/50 border border-slate-200 shadow-sm transition-all hover:shadow-md">
+                                    <p className="text-[10px] md:text-xs text-slate-400 uppercase font-bold text-center tracking-wider">LINE PAY</p>
+                                    <p className="text-lg md:text-xl font-black text-slate-700 text-center whitespace-nowrap mt-1">${Math.round(totalLinePay).toLocaleString()}</p>
                                 </div>
-                                <div className="px-2 md:px-4 py-2 rounded-xl bg-cyan-500/10 border border-cyan-200/20 shadow-sm">
-                                    <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">結算</p>
-                                    <p className={`${getDynamicFontSize(totalFinalTotal)} font-bold text-cyan-700 text-center whitespace-nowrap`}>${formatNumberWithDecimal(totalFinalTotal)}</p>
+                                <div className="px-2 md:px-4 py-3 rounded-2xl bg-slate-50/50 border border-slate-200 shadow-sm transition-all hover:shadow-md">
+                                    <p className="text-[10px] md:text-xs text-slate-400 uppercase font-bold text-center tracking-wider">結算</p>
+                                    <p className={`text-lg md:text-xl font-black text-center whitespace-nowrap mt-1 ${totalFinalTotal < 0 ? 'text-red-600' : 'text-emerald-600'}`}>${Math.round(totalFinalTotal).toLocaleString()}</p>
                                 </div>
-                                <div className="px-2 md:px-4 py-2 rounded-xl bg-sky-500/10 border border-sky-200/20 shadow-sm">
-                                    <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總數量</p>
-                                    <p className={`${getDynamicFontSize(totalQty)} font-bold text-sky-700 text-center whitespace-nowrap`}>{totalQty.toLocaleString()}</p>
+                                <div className="px-2 md:px-4 py-3 rounded-2xl bg-slate-50/50 border border-slate-200 shadow-sm transition-all hover:shadow-md">
+                                    <p className="text-[10px] md:text-xs text-slate-400 uppercase font-bold text-center tracking-wider">總數量</p>
+                                    <p className="text-lg md:text-xl font-black text-slate-700 text-center whitespace-nowrap mt-1">{totalQty.toLocaleString()}</p>
                                 </div>
-                                <div className="px-2 md:px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-200/20 shadow-sm">
-                                    <p className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase font-bold text-center">總筆數</p>
-                                    <p className={`${getDynamicFontSize(totalCount)} font-bold text-purple-700 text-center whitespace-nowrap`}>{totalCount.toLocaleString()}</p>
+                                <div className="px-2 md:px-4 py-3 rounded-2xl bg-slate-50/50 border border-slate-200 shadow-sm transition-all hover:shadow-md">
+                                    <p className="text-[10px] md:text-xs text-slate-400 uppercase font-bold text-center tracking-wider">總筆數</p>
+                                    <p className="text-lg md:text-xl font-black text-slate-700 text-center whitespace-nowrap mt-1">{totalCount.toLocaleString()}</p>
                                 </div>
                             </div>
                         </div>
                     )}
                 </div>
 
-                {/* Filters - Mobile View (Horizontal, No Border, mimics SalesPage) */}
-                <div className="md:hidden mb-6 space-y-4">
-                    {/* 快速日期按鈕 */}
-                    <div className="flex gap-2 pb-1 overflow-x-auto no-scrollbar">
-                        <button onClick={() => handleQuickDate('TODAY')} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 whitespace-nowrap">今天</button>
-                        <button onClick={() => handleQuickDate('THIS_MONTH')} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 whitespace-nowrap">本月</button>
-                        <button onClick={() => handleQuickDate('LAST_MONTH')} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 whitespace-nowrap">上月</button>
-                    </div>
+                {/* [New] Quick Control Center (Unified Filters) */}
+                <div className="bg-slate-50/80 backdrop-blur-sm p-4 rounded-2xl border border-slate-200 mb-6 space-y-4 shadow-sm">
+                    {/* Row 1: Category (BOSS only) */}
+                    {user.role === 'BOSS' && (
+                        <div className="flex items-center gap-3">
+                            <span className="text-sm font-bold text-slate-400 w-12 uppercase tracking-tight">類別:</span>
+                            <div className="flex-1 flex bg-white p-1 rounded-xl border border-slate-100 shadow-inner max-w-sm">
+                                {['全部', '市場', '批發'].map((cat) => (
+                                    <button
+                                        key={cat}
+                                        onClick={() => setCategory(cat)}
+                                        className={`flex-1 px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-200 ${category === cat
+                                            ? 'bg-blue-600 text-white shadow-md'
+                                            : 'text-slate-500 hover:text-slate-900'
+                                            }`}
+                                    >
+                                        {cat}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
+                    {/* Row 2: Quick Dates */}
                     <div className="flex items-center gap-3">
-                        <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">開始日期:</label>
-                        <input
-                            type="date"
-                            required
-                            className="input-field flex-1 py-1.5 px-3"
-                            value={startDate}
-                            onChange={e => setStartDate(e.target.value)}
-                        />
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">結束日期:</label>
-                        <input
-                            type="date"
-                            required
-                            className="input-field flex-1 py-1.5 px-3"
-                            value={endDate}
-                            onChange={e => setEndDate(e.target.value)}
-                        />
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">銷售對象:</label>
-                        <input
-                            type="text"
-                            placeholder="輸入銷售對象..."
-                            className="input-field flex-1 py-1.5 px-3"
-                            value={location}
-                            onChange={e => setLocation(e.target.value)}
-                        />
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">產品名稱:</label>
-                        <input
-                            type="text"
-                            placeholder="輸入產品名稱..."
-                            className="input-field flex-1 py-1.5 px-3"
-                            value={productTerm}
-                            onChange={e => setProductTerm(e.target.value)}
-                        />
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">業務員:</label>
-                        <div className="flex flex-1 gap-2">
-                            <input
-                                type="text"
-                                placeholder="姓名..."
-                                className="input-field flex-1 py-1.5 px-3"
-                                value={salesRep}
-                                onChange={e => setSalesRep(e.target.value)}
-                            />
-                            <button
-                                type="button"
-                                disabled={loading}
-                                className="btn-primary px-4 py-1.5 flex items-center justify-center rounded-lg shadow-sm active:scale-95 transition-transform"
-                                onClick={fetchData}
-                            >
-                                <Search size={18} />
-                            </button>
+                        <span className="text-sm font-bold text-slate-400 w-12 uppercase tracking-tight">時間:</span>
+                        <div className="flex-1 flex bg-white p-1 rounded-xl border border-slate-100 shadow-inner max-w-sm">
+                            {[
+                                { label: '今天', type: 'TODAY' },
+                                { label: '本月', type: 'THIS_MONTH' },
+                                { label: '上月', type: 'LAST_MONTH' }
+                            ].map((btn) => (
+                                <button
+                                    key={btn.type}
+                                    onClick={() => handleQuickDate(btn.type)}
+                                    className={`flex-1 px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-200 ${activeQuickDate === btn.type
+                                        ? 'bg-blue-600 text-white shadow-md'
+                                        : 'text-slate-500 hover:text-slate-900'
+                                        }`}
+                                >
+                                    {btn.label}
+                                </button>
+                            ))}
                         </div>
                     </div>
 
-                    {/* 人員快速篩選 (手機) */}
+                    {/* Row 3: Personnel Quick Filter */}
                     {availableReps.length > 0 && (
-                        <div className="flex items-center gap-2 pt-2 border-t border-dashed border-slate-200">
-                            <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">人員:</span>
-                            <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
-                                <button 
+                        <div className="flex items-center gap-3 pt-2 border-t border-dashed border-slate-200">
+                            <span className="text-sm font-bold text-slate-400 w-12 uppercase tracking-tight">人員:</span>
+                            <div className="flex-1 flex bg-white p-1 rounded-xl border border-slate-100 shadow-inner overflow-x-auto no-scrollbar">
+                                <button
                                     onClick={() => setSalesRep('')}
-                                    className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all whitespace-nowrap ${!salesRep ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                    className={`px-5 py-1.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${!salesRep ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'}`}
                                 >
                                     全部
                                 </button>
                                 {availableReps.map(name => (
-                                    <button 
+                                    <button
                                         key={name}
                                         onClick={() => setSalesRep(name)}
-                                        className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all whitespace-nowrap ${salesRep === name ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                        className={`px-5 py-1.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${salesRep === name ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'}`}
                                     >
                                         {name}
                                     </button>
@@ -635,15 +594,82 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                     )}
                 </div>
 
-                {/* Filters - Desktop View (Original Grid) */}
-                <div className="hidden md:block mb-6 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] shadow-sm">
-                    <div className="flex gap-3 mb-4 border-b border-slate-100 pb-3">
-                        <span className="text-xs font-bold text-slate-400 self-center uppercase tracking-wider">快速日期:</span>
-                        <button onClick={() => handleQuickDate('TODAY')} className="px-4 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 hover:bg-blue-100 transition-colors">今日</button>
-                        <button onClick={() => handleQuickDate('THIS_MONTH')} className="px-4 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 hover:bg-blue-100 transition-colors">本月</button>
-                        <button onClick={() => handleQuickDate('LAST_MONTH')} className="px-4 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 hover:bg-blue-100 transition-colors">上月</button>
+                {/* Filters - Mobile View (Search Inputs) */}
+                <div className="md:hidden mb-8 space-y-5 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="space-y-4 pt-2">
+                        <div className="flex items-center gap-3">
+                            <label className="text-sm font-black text-slate-500 whitespace-nowrap w-[75px]">開始日期:</label>
+                            <input
+                                type="date"
+                                required
+                                className="input-field flex-1 py-2.5 px-4 bg-slate-50/50 border-2 border-slate-100 rounded-xl text-sm font-bold text-blue-900 outline-none focus:border-blue-400 focus:bg-white transition-all text-right"
+                                value={startDate}
+                                onChange={e => {
+                                    setStartDate(e.target.value);
+                                    setActiveQuickDate('');
+                                }}
+                            />
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <label className="text-sm font-black text-slate-500 whitespace-nowrap w-[75px]">結束日期:</label>
+                            <input
+                                type="date"
+                                required
+                                className="input-field flex-1 py-2.5 px-4 bg-slate-50/50 border-2 border-slate-100 rounded-xl text-sm font-bold text-blue-900 outline-none focus:border-blue-400 focus:bg-white transition-all text-right"
+                                value={endDate}
+                                onChange={e => {
+                                    setEndDate(e.target.value);
+                                    setActiveQuickDate('');
+                                }}
+                            />
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <label className="text-sm font-black text-slate-500 whitespace-nowrap w-[75px]">銷售對象:</label>
+                            <input
+                                type="text"
+                                placeholder="輸入銷售對象..."
+                                className="input-field flex-1 py-2.5 px-4 bg-slate-50/50 border-2 border-slate-100 rounded-xl text-sm font-bold text-blue-900 outline-none focus:border-blue-400 focus:bg-white transition-all placeholder:text-slate-400 text-right"
+                                value={location}
+                                onChange={e => setLocation(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <label className="text-sm font-black text-slate-500 whitespace-nowrap w-[75px]">產品名稱:</label>
+                            <input
+                                type="text"
+                                placeholder="輸入產品名稱..."
+                                className="input-field flex-1 py-2.5 px-4 bg-slate-50/50 border-2 border-slate-100 rounded-xl text-sm font-bold text-blue-900 outline-none focus:border-blue-400 focus:bg-white transition-all placeholder:text-slate-400 text-right"
+                                value={productTerm}
+                                onChange={e => setProductTerm(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <label className="text-sm font-black text-slate-500 whitespace-nowrap w-[75px]">業務員:</label>
+                            <div className="flex flex-1 gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="姓名..."
+                                    className="input-field flex-1 py-2.5 px-4 bg-slate-50/50 border-2 border-slate-100 rounded-xl text-sm font-bold text-blue-900 outline-none focus:border-blue-400 focus:bg-white transition-all placeholder:text-slate-400 text-right"
+                                    value={salesRep}
+                                    onChange={e => setSalesRep(e.target.value)}
+                                />
+                                <button
+                                    type="button"
+                                    disabled={loading}
+                                    className="btn-primary w-14 flex items-center justify-center rounded-xl shadow-md active:scale-95 transition-transform"
+                                    onClick={fetchData}
+                                >
+                                    <Search size={20} />
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
+
+                </div>
+
+                {/* Filters - Desktop View (Search Inputs) */}
+                <div className="hidden md:block mb-6 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] shadow-sm">
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                         <div className="grid grid-cols-2 gap-4 md:contents">
                             <div className="space-y-1">
@@ -653,7 +679,10 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                     required
                                     className="input-field w-full"
                                     value={startDate}
-                                    onChange={e => setStartDate(e.target.value)}
+                                    onChange={e => {
+                                        setStartDate(e.target.value);
+                                        setActiveQuickDate('');
+                                    }}
                                 />
                             </div>
                             <div className="space-y-1">
@@ -663,7 +692,10 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                     required
                                     className="input-field w-full"
                                     value={endDate}
-                                    onChange={e => setEndDate(e.target.value)}
+                                    onChange={e => {
+                                        setEndDate(e.target.value);
+                                        setActiveQuickDate('');
+                                    }}
                                 />
                             </div>
                         </div>
@@ -709,29 +741,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                         </div>
                     </div>
 
-                    {/* 人員快速篩選 (桌機) */}
-                    {availableReps.length > 0 && (
-                        <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-100">
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">人員快速點選:</span>
-                            <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
-                                <button 
-                                    onClick={() => setSalesRep('')}
-                                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${!salesRep ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}
-                                >
-                                    全部人員
-                                </button>
-                                {availableReps.map(name => (
-                                    <button 
-                                        key={name}
-                                        onClick={() => setSalesRep(name)}
-                                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${salesRep === name ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}
-                                    >
-                                        {name}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
+
                 </div>
 
                 {/* Content Logic */}
@@ -802,7 +812,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                                     {group.weather === 'SUNNY' ? '☀️ 晴' : '☔ 雨'}
                                                                 </span>
                                                             </div>
-                                                            
+
                                                             {/* Tags (Location, Rep, Operator, Hours) - 靠左對齊，置於日期下方 */}
                                                             <div className="flex flex-wrap gap-1.5 items-center pl-5">
                                                                 <div className="flex items-center gap-1 bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0">
@@ -841,18 +851,18 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                         <div className="text-[10px] text-[var(--text-tertiary)]">
                                                             共 {group.items.length} 項商品 / 總數: {group.totalQty}
                                                         </div>
-                                                        
+
                                                         {Object.keys(group.expenseDetails).length > 0 && (
                                                             <div className="flex flex-col gap-2 border-t border-[var(--border-primary)]/50 pt-3 pb-1">
                                                                 {Object.entries(group.expenseDetails).map(([label, amount], idx) => {
                                                                     const isCash = label.includes('|CASH');
                                                                     const isTransfer = label.includes('|TRANSFER');
                                                                     const methodText = isCash ? '(CASH)' : (isTransfer ? '(轉帳)' : '');
-                                                                    
+
                                                                     let baseLabel = label.replace(/\|CASH|\|TRANSFER/g, '').trim();
                                                                     let categoryText = baseLabel;
                                                                     let remarkText = '';
-                                                                    
+
                                                                     const firstParenIndex = baseLabel.indexOf('(');
                                                                     if (firstParenIndex !== -1) {
                                                                         categoryText = baseLabel.substring(0, firstParenIndex).trim();
