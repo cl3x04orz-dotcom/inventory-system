@@ -1543,13 +1543,14 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                                                         {/* Summary Footer */}
                                                         <div className="flex justify-between items-center pt-2 border-t border-[var(--border-primary)]">
-                                                            <div className="text-xs text-[var(--text-secondary)]">
-                                                                售出: <span className="font-bold text-blue-500 text-sm ml-1">{row.sold}</span>
-                                                            </div>
-                                                            <div className="text-sm font-bold text-rose-600 font-mono">
-                                                                <span className="text-xs text-[var(--text-tertiary)] font-normal mr-1">小計</span>
-                                                                ${row.subtotal?.toLocaleString()}
-                                                            </div>
+                                                             <div className="text-xs text-[var(--text-secondary)] font-bold">
+                                                                 售出: <span className={`font-mono font-black tabular-nums text-base ml-1 ${getSafeNum(row.sold) > 0 ? 'text-blue-600' : 'text-slate-300'}`}>{row.sold}</span>
+                                                             </div>
+                                                             <div className="text-xs text-[var(--text-secondary)] font-bold">
+                                                                 小計: <span className={`font-mono font-black tabular-nums text-base ml-1 ${getSafeNum(row.subtotal) > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
+                                                                    ${getSafeNum(row.subtotal).toLocaleString()}
+                                                                 </span>
+                                                             </div>
                                                         </div>
                                                     </div>
                                                 )}
@@ -1562,17 +1563,17 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                             {/* Desktop Table View (Hidden on < md) */}
                             <table className="hidden md:table w-full text-left border-collapse">
-                                <thead className="sticky top-0 bg-[var(--bg-secondary)] z-10 text-[var(--text-secondary)] text-xs uppercase font-bold border-b border-[var(--border-primary)]">
-                                    <tr>
-                                        <th className="p-3 w-10"></th>
-                                        <th className="p-3">品項</th>
-                                        <th className="p-3 w-20">庫存</th>
-                                        <th className="p-3 w-24">領貨(+)</th>
-                                        <th className="p-3 w-24">原貨(+)</th>
-                                        <th className="p-3 w-24">退貨(-)</th>
+                                <thead className="sticky top-0 z-10 text-slate-500 text-[13px] uppercase font-semibold tracking-wider">
+                                    <tr className="bg-[#F1F5F9]">
+                                        <th className="p-3 w-10 first:rounded-l-2xl"></th>
+                                        <th className="p-3 text-left">品項</th>
+                                        <th className="p-3 w-20 text-center">庫存</th>
+                                        <th className="p-3 w-24 text-center">領貨</th>
+                                        <th className="p-3 w-24 text-center">原貨</th>
+                                        <th className="p-3 w-24 text-center">退貨</th>
                                         <th className="p-3 w-20 text-center">售出</th>
-                                        <th className="p-3 w-24">單價</th>
-                                        <th className="p-3 w-28 text-right">繳回金額</th>
+                                        <th className="p-3 w-24 text-center">單價</th>
+                                        <th className="p-3 w-28 text-right last:rounded-r-2xl">繳回金額</th>
                                     </tr>
                                 </thead>
                                 <Droppable droppableId="desktop-rows" isDropDisabled={!isSorting}>
@@ -1593,25 +1594,25 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                 } ${inputMode === 'keyboard' && activeInput?.rowId === row.id ? 'bg-[var(--bg-hover)]' : ''
                                                                 }`}
                                                         >
-                                                            <td className="p-3">
+                                                            <td className="p-4">
                                                                 {isSorting && (
                                                                     <div {...provided.dragHandleProps} className="text-[var(--text-tertiary)] cursor-grab active:cursor-grabbing">
                                                                         <GripVertical size={16} />
                                                                     </div>
                                                                 )}
                                                             </td>
-                                                            <td className="p-3 font-medium text-[var(--text-primary)]">{row.name}</td>
-                                                            <td className="p-3 text-[var(--text-secondary)] font-mono tracking-wider">
+                                                            <td className="p-4 text-slate-950 font-bold">{row.name}</td>
+                                                            <td className="p-4 text-center font-mono tracking-tighter tabular-nums text-sm text-[var(--text-secondary)]">
                                                                 <span className="text-blue-500">{row.stock}</span>
                                                                 <span className="text-[var(--text-tertiary)] mx-1">/</span>
                                                                 <span className="text-orange-500">{row.originalStock || 0}</span>
                                                             </td>
-                                                            <td className="p-3">
+                                                            <td className="p-4">
                                                                 <input
                                                                     id={`input-${idx}-picked`}
                                                                     type="text"
                                                                     autoComplete="off"
-                                                                    className="input-field text-center p-1"
+                                                                    className="input-field text-center p-1 font-mono"
                                                                     value={row.picked || ''}
                                                                     onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
                                                                     onBlur={(e) => handleBlur(row.id, 'picked', e.target.value)}
@@ -1620,12 +1621,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                     disabled={isSorting}
                                                                 />
                                                             </td>
-                                                            <td className="p-3">
+                                                            <td className="p-4">
                                                                 <input
                                                                     id={`input-${idx}-original`}
                                                                     type="text"
                                                                     autoComplete="off"
-                                                                    className="input-field text-center p-1"
+                                                                    className="input-field text-center p-1 font-mono"
                                                                     value={row.original || ''}
                                                                     onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
                                                                     onBlur={(e) => handleBlur(row.id, 'original', e.target.value)}
@@ -1634,12 +1635,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                     disabled={isSorting}
                                                                 />
                                                             </td>
-                                                            <td className="p-3">
+                                                            <td className="p-4">
                                                                 <input
                                                                     id={`input-${idx}-returns`}
                                                                     type="text"
                                                                     autoComplete="off"
-                                                                    className="input-field text-center p-1 text-red-600"
+                                                                    className="input-field text-center p-1 text-red-600 font-mono"
                                                                     value={row.returns || ''}
                                                                     onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
                                                                     onBlur={(e) => handleBlur(row.id, 'returns', e.target.value)}
@@ -1648,9 +1649,30 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                     disabled={isSorting}
                                                                 />
                                                             </td>
-                                                            <td className="p-3 text-center font-bold text-blue-500">{row.sold}</td>
-                                                            <td className="p-3"><input id={`input-${idx}-price`} type="text" autoComplete="off" className="input-field text-center p-1 w-20" value={row.price} onChange={(e) => handleRowChange(row.id, 'price', e.target.value)} onBlur={(e) => handleBlur(row.id, 'price', e.target.value)} onFocus={() => setActiveInput({ id: `input-${idx}-price`, type: 'row', rowId: row.id, field: 'price' })} onKeyDown={(e) => handleKeyDown(e, idx, 'price')} disabled={isSorting} /></td>
-                                                            <td className="p-3 text-right font-mono text-rose-600">${row.subtotal?.toLocaleString()}</td>
+                                                            <td className="p-4 text-center">
+                                                                <span className={`font-mono font-black tabular-nums text-lg ${getSafeNum(row.sold) > 0 ? 'text-blue-600' : 'text-slate-300'}`}>
+                                                                    {row.sold}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-4">
+                                                                <input
+                                                                    id={`input-${idx}-price`}
+                                                                    type="text"
+                                                                    autoComplete="off"
+                                                                    className="input-field text-center p-1 w-20 font-mono"
+                                                                    value={row.price}
+                                                                    onChange={(e) => handleRowChange(row.id, 'price', e.target.value)}
+                                                                    onBlur={(e) => handleBlur(row.id, 'price', e.target.value)}
+                                                                    onFocus={() => setActiveInput({ id: `input-${idx}-price`, type: 'row', rowId: row.id, field: 'price' })}
+                                                                    onKeyDown={(e) => handleKeyDown(e, idx, 'price')}
+                                                                    disabled={isSorting}
+                                                                />
+                                                            </td>
+                                                            <td className="p-4 text-right">
+                                                                <span className={`font-mono font-black tabular-nums text-lg ${getSafeNum(row.subtotal) > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
+                                                                    ${getSafeNum(row.subtotal).toLocaleString()}
+                                                                </span>
+                                                            </td>
                                                         </tr>
                                                     )}
                                                 </Draggable>
@@ -1664,7 +1686,9 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     </div>
                     <div className="mt-4 pt-4 border-t border-[var(--border-primary)] flex justify-between items-center bg-[var(--bg-secondary)] p-4 rounded-lg">
                         <span className="text-[var(--text-secondary)]">總繳回金額 (商品計算)</span>
-                        <span className="text-2xl font-bold text-rose-600">${totalSalesAmount.toLocaleString()}</span>
+                        <span className={`text-2xl font-bold font-mono tabular-nums ${totalSalesAmount > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
+                            ${totalSalesAmount.toLocaleString()}
+                        </span>
                     </div>
                 </div>
 
@@ -1709,7 +1733,9 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                 })}
                                                 disabled={isCredit}
                                             />
-                                            <span className="w-20 text-right font-mono text-[var(--text-secondary)]">${(denom * getSafeNum(cashCounts[denom])).toLocaleString()}</span>
+                                            <span className={`w-20 text-right font-mono tabular-nums ${denom * getSafeNum(cashCounts[denom]) > 0 ? 'text-blue-600 font-bold' : 'text-slate-300'}`}>
+                                                ${(denom * getSafeNum(cashCounts[denom])).toLocaleString()}
+                                            </span>
                                         </div>
                                     );
                                 })}
@@ -1735,9 +1761,17 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                         disabled={isCredit}
                                     />
                                 </div>
-                                <div className="bg-[var(--bg-secondary)] p-3 rounded flex justify-between items-center border border-[var(--border-primary)]">
+                                <div className="bg-slate-50/50 p-3 rounded-xl flex justify-between items-center border border-slate-200">
                                     <span className="text-[var(--text-secondary)]">總金額</span>
-                                    <span className="text-xl font-bold text-amber-500">${(isCredit ? 0 : totalCashNet).toLocaleString()}</span>
+                                    <span className={`text-xl font-black font-mono tabular-nums ${
+                                        (isCredit ? 0 : totalCashNet) === 0 
+                                            ? 'text-slate-300' 
+                                            : (isCredit ? 0 : totalCashNet) > 0 
+                                                ? 'text-blue-600' 
+                                                : 'text-rose-600'
+                                    }`}>
+                                        ${(isCredit ? 0 : totalCashNet).toLocaleString()}
+                                    </span>
                                 </div>
                             </div>
                         </div>
