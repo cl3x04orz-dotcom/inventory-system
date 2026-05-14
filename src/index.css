@@ -28,6 +28,7 @@
 
     .input-field {
         @apply w-full bg-slate-50/50 border border-slate-200 rounded-lg px-3 py-2 text-[var(--text-primary)] outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100 transition-all font-mono tabular-nums;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
     }
 
     .btn-primary {

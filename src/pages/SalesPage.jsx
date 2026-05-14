@@ -909,7 +909,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 const byteArray = new Uint8Array(byteNumbers);
                 const blob = new Blob([byteArray], { type: 'application/pdf' });
                 const blobUrl = URL.createObjectURL(blob);
-                
+
                 if (pdfWindow) {
                     pdfWindow.location.href = blobUrl;
                 } else {
@@ -1218,56 +1218,56 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             {/* Group 1: Setup & Context (Toggle + Input) */}
                             <div className="flex flex-col md:flex-row md:items-center gap-3 w-full md:w-auto">
                                 <div className="flex flex-row items-center gap-3 flex-1 md:flex-none">
-                                {/* Toggle */}
-                                <div className="flex bg-[var(--bg-tertiary)] rounded-lg p-1 border border-[var(--border-primary)] shrink-0">
-                                    <button
-                                        onClick={() => setPaymentType('CASH')}
-                                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${paymentType === 'CASH'
-                                            ? 'bg-emerald-500 text-white shadow-sm'
-                                            : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-                                            }`}
-                                    >
-                                        現金
-                                    </button>
-                                    <button
-                                        onClick={() => setPaymentType('CREDIT')}
-                                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${paymentType === 'CREDIT'
-                                            ? 'bg-amber-500 text-white shadow-sm'
-                                            : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-                                            }`}
-                                    >
-                                        賒銷
-                                    </button>
-                                </div>
+                                    {/* Toggle */}
+                                    <div className="flex bg-[var(--bg-tertiary)] rounded-lg p-1 border border-[var(--border-primary)] shrink-0">
+                                        <button
+                                            onClick={() => setPaymentType('CASH')}
+                                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${paymentType === 'CASH'
+                                                ? 'bg-emerald-500 text-white shadow-sm'
+                                                : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                                                }`}
+                                        >
+                                            現金
+                                        </button>
+                                        <button
+                                            onClick={() => setPaymentType('CREDIT')}
+                                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${paymentType === 'CREDIT'
+                                                ? 'bg-amber-500 text-white shadow-sm'
+                                                : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                                                }`}
+                                        >
+                                            賒銷
+                                        </button>
+                                    </div>
 
                                     {/* Customer Input */}
                                     <div className="flex items-center gap-2 flex-1 md:flex-none">
-                                    <label className="text-sm text-[var(--text-secondary)] font-bold whitespace-nowrap hidden md:block">銷售對象:</label>
-                                    <input
-                                        id="input-location"
-                                        type="text"
-                                        autoComplete="off"
-                                        list="system-customers-list"
-                                        className="input-field py-1 px-3 w-full md:w-40 lg:w-48"
-                                        placeholder="輸入銷售對象..."
-                                        value={location}
-                                        onChange={(e) => setLocation(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            // [Fix] 避免在輸入中文選字時 (IME) 按下 Enter 直接跳格
-                                            if (e.key === 'Enter') {
-                                                if (e.nativeEvent.isComposing) return;
-                                                
-                                                e.preventDefault();
-                                                if (isPartTime) {
-                                                    focusAndSelect('input-work-hours');
-                                                } else {
-                                                    focusAndSelect('input-m-0-picked') || focusAndSelect('input-0-picked');
+                                        <label className="text-sm text-[var(--text-secondary)] font-bold whitespace-nowrap hidden md:block">銷售對象:</label>
+                                        <input
+                                            id="input-location"
+                                            type="text"
+                                            autoComplete="off"
+                                            list="system-customers-list"
+                                            className="input-field py-1 px-3 w-full md:w-40 lg:w-48"
+                                            placeholder="輸入銷售對象..."
+                                            value={location}
+                                            onChange={(e) => setLocation(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                // [Fix] 避免在輸入中文選字時 (IME) 按下 Enter 直接跳格
+                                                if (e.key === 'Enter') {
+                                                    if (e.nativeEvent.isComposing) return;
+
+                                                    e.preventDefault();
+                                                    if (isPartTime) {
+                                                        focusAndSelect('input-work-hours');
+                                                    } else {
+                                                        focusAndSelect('input-m-0-picked') || focusAndSelect('input-0-picked');
+                                                    }
                                                 }
-                                            }
-                                        }}
-                                    />
+                                            }}
+                                        />
+                                    </div>
                                 </div>
-                            </div>
 
                                 {/* [New] Sales Rep Override - Only show during correction */}
                                 {availableUsers.length > 0 && originalSaleId && (
@@ -1348,7 +1348,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             <div className="flex items-center gap-2 w-[72px] shrink-0">
                                 <span className="text-base w-5 flex justify-center shrink-0">⏱️</span>
                                 <span className="text-[10px] font-bold text-amber-800 leading-tight shrink-0">
-                                    工讀<br/>計時
+                                    工讀<br />計時
                                 </span>
                             </div>
 
@@ -1381,7 +1381,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             <div className="w-14 shrink-0 ml-auto flex justify-end">
                                 {workHours && Number(workHours) > 0 && (
                                     <div className="text-[10px] font-bold py-1 rounded-lg bg-amber-100 text-amber-600 border border-amber-200 leading-tight text-center w-full">
-                                        今日<br/>{workHours} hr
+                                        今日<br />{workHours} hr
                                     </div>
                                 )}
                             </div>
@@ -1394,7 +1394,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                         <div className="flex items-center gap-2 w-[72px] shrink-0">
                             <span className="text-base w-5 flex justify-center shrink-0">{weather === 'SUNNY' ? '☀️' : '☔'}</span>
                             <span className="text-[10px] font-bold text-blue-800 leading-tight shrink-0">
-                                今日<br/>天氣
+                                今日<br />天氣
                             </span>
                         </div>
 
@@ -1430,7 +1430,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 ? 'bg-amber-100 text-amber-600 border-amber-200'
                                 : 'bg-indigo-100 text-indigo-600 border-indigo-200'
                                 }`}>
-                                今日<br/>{weather === 'SUNNY' ? '晴天' : '雨天'}
+                                今日<br />{weather === 'SUNNY' ? '晴天' : '雨天'}
                             </div>
                         </div>
                     </div>
@@ -1543,14 +1543,14 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                                                         {/* Summary Footer */}
                                                         <div className="flex justify-between items-center pt-2 border-t border-[var(--border-primary)]">
-                                                             <div className="text-xs text-[var(--text-secondary)] font-bold">
-                                                                 售出: <span className={`font-mono font-black tabular-nums text-base ml-1 ${getSafeNum(row.sold) > 0 ? 'text-blue-600' : 'text-slate-300'}`}>{row.sold}</span>
-                                                             </div>
-                                                             <div className="text-xs text-[var(--text-secondary)] font-bold">
-                                                                 小計: <span className={`font-mono font-black tabular-nums text-base ml-1 ${getSafeNum(row.subtotal) > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
+                                                            <div className="text-xs text-[var(--text-secondary)] font-bold">
+                                                                售出: <span className={`font-mono font-black tabular-nums text-base ml-1 ${getSafeNum(row.sold) > 0 ? 'text-blue-600' : 'text-slate-300'}`}>{row.sold}</span>
+                                                            </div>
+                                                            <div className="text-xs text-[var(--text-secondary)] font-bold">
+                                                                小計: <span className={`font-mono font-black tabular-nums text-base ml-1 ${getSafeNum(row.subtotal) > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
                                                                     ${getSafeNum(row.subtotal).toLocaleString()}
-                                                                 </span>
-                                                             </div>
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 )}
@@ -1699,27 +1699,29 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                         {/* Overlay for locking if strictly needed, but pointer-events-none does the trick interactively */}
 
-                        <div className="glass-panel p-6 relative">
+                        <div className="glass-panel p-5 relative">
                             {isCredit && <div className="absolute inset-0 z-50 cursor-not-allowed"></div>}
 
-                            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-[var(--text-primary)]">
+                            <h2 className="text-lg font-bold mb-3 flex items-center gap-2 text-[var(--text-primary)]">
                                 <Calculator size={20} className="text-amber-500" /> 錢點清算
                             </h2>
-                            <div className="space-y-3">
+                            {/* Full-Width Cash Counter with 3-Column Grid */}
+                            <div className="space-y-0.5">
                                 {[1000, 500, 100, 50, 10, 5, 1].map((denom, idx, arr) => {
                                     const currentId = `input-cash-${denom}`;
                                     const nextId = idx < arr.length - 1 ? `input-cash-${arr[idx + 1]}` : 'input-reserve';
-                                    const prevId = idx > 0 ? `input-cash-${arr[idx - 1]}` : null; // null means jump to table
+                                    const prevId = idx > 0 ? `input-cash-${arr[idx - 1]}` : null;
+                                    const subtotal = denom * getSafeNum(cashCounts[denom]);
                                     return (
-                                        <div key={denom} className="flex items-center gap-4">
-                                            <span className="w-12 text-[var(--text-secondary)] font-mono text-right">{denom}</span>
-                                            <span className="text-[var(--text-tertiary)]">x</span>
+                                         <div key={denom} className="grid grid-cols-[60px_16px_1fr_80px] items-center gap-2 px-2 py-[5.6px] rounded-lg hover:bg-slate-50 transition-colors">
+                                            <span className="text-slate-600 font-mono font-bold text-base text-right">{denom}</span>
+                                            <span className="text-slate-300 text-xs text-center">×</span>
                                             <input
                                                 id={currentId}
                                                 type="text"
                                                 inputMode="decimal"
                                                 autoComplete="off"
-                                                className="input-field flex-1"
+                                                className="input-field text-center py-[5.6px] px-2 text-sm shadow-sm"
                                                 placeholder="0"
                                                 value={cashCounts[denom] || ''}
                                                 onChange={(e) => handleCashChange(denom, e.target.value)}
@@ -1733,21 +1735,25 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                 })}
                                                 disabled={isCredit}
                                             />
-                                            <span className={`w-20 text-right font-mono tabular-nums ${denom * getSafeNum(cashCounts[denom]) > 0 ? 'text-blue-600 font-bold' : 'text-slate-300'}`}>
-                                                ${(denom * getSafeNum(cashCounts[denom])).toLocaleString()}
-                                            </span>
+                                            <div className="flex items-center justify-end">
+                                                <span className={`font-mono tabular-nums text-base font-black text-right ${subtotal > 0 ? 'text-blue-700' : 'text-slate-300'}`}>
+                                                    ${subtotal.toLocaleString()}
+                                                </span>
+                                            </div>
                                         </div>
                                     );
                                 })}
-                                <div className="border-t border-[var(--border-primary)] my-2 pt-2 flex items-center gap-4 text-red-500">
-                                    <span className="w-12 text-right">預備金</span>
-                                    <span className="text-[var(--text-tertiary)]">-</span>
+
+                                {/* Reserve Fund */}
+                                <div className="border-t border-slate-100 mt-1 pt-1 grid grid-cols-[60px_16px_1fr_80px] items-center gap-2 px-2 py-[5.6px]">
+                                    <span className="text-slate-700 font-bold text-xs text-right">預備金</span>
+                                    <span className="text-slate-300 text-xs text-center">−</span>
                                     <input
                                         id="input-reserve"
                                         type="text"
                                         inputMode="decimal"
                                         autoComplete="off"
-                                        className="input-field flex-1 border-red-900/50 focus:ring-red-500"
+                                        className="input-field text-center py-[5.6px] px-2 text-sm border-rose-100 bg-rose-50/30 focus:ring-rose-200 shadow-sm"
                                         value={reserve}
                                         onChange={(e) => handleReserveChange(e.target.value)}
                                         onBlur={(e) => handleReserveBlur(e.target.value)}
@@ -1760,27 +1766,33 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                         })}
                                         disabled={isCredit}
                                     />
+                                    <div className="flex items-center justify-end">
+                                        <span className={`font-mono tabular-nums text-base font-black text-right ${getSafeNum(reserve) > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
+                                            −${getSafeNum(reserve).toLocaleString()}
+                                        </span>
+                                    </div>
                                 </div>
-                                <div className="bg-slate-50/50 p-3 rounded-xl flex justify-between items-center border border-slate-200">
-                                    <span className="text-[var(--text-secondary)]">總金額</span>
-                                    <span className={`text-xl font-black font-mono tabular-nums ${
-                                        (isCredit ? 0 : totalCashNet) === 0 
-                                            ? 'text-slate-300' 
-                                            : (isCredit ? 0 : totalCashNet) > 0 
-                                                ? 'text-blue-600' 
-                                                : 'text-rose-600'
-                                    }`}>
+
+                                {/* Final Result - Rounded Card */}
+                                <div className="mt-1.5 bg-slate-50 border border-slate-200 rounded-2xl px-5 py-2 flex items-center justify-between" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                                    <span className="text-slate-400 font-bold text-xs uppercase tracking-widest">點清結算</span>
+                                    <span className={`font-black font-mono tabular-nums text-3xl tracking-tight ${(isCredit ? 0 : totalCashNet) === 0
+                                        ? 'text-slate-300'
+                                        : (isCredit ? 0 : totalCashNet) > 0
+                                            ? 'text-blue-600'
+                                            : 'text-rose-600'
+                                        }`}>
                                         ${(isCredit ? 0 : totalCashNet).toLocaleString()}
                                     </span>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="glass-panel p-6 relative">
+                        <div className="glass-panel p-5 relative">
                             {isCredit && <div className="absolute inset-0 z-50 cursor-not-allowed"></div>}
 
-                            <h2 className="text-lg font-bold mb-4 text-rose-500">支出與其他</h2>
-                            <div className="grid grid-cols-2 gap-3">
+                            <h2 className="text-lg font-bold mb-3 text-rose-500">支出與其他</h2>
+                            <div className="grid grid-cols-2 gap-2.5">
                                 {EXPENSE_CATEGORIES.map((item, idx, arr) => {
                                     const { key, label } = item;
                                     const currentId = `input-expense-${key}`;
@@ -1822,7 +1834,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                 type="text"
                                                 inputMode="decimal"
                                                 autoComplete="off"
-                                                className={`input-field text-sm transition-all ${(['gas', 'parking', 'goods', 'others', 'salary', 'reserveFund', 'vehicleMaintenance'].includes(key)) && getSafeNum(expenses[key]) > 0 && !expenses[key === 'goods' ? 'goodsVendor' : `${key}Remark`] ? 'border-rose-200 bg-rose-50/20' : ''}`}
+                                                className={`input-field py-[5.6px] text-sm transition-all ${(['gas', 'parking', 'goods', 'others', 'salary', 'reserveFund', 'vehicleMaintenance'].includes(key)) && getSafeNum(expenses[key]) > 0 && !expenses[key === 'goods' ? 'goodsVendor' : `${key}Remark`] ? 'border-rose-200 bg-rose-50/20' : ''}`}
                                                 value={expenses[key] || ''}
                                                 onChange={(e) => handleExpenseChange(key, e.target.value)}
                                                 onBlur={(e) => handleExpenseBlur(key, e.target.value)}
