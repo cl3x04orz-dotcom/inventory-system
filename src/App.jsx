@@ -148,28 +148,41 @@ function AppContent() {
     // 檢查版本更新 (透過 apiHandler: getVersion)
     const checkCountRef = React.useRef(0);
     const [showHeader, setShowHeader] = useState(true);
+    const [scrolled, setScrolled] = useState(false);
     const lastScrollY = React.useRef(0);
 
     // Auto-hide Header Logic (Mobile Focus)
     useEffect(() => {
+        const threshold = 50; // 捲動門檻 (px)
         const handleScroll = () => {
             const currentScrollY = window.scrollY;
             
-            // At the very top, always show
-            if (currentScrollY < 10) {
+            // 更新陰影狀態
+            setScrolled(currentScrollY > 10);
+
+            // 偵測是否觸底
+            const isBottom = window.innerHeight + currentScrollY >= document.documentElement.scrollHeight - 20;
+
+            // 頂部或底部強制顯示
+            if (currentScrollY < 10 || isBottom) {
                 setShowHeader(true);
                 lastScrollY.current = currentScrollY;
                 return;
             }
 
-            // Scroll down: hide; Scroll up: show
-            if (currentScrollY > lastScrollY.current && currentScrollY > 76) {
+            // 計算捲動位移 delta
+            const delta = currentScrollY - lastScrollY.current;
+
+            // 往下滑動且超過門檻：隱藏
+            if (delta > threshold && currentScrollY > 76) {
                 if (!mobileMenuOpen) setShowHeader(false);
-            } else {
+                lastScrollY.current = currentScrollY;
+            } 
+            // 往上滑動且超過門檻：顯示
+            else if (delta < -threshold) {
                 setShowHeader(true);
+                lastScrollY.current = currentScrollY;
             }
-            
-            lastScrollY.current = currentScrollY;
         };
 
         window.addEventListener('scroll', handleScroll, { passive: true });
@@ -551,7 +564,7 @@ function AppContent() {
             )}
 
             {/* Navbar */}
-            <header className={`h-[76px] border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]/90 backdrop-blur-xl flex justify-between items-center px-6 sticky top-0 z-[60] shadow-sm transition-transform duration-300 ${showHeader ? 'translate-y-0' : '-translate-y-full'}`}>
+            <header className={`h-[76px] border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]/90 backdrop-blur-xl flex justify-between items-center px-6 sticky top-0 z-[60] transition-all duration-300 ${showHeader ? 'translate-y-0' : '-translate-y-full'} ${scrolled ? 'shadow-md border-transparent' : 'shadow-none'}`}>
                 <div className="flex items-center gap-3">
                     <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-11 w-auto object-contain brightness-0 dark:brightness-100 transition-transform hover:scale-105 cursor-pointer" onClick={() => handlePageChange('sales')} />
                 </div>
