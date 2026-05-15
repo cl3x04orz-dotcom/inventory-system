@@ -1461,7 +1461,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                         <GripVertical size={20} />
                                                                     </div>
                                                                 )}
-                                                                <div className="font-bold text-[var(--text-primary)] text-lg leading-tight">{row.name}</div>
+                                                                <div className="font-extrabold text-[var(--text-primary)] text-xl leading-tight whitespace-nowrap">{row.name}</div>
                                                             </div>
                                                             <div className="text-[10px] font-mono bg-[var(--bg-tertiary)] px-2 py-1 rounded border border-[var(--border-primary)] whitespace-nowrap">
                                                                 <span className="text-blue-500 font-bold">{row.stock}</span>
@@ -1601,7 +1601,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                     </div>
                                                                 )}
                                                             </td>
-                                                            <td className="p-4 text-slate-950 font-bold">{row.name}</td>
+                                                            <td className="p-4 text-slate-950 font-extrabold text-xl whitespace-nowrap">{row.name}</td>
                                                             <td className="p-4 text-center font-mono tracking-tighter tabular-nums text-sm text-[var(--text-secondary)]">
                                                                 <span className="text-blue-500">{row.stock}</span>
                                                                 <span className="text-[var(--text-tertiary)] mx-1">/</span>

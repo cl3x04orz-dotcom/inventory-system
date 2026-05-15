@@ -342,7 +342,7 @@ export default function ReceivablePage({ user, apiUrl }) {
                                                                                 />
                                                                             </td>
                                                                             <td className="py-3 px-4 text-[var(--text-secondary)]">{getOperatorName(r)}</td>
-                                                                            <td className="py-3 px-4 text-[var(--text-primary)] font-medium">{item.productName || item.name || '-'}</td>
+                                                                            <td className="py-3 px-4 text-[var(--text-primary)] font-extrabold text-lg whitespace-nowrap">{item.productName || item.name || '-'}</td>
                                                                             <td className="py-3 px-4 text-right text-[var(--text-secondary)] font-mono">${(Number(item.price) || Number(item.unitPrice) || 0).toLocaleString()}</td>
                                                                             <td className="py-3 px-4 text-center text-[var(--text-secondary)] font-mono">{item.qty || item.soldQty || 1}</td>
                                                                             <td className="py-3 px-4 text-center">
@@ -458,7 +458,7 @@ export default function ReceivablePage({ user, apiUrl }) {
                                                     onChange={(e) => toggleItemSelect(e, syntheticId)}
                                                 />
                                                 <div className="flex-1">
-                                                    <div className="text-[var(--text-primary)] font-medium">{item.productName || item.name}</div>
+                                                    <div className="text-[var(--text-primary)] font-extrabold text-lg whitespace-nowrap">{item.productName || item.name}</div>
                                                     <div className="text-[var(--text-tertiary)] text-[10px] font-mono">${(Number(item.price) || 0).toLocaleString()} x {item.qty || 1}</div>
                                                 </div>
                                                 <button

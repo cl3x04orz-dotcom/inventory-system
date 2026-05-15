@@ -108,7 +108,7 @@ export default function InventoryAdjustmentPage({ user, apiUrl }) {
                                     }}
                                     className={`cursor-pointer transition-colors ${selectedItem === item ? 'bg-blue-500/10 active' : 'hover:bg-[var(--bg-hover)]'}`}
                                 >
-                                    <td className="p-3 font-medium text-[var(--text-primary)]">{item.productName}</td>
+                                    <td className="p-3 font-extrabold text-lg text-[var(--text-primary)] whitespace-nowrap">{item.productName}</td>
                                     <td className="p-3 text-sm text-[var(--text-secondary)]">{item.expiry ? new Date(item.expiry).toLocaleDateString('zh-TW') : '-'}</td>
                                     <td className="p-3 text-right font-mono font-bold text-emerald-600">{item.quantity}</td>
                                 </tr>
@@ -129,7 +129,7 @@ export default function InventoryAdjustmentPage({ user, apiUrl }) {
                         <form onSubmit={handleSave} className="space-y-6">
                             <div className="p-4 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-primary)]">
                                 <label className="text-xs text-[var(--text-tertiary)] block mb-1">調整品項</label>
-                                <div className="text-lg font-bold text-[var(--text-primary)]">{selectedItem.productName}</div>
+                                <div className="text-xl font-extrabold text-[var(--text-primary)] whitespace-nowrap">{selectedItem.productName}</div>
                                 <div className="text-sm text-[var(--text-secondary)]">批號: {selectedItem.batchId || '-'}</div>
                             </div>
 

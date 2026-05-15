@@ -789,7 +789,7 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                 <div key={name} className="p-5 rounded-xl border border-slate-200 bg-slate-50/30 hover:border-emerald-200 transition-colors">
                                     <h3 className="text-base font-bold text-emerald-700 mb-4 flex items-center gap-2">
                                         <span className="w-1.5 h-6 bg-emerald-500 rounded-full"></span>
-                                        {name}
+                                        <span className="font-extrabold text-lg">{name}</span>
                                     </h3>
                                     
                                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
