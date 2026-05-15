@@ -1713,7 +1713,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     const prevId = idx > 0 ? `input-cash-${arr[idx - 1]}` : null;
                                     const subtotal = denom * getSafeNum(cashCounts[denom]);
                                     return (
-                                         <div key={denom} className="grid grid-cols-[60px_16px_1fr_80px] items-center gap-2 px-2 py-[5.6px] rounded-lg hover:bg-slate-50 transition-colors">
+                                        <div key={denom} className="grid grid-cols-[60px_16px_1fr_80px] items-center gap-2 px-2 py-[5.6px] rounded-lg hover:bg-slate-50 transition-colors">
                                             <span className="text-slate-600 font-mono font-bold text-base text-right">{denom}</span>
                                             <span className="text-slate-300 text-xs text-center">×</span>
                                             <input
@@ -1861,13 +1861,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     {/* Final Result Card (Fixed at bottom of the right column) */}
                     <div className="p-6 glass-panel shadow-lg border-t-4 border-t-blue-600 opacity-100 pointer-events-auto">
                         <div className="text-sm text-[var(--text-secondary)] mb-1 font-bold">扣除後總金額 (結算)</div>
-                        <div className={`text-4xl font-mono tabular-nums tracking-tight transition-all duration-300 ${
-                            Math.round(isCredit ? totalSalesAmount : finalTotal) === 0
+                        <div className={`text-4xl font-mono tabular-nums tracking-tight transition-all duration-300 ${Math.round(isCredit ? totalSalesAmount : finalTotal) === 0
                                 ? 'text-slate-300 font-medium'
                                 : (isCredit ? totalSalesAmount : finalTotal) > 0
                                     ? 'text-blue-600 font-black'
                                     : 'text-rose-600 font-black'
-                        }`}>
+                            }`}>
                             ${(isCredit ? totalSalesAmount : finalTotal).toLocaleString()}
                         </div>
                         <button id="btn-save-data" onClick={handleSubmit} className="btn-primary w-full mt-6 flex justify-center items-center gap-2 py-4 text-lg">

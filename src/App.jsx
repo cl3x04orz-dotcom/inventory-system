@@ -57,22 +57,37 @@ const NavDropdown = ({ label, icon: Icon, active, children, id, openDropdown, se
                     e.stopPropagation();
                     setOpenDropdown(isOpen ? null : id);
                 }}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all duration-200 ${active
-                    ? 'bg-blue-50 text-blue-600 border border-blue-200 shadow-sm'
-                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
-                    }`}
+                className={`
+                    group relative px-4 py-3 flex items-center gap-2.5 rounded-xl text-base font-medium
+                    transition-all duration-200
+                    ${active
+                        ? 'text-[var(--text-primary)]'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] border border-transparent'
+                    }
+                `}
             >
-                <Icon size={18} />
-                <span className="font-medium">{label}</span>
-                <ChevronDown size={14} className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+                {/* active bottom line */}
+                {active && (
+                    <span
+                        className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-6 h-0.5 rounded-full bg-slate-700 dark:bg-slate-400"
+                        style={{ boxShadow: '0 0 6px 2px rgba(51,65,85,0.35)' }}
+                    />
+                )}
+                <Icon size={19} strokeWidth={active ? 2.5 : 1.8} />
+                <span className={`tracking-wide ${active ? 'font-semibold' : ''}`}>{label}</span>
+                <ChevronDown
+                    size={13}
+                    strokeWidth={2}
+                    className={`transition-transform duration-300 ${isOpen ? 'rotate-180 opacity-70' : 'opacity-30'}`}
+                />
             </button>
 
             {isOpen && (
                 <div
-                    className="absolute top-full left-0 mt-2 w-48 bg-[var(--bg-secondary)] backdrop-blur-xl border border-[var(--border-primary)] rounded-xl shadow-2xl py-2 z-[100] animate-in fade-in slide-in-from-top-2 duration-200"
+                    className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-44 bg-[var(--bg-secondary)] backdrop-blur-xl border border-[var(--border-primary)] rounded-xl shadow-2xl py-1.5 z-[100] animate-in fade-in slide-in-from-top-2 duration-200"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <div className="flex flex-col gap-1 px-1">
+                    <div className="flex flex-col gap-0.5 px-1">
                         {children}
                     </div>
                 </div>
@@ -85,11 +100,11 @@ const NavItem = ({ label, onClick, active, icon: Icon }) => (
     <button
         onClick={onClick}
         className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2 ${active
-            ? 'text-blue-600 bg-blue-50 font-bold'
-            : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+            ? 'text-blue-600 bg-blue-50 dark:bg-blue-500/10 font-semibold'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
             }`}
     >
-        {Icon && <Icon size={14} />}
+        {Icon && <Icon size={14} strokeWidth={active ? 2.5 : 1.8} />}
         {label}
     </button>
 );
@@ -503,9 +518,9 @@ function AppContent() {
             )}
 
             {/* Navbar */}
-            <header className="h-20 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]/80 backdrop-blur-xl flex justify-between items-center px-6 sticky top-0 z-[60] shadow-sm">
+            <header className="h-[76px] border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]/90 backdrop-blur-xl flex justify-between items-center px-6 sticky top-0 z-[60] shadow-sm">
                 <div className="flex items-center gap-3">
-                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-12 w-auto object-contain brightness-0 dark:brightness-100 transition-transform hover:scale-105 cursor-pointer" onClick={() => handlePageChange('sales')} />
+                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-11 w-auto object-contain brightness-0 dark:brightness-100 transition-transform hover:scale-105 cursor-pointer" onClick={() => handlePageChange('sales')} />
                 </div>
 
                 {/* Mobile Menu Trigger & Dropdown */}
@@ -527,7 +542,7 @@ function AppContent() {
                             <div className="p-2 flex flex-col">
                                 {/* 銷售管理 Group */}
                                 {(user.role === 'BOSS' || checkPermission('sales') || checkPermission('report')) && (
-                                    <MobileNavGroup label="銷售管理" icon={ShoppingCart}>
+                                    <MobileNavGroup label="銷售" icon={ShoppingCart}>
                                         {checkPermission('sales') && <NavItem label="商品銷售登錄" icon={ShoppingCart} onClick={() => handlePageChange('sales')} active={page === 'sales'} />}
                                         {checkPermission('report') && <NavItem label="銷售查詢報表" icon={FileText} onClick={() => handlePageChange('report')} active={page === 'report'} />}
                                     </MobileNavGroup>
@@ -535,7 +550,7 @@ function AppContent() {
 
                                 {/* 進貨管理 Group */}
                                 {(user.role === 'BOSS' || checkPermission('purchase') || checkPermission('purchaseHistory')) && (
-                                    <MobileNavGroup label="進貨管理" icon={PackagePlus}>
+                                    <MobileNavGroup label="進貨" icon={PackagePlus}>
                                         {checkPermission('purchase') && <NavItem label="商品進貨登錄" icon={PackagePlus} onClick={() => handlePageChange('purchase')} active={page === 'purchase'} />}
                                         {checkPermission('purchaseHistory') && <NavItem label="進貨查詢報表" icon={ClipboardList} onClick={() => handlePageChange('purchaseHistory')} active={page === 'purchaseHistory'} />}
                                     </MobileNavGroup>
@@ -543,7 +558,7 @@ function AppContent() {
 
                                 {/* 庫存管理 Group */}
                                 {(user.role === 'BOSS' || checkPermission('inventory') || checkPermission('stocktake') || checkPermission('valuation') || checkPermission('adjustHistory') || checkPermission('stocktakeHistory')) && (
-                                    <MobileNavGroup label="庫存管理" icon={Archive}>
+                                    <MobileNavGroup label="庫存" icon={Archive}>
                                         {checkPermission('inventory') && <NavItem label="庫存檢視" icon={Archive} onClick={() => handlePageChange('inventory')} active={page === 'inventory'} />}
                                         {checkPermission('stocktake') && <NavItem label="庫存盤點" icon={CheckSquare} onClick={() => handlePageChange('stocktake')} active={page === 'stocktake'} />}
                                         {checkPermission('valuation') && <NavItem label="庫存估值" icon={DollarSign} onClick={() => handlePageChange('valuation')} active={page === 'valuation'} />}
@@ -554,14 +569,14 @@ function AppContent() {
 
                                 {/* 支出管理 Group */}
                                 {(user.role === 'BOSS' || checkPermission('expenditureManagement')) && (
-                                    <MobileNavGroup label="支出管理" icon={DollarSign}>
+                                    <MobileNavGroup label="支出" icon={DollarSign}>
                                         <NavItem label="支出登錄" icon={DollarSign} onClick={() => handlePageChange('expenditureManagement')} active={page === 'expenditureManagement'} />
                                     </MobileNavGroup>
                                 )}
 
                                 {/* 財務管理 Group */}
                                 {(user.role === 'BOSS' || checkPermission('receivable') || checkPermission('payable') || checkPermission('incomeStatement') || checkPermission('costCalculation') || checkPermission('payroll')) && (
-                                    <MobileNavGroup label="財務帳務" icon={Wallet}>
+                                    <MobileNavGroup label="帳務" icon={Wallet}>
                                         {checkPermission('receivable') && <NavItem label="應收帳款" icon={Wallet} onClick={() => handlePageChange('receivable')} active={page === 'receivable'} />}
                                         {checkPermission('payable') && <NavItem label="應付帳款" icon={Wallet} onClick={() => handlePageChange('payable')} active={page === 'payable'} />}
                                         {checkPermission('incomeStatement') && <NavItem label="損益表" icon={PieChart} onClick={() => handlePageChange('incomeStatement')} active={page === 'incomeStatement'} />}
@@ -572,7 +587,7 @@ function AppContent() {
 
                                 {/* 數據分析 Group */}
                                 {(user.role === 'BOSS' || checkPermission('salesRanking') || checkPermission('customerRanking') || checkPermission('profitAnalysis') || checkPermission('turnoverRate')) && (
-                                    <MobileNavGroup label="數據分析" icon={TrendingUp}>
+                                    <MobileNavGroup label="分析" icon={TrendingUp}>
                                         {checkPermission('salesRanking') && <NavItem label="商品銷售排行" icon={BarChart2} onClick={() => handlePageChange('salesRanking')} active={page === 'salesRanking'} />}
                                         {checkPermission('customerRanking') && <NavItem label="客戶銷售排行" icon={Users} onClick={() => handlePageChange('customerRanking')} active={page === 'customerRanking'} />}
                                         {checkPermission('customerAnalytics') && <NavItem label="客戶深度分析" icon={Activity} onClick={() => handlePageChange('customerAnalytics')} active={page === 'customerAnalytics'} />}
@@ -583,7 +598,7 @@ function AppContent() {
 
                                 {/* 系統管理 Group */}
                                 {(user.role === 'BOSS' || checkPermission('permissionControl') || checkPermission('activityLog')) && (
-                                    <MobileNavGroup label="系統管理" icon={Shield}>
+                                    <MobileNavGroup label="系統" icon={Shield}>
                                         {checkPermission('permissionControl') && <NavItem label="權限控管表" icon={Shield} onClick={() => handlePageChange('permissionControl')} active={page === 'permissionControl'} />}
                                         {checkPermission('activityLog') && <NavItem label="操作紀錄查詢" icon={Activity} onClick={() => handlePageChange('activityLog')} active={page === 'activityLog'} />}
                                     </MobileNavGroup>
@@ -594,12 +609,12 @@ function AppContent() {
                 </div>
 
                 {/* Desktop Navigation (Hidden on Mobile) */}
-                <nav className="hidden md:flex gap-1">
+                <nav className="hidden md:flex flex-1 items-center justify-center gap-0.5 mx-6">
                     {/* 銷售管理 Group */}
                     {(user.role === 'BOSS' || checkPermission('sales') || checkPermission('report')) && (
                         <NavDropdown
                             id="sales"
-                            label="銷售管理"
+                            label="銷售"
                             icon={ShoppingCart}
                             openDropdown={openDropdown}
                             setOpenDropdown={setOpenDropdown}
@@ -614,7 +629,7 @@ function AppContent() {
                     {(user.role === 'BOSS' || checkPermission('purchase') || checkPermission('purchaseHistory')) && (
                         <NavDropdown
                             id="purchase"
-                            label="進貨管理"
+                            label="進貨"
                             icon={PackagePlus}
                             openDropdown={openDropdown}
                             setOpenDropdown={setOpenDropdown}
@@ -629,7 +644,7 @@ function AppContent() {
                     {(user.role === 'BOSS' || checkPermission('inventory') || checkPermission('stocktake') || checkPermission('valuation') || checkPermission('adjustHistory') || checkPermission('stocktakeHistory')) && (
                         <NavDropdown
                             id="inventory"
-                            label="庫存管理"
+                            label="庫存"
                             icon={Archive}
                             openDropdown={openDropdown}
                             setOpenDropdown={setOpenDropdown}
@@ -649,7 +664,7 @@ function AppContent() {
                     {(user.role === 'BOSS' || checkPermission('expenditureManagement')) && (
                         <NavDropdown
                             id="expenditure"
-                            label="支出管理"
+                            label="支出"
                             icon={DollarSign}
                             openDropdown={openDropdown}
                             setOpenDropdown={setOpenDropdown}
@@ -664,7 +679,7 @@ function AppContent() {
                     {(user.role === 'BOSS' || checkPermission('receivable') || checkPermission('payable') || checkPermission('incomeStatement') || checkPermission('costCalculation') || checkPermission('payroll')) && (
                         <NavDropdown
                             id="accounting"
-                            label="財務帳務"
+                            label="帳務"
                             icon={Wallet}
                             openDropdown={openDropdown}
                             setOpenDropdown={setOpenDropdown}
@@ -683,7 +698,7 @@ function AppContent() {
                     {(user.role === 'BOSS' || checkPermission('salesRanking') || checkPermission('customerRanking') || checkPermission('profitAnalysis') || checkPermission('turnoverRate')) && (
                         <NavDropdown
                             id="analytics"
-                            label="數據分析"
+                            label="分析"
                             icon={TrendingUp}
                             openDropdown={openDropdown}
                             setOpenDropdown={setOpenDropdown}
@@ -701,7 +716,7 @@ function AppContent() {
                     {(user.role === 'BOSS' || checkPermission('permissionControl') || checkPermission('activityLog')) && (
                         <NavDropdown
                             id="system"
-                            label="系統管理"
+                            label="系統"
                             icon={Shield}
                             openDropdown={openDropdown}
                             setOpenDropdown={setOpenDropdown}
@@ -714,10 +729,7 @@ function AppContent() {
                 </nav>
 
                 <div className="flex items-center gap-4">
-                    {/* Theme Toggle Wrapper */}
-                    <div className="p-1 bg-slate-100/50 dark:bg-slate-800/50 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
-                        <ThemeToggle />
-                    </div>
+                    <ThemeToggle />
 
                     <div className="hidden sm:flex flex-col items-end border-l border-slate-200 dark:border-slate-700 pl-4 h-10 justify-center">
                         <span className="text-sm font-black text-blue-600 dark:text-blue-400 leading-none">{user.username}</span>

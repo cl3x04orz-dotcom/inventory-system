@@ -9,43 +9,70 @@ export default function ThemeToggle() {
     const themes = [
         { value: 'light', label: '淺色', icon: Sun },
         { value: 'dark', label: '深色', icon: Moon },
-        { value: 'auto', label: '自動', icon: Clock }
+        { value: 'auto', label: '自動', icon: Clock },
     ];
 
     const handleScheduleChange = (field, value) => {
-        setAutoSchedule({
-            ...autoSchedule,
-            [field]: value
-        });
+        setAutoSchedule({ ...autoSchedule, [field]: value });
     };
 
     return (
         <div className="relative">
-            {/* 主題切換按鈕 */}
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
-                {themes.map(({ value, label, icon: Icon }) => (
-                    <button
-                        key={value}
-                        onClick={() => setTheme(value)}
-                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${theme === value
-                            ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                            }`}
-                        title={label}
-                    >
-                        <Icon size={14} />
-                        <span className="hidden md:inline">{label}</span>
-                    </button>
-                ))}
+            {/* 膠囊容器 */}
+            <div
+                className="flex items-center gap-0.5 rounded-full px-1 py-1"
+                style={{
+                    background: 'var(--theme-toggle-bg, #1e293b)',
+                    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.06)',
+                }}
+            >
+                {themes.map(({ value, label, icon: Icon }) => {
+                    const active = theme === value;
+                    return (
+                        <button
+                            key={value}
+                            onClick={() => setTheme(value)}
+                            title={label}
+                            className={`
+                                relative flex items-center justify-center w-8 h-8 rounded-full
+                                transition-all duration-300 ease-out
+                                ${active
+                                    ? 'text-blue-500 scale-100'
+                                    : 'text-slate-400 hover:text-slate-200 scale-95 hover:scale-100'
+                                }
+                            `}
+                            style={active ? {
+                                background: 'radial-gradient(circle at 40% 35%, #334155, #1e293b)',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)',
+                            } : {}}
+                        >
+                            <Icon size={14} strokeWidth={active ? 2.5 : 1.8} />
+                            {/* 僅在 active 時顯示底部光點 */}
+                            {active && (
+                                <span
+                                    className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-blue-400"
+                                    style={{ boxShadow: '0 0 4px 1px rgba(96,165,250,0.6)' }}
+                                />
+                            )}
+                        </button>
+                    );
+                })}
 
-                {/* 設定按鈕 (僅在 auto 模式顯示) */}
+                {/* 排程設定齒輪（auto 模式才顯示） */}
                 {theme === 'auto' && (
                     <button
                         onClick={() => setShowSettings(!showSettings)}
-                        className="p-1.5 rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
                         title="排程設定"
+                        className={`
+                            flex items-center justify-center w-7 h-7 rounded-full ml-0.5
+                            transition-all duration-200
+                            ${showSettings
+                                ? 'text-blue-400 rotate-45'
+                                : 'text-slate-500 hover:text-slate-300'
+                            }
+                        `}
                     >
-                        <Settings size={14} />
+                        <Settings size={12} />
                     </button>
                 )}
             </div>
@@ -59,7 +86,6 @@ export default function ThemeToggle() {
                     </h4>
 
                     <div className="space-y-3">
-                        {/* 啟用開關 */}
                         <label className="flex items-center justify-between">
                             <span className="text-sm text-slate-600 dark:text-slate-400">啟用自動排程</span>
                             <input
@@ -70,7 +96,6 @@ export default function ThemeToggle() {
                             />
                         </label>
 
-                        {/* 淺色模式開始時間 */}
                         <div>
                             <label className="text-xs text-slate-500 dark:text-slate-400 block mb-1">
                                 <Sun size={12} className="inline mr-1" />
@@ -85,7 +110,6 @@ export default function ThemeToggle() {
                             />
                         </div>
 
-                        {/* 深色模式開始時間 */}
                         <div>
                             <label className="text-xs text-slate-500 dark:text-slate-400 block mb-1">
                                 <Moon size={12} className="inline mr-1" />
@@ -100,13 +124,10 @@ export default function ThemeToggle() {
                             />
                         </div>
 
-                        {/* 當前狀態 */}
-                        <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
-                            <div className="text-xs text-slate-500 dark:text-slate-400">
-                                當前主題: <span className="font-bold text-slate-700 dark:text-slate-300">
-                                    {actualTheme === 'light' ? '淺色' : '深色'}
-                                </span>
-                            </div>
+                        <div className="pt-2 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400">
+                            當前主題：<span className="font-bold text-slate-700 dark:text-slate-300">
+                                {actualTheme === 'light' ? '淺色' : '深色'}
+                            </span>
                         </div>
                     </div>
 
