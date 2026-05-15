@@ -518,52 +518,9 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         }
     };
 
-    const insertMathSymbol = (sym) => {
-        if (!activeInput) return;
-        const el = document.getElementById(activeInput.id);
-        if (el) {
-            const start = el.selectionStart;
-            const end = el.selectionEnd;
-            const text = el.value;
-            const before = text.substring(0, start);
-            const after = text.substring(end, text.length);
 
-            const newValue = before + sym + after;
 
-            // Programmatically update based on type
-            if (activeInput.type === 'row') {
-                handleRowChange(activeInput.rowId, activeInput.field, newValue);
-            } else if (activeInput.type === 'cash') {
-                handleCashChange(activeInput.denom, newValue);
-            } else if (activeInput.type === 'expense') {
-                handleExpenseChange(activeInput.key, newValue);
-            } else if (activeInput.type === 'reserve') {
-                handleReserveChange(newValue);
-            }
 
-            // Reposition cursor
-            const newPos = start + sym.length;
-            setTimeout(() => {
-                el.selectionStart = el.selectionEnd = newPos;
-                el.focus();
-            }, 0);
-        }
-    };
-
-    const MathHelperButtons = ({ inputId }) => (
-        <div className="flex gap-1 mb-2 overflow-x-auto pb-1 no-scrollbar">
-            {['=', '+', '-', '*', '÷'].map(sym => (
-                <button
-                    key={sym}
-                    onMouseDown={(e) => e.preventDefault()} // Prevent blur
-                    onClick={() => insertMathSymbol(sym === '÷' ? '/' : sym)}
-                    className="flex-1 h-10 min-w-[44px] rounded-lg bg-white border border-gray-200 text-[#800020] font-bold text-2xl active:bg-gray-100 shadow-sm transition-all flex items-center justify-center pt-0.5"
-                >
-                    {sym}
-                </button>
-            ))}
-        </div>
-    );
 
     const handleKeyDown = (e, idx, field, prefix = 'input-') => {
         const validKeys = ['Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
@@ -1470,9 +1427,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                             </div>
                                                         </div>
 
-                                                        {/* Inline Math Helper (Gray Background) */}
-                                                        <div className="bg-gray-50 rounded-lg p-2 mb-3 border border-gray-100 min-h-[120px]">
-                                                            <MathHelperButtons />
+                                                        <div className="bg-gray-50 rounded-lg p-2 mb-3 border border-gray-100">
+
                                                             <div className="grid grid-cols-4 gap-2">
                                                                 <div className="flex flex-col gap-1 min-h-[56px]">
                                                                     <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">領貨</label>
