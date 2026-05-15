@@ -599,8 +599,8 @@ function AppContent() {
                         )}
                     </div>
 
-                    {/* Desktop Navigation (Hidden on Mobile) */}
-                    <nav className="hidden md:flex items-center gap-0.5 mx-2">
+                    {/* Desktop Navigation (Fluid Center - 7 Items Spread Evenly) */}
+                    <nav className="hidden md:flex flex-1 items-center justify-evenly mx-12 lg:mx-20">
                         {/* 銷售管理 Group */}
                         {(user.role === 'BOSS' || checkPermission('sales') || checkPermission('report')) && (
                             <NavDropdown
@@ -708,16 +708,19 @@ function AppContent() {
                     {/* Mode (ThemeToggle) */}
                     <ThemeToggle />
 
-                    {/* User Info (Desktop only) */}
-                    <div className="hidden sm:flex flex-col items-end border-l border-slate-200 dark:border-slate-700 pl-4 h-10 justify-center">
-                        <span className="text-sm font-black text-blue-600 dark:text-blue-400 leading-none">{user.username}</span>
-                        <span className="text-[9px] text-slate-400 dark:text-slate-500 uppercase font-black tracking-widest mt-1">{user.role}</span>
+                    {/* User Info (Ultra-Minimalist Horizontal Layout) */}
+                    <div className="hidden md:flex items-center gap-3 pl-6 border-l border-slate-300 h-8 my-auto">
+                        <span className="text-sm font-black text-black tracking-tight">{user.username}</span>
+                        <div className="w-[1px] h-4 bg-slate-300 dark:bg-slate-700" />
+                        <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">
+                            {user.role}
+                        </span>
                     </div>
 
-                    {/* Logout (Icon only, no frame for symmetry with Logo) */}
+                    {/* Logout */}
                     <button
                         onClick={handleLogout}
-                        className="flex items-center justify-center p-2 text-slate-400 hover:text-red-600 transition-all duration-300 active:scale-95"
+                        className="flex items-center justify-center p-2 text-slate-500 hover:text-red-600 transition-all duration-300 active:scale-95"
                         title="登出系統"
                     >
                         <LogOut size={20} />
