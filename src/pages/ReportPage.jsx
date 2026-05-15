@@ -34,7 +34,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     const [viewMode, setViewMode] = useState('SALES'); // 'SALES' or 'EXPENSES'
     const [isVoiding, setIsVoiding] = useState(false); // [New] Loading state for voiding
     const [expandedGroups, setExpandedGroups] = useState({}); // [New] Track expanded transactions
-    const [activeQuickDate, setActiveQuickDate] = useState('THIS_MONTH'); // 預設選中本月
+    const [activeQuickDate, setActiveQuickDate] = useState('TODAY'); // 預設選中今天
     const [category, setCategory] = useState('全部'); // [New] 類別過濾 (市場 / 批發)
 
     // 1. Fetch Data from Server (Only on Date Change)
