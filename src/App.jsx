@@ -147,6 +147,35 @@ function AppContent() {
 
     // 檢查版本更新 (透過 apiHandler: getVersion)
     const checkCountRef = React.useRef(0);
+    const [showHeader, setShowHeader] = useState(true);
+    const lastScrollY = React.useRef(0);
+
+    // Auto-hide Header Logic (Mobile Focus)
+    useEffect(() => {
+        const handleScroll = () => {
+            const currentScrollY = window.scrollY;
+            
+            // At the very top, always show
+            if (currentScrollY < 10) {
+                setShowHeader(true);
+                lastScrollY.current = currentScrollY;
+                return;
+            }
+
+            // Scroll down: hide; Scroll up: show
+            if (currentScrollY > lastScrollY.current && currentScrollY > 76) {
+                if (!mobileMenuOpen) setShowHeader(false);
+            } else {
+                setShowHeader(true);
+            }
+            
+            lastScrollY.current = currentScrollY;
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, [mobileMenuOpen]);
+
     const lastCheckTimeRef = React.useRef(0);
     const [lastCheckTime, setLastCheckTime] = useState(null);
 
@@ -522,7 +551,7 @@ function AppContent() {
             )}
 
             {/* Navbar */}
-            <header className="h-[76px] border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]/90 backdrop-blur-xl flex justify-between items-center px-6 sticky top-0 z-[60] shadow-sm">
+            <header className={`h-[76px] border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]/90 backdrop-blur-xl flex justify-between items-center px-6 sticky top-0 z-[60] shadow-sm transition-transform duration-300 ${showHeader ? 'translate-y-0' : '-translate-y-full'}`}>
                 <div className="flex items-center gap-3">
                     <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-11 w-auto object-contain brightness-0 dark:brightness-100 transition-transform hover:scale-105 cursor-pointer" onClick={() => handlePageChange('sales')} />
                 </div>
