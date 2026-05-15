@@ -1420,13 +1420,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                 )}
                                                                 <div className="font-extrabold text-[var(--text-primary)] text-xl leading-tight whitespace-nowrap">{row.name}</div>
                                                             </div>
-                                                            <div className="text-[10px] font-mono bg-[var(--bg-tertiary)] px-2 py-1 rounded border border-[var(--border-primary)] whitespace-nowrap">
-                                                                <span className="text-blue-500 font-bold">{row.stock}</span>
-                                                                <span className="text-[var(--text-tertiary)] mx-0.5">/</span>
-                                                                <span className="text-orange-500 font-bold">{row.originalStock || 0}</span>
-                                                            </div>
-                                                        </div>
-
+                                                             <div className="text-[10px] font-mono bg-transparent px-2 py-0.5 rounded-lg border border-slate-200/40 whitespace-nowrap">
+                                                                 <span className="text-blue-500 font-bold">{row.stock}</span>
+                                                                 <span className="text-slate-300 dark:text-slate-600 mx-1">/</span>
+                                                                 <span className="text-orange-500 font-bold">{row.originalStock || 0}</span>
+                                                             </div>
+                                                         </div>
                                                         <div className="bg-gray-50 rounded-lg p-2 mb-3 border border-gray-100">
 
                                                             <div className="grid grid-cols-4 gap-2">
