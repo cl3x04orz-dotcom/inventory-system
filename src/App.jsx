@@ -564,7 +564,7 @@ function AppContent() {
             )}
 
             {/* Navbar */}
-            <header className={`h-[76px] border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]/90 backdrop-blur-xl flex justify-between items-center px-6 sticky top-0 z-[60] transition-all duration-300 ${showHeader ? 'translate-y-0' : '-translate-y-full'} ${scrolled ? 'shadow-md border-transparent' : 'shadow-none'}`}>
+            <header className={`h-[76px] border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]/85 backdrop-blur-xl flex justify-between items-center px-6 sticky top-0 z-[60] transition-[transform,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.17,0.67,0.83,0.67)] ${showHeader ? 'translate-y-0' : '-translate-y-full'} ${scrolled ? 'shadow-lg border-transparent' : 'shadow-none'}`}>
                 <div className="flex items-center gap-3">
                     <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-11 w-auto object-contain brightness-0 dark:brightness-100 transition-transform hover:scale-105 cursor-pointer" onClick={() => handlePageChange('sales')} />
                 </div>
