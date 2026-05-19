@@ -563,23 +563,37 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
       },
       header: {
         type: "box",
-        layout: "vertical",
+        layout: "horizontal",
         paddingAll: "lg",
         contents: [
-          { 
-            type: "text", 
-            text: `📦 【${vendorName}】採購訂單`, 
-            color: "#FFFFFF", 
-            weight: "bold", 
-            size: "xl", 
-            wrap: true 
+          {
+            type: "text",
+            text: "📦",
+            size: "xxl",
+            flex: 0
           },
-          { 
-            type: "text", 
-            text: "系統叫貨，點擊下方確認配送", 
-            color: "#94A3B8", 
-            size: "xs", 
-            margin: "xs" 
+          {
+            type: "box",
+            layout: "vertical",
+            flex: 1,
+            margin: "md",
+            contents: [
+              { 
+                type: "text", 
+                text: `${vendorName} 採購訂單`, 
+                color: "#FFFFFF", 
+                weight: "bold", 
+                size: "lg", 
+                wrap: true 
+              },
+              { 
+                type: "text", 
+                text: "系統叫貨，點擊下方確認配送", 
+                color: "#94A3B8", 
+                size: "xs", 
+                margin: "xs" 
+              }
+            ]
           }
         ]
       },
@@ -593,8 +607,8 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
             layout: "horizontal",
             paddingBottom: "md",
             contents: [
-              { type: "text", text: "品項名稱", size: "xs", color: "#94A3B8", weight: "bold", flex: 4 },
-              { type: "text", text: "建議訂量", size: "xs", color: "#94A3B8", weight: "bold", flex: 2, align: "center" }
+              { type: "text", text: "品項", size: "xs", color: "#94A3B8", weight: "bold", flex: 4 },
+              { type: "text", text: "數量", size: "xs", color: "#94A3B8", weight: "bold", flex: 2, align: "center" }
             ]
           },
           {
