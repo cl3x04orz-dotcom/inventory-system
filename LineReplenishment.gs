@@ -629,7 +629,6 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
             type: "button",
             style: "primary",
             color: "#F97316",
-            height: "medium",
             action: {
               type: "postback",
               label: "確認訂單（配送中）",
