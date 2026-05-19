@@ -501,50 +501,120 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
       type: "box",
       layout: "horizontal",
       margin: "md",
+      alignItems: "center",
       contents: [
-        { type: "text", text: item.productName, size: "sm", color: "#555555", flex: 4, wrap: true },
-        { type: "text", text: String(item.quantity), size: "sm", color: "#111111", flex: 2, align: "end", weight: "bold" }
+        { 
+          type: "text", 
+          text: item.productName, 
+          size: "sm", 
+          color: "#334155", 
+          flex: 4, 
+          wrap: true,
+          weight: "bold"
+        },
+        { 
+          type: "box",
+          layout: "vertical",
+          backgroundColor: "#EFF6FF", 
+          cornerRadius: "md",
+          paddingStart: "md",
+          paddingEnd: "md",
+          paddingTop: "xs",
+          paddingBottom: "xs",
+          flex: 2,
+          contents: [
+            { 
+              type: "text", 
+              text: `${item.quantity} 罐`, 
+              size: "sm", 
+              color: "#1E40AF", 
+              align: "center", 
+              weight: "bold" 
+            }
+          ]
+        }
       ]
     });
+    
+    // Add subtle separator
+    bubbleContents.push({
+      type: "separator",
+      margin: "md",
+      color: "#F1F5F9"
+    });
   });
+
+  // Remove trailing separator
+  if (bubbleContents.length > 0) {
+    bubbleContents.pop();
+  }
 
   if (suggestions.length > 15) {
     bubbleContents.push({
       type: "text",
       text: `...及其他 ${suggestions.length - 15} 項商品`,
       size: "xs",
-      color: "#aaaaaa",
-      margin: "sm"
+      color: "#94A3B8",
+      margin: "md",
+      align: "center"
     });
   }
 
   const flexMessage = {
     type: "flex",
-    altText: `📦 【${vendorName}】下週訂貨建議單`,
+    altText: `📦 【${vendorName}】智慧採購訂單`,
     contents: {
       type: "bubble",
+      styles: {
+        header: {
+          backgroundColor: "#0F172A"
+        },
+        body: {
+          backgroundColor: "#FFFFFF"
+        },
+        footer: {
+          backgroundColor: "#F8FAFC"
+        }
+      },
       header: {
         type: "box",
         layout: "vertical",
-        backgroundColor: "#1F2937",
+        paddingAll: "lg",
         contents: [
-          { type: "text", text: `📦 【${vendorName}】訂貨建議`, color: "#FFFFFF", weight: "bold", size: "lg", wrap: true },
-          { type: "text", text: "依據近3週實際銷量與目前可用庫存推算", color: "#9CA3AF", size: "xs", margin: "xs" }
+          { 
+            type: "text", 
+            text: `📦 【${vendorName}】採購訂單`, 
+            color: "#FFFFFF", 
+            weight: "bold", 
+            size: "xl", 
+            wrap: true 
+          },
+          { 
+            type: "text", 
+            text: "系統智慧精密演算 • 點擊下方確認配送", 
+            color: "#94A3B8", 
+            size: "xs", 
+            margin: "xs" 
+          }
         ]
       },
       body: {
         type: "box",
         layout: "vertical",
+        paddingAll: "lg",
         contents: [
           {
             type: "box",
             layout: "horizontal",
-            borderWidth: "light",
-            borderColor: "#E5E7EB",
+            paddingBottom: "md",
             contents: [
-              { type: "text", text: "品項名稱", size: "xs", color: "#9CA3AF", weight: "bold", flex: 4 },
-              { type: "text", text: "建議訂量", size: "xs", color: "#9CA3AF", weight: "bold", flex: 2, align: "end" }
+              { type: "text", text: "品項名稱", size: "xs", color: "#94A3B8", weight: "bold", flex: 4 },
+              { type: "text", text: "建議訂量", size: "xs", color: "#94A3B8", weight: "bold", flex: 2, align: "center" }
             ]
+          },
+          {
+            type: "separator",
+            color: "#CBD5E1"
           },
           ...bubbleContents
         ]
@@ -552,17 +622,19 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
       footer: {
         type: "box",
         layout: "vertical",
+        paddingAll: "lg",
         spacing: "sm",
         contents: [
           {
             type: "button",
             style: "primary",
-            color: "#10B981",
+            color: "#F97316",
+            height: "medium",
             action: {
               type: "postback",
-              label: "一鍵送出採購單 (在途)",
+              label: "確認訂單（配送中）",
               data: `action=execute_weekly_order&id=${suggestionId}`,
-              displayText: "一鍵送出採購單 (在途)"
+              displayText: "確認訂單（配送中）"
             }
           }
         ]
