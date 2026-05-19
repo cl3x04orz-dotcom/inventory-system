@@ -547,7 +547,7 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
 
   const flexMessage = {
     type: "flex",
-    altText: `📦 採購 ${vendorName} 採購訂單`,
+    altText: `📦 『${vendorName}』 採購訂單`,
     contents: {
       type: "bubble",
       styles: {
@@ -607,7 +607,7 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
             layout: "horizontal",
             paddingBottom: "md",
             contents: [
-              { type: "text", text: "品項", size: "xs", color: "#94A3B8", weight: "bold", flex: 4, align: "center" },
+              { type: "text", text: "品項", size: "xs", color: "#94A3B8", weight: "bold", flex: 4 },
               { type: "text", text: "數量", size: "xs", color: "#94A3B8", weight: "bold", flex: 2, align: "center" }
             ]
           },
