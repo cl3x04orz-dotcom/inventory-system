@@ -580,7 +580,7 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
             contents: [
               { 
                 type: "text", 
-                text: `${vendorName} 採購訂單`, 
+                text: `米立微 ➔ 『${vendorName}』採購單`, 
                 color: "#FFFFFF", 
                 weight: "bold", 
                 size: "lg", 
