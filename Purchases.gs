@@ -81,7 +81,7 @@ function addPurchaseService(data, user) {
         
         if (productId) {
             const currPaymentMethod = item.paymentMethod || paymentMethod || 'CASH';
-            const status = (currPaymentMethod === 'CREDIT') ? 'UNPAID' : 'PAID';
+            const status = item.status || ((currPaymentMethod === 'CREDIT') ? 'UNPAID' : 'PAID');
             const uuid = Utilities.getUuid();
             
             // Collect Purchase Row
@@ -93,9 +93,11 @@ function addPurchaseService(data, user) {
             
             // Collect Inventory Row
             // Col 0: UUID, 1: ProductID, 2: Qty, 3: Expiry, 4: Date, 5: Type, 6: Price/Note
-            inventoryRows.push([
-              Utilities.getUuid(), productId, item.quantity, item.expiry, entryDate, 'STOCK', item.price, item.productName
-            ]);
+            if (status !== 'ORDERED') {
+                inventoryRows.push([
+                  Utilities.getUuid(), productId, item.quantity, item.expiry, entryDate, 'STOCK', item.price, item.productName
+                ]);
+            }
         }
     });
 
@@ -166,13 +168,21 @@ function getPurchaseHistory(filter) {
   if (uSheet) uSheet.getDataRange().getValues().slice(1).forEach(r => { if (r[0]) userMap[r[0]] = r[1]; });
 
   return purData.filter(row => {
+    const status = String(row[9] || '').toUpperCase();
+    const isOrdered = (status === 'ORDERED');
+    
     const rowDate = new Date(row[1]);
     const start = new Date(filter.startDate), end = new Date(filter.endDate);
     end.setHours(23, 59, 59);
+    
     const vName = String(row[2] || '').toLowerCase();
     const pName = String(productMap[row[3]] || 'Unknown').toLowerCase();
     const keyword = filter.keyword ? filter.keyword.toLowerCase() : '';
-    return (rowDate >= start && rowDate <= end) && (!keyword || vName.includes(keyword) || pName.includes(keyword));
+    
+    // 如果是 ORDERED (待驗收)，直接無視日期區間篩選，但仍會受到關鍵字搜尋篩選
+    const dateMatch = isOrdered || (rowDate >= start && rowDate <= end);
+    
+    return dateMatch && (!keyword || vName.includes(keyword) || pName.includes(keyword));
   }).map(row => {
       // 抓取執行人邏輯：
       // 1. 優先抓第 11 欄 (index 10)，看是否有 "VOID_BY: " 標記
@@ -447,4 +457,86 @@ function repairInventoryTypes() {
   SpreadsheetApp.flush();
   Logger.log(`修復完成：共更新 ${updated} 筆庫存紀錄`);
   return { success: true, updated };
+}
+
+/**
+ * 確認進貨到貨 (實收驗收)
+ * 允許修改實到數量與單價，並正式入庫
+ */
+function confirmPurchaseReceipt(payload, user) {
+  const { id, actualQty, actualPrice } = payload;
+  if (!id) throw new Error("缺少單據 ID");
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const purSheet = ss.getSheetByName('Purchases');
+  const iSheet = ss.getSheetByName('Inventory');
+  
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+    const purData = purSheet.getDataRange().getValues();
+    
+    for (let i = 1; i < purData.length; i++) {
+      if (String(purData[i][0]) === String(id)) {
+        const currentStatus = purData[i][9];
+        if (currentStatus !== 'ORDERED') throw new Error("此單據非待驗收狀態，或已驗收過");
+        
+        const finalQty = typeof actualQty !== 'undefined' ? Number(actualQty) : Number(purData[i][4]);
+        const finalPrice = typeof actualPrice !== 'undefined' ? Number(actualPrice) : Number(purData[i][5]);
+        
+        const originalDate = new Date(purData[i][1]);
+        const formattedOldDate = Utilities.formatDate(originalDate, "Asia/Taipei", "yyyy/MM/dd HH:mm");
+        const verifyDate = new Date();
+
+        // 1. 更新 Purchases 表中的日期(改為驗收日)、數量與單價
+        purSheet.getRange(i + 1, 2).setValue(verifyDate); 
+        purSheet.getRange(i + 1, 5).setValue(finalQty); 
+        purSheet.getRange(i + 1, 6).setValue(finalPrice); 
+        
+        // 更新狀態為已結帳 (依據付款方式)
+        const paymentMethod = purData[i][8] || 'CASH';
+        const newStatus = (paymentMethod === 'CREDIT') ? 'UNPAID' : 'PAID';
+        purSheet.getRange(i + 1, 10).setValue(newStatus);
+        
+        // 記錄驗收人與原下單時間
+        const operator = user ? (user.displayName || user.name || user.username || 'Unknown') : '系統/LINE';
+        const oldNote = String(purData[i][10] || '').trim();
+        purSheet.getRange(i + 1, 11).setValue(`[下單:${formattedOldDate}] [驗收:${operator}] ${oldNote}`.trim());
+        
+        // 2. 正式寫入庫存日誌 (使用同一個驗收時間 verifyDate)
+        const productId = purData[i][3];
+        const pName = purData[i][11];
+        
+        if (finalQty > 0) {
+            iSheet.appendRow([
+              Utilities.getUuid(), productId, finalQty, "", verifyDate, 'STOCK', finalPrice, pName
+            ]);
+        }
+        
+        // 3. 更新 Products 表最新成本
+        const pSheet = ss.getSheetByName('Products');
+        if (pSheet && finalQty > 0) {
+            const pValues = pSheet.getDataRange().getValues();
+            const headers = pValues[0];
+            const costIdx = headers.findIndex(h => h.includes('成本') || h.toLowerCase() === 'cost');
+            if (costIdx !== -1) {
+                for (let j = 1; j < pValues.length; j++) {
+                    if (String(pValues[j][0]) === String(productId)) {
+                        pSheet.getRange(j + 1, costIdx + 1).setValue(finalPrice);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        SpreadsheetApp.flush();
+        return { success: true, actualQty: finalQty, actualPrice: finalPrice };
+      }
+    }
+    throw new Error("找不到該筆在途叫貨紀錄");
+  } catch (e) {
+      throw new Error("驗收失敗: " + e.message);
+  } finally {
+    lock.releaseLock();
+  }
 }

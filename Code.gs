@@ -75,6 +75,7 @@ function apiHandler(request) {
         'getPurchaseSuggestions': 'purchase_entry',
         'getPurchaseHistory': 'purchase_history',
         'voidAndFetchPurchase': 'purchase_history',
+        'confirmPurchaseReceipt': 'purchase_entry',
         
         // Inventory (庫存管理)
         'adjustInventory': 'inventory_adjust',
@@ -178,6 +179,7 @@ function apiHandler(request) {
             case 'addPurchase': return typeof addPurchaseService !== 'undefined' ? addPurchaseService(payload, user) : {error: '後端服務缺失: addPurchaseService (進貨功能)'}; 
             case 'getPurchaseHistory': return typeof getPurchaseHistory !== 'undefined' ? getPurchaseHistory(payload) : {error: '後端服務缺失: getPurchaseHistory'};
             case 'voidAndFetchPurchase': return typeof voidAndFetchPurchaseService !== 'undefined' ? voidAndFetchPurchaseService(payload, user) : {error: '後端服務缺失: voidAndFetchPurchaseService'};
+            case 'confirmPurchaseReceipt': return typeof confirmPurchaseReceipt !== 'undefined' ? confirmPurchaseReceipt(payload, user) : {error: '後端服務缺失: confirmPurchaseReceipt'};
             case 'saveVendorDefault': return typeof saveVendorDefaultService !== 'undefined' ? saveVendorDefaultService(payload) : {error: '後端服務缺失: saveVendorDefaultService'};
 
             // 估值與盤點
@@ -251,6 +253,17 @@ function apiHandler(request) {
 function doPost(e) {
     try {
         const request = JSON.parse(e.postData.contents);
+        
+        // ----------------------------------------
+        // 判斷是否為 LINE Webhook 請求
+        // ----------------------------------------
+        if (request.events && Array.isArray(request.events)) {
+            return handleLineWebhook_(request.events);
+        }
+        
+        // ----------------------------------------
+        // 原有 React 前端 API 路由
+        // ----------------------------------------
         const result = apiHandler(request);
         return ContentService.createTextOutput(JSON.stringify(result))
             .setMimeType(ContentService.MimeType.JSON);

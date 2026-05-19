@@ -13,6 +13,11 @@ export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
     const [startDate, setStartDate] = useState(getLocalDateString());
     const [endDate, setEndDate] = useState(getLocalDateString());
     const [isVoiding, setIsVoiding] = useState(false);
+    
+    // Verification Modal State
+    const [verifyingRecord, setVerifyingRecord] = useState(null);
+    const [actualQty, setActualQty] = useState('');
+    const [actualPrice, setActualPrice] = useState('');
 
     const fetchHistory = React.useCallback(async () => {
         setLoading(true);
@@ -62,6 +67,37 @@ export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
         }
     };
 
+    const openVerification = (record) => {
+        setVerifyingRecord(record);
+        setActualQty(record.quantity);
+        setActualPrice(record.unitPrice);
+    };
+
+    const handleVerifySubmit = async () => {
+        if (actualQty === '' || actualPrice === '') return alert("數量與單價不能為空");
+        if (Number(actualQty) < 0 || Number(actualPrice) < 0) return alert("數值不能為負數");
+        
+        setLoading(true);
+        try {
+            const res = await callGAS(apiUrl, 'confirmPurchaseReceipt', {
+                id: verifyingRecord.id,
+                actualQty: Number(actualQty),
+                actualPrice: Number(actualPrice)
+            }, user.token);
+            
+            if (res.success) {
+                setVerifyingRecord(null);
+                fetchHistory();
+            } else {
+                throw new Error(res.error || '驗收失敗');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('驗收失敗: ' + error.message);
+            setLoading(false);
+        }
+    };
+
     const filtered = records.filter(r => {
         const pName = String(r.productName || '').toLowerCase();
         const vName = String(r.vendorName || r.vendor || '').toLowerCase();
@@ -75,7 +111,7 @@ export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
     });
 
     const totalAmount = filtered.reduce((sum, r) => {
-        if (r.status === 'VOID') return sum;
+        if (r.status === 'VOID' || r.status === 'ORDERED') return sum;
         return sum + (Number(r.totalPrice) || 0);
     }, 0);
 
@@ -257,7 +293,14 @@ export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
                                         <div className="text-lg font-bold text-emerald-600 font-mono">
                                             ${(Number(record.totalPrice) || 0).toLocaleString()}
                                         </div>
-                                        {record.status !== 'VOID' && (
+                                        {record.status === 'ORDERED' ? (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); openVerification(record); }}
+                                                className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-orange-500 text-white hover:bg-orange-600 transition-colors text-xs font-bold shadow-sm"
+                                            >
+                                                驗收單據
+                                            </button>
+                                        ) : record.status !== 'VOID' && (
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); handleCorrection(record.id); }}
                                                 className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-amber-600 border border-amber-200 hover:bg-amber-100 transition-colors text-xs font-bold"
@@ -363,7 +406,14 @@ export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
                                                 </div>
                                             </td>
                                             <td className="p-4 text-center">
-                                                {record.status !== 'VOID' ? (
+                                                {record.status === 'ORDERED' ? (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); openVerification(record); }}
+                                                        className="px-3 py-1.5 rounded-lg bg-orange-500 text-white font-bold hover:bg-orange-600 transition-colors text-xs shadow-sm whitespace-nowrap"
+                                                    >
+                                                        待驗收
+                                                    </button>
+                                                ) : record.status !== 'VOID' ? (
                                                     <button
                                                         onClick={() => handleCorrection(record.id)}
                                                         className="p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors"
@@ -392,6 +442,55 @@ export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
                     </div>
                 </div>
             </div>
+
+            {/* Verification Modal */}
+            {verifyingRecord && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
+                    <div className="bg-white dark:bg-[#1f2937] rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-[var(--border-primary)]">
+                        <div className="p-5 border-b border-[var(--border-primary)]">
+                            <h3 className="text-lg font-bold text-[var(--text-primary)]">確認到貨驗收</h3>
+                            <p className="text-sm text-[var(--text-secondary)] mt-1">{verifyingRecord.vendorName} - <span className="font-bold text-blue-500">{verifyingRecord.productName}</span></p>
+                        </div>
+                        <div className="p-5 space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-[var(--text-secondary)] mb-1">實收數量</label>
+                                <input
+                                    type="number"
+                                    className="input-field w-full text-lg font-bold"
+                                    value={actualQty}
+                                    onChange={(e) => setActualQty(e.target.value)}
+                                />
+                                <p className="text-xs text-[var(--text-tertiary)] mt-1">原叫貨數量: {verifyingRecord.quantity}</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-[var(--text-secondary)] mb-1">實收單價</label>
+                                <input
+                                    type="number"
+                                    className="input-field w-full text-lg font-bold"
+                                    value={actualPrice}
+                                    onChange={(e) => setActualPrice(e.target.value)}
+                                />
+                                <p className="text-xs text-[var(--text-tertiary)] mt-1">原叫貨單價: ${verifyingRecord.unitPrice}</p>
+                            </div>
+                        </div>
+                        <div className="p-4 bg-gray-50 dark:bg-[#111827] border-t border-[var(--border-primary)] flex justify-end gap-3">
+                            <button
+                                onClick={() => setVerifyingRecord(null)}
+                                className="px-4 py-2 rounded-xl border border-[var(--border-primary)] text-[var(--text-secondary)] font-bold hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                取消
+                            </button>
+                            <button
+                                onClick={handleVerifySubmit}
+                                disabled={loading}
+                                className="px-6 py-2 rounded-xl bg-orange-500 text-white font-bold shadow-md hover:bg-orange-600 transition-transform active:scale-95 disabled:opacity-50"
+                            >
+                                {loading ? '處理中...' : '確認入庫'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
