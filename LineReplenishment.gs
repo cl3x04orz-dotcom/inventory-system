@@ -205,18 +205,8 @@ function calculateSmartReplenishmentSuggestions(productVendorMap = {}, vendorCon
         netNeed = minOrderQty;
       }
       
-      // 對齊箱規與發貨階梯
-      if (dispatchSteps.length > 0) {
-        if (typeof snapToDispatchSteps_ !== 'undefined') {
-          netNeed = snapToDispatchSteps_(netNeed, dispatchSteps);
-        } else {
-          // Fallback if snapToDispatchSteps_ is not globally available
-          netNeed = Math.ceil(netNeed / packSize) * packSize;
-        }
-      } else {
-        // 廠商採購專用的【嚴格整箱向上進位】邏輯
-        netNeed = Math.ceil(netNeed / packSize) * packSize;
-      }
+      // 廠商採購專用的【嚴格整箱向上進位】邏輯（忽略門市配貨階梯）
+      netNeed = Math.ceil(netNeed / packSize) * packSize;
 
       if (netNeed > 0) {
         suggestions.push({
