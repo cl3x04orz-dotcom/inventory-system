@@ -547,7 +547,7 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
 
   const flexMessage = {
     type: "flex",
-    altText: `📦 『${vendorName}』 採購訂單`,
+    altText: `📦 米立微 ➔ 『${vendorName}』採購單`,
     contents: {
       type: "bubble",
       styles: {
