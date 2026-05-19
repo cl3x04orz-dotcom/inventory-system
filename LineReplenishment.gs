@@ -214,13 +214,8 @@ function calculateSmartReplenishmentSuggestions(productVendorMap = {}, vendorCon
           netNeed = Math.ceil(netNeed / packSize) * packSize;
         }
       } else {
-        const fullBoxes = Math.floor(netNeed / packSize);
-        const remainder = netNeed % packSize;
-        if (remainder >= threshold) {
-          netNeed = (fullBoxes + 1) * packSize;
-        } else {
-          netNeed = (fullBoxes * packSize) + Math.ceil(remainder);
-        }
+        // 廠商採購專用的【嚴格整箱向上進位】邏輯
+        netNeed = Math.ceil(netNeed / packSize) * packSize;
       }
 
       if (netNeed > 0) {
@@ -591,7 +586,7 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
           },
           { 
             type: "text", 
-            text: "系統智慧精密演算 • 點擊下方確認配送", 
+            text: "系統叫貨，點擊下方確認配送", 
             color: "#94A3B8", 
             size: "xs", 
             margin: "xs" 
