@@ -515,7 +515,7 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
       const chWeekdays = ["", "週一", "週二", "週三", "週四", "週五", "週六", "週日"];
       const orderStr = chWeekdays[todayDay];
       const deliveryStr = chWeekdays[deliveryDays[idx]];
-      subtitleText = `👉 ${orderStr}叫貨、${deliveryStr}到貨，點擊下方確認配送`;
+      subtitleText = `${orderStr}叫貨、${deliveryStr}到貨，點擊下方確認配送`;
     }
   }
 
@@ -537,7 +537,7 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
           type: "text", 
           text: item.productName, 
           size: "sm", 
-          color: "#1E293B", 
+          color: "#0F172A", 
           wrap: true,
           weight: "bold"
         },
@@ -547,10 +547,28 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
           contents: [
             {
               type: "text",
-              text: `數量：${item.quantity} 罐 (${boxesStr} 箱)`,
-              size: "xs",
-              color: "#475569", 
-              weight: "bold"
+              contents: [
+                {
+                  type: "span",
+                  text: "數量：",
+                  color: "#64748B",
+                  size: "xs"
+                },
+                {
+                  type: "span",
+                  text: `${item.quantity} 罐`,
+                  color: "#C67A4B",
+                  weight: "bold",
+                  size: "xs"
+                },
+                {
+                  type: "span",
+                  text: `  (${boxesStr} 箱)`,
+                  color: "#7A7571",
+                  weight: "bold",
+                  size: "xs"
+                }
+              ]
             }
           ]
         }
@@ -588,7 +606,7 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
       type: "bubble",
       styles: {
         header: {
-          backgroundColor: "#0F172A"
+          backgroundColor: "#3D2B1F"
         },
         body: {
           backgroundColor: "#FFFFFF"
@@ -640,7 +658,7 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
         contents: [
           {
             type: "text",
-            text: "建議採購明細",
+            text: "訂單明細",
             size: "xs",
             color: "#94A3B8",
             weight: "bold",
@@ -663,7 +681,7 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
           {
             type: "button",
             style: "primary",
-            color: "#F97316",
+            color: "#C67A4B",
             action: {
               type: "postback",
               label: "確認訂單（配送中）",
