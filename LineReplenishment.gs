@@ -135,6 +135,7 @@ function calculateSmartReplenishmentSuggestions(productVendorMap = {}, vendorCon
   // 自動尋找「訂貨箱規」與「最低起訂量」欄位
   const orderPackSizeIdx = prodHeaders.findIndex(h => h.includes('訂貨箱規') || h.includes('叫貨箱規'));
   const minOrderQtyIdx = prodHeaders.findIndex(h => h.includes('最低起訂') || h.includes('起訂量'));
+  const splitFlavorsIdx = prodHeaders.findIndex(h => h.includes('拆分口味') || h.includes('口味拆分') || h.includes('口味'));
 
   prodRows.forEach(row => {
     const productId = String(row[0]).trim();
@@ -165,6 +166,8 @@ function calculateSmartReplenishmentSuggestions(productVendorMap = {}, vendorCon
     const dispatchSteps = stepsStr ? stepsStr.split(',').map(Number) : [];
     const threshold = typeof row[10] !== 'undefined' ? Number(row[10]) : 99; // 進位門檻
     const minOrderQty = (minOrderQtyIdx !== -1 && row[minOrderQtyIdx] !== '') ? Number(row[minOrderQtyIdx]) : 0; // 最低起訂量
+    const splitFlavorsStr = (splitFlavorsIdx !== -1 && row[splitFlavorsIdx] !== '') ? String(row[splitFlavorsIdx]).trim() : '';
+    const flavors = splitFlavorsStr ? splitFlavorsStr.split(',').map(f => f.trim()).filter(Boolean) : [];
 
     // 動態計算叫貨覆蓋天數與目標覆蓋星期
     const vendor = productVendorMap[productId] || "未指定廠商";
@@ -208,15 +211,34 @@ function calculateSmartReplenishmentSuggestions(productVendorMap = {}, vendorCon
       // 廠商採購專用的【嚴格整箱向上進位】邏輯（忽略門市配貨階梯）
       netNeed = Math.ceil(netNeed / packSize) * packSize;
 
-      if (netNeed > 0) {
-        suggestions.push({
-          productId: productId,
-          productName: productName,
-          quantity: netNeed,
-          price: price,
-          forecast: forecastDemand,
-          currentStock: currentStock
-        });
+       if (netNeed > 0) {
+        if (flavors.length > 0) {
+          // 均分量並對齊各口味的箱規
+          const qtyPerFlavor = Math.ceil((netNeed / flavors.length) / packSize) * packSize;
+          if (qtyPerFlavor > 0) {
+            flavors.forEach(flavor => {
+              suggestions.push({
+                productId: productId + "_" + flavor,
+                productName: `${productName} (${flavor})`,
+                quantity: qtyPerFlavor,
+                price: price,
+                forecast: Math.ceil(forecastDemand / flavors.length),
+                currentStock: Math.ceil(currentStock / flavors.length),
+                packSize: packSize
+              });
+            });
+          }
+        } else {
+          suggestions.push({
+            productId: productId,
+            productName: productName,
+            quantity: netNeed,
+            price: price,
+            forecast: forecastDemand,
+            currentStock: currentStock,
+            packSize: packSize
+          });
+        }
       }
     }
   });
@@ -470,18 +492,40 @@ function generateAndPushWeeklyOrderSuggestion() {
     }));
     
     // 推播到群組
-    pushWeeklyOrderFlexMessage(groupId, suggestionId, suggestions, vendor);
+    pushWeeklyOrderFlexMessage(groupId, suggestionId, suggestions, vendor, config.orderDays, config.deliveryDays);
   }
 }
 
 /**
  * 發送 Flex Message
  */
-function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorName) {
+function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorName, orderDaysStr = '', deliveryDaysStr = '') {
+  let subtitleText = "系統叫貨，點擊下方確認配送";
+  
+  if (orderDaysStr && deliveryDaysStr) {
+    const dateStr = Utilities.formatDate(new Date(), "Asia/Taipei", "u"); 
+    const todayDay = parseInt(dateStr, 10); 
+    
+    const orderDays = parseDaysString_(orderDaysStr);
+    const deliveryDays = parseDaysString_(deliveryDaysStr);
+    
+    let idx = orderDays.indexOf(todayDay);
+    if (idx !== -1 && deliveryDays[idx]) {
+      const chWeekdays = ["", "週一", "週二", "週三", "週四", "週五", "週六", "週日"];
+      const orderStr = chWeekdays[todayDay];
+      const deliveryStr = chWeekdays[deliveryDays[idx]];
+      subtitleText = `👉 ${orderStr}叫貨、${deliveryStr}到貨，點擊下方確認配送`;
+    }
+  }
+
   const bubbleContents = [];
   const displayItems = suggestions.slice(0, 15);
   
   displayItems.forEach(item => {
+    const packSize = item.packSize || 1;
+    const boxes = item.quantity / packSize;
+    const boxesStr = (boxes % 1 === 0) ? `${boxes}` : boxes.toFixed(1);
+
     bubbleContents.push({
       type: "box",
       layout: "horizontal",
@@ -502,16 +546,16 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
           layout: "vertical",
           backgroundColor: "#EFF6FF", 
           cornerRadius: "md",
-          paddingStart: "md",
-          paddingEnd: "md",
+          paddingStart: "sm",
+          paddingEnd: "sm",
           paddingTop: "xs",
           paddingBottom: "xs",
-          flex: 2,
+          flex: 2.2, // slightly larger flex to fit the text comfortably
           contents: [
             { 
               type: "text", 
-              text: `${item.quantity} 罐`, 
-              size: "sm", 
+              text: `${item.quantity} 罐 (${boxesStr} 箱)`, 
+              size: "xs", 
               color: "#1E40AF", 
               align: "center", 
               weight: "bold" 
@@ -588,7 +632,7 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
               },
               { 
                 type: "text", 
-                text: "系統叫貨，點擊下方確認配送", 
+                text: subtitleText, 
                 color: "#94A3B8", 
                 size: "xs", 
                 margin: "xs" 
