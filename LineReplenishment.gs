@@ -167,7 +167,7 @@ function calculateSmartReplenishmentSuggestions(productVendorMap = {}, vendorCon
     const threshold = typeof row[10] !== 'undefined' ? Number(row[10]) : 99; // 進位門檻
     const minOrderQty = (minOrderQtyIdx !== -1 && row[minOrderQtyIdx] !== '') ? Number(row[minOrderQtyIdx]) : 0; // 最低起訂量
     const splitFlavorsStr = (splitFlavorsIdx !== -1 && row[splitFlavorsIdx] !== '') ? String(row[splitFlavorsIdx]).trim() : '';
-    const flavors = splitFlavorsStr ? splitFlavorsStr.split(',').map(f => f.trim()).filter(Boolean) : [];
+    const flavors = splitFlavorsStr ? splitFlavorsStr.split(/[,，]/).map(f => f.trim()).filter(Boolean) : [];
 
     // 動態計算叫貨覆蓋天數與目標覆蓋星期
     const vendor = productVendorMap[productId] || "未指定廠商";
@@ -457,7 +457,8 @@ function generateAndPushWeeklyOrderSuggestion() {
   // 3. 將建議清單按廠商分群
   const vendorGroupedSuggestions = {}; 
   allSuggestions.forEach(item => {
-    const vendor = productVendorMap[item.productId] || "未指定廠商";
+    const baseProductId = item.productId.split("_")[0];
+    const vendor = productVendorMap[baseProductId] || "未指定廠商";
     if (!vendorGroupedSuggestions[vendor]) {
       vendorGroupedSuggestions[vendor] = [];
     }
@@ -528,37 +529,28 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
 
     bubbleContents.push({
       type: "box",
-      layout: "horizontal",
+      layout: "vertical",
       margin: "md",
-      alignItems: "center",
+      spacing: "xs",
       contents: [
         { 
           type: "text", 
           text: item.productName, 
           size: "sm", 
-          color: "#334155", 
-          flex: 4, 
+          color: "#1E293B", 
           wrap: true,
           weight: "bold"
         },
-        { 
+        {
           type: "box",
-          layout: "vertical",
-          backgroundColor: "#EFF6FF", 
-          cornerRadius: "md",
-          paddingStart: "sm",
-          paddingEnd: "sm",
-          paddingTop: "xs",
-          paddingBottom: "xs",
-          flex: 2.2, // slightly larger flex to fit the text comfortably
+          layout: "horizontal",
           contents: [
-            { 
-              type: "text", 
-              text: `${item.quantity} 罐 (${boxesStr} 箱)`, 
-              size: "xs", 
-              color: "#1E40AF", 
-              align: "center", 
-              weight: "bold" 
+            {
+              type: "text",
+              text: `數量：${item.quantity} 罐 (${boxesStr} 箱)`,
+              size: "xs",
+              color: "#475569", 
+              weight: "bold"
             }
           ]
         }
@@ -647,17 +639,17 @@ function pushWeeklyOrderFlexMessage(targetId, suggestionId, suggestions, vendorN
         paddingAll: "lg",
         contents: [
           {
-            type: "box",
-            layout: "horizontal",
-            paddingBottom: "md",
-            contents: [
-              { type: "text", text: "品項", size: "xs", color: "#94A3B8", weight: "bold", flex: 4 },
-              { type: "text", text: "數量", size: "xs", color: "#94A3B8", weight: "bold", flex: 2, align: "center" }
-            ]
+            type: "text",
+            text: "建議採購明細",
+            size: "xs",
+            color: "#94A3B8",
+            weight: "bold",
+            margin: "none"
           },
           {
             type: "separator",
-            color: "#CBD5E1"
+            color: "#E2E8F0",
+            margin: "sm"
           },
           ...bubbleContents
         ]
@@ -798,6 +790,7 @@ function handleLineWebhook_(events) {
             serverTimestamp: new Date().getTime(),
             operator: "LINE_BOT",
             items: items.map(item => ({
+              productId: item.productId ? item.productId.split("_")[0] : undefined,
               productName: item.productName,
               quantity: item.quantity,
               price: item.price,

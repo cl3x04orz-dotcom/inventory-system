@@ -45,7 +45,7 @@ function addPurchaseService(data, user) {
 
     items.forEach(item => {
         const rowVendor = item.vendor || vendor;
-        let productId = productMap[item.productName];
+        let productId = item.productId || productMap[item.productName];
         
         // Auto-create product if missing (and track it to avoid duplicates in same batch)
         if (!productId && item.productName) {
@@ -176,7 +176,7 @@ function getPurchaseHistory(filter) {
     end.setHours(23, 59, 59);
     
     const vName = String(row[2] || '').toLowerCase();
-    const pName = String(productMap[row[3]] || 'Unknown').toLowerCase();
+    const pName = String(row[11] || productMap[row[3]] || 'Unknown').toLowerCase();
     const keyword = filter.keyword ? filter.keyword.toLowerCase() : '';
     
     // 如果是 ORDERED (待驗收)，直接無視日期區間篩選，但仍會受到關鍵字搜尋篩選
@@ -210,7 +210,7 @@ function getPurchaseHistory(filter) {
         id: row[0],
         date: row[1],
         vendorName: row[2],
-        productName: productMap[row[3]] || 'Unknown',
+        productName: row[11] || productMap[row[3]] || 'Unknown',
         productId: row[3],
         quantity: Number(row[4]) || 0,
         unitPrice: Number(row[5]) || 0,
