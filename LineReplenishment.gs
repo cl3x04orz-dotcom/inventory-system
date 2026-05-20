@@ -3,8 +3,8 @@
  * LINE 智慧補貨系統 (多群組分流、趨勢加權、實收驗收)
  */
 
-// 請在此設定你的 LINE Channel Access Token
-const LINE_ACCESS_TOKEN = "VC6tkew0F+h0uXg7XRdjqbajXwKvbXLRK4VzXEAdWhwd6m/b9BsNJLoKgr9aXBlgbvZI+C/+Sz6ER6y8h2gDij4+YO8b4heIFzOupzwGJf/ZV8gAqHoaCGoNArQuN6+YdxqPjIIatQjUYC5P1+UCNQdB04t89/1O/w1cDnyilFU=";
+// 讀取儲存在 GAS 指令碼屬性中的 LINE 權限金鑰 (安全防護，防 Git 洩漏)
+const LINE_ACCESS_TOKEN = PropertiesService.getScriptProperties().getProperty("LINE_TOKEN");
 
 // 🌟 常規叫貨白名單：只有這些商品會被預測並推播到 LINE 群組
 const AUTO_ORDER_WHITELIST = [
@@ -898,3 +898,4 @@ function testPushReplenishmentToLine() {
   Logger.log(`✅ 成功向廠商【${boundVendor}】的群組推播測試訂貨 Flex Message！`);
   return `成功發送測試！請查看 LINE 群組。`;
 }
+
