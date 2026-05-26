@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Search, Calendar, RefreshCw, DollarSign } from 'lucide-react';
 import { callGAS } from '../utils/api';
-import { getLocalDateString } from '../utils/constants';
+import { getLocalDateString, getFirstDayOfMonthString } from '../utils/constants';
 
 export default function CustomerRankingPage({ user, apiUrl }) {
     const [data, setData] = useState([]);
@@ -10,6 +10,25 @@ export default function CustomerRankingPage({ user, apiUrl }) {
     const [endDate, setEndDate] = useState(getLocalDateString());
     const [searchTerm, setSearchTerm] = useState('');
     const [category, setCategory] = useState('全部'); // 全部, 市場, 批發
+    const [activeQuickDate, setActiveQuickDate] = useState('TODAY');
+
+    const handleQuickDate = (type) => {
+        const today = new Date();
+        setActiveQuickDate(type);
+        if (type === 'TODAY') {
+            const d = getLocalDateString();
+            setStartDate(d);
+            setEndDate(d);
+        } else if (type === 'THIS_MONTH') {
+            setStartDate(getFirstDayOfMonthString());
+            setEndDate(getLocalDateString());
+        } else if (type === 'LAST_MONTH') {
+            const firstOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+            setStartDate(getLocalDateString(firstOfLastMonth));
+            setEndDate(getLocalDateString(lastOfLastMonth));
+        }
+    };
 
     const fetchData = async () => {
         setLoading(true);
@@ -48,10 +67,32 @@ export default function CustomerRankingPage({ user, apiUrl }) {
             </div>
 
             <div className="bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shrink-0 grid grid-cols-1 md:grid-cols-2 gap-4 shadow-sm">
+                {/* 快速日期切換 */}
+                <div className="md:col-span-2 flex gap-2 pb-3 border-b border-dashed border-slate-200">
+                    <span className="text-[10px] font-bold text-slate-400 self-center uppercase tracking-wider mr-2 whitespace-nowrap">快速切換:</span>
+                    {[
+                        { label: '今天', type: 'TODAY' },
+                        { label: '本月', type: 'THIS_MONTH' },
+                        { label: '上月', type: 'LAST_MONTH' }
+                    ].map((btn) => (
+                        <button
+                            key={btn.type}
+                            onClick={() => handleQuickDate(btn.type)}
+                            className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all duration-200 active:scale-95 whitespace-nowrap ${
+                                activeQuickDate === btn.type
+                                    ? 'bg-blue-50 text-blue-600 border-blue-200 shadow-sm'
+                                    : 'bg-slate-50/50 text-slate-400 border-slate-100 hover:bg-slate-100 hover:text-slate-600'
+                            }`}
+                        >
+                            {btn.label}
+                        </button>
+                    ))}
+                </div>
+
                 <div className="flex items-center gap-2">
-                    <input type="date" className="input-field flex-1 text-sm bg-[var(--bg-tertiary)]" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                    <input type="date" className="input-field flex-1 text-sm bg-[var(--bg-tertiary)]" value={startDate} onChange={e => { setStartDate(e.target.value); setActiveQuickDate(''); }} />
                     <span className="text-[var(--text-secondary)] font-bold hidden md:inline">至</span>
-                    <input type="date" className="input-field flex-1 text-sm bg-[var(--bg-tertiary)]" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                    <input type="date" className="input-field flex-1 text-sm bg-[var(--bg-tertiary)]" value={endDate} onChange={e => { setEndDate(e.target.value); setActiveQuickDate(''); }} />
                 </div>
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />

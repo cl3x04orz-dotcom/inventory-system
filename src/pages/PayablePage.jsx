@@ -16,6 +16,25 @@ export default function PayablePage({ user, apiUrl }) {
     const [expandedRows, setExpandedRows] = useState(new Set());
     // 批次選取：以項目的 UUID 為準
     const [selectedItemUuids, setSelectedItemUuids] = useState(new Set());
+    const [activeQuickDate, setActiveQuickDate] = useState('THIS_MONTH');
+
+    const handleQuickDate = (type) => {
+        const today = new Date();
+        setActiveQuickDate(type);
+        if (type === 'TODAY') {
+            const d = getLocalDateString();
+            setStartDate(d);
+            setEndDate(d);
+        } else if (type === 'THIS_MONTH') {
+            setStartDate(getFirstDayOfMonthString());
+            setEndDate(getLocalDateString());
+        } else if (type === 'LAST_MONTH') {
+            const firstOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+            setStartDate(getLocalDateString(firstOfLastMonth));
+            setEndDate(getLocalDateString(lastOfLastMonth));
+        }
+    };
 
     const fetchData = React.useCallback(async () => {
         setLoading(true);
@@ -214,6 +233,27 @@ export default function PayablePage({ user, apiUrl }) {
 
             {/* Filters */}
             <div className="mb-6 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)]">
+                {/* 快速日期切換 */}
+                <div className="flex gap-2 pb-3 mb-3 overflow-x-auto no-scrollbar border-b border-dashed border-slate-200">
+                    <span className="text-[10px] font-bold text-slate-400 self-center uppercase tracking-wider mr-2 whitespace-nowrap">快速切換:</span>
+                    {[
+                        { label: '今天', type: 'TODAY' },
+                        { label: '本月', type: 'THIS_MONTH' },
+                        { label: '上月', type: 'LAST_MONTH' }
+                    ].map((btn) => (
+                        <button
+                            key={btn.type}
+                            onClick={() => handleQuickDate(btn.type)}
+                            className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all duration-200 active:scale-95 whitespace-nowrap ${
+                                activeQuickDate === btn.type
+                                    ? 'bg-blue-50 text-blue-600 border-blue-200 shadow-sm'
+                                    : 'bg-slate-50/50 text-slate-400 border-slate-100 hover:bg-slate-100 hover:text-slate-600'
+                            }`}
+                        >
+                            {btn.label}
+                        </button>
+                    ))}
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div className="space-y-1">
                         <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase px-1">開始日期</label>
@@ -221,7 +261,10 @@ export default function PayablePage({ user, apiUrl }) {
                             type="date"
                             className="input-field w-full h-10 appearance-none bg-[var(--bg-primary)]"
                             value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
+                            onChange={(e) => {
+                                setStartDate(e.target.value);
+                                setActiveQuickDate('');
+                            }}
                         />
                     </div>
                     <div className="space-y-1">
@@ -230,7 +273,10 @@ export default function PayablePage({ user, apiUrl }) {
                             type="date"
                             className="input-field w-full h-10 appearance-none bg-[var(--bg-primary)]"
                             value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
+                            onChange={(e) => {
+                                setEndDate(e.target.value);
+                                setActiveQuickDate('');
+                            }}
                         />
                     </div>
                     <div className="space-y-1">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Calendar, Filter, RefreshCw, ClipboardList, DollarSign, User, Truck, RotateCcw } from 'lucide-react';
 import { callGAS } from '../utils/api';
-import { getLocalDateString } from '../utils/constants';
+import { getLocalDateString, getFirstDayOfMonthString } from '../utils/constants';
 
 export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
     const [records, setRecords] = useState([]);
@@ -13,6 +13,25 @@ export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
     const [startDate, setStartDate] = useState(getLocalDateString());
     const [endDate, setEndDate] = useState(getLocalDateString());
     const [isVoiding, setIsVoiding] = useState(false);
+    const [activeQuickDate, setActiveQuickDate] = useState('TODAY');
+
+    const handleQuickDate = (type) => {
+        const today = new Date();
+        setActiveQuickDate(type);
+        if (type === 'TODAY') {
+            const d = getLocalDateString();
+            setStartDate(d);
+            setEndDate(d);
+        } else if (type === 'THIS_MONTH') {
+            setStartDate(getFirstDayOfMonthString());
+            setEndDate(getLocalDateString());
+        } else if (type === 'LAST_MONTH') {
+            const firstOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+            setStartDate(getLocalDateString(firstOfLastMonth));
+            setEndDate(getLocalDateString(lastOfLastMonth));
+        }
+    };
     
     // Verification Modal State
     const [verifyingRecord, setVerifyingRecord] = useState(null);
@@ -150,14 +169,38 @@ export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
 
                 {/* Filters - Mobile View (Horizontal, No Border, mimics SalesPage/ReportPage) */}
                 {/* Filters - Mobile View (Horizontal, No Border) */}
-                <div className="md:hidden mb-6 space-y-3">
+                <div className="md:hidden mb-6 space-y-3 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)]">
+                    {/* 快速日期切換 */}
+                    <div className="flex gap-2 pb-3 mb-3 overflow-x-auto no-scrollbar border-b border-dashed border-slate-200">
+                        <span className="text-[10px] font-bold text-slate-400 self-center uppercase tracking-wider mr-2 whitespace-nowrap">快速切換:</span>
+                        {[
+                            { label: '今天', type: 'TODAY' },
+                            { label: '本月', type: 'THIS_MONTH' },
+                            { label: '上月', type: 'LAST_MONTH' }
+                        ].map((btn) => (
+                            <button
+                                key={btn.type}
+                                onClick={() => handleQuickDate(btn.type)}
+                                className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all duration-200 active:scale-95 whitespace-nowrap ${
+                                    activeQuickDate === btn.type
+                                        ? 'bg-blue-50 text-blue-600 border-blue-200 shadow-sm'
+                                        : 'bg-slate-50/50 text-slate-400 border-slate-100 hover:bg-slate-100 hover:text-slate-600'
+                                }`}
+                            >
+                                {btn.label}
+                            </button>
+                        ))}
+                    </div>
                     <div className="flex items-center gap-3">
                         <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">開始日期:</label>
                         <input
                             type="date"
                             className="input-field flex-1 py-1.5 px-3"
                             value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
+                            onChange={(e) => {
+                                setStartDate(e.target.value);
+                                setActiveQuickDate('');
+                            }}
                         />
                     </div>
                     <div className="flex items-center gap-3">
@@ -166,7 +209,10 @@ export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
                             type="date"
                             className="input-field flex-1 py-1.5 px-3"
                             value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
+                            onChange={(e) => {
+                                setEndDate(e.target.value);
+                                setActiveQuickDate('');
+                            }}
                         />
                     </div>
                     <div className="flex items-center gap-3">
@@ -205,6 +251,27 @@ export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
 
                 {/* Filters - Desktop View (Original Grid) */}
                 <div className="hidden md:block mb-6 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)]">
+                    {/* 快速日期切換 */}
+                    <div className="flex gap-2 pb-3 mb-3 overflow-x-auto no-scrollbar border-b border-dashed border-slate-200">
+                        <span className="text-[10px] font-bold text-slate-400 self-center uppercase tracking-wider mr-2 whitespace-nowrap">快速切換:</span>
+                        {[
+                            { label: '今天', type: 'TODAY' },
+                            { label: '本月', type: 'THIS_MONTH' },
+                            { label: '上月', type: 'LAST_MONTH' }
+                        ].map((btn) => (
+                            <button
+                                key={btn.type}
+                                onClick={() => handleQuickDate(btn.type)}
+                                className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all duration-200 active:scale-95 whitespace-nowrap ${
+                                    activeQuickDate === btn.type
+                                        ? 'bg-blue-50 text-blue-600 border-blue-200 shadow-sm'
+                                        : 'bg-slate-50/50 text-slate-400 border-slate-100 hover:bg-slate-100 hover:text-slate-600'
+                                }`}
+                            >
+                                {btn.label}
+                            </button>
+                        ))}
+                    </div>
                     <div className="flex flex-col md:flex-row gap-4 items-end">
                         <div className="flex-1 space-y-1.5 w-full">
                             <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase px-1">產品名稱</label>
@@ -240,7 +307,10 @@ export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
                                 type="date"
                                 className="input-field w-full text-sm"
                                 value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
+                                onChange={(e) => {
+                                    setStartDate(e.target.value);
+                                    setActiveQuickDate('');
+                                }}
                             />
                         </div>
 
@@ -250,7 +320,10 @@ export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
                                 type="date"
                                 className="input-field w-full text-sm"
                                 value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
+                                onChange={(e) => {
+                                    setEndDate(e.target.value);
+                                    setActiveQuickDate('');
+                                }}
                             />
                         </div>
 
