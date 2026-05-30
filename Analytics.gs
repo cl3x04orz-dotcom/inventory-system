@@ -37,7 +37,7 @@ function getDataWithNormalizedHeaders_(sheetName) {
   return data;
 }
 
-function getValidSalesMap_(startDateStr, endDateStr, customer, includeStats = false, category = null) {
+function getValidSalesMap_(startDateStr, endDateStr, customer, includeStats = false, category = null, salesRep = null) {
   const start = parseLocalYMD_(startDateStr); start.setHours(0,0,0,0);
   const end = parseLocalYMD_(endDateStr); end.setHours(23,59,59,999);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -60,9 +60,11 @@ function getValidSalesMap_(startDateStr, endDateStr, customer, includeStats = fa
     if (status === 'VOID') continue;
 
     const rowCustomer = String(values[i][6] || "").trim(); // Col G
+    const rowSalesRep = String(values[i][2] || "").trim(); // Col C
 
     if (dVal && sid && dVal >= start && dVal <= end) {
       if (customer && rowCustomer !== customer.trim()) continue;
+      if (salesRep && rowSalesRep !== salesRep.trim()) continue;
       
       // [新增] 類別過濾 (市場 / 批發)
       if (category && category !== '全部') {
@@ -119,12 +121,12 @@ function getSalesRanking(payload) {
 }
 
 function getProfitAnalysis(payload) {
-  const { startDate, endDate, customer, category } = payload;
+  const { startDate, endDate, customer, category, salesRep } = payload;
   let validSales;
   let customerStats = null;
   
   if (customer) {
-    const statsResult = getValidSalesMap_(startDate, endDate, customer, true, category);
+    const statsResult = getValidSalesMap_(startDate, endDate, customer, true, category, salesRep);
     validSales = statsResult.map;
     customerStats = {
       visitCount: statsResult.visitCount,
@@ -132,7 +134,7 @@ function getProfitAnalysis(payload) {
       lastVisitDate: statsResult.lastVisitDate
     };
   } else {
-    validSales = getValidSalesMap_(startDate, endDate, null, false, category);
+    validSales = getValidSalesMap_(startDate, endDate, null, false, category, salesRep);
   }
   
   const productMap = getProductInfoMap_(); 
@@ -250,4 +252,20 @@ function getCustomersList() {
   }
   
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-TW'));
+}
+
+// 取得不重複業務員清單
+function getSalesRepsList() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const salesSheet = ss.getSheetByName('Sales');
+  const reps = new Set();
+  if (salesSheet) {
+    const v = salesSheet.getDataRange().getValues();
+    for (let i = 1; i < v.length; i++) {
+      if (String(v[i][9]).toUpperCase() === 'VOID') continue;
+      const r = String(v[i][2] || "").trim(); // Col C
+      if (r && r !== 'Unknown') reps.add(r);
+    }
+  }
+  return Array.from(reps).sort((a, b) => a.localeCompare(b, 'zh-TW'));
 }

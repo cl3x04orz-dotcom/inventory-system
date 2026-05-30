@@ -15,6 +15,8 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
     const [customerStats, setCustomerStats] = useState(null);
     const [sortConfig, setSortConfig] = useState({ key: 'profit', direction: 'desc' });
     const [category, setCategory] = useState('全部'); // 全部, 市場, 批發
+    const [salesRepFilter, setSalesRepFilter] = useState(''); // [新增] 業務員篩選
+    const [salesRepsList, setSalesRepsList] = useState([]); // [新增] 業務員清單
 
     // [新增] 快速日期切換
     const handleQuickDate = (type) => {
@@ -44,7 +46,7 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
                 setProductMap(pMap);
             }
 
-            const response = await callGAS(apiUrl, 'getProfitAnalysis', { startDate, endDate, customer: customerFilter, category }, user.token);
+            const response = await callGAS(apiUrl, 'getProfitAnalysis', { startDate, endDate, customer: customerFilter, category, salesRep: salesRepFilter }, user.token);
             if (Array.isArray(response)) {
                 setData(response);
                 setCustomerStats(null);
@@ -67,13 +69,17 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
         if (user?.token) {
             fetchData();
         }
-    }, [user.token, apiUrl, startDate, endDate, category, customerFilter]);
+    }, [user.token, apiUrl, startDate, endDate, category, customerFilter, salesRepFilter]);
 
     useEffect(() => {
         if (user?.token) {
             callGAS(apiUrl, 'getCustomersList', {}, user.token)
                 .then(res => { if (Array.isArray(res)) setCustomersList(res); })
                 .catch(err => console.error("Failed to fetch customers list:", err));
+
+            callGAS(apiUrl, 'getSalesRepsList', {}, user.token)
+                .then(res => { if (Array.isArray(res)) setSalesRepsList(res); })
+                .catch(err => console.error("Failed to fetch sales reps list:", err));
         }
     }, [user.token, apiUrl]);
 
@@ -164,7 +170,7 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
                         <input 
                             type="text" 
                             list="customer-suggestions"
-                            placeholder="輸入客戶名稱以篩選客製毛利..." 
+                            placeholder="輸入客戶名稱篩選..." 
                             className="input-field w-full text-sm bg-[var(--bg-tertiary)]" 
                             value={customerFilter} 
                             onChange={e => setCustomerFilter(e.target.value)} 
@@ -172,6 +178,21 @@ export default function ProfitAnalysisPage({ user, apiUrl }) {
                         />
                         <datalist id="customer-suggestions">
                             {customersList.map(c => <option key={c} value={c} />)}
+                        </datalist>
+                    </div>
+
+                    <div className="flex-1 w-full sm:w-auto sm:min-w-[180px]">
+                        <input 
+                            type="text" 
+                            list="salesrep-suggestions"
+                            placeholder="篩選業務員..." 
+                            className="input-field w-full text-sm bg-[var(--bg-tertiary)]" 
+                            value={salesRepFilter} 
+                            onChange={e => setSalesRepFilter(e.target.value)} 
+                            onKeyDown={e => { if(e.key === 'Enter') fetchData(); }}
+                        />
+                        <datalist id="salesrep-suggestions">
+                            {salesRepsList.map(r => <option key={r} value={r} />)}
                         </datalist>
                     </div>
 

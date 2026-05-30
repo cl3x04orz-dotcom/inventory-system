@@ -27,7 +27,7 @@
     }
 
     .input-field {
-        @apply w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-[var(--text-primary)] outline-none transition-all font-mono tabular-nums shadow-sm hover:border-slate-300 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10;
+        @apply w-full bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-lg px-3 py-2 text-[var(--text-primary)] outline-none transition-all font-mono tabular-nums shadow-sm hover:border-[var(--border-secondary)] focus:border-[var(--accent-blue)] focus:bg-[var(--bg-secondary)] focus:ring-4 focus:ring-[var(--accent-blue)]/10;
         box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
     }
 

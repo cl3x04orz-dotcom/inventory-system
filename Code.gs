@@ -1,7 +1,7 @@
 /**
  * Serves the React App
  */
-const APP_VERSION = '1779802511074';
+const APP_VERSION = '1780143347296';
  // 版本號：A2:3/24
 
 function doGet() {
@@ -99,6 +99,7 @@ function apiHandler(request) {
         'markPayableAsPaid': 'finance_payable',
         'getProfitAnalysis': 'analytics_profit', // 毛利分析歸類於數據分析
         'getCustomersList': 'analytics_profit',  // 提供給毛利分析的自動完成清單
+        'getSalesRepsList': 'analytics_profit',
 
         // Payroll (薪資管理) - 新增
         'getPayrollData': 'finance_payroll',
@@ -207,6 +208,7 @@ function apiHandler(request) {
             case 'getProfitAnalysis': return typeof getProfitAnalysis !== 'undefined' ? getProfitAnalysis(payload) : {error: 'Service missing'};
             case 'getTurnoverRate': return typeof getTurnoverRate !== 'undefined' ? getTurnoverRate(payload) : {error: 'Service missing'};
             case 'getCustomersList': return typeof getCustomersList !== 'undefined' ? getCustomersList(payload) : {error: 'Service missing'};
+            case 'getSalesRepsList': return typeof getSalesRepsList !== 'undefined' ? getSalesRepsList(payload) : {error: 'Service missing'};
             
             // Payroll
             case 'getPayrollData': return getPayrollDataService(payload, user);

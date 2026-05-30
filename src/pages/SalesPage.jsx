@@ -1228,12 +1228,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                                 {/* [New] Sales Rep Override - Only show during correction */}
                                 {availableUsers.length > 0 && originalSaleId && (
-                                    <div className="flex items-center gap-2 w-full md:w-auto bg-amber-50 border border-amber-200 px-3 py-1 rounded-lg animate-pulse">
-                                        <label className="text-sm text-amber-700 font-bold whitespace-nowrap">業績歸屬:</label>
+                                    <div className="flex items-center gap-2 w-full md:w-auto bg-[var(--accent-yellow-light)] border border-[var(--accent-yellow)]/30 px-3 py-1 rounded-lg animate-pulse">
+                                        <label className="text-sm text-[var(--accent-yellow)] font-bold whitespace-nowrap">業績歸屬:</label>
                                         <select
                                             value={targetSalesRep}
                                             onChange={(e) => setTargetSalesRep(e.target.value)}
-                                            className="bg-white border border-amber-300 text-amber-800 text-xs font-bold rounded p-1 focus:ring-1 focus:ring-amber-500 outline-none"
+                                            className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)] text-xs font-bold rounded p-1 focus:ring-1 focus:ring-[var(--accent-yellow)] outline-none"
                                         >
                                             {availableUsers.map(u => (
                                                 <option key={u} value={u}>{u}</option>
@@ -1346,24 +1346,24 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     )}
 
                     {/* [New] Weather Selector Banner - 樣式同工讀計時 */}
-                    <div className="flex items-center mb-3 px-3 md:px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 h-14">
+                    <div className="flex items-center mb-3 px-3 md:px-4 py-2.5 rounded-xl bg-gradient-to-r from-[var(--bg-secondary)] to-[var(--bg-tertiary)] border border-[var(--border-primary)] h-14">
                         {/* Left Column */}
                         <div className="flex items-center gap-2 w-[72px] shrink-0">
                             <span className="text-base w-5 flex justify-center shrink-0">{weather === 'SUNNY' ? '☀️' : '☔'}</span>
-                            <span className="text-[10px] font-bold text-blue-800 leading-tight shrink-0">
+                            <span className="text-[10px] font-bold text-[var(--text-primary)] leading-tight shrink-0">
                                 今日<br />天氣
                             </span>
                         </div>
 
                         {/* Middle Column */}
                         <div className="flex items-center flex-1 ml-1 md:ml-2">
-                            <div className="flex w-full max-w-[150px] bg-white/50 rounded-lg p-1 border border-blue-200 shadow-sm">
+                            <div className="flex w-full max-w-[150px] bg-[var(--bg-primary)]/50 rounded-lg p-1 border border-[var(--border-primary)] shadow-sm">
                                 <button
                                     type="button"
                                     onClick={() => setWeather('SUNNY')}
                                     className={`flex-1 flex justify-center items-center gap-1 px-2 py-1.5 text-[11px] md:text-xs font-black rounded-md transition-all ${weather === 'SUNNY'
-                                        ? 'bg-amber-500 text-white shadow-md'
-                                        : 'text-blue-400 hover:text-blue-600 hover:bg-white'
+                                        ? 'bg-[var(--accent-yellow)] text-white shadow-md'
+                                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
                                         }`}
                                 >
                                     ☀️ 晴天
@@ -1372,8 +1372,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     type="button"
                                     onClick={() => setWeather('RAINY')}
                                     className={`flex-1 flex justify-center items-center gap-1 px-2 py-1.5 text-[11px] md:text-xs font-black rounded-md transition-all ${weather === 'RAINY'
-                                        ? 'bg-indigo-600 text-white shadow-md'
-                                        : 'text-blue-400 hover:text-blue-600 hover:bg-white'
+                                        ? 'bg-[var(--accent-blue)] text-white shadow-md'
+                                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
                                         }`}
                                 >
                                     ☔ 雨天
@@ -1384,8 +1384,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                         {/* Right Column */}
                         <div className="w-14 shrink-0 ml-auto flex justify-end">
                             <div className={`text-[10px] font-bold py-1 rounded-lg transition-all duration-500 border leading-tight text-center w-full ${weather === 'SUNNY'
-                                ? 'bg-amber-100 text-amber-600 border-amber-200'
-                                : 'bg-indigo-100 text-indigo-600 border-indigo-200'
+                                ? 'bg-[var(--accent-yellow-light)] text-[var(--accent-yellow)] border-[var(--accent-yellow)]/30'
+                                : 'bg-[var(--accent-blue-light)] text-[var(--accent-blue)] border-[var(--accent-blue)]/30'
                                 }`}>
                                 今日<br />{weather === 'SUNNY' ? '晴天' : '雨天'}
                             </div>
@@ -1518,8 +1518,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                             {/* Desktop Table View (Hidden on < md) */}
                             <table className="hidden md:table w-full text-left border-collapse">
-                                <thead className="sticky top-0 z-10 text-slate-500 text-[13px] uppercase font-semibold tracking-wider">
-                                    <tr className="bg-[#F1F5F9]">
+                                <thead className="sticky top-0 z-10 text-[var(--text-secondary)] text-[13px] uppercase font-semibold tracking-wider">
+                                    <tr className="bg-[var(--bg-tertiary)]">
                                         <th className="p-3 w-10 first:rounded-l-2xl"></th>
                                         <th className="p-3 text-left">品項</th>
                                         <th className="p-3 w-20 text-center">庫存</th>
@@ -1556,7 +1556,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                                     </div>
                                                                 )}
                                                             </td>
-                                                            <td className="p-4 text-slate-950 font-extrabold text-xl whitespace-nowrap">{row.name}</td>
+                                                            <td className="p-4 text-[var(--text-primary)] font-extrabold text-xl whitespace-nowrap">{row.name}</td>
                                                             <td className="p-4 text-center font-mono tracking-tighter tabular-nums text-sm text-[var(--text-secondary)]">
                                                                 <span className="text-blue-500">{row.stock}</span>
                                                                 <span className="text-[var(--text-tertiary)] mx-1">/</span>
@@ -1729,13 +1729,13 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 </div>
 
                                 {/* Final Result - Rounded Card */}
-                                <div className="mt-1.5 bg-slate-50 border border-slate-200 rounded-2xl px-5 py-2 flex items-center justify-between" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                                    <span className="text-slate-400 font-bold text-xs uppercase tracking-widest">點清結算</span>
+                                <div className="mt-1.5 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-2xl px-5 py-2 flex items-center justify-between" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                                    <span className="text-[var(--text-secondary)] font-bold text-xs uppercase tracking-widest">點清結算</span>
                                     <span className={`font-black font-mono tabular-nums text-3xl tracking-tight ${(isCredit ? 0 : totalCashNet) === 0
-                                        ? 'text-slate-300'
+                                        ? 'text-[var(--text-tertiary)]'
                                         : (isCredit ? 0 : totalCashNet) > 0
-                                            ? 'text-blue-600'
-                                            : 'text-rose-600'
+                                            ? 'text-[var(--accent-blue)]'
+                                            : 'text-[var(--accent-red)]'
                                         }`}>
                                         ${(isCredit ? 0 : totalCashNet).toLocaleString()}
                                     </span>
@@ -1817,10 +1817,10 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     <div className="p-6 glass-panel shadow-lg border-t-4 border-t-blue-600 opacity-100 pointer-events-auto">
                         <div className="text-sm text-[var(--text-secondary)] mb-1 font-bold">扣除後總金額 (結算)</div>
                         <div className={`text-4xl font-mono tabular-nums tracking-tight transition-all duration-300 ${Math.round(isCredit ? totalSalesAmount : finalTotal) === 0
-                                ? 'text-slate-300 font-medium'
+                                ? 'text-[var(--text-tertiary)] font-medium'
                                 : (isCredit ? totalSalesAmount : finalTotal) > 0
-                                    ? 'text-blue-600 font-black'
-                                    : 'text-rose-600 font-black'
+                                    ? 'text-[var(--accent-blue)] font-black'
+                                    : 'text-[var(--accent-red)] font-black'
                             }`}>
                             ${(isCredit ? totalSalesAmount : finalTotal).toLocaleString()}
                         </div>
