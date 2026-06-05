@@ -263,6 +263,8 @@ function getPayrollDataService(payload, user) {
             } else if (type === 'SICK_LEAVE') {
                 dailyRecords[dateKey].isSickLeave = true;
                 sickLeaveDays++;
+            } else if (type === 'WORK') {
+                dailyRecords[dateKey].isWork = true;
             } else if (type === 'LOSS') {
                 const absLoss = Math.abs(val);
                 dailyRecords[dateKey].loss = (dailyRecords[dateKey].loss || 0) + absLoss;
@@ -287,9 +289,10 @@ function getPayrollDataService(payload, user) {
         const hasSales = (dailyData[dateKey] || 0) > 0;
         const hasRecord = dailyRecords[dateKey];
         const hasExplicitLeave = hasRecord && (hasRecord.isLeave || hasRecord.isSpecialLeave || hasRecord.isSickLeave);
+        const hasExplicitWork = hasRecord && hasRecord.isWork;
         
-        // If no sales and no explicit leave record, count as general leave (default state)
-        if (!hasSales && !hasExplicitLeave) {
+        // If no sales, no explicit work record, and no explicit leave record, count as general leave (default state)
+        if (!hasSales && !hasExplicitWork && !hasExplicitLeave) {
             if (!dailyRecords[dateKey]) dailyRecords[dateKey] = {};
             dailyRecords[dateKey].isLeave = true;
             generalLeaveDays++;

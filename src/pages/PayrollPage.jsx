@@ -324,8 +324,8 @@ export default function PayrollPage({ user, apiUrl }) {
         const hasSales = sales > 0;
 
         // Match the exact logic used in the table display
-        if (hasSales) {
-            // 出勤 (有業績)
+        if (hasSales || record.isWork) {
+            // 出勤 (有業績或手動上班)
             attendanceDaysCount++;
         } else if (record.isLeave) {
             // 休假
@@ -745,7 +745,7 @@ export default function PayrollPage({ user, apiUrl }) {
                         let status = '休假';
                         let statusStyle = 'bg-yellow-50 text-yellow-600 border-yellow-200';
 
-                        if (hasSales) {
+                        if (hasSales || record.isWork) {
                             status = '出勤';
                             statusStyle = 'bg-emerald-50 text-emerald-600 border-emerald-200';
                         } else if (record.isLeave) {
@@ -777,7 +777,20 @@ export default function PayrollPage({ user, apiUrl }) {
                                             <button
                                                 onClick={() => {
                                                     setEditingDay(dayItem);
-                                                    setEditType('LEAVE'); // Default
+                                                    let currentType = 'LEAVE';
+                                                    if (record.isWork) currentType = 'WORK';
+                                                    else if (record.isLeave) currentType = 'LEAVE';
+                                                    else if (record.isSpecialLeave) currentType = 'SPECIAL_LEAVE';
+                                                    else if (record.isSickLeave) currentType = 'SICK_LEAVE';
+                                                    else if (record.loss > 0) currentType = 'LOSS';
+                                                    setEditType(currentType);
+                                                    setEditValue(record.loss ? String(-record.loss) : '');
+                                                    let cleanNote = record.note || '';
+                                                    if (cleanNote) {
+                                                        cleanNote = cleanNote.replace(/\[結算:[^\]]+\]/g, '').trim();
+                                                        cleanNote = cleanNote.replace(/^\||\|$/g, '').trim();
+                                                    }
+                                                    setEditNote(cleanNote);
                                                 }}
                                                 className="opacity-0 group-hover:opacity-100 text-[10px] font-bold bg-blue-50 text-blue-600 px-2 py-0.5 rounded shadow-sm transition-opacity"
                                             >
@@ -837,7 +850,7 @@ export default function PayrollPage({ user, apiUrl }) {
                         let status = '休';
                         let statusStyle = 'bg-yellow-50 text-yellow-600';
 
-                        if (hasSales) {
+                        if (hasSales || record.isWork) {
                             status = '勤';
                             statusStyle = 'bg-emerald-50 text-emerald-600';
                         } else if (record.isLeave) {
@@ -858,7 +871,20 @@ export default function PayrollPage({ user, apiUrl }) {
                                  onClick={() => {
                                      if(user.role === 'BOSS') {
                                          setEditingDay(dayItem);
-                                         setEditType('LEAVE');
+                                         let currentType = 'LEAVE';
+                                         if (record.isWork) currentType = 'WORK';
+                                         else if (record.isLeave) currentType = 'LEAVE';
+                                         else if (record.isSpecialLeave) currentType = 'SPECIAL_LEAVE';
+                                         else if (record.isSickLeave) currentType = 'SICK_LEAVE';
+                                         else if (record.loss > 0) currentType = 'LOSS';
+                                         setEditType(currentType);
+                                         setEditValue(record.loss ? String(-record.loss) : '');
+                                         let cleanNote = record.note || '';
+                                         if (cleanNote) {
+                                             cleanNote = cleanNote.replace(/\[結算:[^\]]+\]/g, '').trim();
+                                             cleanNote = cleanNote.replace(/^\||\|$/g, '').trim();
+                                         }
+                                         setEditNote(cleanNote);
                                      }
                                  }}
                                  className={`bg-[var(--bg-primary)] p-1 min-h-[64px] flex flex-col items-center relative active:bg-[var(--bg-secondary)] transition-colors ${isWeekend ? 'bg-[var(--bg-secondary)]/20' : ''} ${user.role === 'BOSS' ? 'cursor-pointer' : ''}`}>
