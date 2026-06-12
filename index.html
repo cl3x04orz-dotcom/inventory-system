@@ -35394,7 +35394,7 @@ const useActivityLogger = ({ user, apiUrl: apiUrl2, enabled = true }) => {
   };
 };
 const GAS_API_URL = window.GAS_API_URL || "https://script.google.com/macros/s/AKfycbw0sN21nJXfjezYL446-wgwTbLOCUziFGOEN8qsXYg7cYHsN5R4Sgn2dSyzoGtH0Xb5/exec";
-const LOCAL_VERSION = "1781278272666";
+const LOCAL_VERSION = "1781278840774";
 console.log("--- 系統偵錯資訊 ---");
 console.log("Base URL:", "/");
 if (!GAS_API_URL || GAS_API_URL.includes("YOUR_SCRIPT_ID")) {
@@ -35524,6 +35524,8 @@ function AppContent() {
   const [lastCheckTime, setLastCheckTime] = reactExports.useState(null);
   reactExports.useEffect(() => {
     const checkUpdate = async () => {
+      if (user?.username === "guest")
+        return;
       const now2 = Date.now();
       if (now2 - lastCheckTimeRef.current < 5e3)
         return;
@@ -35552,8 +35554,7 @@ function AppContent() {
               console.log(`[VersionCheck] 本地版本較新或相同，無需更新 (${LOCAL_VERSION} >= ${res.version})`);
             }
           } else {
-            console.warn(`[VersionCheck] 偵測到版本字串不符! (${LOCAL_VERSION} != ${res.version})`);
-            setHasUpdate({ local: LOCAL_VERSION, server: res.version });
+            console.log(`[VersionCheck] 偵測到版本字串不同，但不進行強制更新提示 (${LOCAL_VERSION} != ${res.version})`);
           }
         }
       } catch (e) {
