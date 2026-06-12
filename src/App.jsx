@@ -198,6 +198,9 @@ function AppContent() {
 
     useEffect(() => {
         const checkUpdate = async () => {
+            // 如果是點餐訪客，直接跳過版本檢查，不干擾客戶點餐
+            if (user?.username === 'guest') return;
+
             const now = Date.now();
             if (now - lastCheckTimeRef.current < 5000) return; // 防抖 5 秒內不重複檢查
             lastCheckTimeRef.current = now;
@@ -230,8 +233,8 @@ function AppContent() {
                             console.log(`[VersionCheck] 本地版本較新或相同，無需更新 (${LOCAL_VERSION} >= ${res.version})`);
                         }
                     } else {
-                        console.warn(`[VersionCheck] 偵測到版本字串不符! (${LOCAL_VERSION} != ${res.version})`);
-                        setHasUpdate({ local: LOCAL_VERSION, server: res.version });
+                        // 字串不符（例如包含字母等特殊標記），只在 console 記錄，不彈出更新提示打擾使用者
+                        console.log(`[VersionCheck] 偵測到版本字串不同，但不進行強制更新提示 (${LOCAL_VERSION} != ${res.version})`);
                     }
                 }
             } catch (e) {
