@@ -1,3 +1,4 @@
+import { safeLocalStorage, safeSessionStorage } from './utils/storage';
 import React, { useState, useEffect } from 'react';
 import LoginPage from './pages/LoginPage';
 import SalesPage from './pages/SalesPage';
@@ -22,10 +23,13 @@ import ExpenditureManagementPage from './pages/ExpenditureManagementPage';
 import PermissionControlPage from './pages/PermissionControlPage';
 import PayrollPage from './pages/PayrollPage';
 import ActivityLogPage from './pages/ActivityLogPage';
+import LiffOrderPage from './pages/LiffOrderPage';
+import PendingOrdersPage from './pages/PendingOrdersPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './contexts/ThemeContext';
 import ThemeToggle from './components/ThemeToggle';
 import SessionManager from './utils/SessionManager';
+import { callGAS } from './utils/api';
 import useActivityLogger from './hooks/useActivityLogger';
 import {
     LayoutDashboard, ShoppingCart, Archive, LogOut, PackagePlus,
@@ -34,7 +38,7 @@ import {
 } from 'lucide-react';
 
 // Google Apps Script (GAS) API Endpoint
-const GAS_API_URL = import.meta.env.VITE_GAS_API_URL;
+const GAS_API_URL = window.GAS_API_URL || import.meta.env.VITE_GAS_API_URL;
 const LOCAL_VERSION = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : '2026.03.17.B7';
 
 console.log('--- 系統偵錯資訊 ---');
@@ -319,7 +323,7 @@ function AppContent() {
     useEffect(() => {
         const handleAuthExpired = () => {
             if (user) {
-                sessionStorage.removeItem('inventory_user');
+                safeSessionStorage.removeItem('inventory_user');
                 setUser(null);
                 alert('登入憑證已過期，請重新登入！');
             }
@@ -352,7 +356,7 @@ function AppContent() {
                     const res = await callGAS(GAS_API_URL, 'renewToken', {}, user.token);
                     if (res && res.success && res.token) {
                         const updatedUser = { ...user, token: res.token };
-                        sessionStorage.setItem('inventory_user', JSON.stringify(updatedUser));
+                        safeSessionStorage.setItem('inventory_user', JSON.stringify(updatedUser));
                         setUser(updatedUser);
                         console.log('[Heartbeat] Token successfully renewed');
                     }
@@ -367,16 +371,22 @@ function AppContent() {
 
     // Check for saved user session on component mount
     useEffect(() => {
-        const savedUser = sessionStorage.getItem('inventory_user');
+        const savedUser = safeSessionStorage.getItem('inventory_user');
         if (savedUser) {
-            const parsed = JSON.parse(savedUser);
-            // [Fix] Old session data might not have permissions. Force logout if undefined.
-            if (parsed && typeof parsed.permissions === 'undefined') {
-                console.warn('Detected stale user data (no permissions). Clearing session.');
-                sessionStorage.removeItem('inventory_user');
+            try {
+                const parsed = JSON.parse(savedUser);
+                // [Fix] Old session data might not have permissions. Force logout if undefined.
+                if (parsed && typeof parsed.permissions === 'undefined') {
+                    console.warn('Detected stale user data (no permissions). Clearing session.');
+                    safeSessionStorage.removeItem('inventory_user');
+                    setUser(null);
+                } else {
+                    setUser(parsed);
+                }
+            } catch (e) {
+                console.error('Failed to parse saved user session:', e);
+                safeSessionStorage.removeItem('inventory_user');
                 setUser(null);
-            } else {
-                setUser(parsed);
             }
         }
 
@@ -394,6 +404,33 @@ function AppContent() {
             logPageView(page);
         }
     }, [page, user]);
+
+    // Auto-login for LIFF order page (guest account)
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const isLiff = params.get('page') === 'liffOrder' || 
+                       (window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === 'liffOrder');
+        
+        if (isLiff && !user) {
+            const autoLogin = async () => {
+                try {
+                    console.log('Detecting LIFF order request, logging in guest...');
+                    const res = await callGAS(GAS_API_URL, 'login', { username: 'guest', password: 'guest' });
+                    if (res && res.success) {
+                        handleLogin(res);
+                        setPage('liffOrder');
+                    } else {
+                        console.error('Auto login guest failed:', res?.error);
+                    }
+                } catch (err) {
+                    console.error('Auto login guest error:', err);
+                }
+            };
+            autoLogin();
+        } else if (isLiff && user) {
+            setPage('liffOrder');
+        }
+    }, [user]);
 
     const checkPermission = (targetPage) => {
         if (!user) return false;
@@ -417,6 +454,10 @@ function AppContent() {
         if (!Array.isArray(perms)) perms = [];
 
         switch (targetPage) {
+            case 'liffOrder':
+                return user.username === 'guest' || user.role === 'BOSS' || perms.includes('sales_liff');
+            case 'pendingOrders':
+                return perms.includes('sales_pending') || user.role === 'BOSS';
             case 'sales':
                 return perms.includes('sales_entry') || perms.includes('sales');
             case 'report':
@@ -480,7 +521,7 @@ function AppContent() {
 
     const handleLogin = (userData) => {
         setUser(userData);
-        sessionStorage.setItem('inventory_user', JSON.stringify(userData));
+        safeSessionStorage.setItem('inventory_user', JSON.stringify(userData));
     };
 
     // 監聽登入動作：當使用者從 null 變為有值時，紀錄登入活動
@@ -498,7 +539,7 @@ function AppContent() {
     const handleLogout = () => {
         if (logLogout) logLogout('MANUAL');
         setUser(null);
-        sessionStorage.removeItem('inventory_user');
+        safeSessionStorage.removeItem('inventory_user');
         if (sessionManager) {
             sessionManager.destroy();
         }
@@ -589,10 +630,12 @@ function AppContent() {
                             <div className="fixed top-20 left-0 right-0 mx-auto w-[94%] max-w-md bg-[var(--bg-secondary)] backdrop-blur-xl border border-[var(--border-primary)] rounded-2xl shadow-2xl overflow-y-auto max-h-[80vh] animate-in fade-in slide-in-from-top-4 duration-200 z-[100]">
                                 <div className="p-2.5 flex flex-col gap-1.5">
                                     {/* 銷售管理 Group */}
-                                    {(user.role === 'BOSS' || checkPermission('sales') || checkPermission('report')) && (
+                                    {(user.role === 'BOSS' || checkPermission('sales') || checkPermission('report') || checkPermission('liffOrder') || checkPermission('pendingOrders')) && (
                                         <MobileNavGroup label="銷售" icon={ShoppingCart}>
                                             {checkPermission('sales') && <NavItem label="商品銷售登錄" icon={ShoppingCart} onClick={() => handlePageChange('sales')} active={page === 'sales'} />}
                                             {checkPermission('report') && <NavItem label="銷售查詢報表" icon={FileText} onClick={() => handlePageChange('report')} active={page === 'report'} />}
+                                            {checkPermission('liffOrder') && <NavItem label="團購一鍵下單" icon={ShoppingCart} onClick={() => handlePageChange('liffOrder')} active={page === 'liffOrder'} />}
+                                            {checkPermission('pendingOrders') && <NavItem label="待確認訂單審核" icon={ClipboardList} onClick={() => handlePageChange('pendingOrders')} active={page === 'pendingOrders'} />}
                                         </MobileNavGroup>
                                     )}
                                     {/* ...其餘 Mobile 選單項目保持不變... */}
@@ -650,17 +693,20 @@ function AppContent() {
                         {/* Column 1: 銷售 */}
                         <div className="flex justify-center">
                             {/* 銷售管理 Group */}
-                            {(user.role === 'BOSS' || checkPermission('sales') || checkPermission('report')) && (
+                            {(user.role === 'BOSS' || checkPermission('sales') || checkPermission('report') || checkPermission('liffOrder') || checkPermission('pendingOrders')) && (
                                 <NavDropdown
                                     id="sales"
                                     label="銷售"
                                     icon={ShoppingCart}
                                     openDropdown={openDropdown}
                                     setOpenDropdown={setOpenDropdown}
-                                    active={['sales', 'report'].includes(page)}
+                                    active={['sales', 'report', 'liffOrder', 'pendingOrders'].includes(page)}
                                 >
                                     {checkPermission('sales') && <NavItem label="商品銷售登錄" icon={ShoppingCart} onClick={() => handlePageChange('sales')} active={page === 'sales'} />}
                                     {checkPermission('report') && <NavItem label="銷售查詢報表" icon={FileText} onClick={() => handlePageChange('report')} active={page === 'report'} />}
+                                    <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+                                    {checkPermission('liffOrder') && <NavItem label="團購一鍵下單" icon={ShoppingCart} onClick={() => handlePageChange('liffOrder')} active={page === 'liffOrder'} />}
+                                    {checkPermission('pendingOrders') && <NavItem label="待確認訂單審核" icon={ClipboardList} onClick={() => handlePageChange('pendingOrders')} active={page === 'pendingOrders'} />}
                                 </NavDropdown>
                             )}
                         </div>
@@ -831,6 +877,8 @@ function AppContent() {
                         {page === 'permissionControl' && <PermissionControlPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'payroll' && <PayrollPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'activityLog' && <ActivityLogPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'liffOrder' && <LiffOrderPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'pendingOrders' && <PendingOrdersPage user={user} apiUrl={GAS_API_URL} />}
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full text-slate-400">

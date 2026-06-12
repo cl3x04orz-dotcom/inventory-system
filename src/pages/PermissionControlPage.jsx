@@ -15,7 +15,9 @@ export default function PermissionControlPage({ user, apiUrl }) {
             group: '銷售管理',
             items: [
                 { key: 'sales_entry', label: '商品銷售登錄' },
-                { key: 'sales_report', label: '銷售查詢報表' }
+                { key: 'sales_report', label: '銷售查詢報表' },
+                { key: 'sales_liff', label: '團購一鍵下單' },
+                { key: 'sales_pending', label: '待確認訂單審核' }
             ]
         },
         {

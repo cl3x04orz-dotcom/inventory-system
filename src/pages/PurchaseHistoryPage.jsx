@@ -1,3 +1,4 @@
+import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 import React, { useState, useEffect } from 'react';
 import { Search, Calendar, Filter, RefreshCw, ClipboardList, DollarSign, User, Truck, RotateCcw } from 'lucide-react';
 import { callGAS } from '../utils/api';
@@ -69,7 +70,7 @@ export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
         try {
             const res = await callGAS(apiUrl, 'voidAndFetchPurchase', { id }, user.token);
             if (res.success && res.originalRecord) {
-                sessionStorage.setItem('clonedPurchase', JSON.stringify(res.originalRecord));
+                safeSessionStorage.setItem('clonedPurchase', JSON.stringify(res.originalRecord));
                 if (typeof setPage === 'function') {
                     setPage('purchase');
                 } else {

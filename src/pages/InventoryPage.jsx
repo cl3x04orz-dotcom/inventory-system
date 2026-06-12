@@ -1,5 +1,6 @@
+import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 import React, { useState, useEffect, useCallback } from 'react';
-import { Package, Search, AlertCircle, RefreshCw, AlertTriangle, Trash2, Clock } from 'lucide-react';
+import { Package, Search, AlertCircle, RefreshCw, AlertTriangle, Trash2, Clock, Edit2, Save, Image, X } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import { CASE_MAP, sortProducts } from '../utils/constants';
 
@@ -16,6 +17,7 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
     const [tempSafetyInput, setTempSafetyInput] = useState({});
     const [customCaseSizes, setCustomCaseSizes] = useState({}); // Hand-tuned case sizes
     const [isAdjusting, setIsAdjusting] = useState(false);
+    const [showProductModal, setShowProductModal] = useState(false);
 
     const fetchInventory = useCallback(async () => {
         setLoading(true);
@@ -52,11 +54,23 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
         const init = async () => {
             if (user?.token) {
                 await fetchInventory();
-                const savedSafety = localStorage.getItem('safetyStocks');
-                if (savedSafety) setSafetyStocks(JSON.parse(savedSafety));
+                const savedSafety = safeLocalStorage.getItem('safetyStocks');
+                if (savedSafety) {
+                    try {
+                        setSafetyStocks(JSON.parse(savedSafety));
+                    } catch (e) {
+                        console.error('Failed to parse safetyStocks:', e);
+                    }
+                }
 
-                const savedCaseSizes = localStorage.getItem('customCaseSizes');
-                if (savedCaseSizes) setCustomCaseSizes(JSON.parse(savedCaseSizes));
+                const savedCaseSizes = safeLocalStorage.getItem('customCaseSizes');
+                if (savedCaseSizes) {
+                    try {
+                        setCustomCaseSizes(JSON.parse(savedCaseSizes));
+                    } catch (e) {
+                        console.error('Failed to parse customCaseSizes:', e);
+                    }
+                }
             }
         };
         init();
@@ -125,7 +139,7 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
     const updateSafetyStock = (productName, level) => {
         const newLevels = { ...safetyStocks, [productName]: Number(level) || 0 };
         setSafetyStocks(newLevels);
-        localStorage.setItem('safetyStocks', JSON.stringify(newLevels));
+        safeLocalStorage.setItem('safetyStocks', JSON.stringify(newLevels));
     };
 
     const handleSafetyInputChange = (productName, value) => {
@@ -142,7 +156,7 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
     const updateCustomCaseSize = (productName, size) => {
         const newSizes = { ...customCaseSizes, [productName]: Number(size) || 0 };
         setCustomCaseSizes(newSizes);
-        localStorage.setItem('customCaseSizes', JSON.stringify(newSizes));
+        safeLocalStorage.setItem('customCaseSizes', JSON.stringify(newSizes));
     };
 
     const focusAndSelect = (id) => {
@@ -554,6 +568,14 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
                     <button onClick={fetchInventory} className="btn-secondary p-2 whitespace-nowrap" title="重新整理">
                         <RefreshCw size={20} />
                     </button>
+                    {user.role === 'BOSS' && (
+                        <button
+                            onClick={() => setShowProductModal(true)}
+                            className="btn-primary px-3 py-2 text-sm flex items-center gap-1 whitespace-nowrap"
+                        >
+                            <Edit2 size={16} /> 商品管理
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -649,6 +671,201 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
                     </div>
                 </div>
             )}
+            {showProductModal && (
+                <ProductManagementModal
+                    isOpen={showProductModal}
+                    onClose={() => {
+                        setShowProductModal(false);
+                        fetchInventory();
+                    }}
+                    apiUrl={apiUrl}
+                    token={user.token}
+                />
+            )}
+        </div>
+    );
+}
+
+function ProductManagementModal({ isOpen, onClose, apiUrl, token }) {
+    const [products, setProducts] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [search, setSearch] = useState('');
+    const [savingId, setSavingId] = useState(null);
+
+    const fetchProducts = async () => {
+        setLoading(true);
+        try {
+            const data = await callGAS(apiUrl, 'getProducts', {}, token);
+            if (Array.isArray(data)) {
+                setProducts(data);
+            }
+        } catch (error) {
+            alert('載入商品失敗: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (isOpen) {
+            fetchProducts();
+        }
+    }, [isOpen]);
+
+    const handleFieldChange = (id, field, value) => {
+        setProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: value, _dirty: true } : p));
+    };
+
+    const handleSave = async (product) => {
+        setSavingId(product.id);
+        try {
+            const res = await callGAS(apiUrl, 'updateProductDetails', {
+                productId: product.id,
+                isActive: product.isActive,
+                imageUrl: product.imageUrl,
+                expiryDate: product.expiryDate
+            }, token);
+            
+            if (res && res.error) {
+                throw new Error(res.error);
+            }
+            
+            setProducts(prev => prev.map(p => p.id === product.id ? { ...p, _dirty: false } : p));
+            alert(`${product.name} 儲存成功`);
+        } catch (error) {
+            alert('儲存失敗: ' + error.message);
+        } finally {
+            setSavingId(null);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    const filtered = products.filter(p => 
+        String(p.name || '').toLowerCase().includes(search.toLowerCase()) ||
+        String(p.id || '').toLowerCase().includes(search.toLowerCase())
+    );
+
+    return (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-primary)] shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden glass-panel">
+                <div className="p-5 border-b border-[var(--border-primary)] flex justify-between items-center bg-[var(--bg-tertiary)]">
+                    <h3 className="text-xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+                        <Package className="text-blue-500" size={22} />
+                        商品上架與屬性管理
+                    </h3>
+                    <button onClick={onClose} className="text-[var(--text-secondary)] hover:text-red-500 transition-colors p-1.5 rounded-lg hover:bg-[var(--bg-hover)]">
+                        <X size={20} />
+                    </button>
+                </div>
+                
+                <div className="p-4 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] flex gap-4 items-center">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
+                        <input
+                            type="text"
+                            placeholder="搜尋商品名稱或ID..."
+                            className="input-field pl-10 w-full"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <button onClick={fetchProducts} className="btn-secondary p-2 rounded-lg" title="重新整理">
+                        <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[var(--bg-primary)]">
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center py-20 gap-3 text-[var(--text-secondary)]">
+                            <RefreshCw className="animate-spin text-blue-500" size={36} />
+                            <span>載入中，請稍候...</span>
+                        </div>
+                    ) : filtered.length === 0 ? (
+                        <div className="text-center py-20 text-[var(--text-secondary)] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">
+                            無商品資料
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {filtered.map(product => (
+                                <div key={product.id} className="flex flex-col md:flex-row md:items-center gap-4 p-4 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] hover:border-blue-500/20 transition-all shadow-sm">
+                                    {/* 圖片預覽 */}
+                                    <div className="w-16 h-16 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] overflow-hidden flex items-center justify-center flex-shrink-0 relative group">
+                                        {product.imageUrl ? (
+                                            <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; }} />
+                                        ) : (
+                                            <Image size={24} className="text-[var(--text-tertiary)]" />
+                                        )}
+                                    </div>
+
+                                    {/* 商品資訊 */}
+                                    <div className="flex-1 min-w-[150px]">
+                                        <div className="font-bold text-base text-[var(--text-primary)]">{product.name}</div>
+                                        <div className="text-xs text-[var(--text-tertiary)] font-mono mt-0.5">ID: {product.id}</div>
+                                        <div className="text-sm text-blue-600 font-bold mt-1">單價: ${product.price}</div>
+                                    </div>
+
+                                    {/* 屬性編輯區 */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:flex md:items-center md:gap-4 flex-shrink-0">
+                                        {/* 圖片網址 */}
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-[10px] uppercase font-bold text-[var(--text-tertiary)]">圖片網址</span>
+                                            <input
+                                                type="text"
+                                                className="input-field text-xs p-2 w-full md:w-48"
+                                                placeholder="圖片網址 https://..."
+                                                value={product.imageUrl || ''}
+                                                onChange={(e) => handleFieldChange(product.id, 'imageUrl', e.target.value)}
+                                            />
+                                        </div>
+
+                                        {/* 有效日期 */}
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-[10px] uppercase font-bold text-[var(--text-tertiary)]">有效日期</span>
+                                            <input
+                                                type="date"
+                                                className="input-field text-xs p-2 w-full md:w-36"
+                                                value={product.expiryDate || ''}
+                                                onChange={(e) => handleFieldChange(product.id, 'expiryDate', e.target.value)}
+                                            />
+                                        </div>
+
+                                        {/* 上架開關 */}
+                                        <div className="flex flex-col gap-1 justify-center items-center">
+                                            <span className="text-[10px] uppercase font-bold text-[var(--text-tertiary)]">上架狀態</span>
+                                            <label className="relative inline-flex items-center cursor-pointer mt-1">
+                                                <input
+                                                    type="checkbox"
+                                                    className="sr-only peer"
+                                                    checked={!!product.isActive}
+                                                    onChange={(e) => handleFieldChange(product.id, 'isActive', e.target.checked)}
+                                                />
+                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                            </label>
+                                        </div>
+
+                                        {/* 儲存按鈕 */}
+                                        <div className="flex items-end pt-3 sm:pt-0">
+                                            <button
+                                                disabled={savingId === product.id || !product._dirty}
+                                                onClick={() => handleSave(product)}
+                                                className={`w-full md:w-auto px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all ${
+                                                    product._dirty 
+                                                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md' 
+                                                        : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+                                                }`}
+                                            >
+                                                <Save size={14} />
+                                                {savingId === product.id ? '儲存中...' : '儲存'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

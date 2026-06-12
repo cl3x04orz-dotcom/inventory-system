@@ -1,3 +1,4 @@
+import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 import React, { useState, useEffect } from 'react';
 import { Lock, User, ArrowRight } from 'lucide-react';
 import { callGAS } from '../utils/api';
@@ -11,7 +12,7 @@ export default function LoginPage({ onLogin, apiUrl }) {
 
     // [New] 初始化時讀取記住的使用者名稱
     useEffect(() => {
-        const savedUser = localStorage.getItem('rememberedUsername');
+        const savedUser = safeLocalStorage.getItem('rememberedUsername');
         if (savedUser) {
             setUsername(savedUser);
             setRememberMe(true);
@@ -32,9 +33,9 @@ export default function LoginPage({ onLogin, apiUrl }) {
             } else {
                 // [New] 登入成功後處理記住帳號邏輯
                 if (rememberMe) {
-                    localStorage.setItem('rememberedUsername', username);
+                    safeLocalStorage.setItem('rememberedUsername', username);
                 } else {
-                    localStorage.removeItem('rememberedUsername');
+                    safeLocalStorage.removeItem('rememberedUsername');
                 }
                 onLogin(result);
             }

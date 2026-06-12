@@ -10,6 +10,26 @@ function getProductsService() {
     
     if (!productsSheet) return { error: "找不到 'Products' 分頁" };
     
+    // [新增] 自動初始化擴充欄位
+    var headerRow = productsSheet.getRange(1, 1, 1, productsSheet.getLastColumn()).getValues()[0];
+    var headerStrs = headerRow.map(h => String(h || '').trim());
+    var newCols = ['是否上架', '圖片網址', '有效日期'];
+    newCols.forEach(col => {
+        if (!headerStrs.includes(col)) {
+            var nextCol = productsSheet.getLastColumn() + 1;
+            productsSheet.getRange(1, nextCol).setValue(col);
+            // 如果是「是否上架」，預設現有所有列為 TRUE
+            if (col === '是否上架' && productsSheet.getLastRow() > 1) {
+                var rows = productsSheet.getLastRow() - 1;
+                var trueValues = Array.from({length: rows}, () => [true]);
+                productsSheet.getRange(2, nextCol, rows, 1).setValues(trueValues);
+                // 在該欄設定資料驗證（核取方塊）
+                var rule = SpreadsheetApp.newDataValidation().requireCheckbox().build();
+                productsSheet.getRange(2, nextCol, rows, 1).setDataValidation(rule);
+            }
+        }
+    });
+
     // 1. 讀取 Products 分頁（產品主檔）
     var productData = productsSheet.getDataRange().getValues();
     if (productData.length < 2) return [];
@@ -21,6 +41,11 @@ function getProductsService() {
     var idxWeight = productHeaders.indexOf('排序權重');
     if (idxWeight === -1) idxWeight = productHeaders.indexOf('sortweight');
     if (idxWeight === -1) idxWeight = productHeaders.findIndex(h => h.includes('權重') && !h.includes('單位'));
+    
+    // [新增] 擴充欄位 index
+    var idxActive = productData[0].findIndex(h => String(h || '').trim() === '是否上架');
+    var idxImage = productData[0].findIndex(h => String(h || '').trim() === '圖片網址');
+    var idxExpiry = productData[0].findIndex(h => String(h || '').trim() === '有效日期');
     
     if (idxName === -1) idxName = 1; // Fallback
     
@@ -69,6 +94,17 @@ function getProductsService() {
             if (!isNaN(psVal) && psVal > 0) packSize = psVal;
         }
 
+        // [新增] 有效日期格式化
+        var expiryStr = '';
+        if (idxExpiry !== -1 && row[idxExpiry]) {
+            var expVal = row[idxExpiry];
+            if (expVal instanceof Date) {
+                expiryStr = Utilities.formatDate(expVal, 'GMT+8', 'yyyy-MM-dd');
+            } else {
+                expiryStr = String(expVal).trim();
+            }
+        }
+
         var p = {
             id: productId,
             name: nameCell,
@@ -76,6 +112,9 @@ function getProductsService() {
             packSize: packSize,
             stock: 0,
             originalStock: 0,
+            isActive: idxActive !== -1 ? (row[idxActive] === true || row[idxActive] === 'TRUE' || row[idxActive] === '是') : true,
+            imageUrl: idxImage !== -1 ? String(row[idxImage] || '').trim() : '',
+            expiryDate: expiryStr,
             _fromSheet: 'Products'
         };
         
@@ -146,4 +185,59 @@ function updateProductSortOrderService(payload) {
     weightRange.setValues(weightValues);
     SpreadsheetApp.flush();
     return { success: true, updateCount: updateCount };
+}
+
+/**
+ * [Service] 更新商品擴充屬性（是否上架、圖片網址、有效日期）
+ * 只有 BOSS 可以操作
+ */
+function updateProductDetailsService(payload, user) {
+    if (user.role !== 'BOSS') throw new Error('權限不足');
+
+    const { productId, isActive, imageUrl, expiryDate } = payload;
+    if (!productId) throw new Error('缺少 productId');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Products');
+    if (!sheet) throw new Error('找不到 Products 分頁');
+
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+
+    const idColIdx = headers.findIndex(h => {
+        const s = String(h || '').trim().toLowerCase();
+        return s.includes('id') || s.includes('序號') || s.includes('uuid');
+    });
+    const nameColIdx = headers.findIndex(h => {
+        const s = String(h || '').trim().toLowerCase();
+        return s.includes('名稱') || s.includes('name') || s.includes('品項') || s.includes('品名');
+    });
+    const idxActive = headers.findIndex(h => String(h || '').trim() === '是否上架');
+    const idxImage = headers.findIndex(h => String(h || '').trim() === '圖片網址');
+    const idxExpiry = headers.findIndex(h => String(h || '').trim() === '有效日期');
+
+    let foundRow = -1;
+    for (let i = 1; i < data.length; i++) {
+        const idVal = idColIdx !== -1 ? String(data[i][idColIdx] || '').trim() : '';
+        const nameVal = nameColIdx !== -1 ? String(data[i][nameColIdx] || '').trim() : '';
+        if (idVal === productId || nameVal === productId) {
+            foundRow = i + 1;
+            break;
+        }
+    }
+    if (foundRow === -1) throw new Error('找不到商品：' + productId);
+
+    // 逐欄更新
+    if (idxActive !== -1 && isActive !== undefined) {
+        sheet.getRange(foundRow, idxActive + 1).setValue(isActive === true || isActive === 'true' || isActive === true);
+    }
+    if (idxImage !== -1 && imageUrl !== undefined) {
+        sheet.getRange(foundRow, idxImage + 1).setValue(imageUrl || '');
+    }
+    if (idxExpiry !== -1 && expiryDate !== undefined) {
+        sheet.getRange(foundRow, idxExpiry + 1).setValue(expiryDate || '');
+    }
+
+    SpreadsheetApp.flush();
+    return { success: true };
 }

@@ -1,3 +1,4 @@
+import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 import React, { useState, useEffect, useCallback } from 'react';
 import { Save, RefreshCw, Calculator, DollarSign, GripVertical, ListOrdered, Printer } from 'lucide-react';
 
@@ -224,7 +225,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 // 1. Generate Base Rows
                 let finalRows = sortedProducts.map(p => {
                     const localPriceKey = `last_price_${p.id}`;
-                    const localPrice = localStorage.getItem(localPriceKey);
+                    const localPrice = safeLocalStorage.getItem(localPriceKey);
 
                     // 優先使用記憶單價，若無則保持空白讓使用者填寫
                     let finalPrice = localPrice !== null ? Number(localPrice) : '';
@@ -246,7 +247,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 });
 
                 // 2. Check & Merge Cloned Data immediately
-                const clonedRaw = sessionStorage.getItem('clonedSale');
+                const clonedRaw = safeSessionStorage.getItem('clonedSale');
                 if (clonedRaw) {
                     try {
                         const cloned = JSON.parse(clonedRaw);
@@ -384,7 +385,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
             // 2. Local Price Memory Persistence
             if (field === 'price') {
-                localStorage.setItem(`last_price_${id}`, getSafeNum(newPrice).toString());
+                safeLocalStorage.setItem(`last_price_${id}`, getSafeNum(newPrice).toString());
             }
 
             // 3. Validate Stock Limits (Use getSafeNum for subtraction/comparison)
@@ -729,7 +730,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             }
 
             alert('保存成功！資料已寫入 Google Sheet。');
-            sessionStorage.removeItem('clonedSale');
+            safeSessionStorage.removeItem('clonedSale');
             window.location.reload();
 
         } catch (e) {

@@ -1,12 +1,14 @@
 /**
  * Serves the React App
  */
-const APP_VERSION = '1780624639617';
+const APP_VERSION = '1781276743985';
  // 版本號：A2:3/24
 
-function doGet() {
-    return HtmlService.createTemplateFromFile('Client')
-        .evaluate()
+function doGet(e) {
+    const template = HtmlService.createTemplateFromFile('Client');
+    template.parameters = JSON.stringify(e && e.parameter ? e.parameter : {});
+    template.currentApiUrl = ScriptApp.getService().getUrl();
+    return template.evaluate()
         .addMetaTag('viewport', 'width=device-width, initial-scale=1')
         .setTitle('Inventory System')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -87,8 +89,15 @@ function apiHandler(request) {
         'getInventoryForStocktake': 'inventory_stocktake',
         'saveStocktake': 'inventory_stocktake',
         'getStocktakeHistory': 'inventory_history',
-        'getProducts': 'inventory_adjust',
+        'getProducts': null, // 任何登入使用者（含點餐訪客）皆可獲取商品列表
         'updateProductSortOrder': 'system_config',
+        'updateProductDetails': 'system_config',
+        
+        // Group Buy Orders (團購)
+        'savePendingOrder': null, // 任何登入使用者可下單
+        'getPendingOrders': 'sales_pending',
+        'updatePendingOrder': 'sales_pending',
+        'confirmPendingOrder': 'sales_pending',
         
         // Finance (財務管理)
         'getExpenditures': null, // [Modification] Anyone can call, filtering happens in service
@@ -175,6 +184,12 @@ function apiHandler(request) {
             // Inventory & Purchase
             case 'getProducts': return typeof getProductsService !== 'undefined' ? getProductsService() : {error: '後端服務缺失: getProductsService'}; 
             case 'updateProductSortOrder': return typeof updateProductSortOrderService !== 'undefined' ? updateProductSortOrderService(payload) : {error: '後端服務缺失: updateProductSortOrderService'};
+            case 'updateProductDetails': return typeof updateProductDetailsService !== 'undefined' ? updateProductDetailsService(payload, user) : {error: '後端服務缺失: updateProductDetailsService'};
+            // Group Buy Orders (團購)
+            case 'savePendingOrder': return typeof savePendingOrderService !== 'undefined' ? savePendingOrderService(payload, user) : {error: '後端服務缺失: savePendingOrderService'};
+            case 'getPendingOrders': return typeof getPendingOrdersService !== 'undefined' ? getPendingOrdersService(payload, user) : {error: '後端服務缺失: getPendingOrdersService'};
+            case 'updatePendingOrder': return typeof updatePendingOrderService !== 'undefined' ? updatePendingOrderService(payload, user) : {error: '後端服務缺失: updatePendingOrderService'};
+            case 'confirmPendingOrder': return typeof confirmPendingOrderService !== 'undefined' ? confirmPendingOrderService(payload, user) : {error: '後端服務缺失: confirmPendingOrderService'};
             case 'getInventory': return typeof getInventoryService !== 'undefined' ? getInventoryService() : {error: '後端服務缺失: getInventoryService'}; 
             case 'getPurchaseSuggestions': return typeof getPurchaseSuggestionsService !== 'undefined' ? getPurchaseSuggestionsService() : {error: '後端服務缺失: getPurchaseSuggestionsService'}; 
             case 'addPurchase': return typeof addPurchaseService !== 'undefined' ? addPurchaseService(payload, user) : {error: '後端服務缺失: addPurchaseService (進貨功能)'}; 

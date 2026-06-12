@@ -1,3 +1,4 @@
+import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const ThemeContext = createContext({
@@ -12,11 +13,11 @@ export const useTheme = () => useContext(ThemeContext);
 
 export const ThemeProvider = ({ children }) => {
     const [theme, setThemeState] = useState(() => {
-        return localStorage.getItem('theme') || 'light';
+        return safeLocalStorage.getItem('theme') || 'light';
     });
 
     const [autoSchedule, setAutoScheduleState] = useState(() => {
-        const saved = localStorage.getItem('themeSchedule');
+        const saved = safeLocalStorage.getItem('themeSchedule');
         return saved ? JSON.parse(saved) : {
             lightStart: '06:00',
             darkStart: '18:00',
@@ -48,13 +49,13 @@ export const ThemeProvider = ({ children }) => {
     // 設定主題
     const setTheme = (newTheme) => {
         setThemeState(newTheme);
-        localStorage.setItem('theme', newTheme);
+        safeLocalStorage.setItem('theme', newTheme);
     };
 
     // 設定自動排程
     const setAutoSchedule = (schedule) => {
         setAutoScheduleState(schedule);
-        localStorage.setItem('themeSchedule', JSON.stringify(schedule));
+        safeLocalStorage.setItem('themeSchedule', JSON.stringify(schedule));
     };
 
     // 監聽主題變化並應用到 DOM

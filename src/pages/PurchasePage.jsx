@@ -1,3 +1,4 @@
+import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 import React, { useState, useEffect } from 'react';
 import { PlusCircle } from 'lucide-react';
 import { callGAS } from '../utils/api';
@@ -39,9 +40,9 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
         if (user?.token) fetchSuggestions();
     }, [user.token, apiUrl]);
 
-    // [New] Handle Correction/Clone from sessionStorage
+    // [New] Handle Correction/Clone from safeSessionStorage
     useEffect(() => {
-        const cloned = sessionStorage.getItem('clonedPurchase');
+        const cloned = safeSessionStorage.getItem('clonedPurchase');
         if (cloned) {
             try {
                 const data = JSON.parse(cloned);
@@ -62,7 +63,7 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                 };
 
                 setItems([newItem]);
-                sessionStorage.removeItem('clonedPurchase');
+                safeSessionStorage.removeItem('clonedPurchase');
 
                 // Optional: show a small toast or log
                 console.log("Loaded cloned purchase data");

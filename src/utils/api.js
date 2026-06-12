@@ -1,3 +1,4 @@
+import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 /**
  * Unified API Caller for Google Apps Script (GAS)
  */
@@ -37,11 +38,11 @@ export const callGAS = async (apiUrl, action, payload, token = null) => {
                         console.log('[API] 自動續約成功，重試原始請求');
                         
                         // 更新本地存儲的 token (給下次其他請求用)
-                        const savedUser = sessionStorage.getItem('inventory_user');
+                        const savedUser = safeSessionStorage.getItem('inventory_user');
                         if (savedUser) {
                             const userData = JSON.parse(savedUser);
                             userData.token = renewRes.token;
-                            sessionStorage.setItem('inventory_user', JSON.stringify(userData));
+                            safeSessionStorage.setItem('inventory_user', JSON.stringify(userData));
                             
                             // 這裡我們發出一個事件，讓 App.jsx 知道要更新 state 中的 user
                             window.dispatchEvent(new CustomEvent('token_renewed', { detail: userData }));

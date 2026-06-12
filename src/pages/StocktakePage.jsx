@@ -1,3 +1,4 @@
+import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 import React, { useState, useEffect, useCallback } from 'react';
 import { Save, Search, AlertTriangle, CheckSquare, RotateCcw, Package, AlertCircle } from 'lucide-react';
 import { callGAS } from '../utils/api';
@@ -55,7 +56,7 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
                 });
 
                 // Load Draft from LocalStorage
-                const savedDraft = localStorage.getItem('stocktake_draft');
+                const savedDraft = safeLocalStorage.getItem('stocktake_draft');
                 if (savedDraft) {
                     try {
                         const parsed = JSON.parse(savedDraft);
@@ -85,9 +86,15 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
     useEffect(() => {
         if (user?.token) {
             fetchInventory();
-            // Load custom case sizes from localStorage (consistent with InventoryPage)
-            const saved = localStorage.getItem('customCaseSizes');
-            if (saved) setCustomCaseSizes(JSON.parse(saved));
+            // Load custom case sizes from safeLocalStorage (consistent with InventoryPage)
+            const saved = safeLocalStorage.getItem('customCaseSizes');
+            if (saved) {
+                try {
+                    setCustomCaseSizes(JSON.parse(saved));
+                } catch (e) {
+                    console.error('Failed to parse customCaseSizes:', e);
+                }
+            }
         }
     }, [user.token, fetchInventory]);
 
@@ -101,7 +108,7 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
                 }
             };
             // 即時存檔
-            localStorage.setItem('stocktake_draft', JSON.stringify(newData));
+            safeLocalStorage.setItem('stocktake_draft', JSON.stringify(newData));
             return newData;
         });
     };
@@ -279,7 +286,7 @@ export default function StocktakePage({ user, apiUrl, logActivity }) {
 
             alert('盤點資料提交成功！');
             // Reset and load
-            localStorage.removeItem('stocktake_draft');
+            safeLocalStorage.removeItem('stocktake_draft');
             setStocktakeData({});
             await fetchInventory();
         } catch (error) {

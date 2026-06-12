@@ -1,8 +1,9 @@
+import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 import React, { useState, useEffect } from 'react';
 import { ListOrdered, Printer, Clock, CreditCard, Package, X, Trash2, CheckCircle2, Sparkles, Sun, CloudRain, MapPin, Calendar, ChevronDown } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
-const apiUrl = import.meta.env.VITE_GAS_API_URL;
+const apiUrl = window.GAS_API_URL || import.meta.env.VITE_GAS_API_URL;
 
 export default function MergePrintModal({
     show,
@@ -118,7 +119,7 @@ export default function MergePrintModal({
         setAiMessage(null);
 
         try {
-            const userString = sessionStorage.getItem('inventory_user');
+            const userString = safeSessionStorage.getItem('inventory_user');
             const user = userString ? JSON.parse(userString) : null;
             if (!user) throw new Error('連線逾時或尚未登入，請重新整理頁面');
 

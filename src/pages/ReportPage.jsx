@@ -1,3 +1,4 @@
+import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 import React, { useState, useCallback } from 'react';
 import { Search, Calendar, MapPin, User, FileText, TrendingUp, Package, DollarSign, RotateCcw, ChevronDown, ChevronRight } from 'lucide-react';
 import { callGAS } from '../utils/api';
@@ -113,7 +114,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
             // [優化] 第一步：先抓取資料（純讀取，極快），即便後續作廢超時，資料也已經在快取裡了
             const fetchRes = await callGAS(apiUrl, 'getSaleToClone', { saleId }, user.token);
             if (fetchRes.success && fetchRes.cloneData) {
-                sessionStorage.setItem('clonedSale', JSON.stringify(fetchRes.cloneData));
+                safeSessionStorage.setItem('clonedSale', JSON.stringify(fetchRes.cloneData));
             } else {
                 throw new Error(fetchRes.error || '無法獲取原始資料');
             }

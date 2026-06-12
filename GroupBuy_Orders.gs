@@ -1,0 +1,313 @@
+/**
+ * GroupBuy_Orders.gs
+ * 團購待確認訂單管理
+ * 訂單流程：客戶下單 → PENDING → 管理員審核/修改 → CONFIRMED（扣庫存）
+ */
+
+const GB_SHEET_NAME = 'GroupBuy_Orders';
+const GB_DETAIL_SHEET_NAME = 'GroupBuy_OrderDetails';
+const GB_HEADERS = ['OrderId', 'Status', 'CustomerLineId', 'CustomerName', 'CustomerPhone', 'DeliveryAddress', 'SourceGroup', 'Note', 'TotalAmount', 'CreatedAt', 'UpdatedAt', 'ConfirmedAt', 'ConfirmedBy'];
+const GB_DETAIL_HEADERS = ['OrderId', 'ProductId', 'ProductName', 'UnitPrice', 'Qty', 'Subtotal'];
+
+function initGroupBuySheets_() {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let orderSheet = ss.getSheetByName(GB_SHEET_NAME);
+    if (!orderSheet) {
+        orderSheet = ss.insertSheet(GB_SHEET_NAME);
+        orderSheet.appendRow(GB_HEADERS);
+        orderSheet.setFrozenRows(1);
+    }
+    let detailSheet = ss.getSheetByName(GB_DETAIL_SHEET_NAME);
+    if (!detailSheet) {
+        detailSheet = ss.insertSheet(GB_DETAIL_SHEET_NAME);
+        detailSheet.appendRow(GB_DETAIL_HEADERS);
+        detailSheet.setFrozenRows(1);
+    }
+    return { orderSheet, detailSheet };
+}
+
+function generateOrderId_() {
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `GB${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+}
+
+/**
+ * [Service] 客戶送出訂單 (寫入 PENDING，不扣庫存)
+ */
+function savePendingOrderService(payload, user) {
+    const { customerName, customerPhone, deliveryAddress, sourceGroup, note, items } = payload;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+        throw new Error('訂單明細不得為空');
+    }
+
+    const { orderSheet, detailSheet } = initGroupBuySheets_();
+    const orderId = generateOrderId_();
+    const now = new Date();
+
+    const totalAmount = items.reduce((sum, item) => sum + (Number(item.unitPrice) * Number(item.qty)), 0);
+
+    // 寫入主單
+    orderSheet.appendRow([
+        orderId,
+        'PENDING',
+        user.lineUserId || user.username || '',
+        customerName || '',
+        customerPhone || '',
+        deliveryAddress || '',
+        sourceGroup || '',
+        note || '',
+        totalAmount,
+        now,
+        now,
+        '',
+        ''
+    ]);
+
+    // 寫入明細
+    items.forEach(item => {
+        const subtotal = Number(item.unitPrice) * Number(item.qty);
+        detailSheet.appendRow([
+            orderId,
+            item.productId || '',
+            item.productName || '',
+            Number(item.unitPrice) || 0,
+            Number(item.qty) || 0,
+            subtotal
+        ]);
+    });
+
+    SpreadsheetApp.flush();
+    return { success: true, orderId };
+}
+
+/**
+ * [Service] 取得所有待確認訂單 (僅 BOSS 可用)
+ */
+function getPendingOrdersService(payload, user) {
+    if (user.role !== 'BOSS') throw new Error('權限不足');
+
+    const { status } = payload || {};
+    const { orderSheet, detailSheet } = initGroupBuySheets_();
+
+    const orderRows = orderSheet.getDataRange().getValues();
+    const detailRows = detailSheet.getDataRange().getValues();
+
+    // 組織明細 Map
+    const detailMap = {};
+    for (let i = 1; i < detailRows.length; i++) {
+        const row = detailRows[i];
+        const oid = String(row[0] || '').trim();
+        if (!oid) continue;
+        if (!detailMap[oid]) detailMap[oid] = [];
+        detailMap[oid].push({
+            productId: String(row[1] || ''),
+            productName: String(row[2] || ''),
+            unitPrice: Number(row[3]) || 0,
+            qty: Number(row[4]) || 0,
+            subtotal: Number(row[5]) || 0
+        });
+    }
+
+    const orders = [];
+    for (let i = 1; i < orderRows.length; i++) {
+        const row = orderRows[i];
+        const orderId = String(row[0] || '').trim();
+        const rowStatus = String(row[1] || '').trim();
+        if (!orderId) continue;
+        if (status && rowStatus !== status) continue;
+
+        orders.push({
+            orderId,
+            status: rowStatus,
+            customerLineId: String(row[2] || ''),
+            customerName: String(row[3] || ''),
+            customerPhone: String(row[4] || ''),
+            deliveryAddress: String(row[5] || ''),
+            sourceGroup: String(row[6] || ''),
+            note: String(row[7] || ''),
+            totalAmount: Number(row[8]) || 0,
+            createdAt: row[9] ? new Date(row[9]).toISOString() : '',
+            updatedAt: row[10] ? new Date(row[10]).toISOString() : '',
+            confirmedAt: row[11] ? new Date(row[11]).toISOString() : '',
+            confirmedBy: String(row[12] || ''),
+            items: detailMap[orderId] || []
+        });
+    }
+
+    return orders.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+}
+
+/**
+ * [Service] 管理員修改待確認訂單（商品、數量、收件資訊全可改）
+ */
+function updatePendingOrderService(payload, user) {
+    if (user.role !== 'BOSS') throw new Error('權限不足');
+
+    const { orderId, customerName, customerPhone, deliveryAddress, note, items } = payload;
+    if (!orderId) throw new Error('缺少 orderId');
+
+    const { orderSheet, detailSheet } = initGroupBuySheets_();
+    const orderData = orderSheet.getDataRange().getValues();
+
+    // 找主單列
+    let foundOrderRow = -1;
+    for (let i = 1; i < orderData.length; i++) {
+        if (String(orderData[i][0]).trim() === orderId) {
+            foundOrderRow = i + 1;
+            break;
+        }
+    }
+    if (foundOrderRow === -1) throw new Error('找不到訂單：' + orderId);
+
+    const now = new Date();
+    const totalAmount = (items || []).reduce((sum, item) => sum + (Number(item.unitPrice) * Number(item.qty)), 0);
+
+    // 更新主單欄位 (保留 OrderId, Status, CustomerLineId, CreatedAt 不動)
+    orderSheet.getRange(foundOrderRow, 4, 1, 6).setValues([[
+        customerName || orderData[foundOrderRow-1][3],
+        customerPhone || orderData[foundOrderRow-1][4],
+        deliveryAddress || orderData[foundOrderRow-1][5],
+        orderData[foundOrderRow-1][6], // sourceGroup 不改
+        note !== undefined ? note : orderData[foundOrderRow-1][7],
+        totalAmount
+    ]]);
+    // 更新 UpdatedAt (col 11)
+    orderSheet.getRange(foundOrderRow, 11).setValue(now);
+
+    // 清除舊明細並重寫
+    if (items && items.length > 0) {
+        const detailData = detailSheet.getDataRange().getValues();
+        const rowsToDelete = [];
+        for (let i = detailData.length - 1; i >= 1; i--) {
+            if (String(detailData[i][0]).trim() === orderId) {
+                rowsToDelete.push(i + 1);
+            }
+        }
+        rowsToDelete.forEach(r => detailSheet.deleteRow(r));
+
+        items.forEach(item => {
+            const subtotal = Number(item.unitPrice) * Number(item.qty);
+            detailSheet.appendRow([
+                orderId,
+                item.productId || '',
+                item.productName || '',
+                Number(item.unitPrice) || 0,
+                Number(item.qty) || 0,
+                subtotal
+            ]);
+        });
+    }
+
+    SpreadsheetApp.flush();
+    return { success: true };
+}
+
+/**
+ * [Service] 確認出貨：將 PENDING 訂單轉為 CONFIRMED，並寫入正式銷售
+ */
+function confirmPendingOrderService(payload, user) {
+    if (user.role !== 'BOSS') throw new Error('權限不足');
+
+    const { orderId } = payload;
+    if (!orderId) throw new Error('缺少 orderId');
+
+    const { orderSheet, detailSheet } = initGroupBuySheets_();
+    const orderData = orderSheet.getDataRange().getValues();
+
+    let foundOrderRow = -1;
+    let orderRecord = null;
+    for (let i = 1; i < orderData.length; i++) {
+        if (String(orderData[i][0]).trim() === orderId) {
+            foundOrderRow = i + 1;
+            orderRecord = orderData[i];
+            break;
+        }
+    }
+    if (foundOrderRow === -1) throw new Error('找不到訂單：' + orderId);
+    if (orderRecord[1] !== 'PENDING') throw new Error('此訂單已不是 PENDING 狀態');
+
+    // 讀取明細
+    const detailData = detailSheet.getDataRange().getValues();
+    const items = [];
+    for (let i = 1; i < detailData.length; i++) {
+        if (String(detailData[i][0]).trim() === orderId) {
+            items.push({
+                productId: String(detailData[i][1] || ''),
+                productName: String(detailData[i][2] || ''),
+                unitPrice: Number(detailData[i][3]) || 0,
+                qty: Number(detailData[i][4]) || 0,
+                subtotal: Number(detailData[i][5]) || 0
+            });
+        }
+    }
+    if (items.length === 0) throw new Error('訂單明細為空，無法確認出貨');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const salesSheet = ss.getSheetByName('Sales');
+    const salesDetailSheet = ss.getSheetByName('SalesDetails');
+    const now = new Date();
+
+    const customerName = String(orderRecord[3] || '');
+    const totalAmount = Number(orderRecord[8]) || 0;
+    const deliveryAddress = String(orderRecord[5] || '');
+    const sourceGroup = String(orderRecord[6] || '');
+
+    // 寫入 Sales 主單（使用 orderId 作為 SaleID）
+    if (salesSheet) {
+        const salesHeaders = salesSheet.getRange(1, 1, 1, salesSheet.getLastColumn()).getValues()[0];
+        const findSalesIdx = kws => salesHeaders.findIndex(h => kws.some(k => String(h || '').toLowerCase().includes(k)));
+
+        const sIdIdx    = findSalesIdx(['saleid', '編號', 'id']);
+        const sDateIdx  = findSalesIdx(['日期', 'date', 'time']);
+        const sUserIdx  = findSalesIdx(['業務', 'rep', 'user', 'operator']);
+        const sCustIdx  = findSalesIdx(['客戶', 'customer']);
+        const sTotalIdx = findSalesIdx(['total', '金額', 'amount']);
+        const sNoteIdx  = findSalesIdx(['備註', 'note']);
+
+        const colCount  = Math.max(salesHeaders.length, 12);
+        const newRow    = new Array(colCount).fill('');
+        if (sIdIdx   !== -1) newRow[sIdIdx]   = orderId;
+        if (sDateIdx !== -1) newRow[sDateIdx]  = now;
+        if (sUserIdx !== -1) newRow[sUserIdx]  = user.username;
+        if (sCustIdx !== -1) newRow[sCustIdx]  = customerName + (deliveryAddress ? ' ' + deliveryAddress : '');
+        if (sTotalIdx !== -1) newRow[sTotalIdx] = totalAmount;
+        if (sNoteIdx !== -1) newRow[sNoteIdx] = '團購' + (sourceGroup ? '/' + sourceGroup : '');
+        salesSheet.appendRow(newRow);
+    }
+
+    // 寫入 SalesDetails
+    if (salesDetailSheet) {
+        const detailHeaders = salesDetailSheet.getRange(1, 1, 1, salesDetailSheet.getLastColumn()).getValues()[0];
+        const findDIdx = kws => detailHeaders.findIndex(h => kws.some(k => String(h || '').toLowerCase().includes(k)));
+        const dIdIdx  = findDIdx(['saleid', '訂單', '編號', 'id']);
+        const dPidIdx = findDIdx(['productid', '商品id', '產品id']);
+        const dNameIdx = findDIdx(['name', '名稱', '品名', '品項']);
+        const dPriceIdx = findDIdx(['price', '單價', 'unitprice']);
+        const dQtyIdx = findDIdx(['qty', 'quantity', '數量']);
+        const dSubIdx = findDIdx(['subtotal', '小計', '金額']);
+
+        items.forEach(item => {
+            const colCount = Math.max(detailHeaders.length, 8);
+            const newRow = new Array(colCount).fill('');
+            if (dIdIdx   !== -1) newRow[dIdIdx]   = orderId;
+            if (dPidIdx  !== -1) newRow[dPidIdx]  = item.productId;
+            if (dNameIdx !== -1) newRow[dNameIdx] = item.productName;
+            if (dPriceIdx !== -1) newRow[dPriceIdx] = item.unitPrice;
+            if (dQtyIdx  !== -1) newRow[dQtyIdx]  = item.qty;
+            if (dSubIdx  !== -1) newRow[dSubIdx]  = item.subtotal;
+            salesDetailSheet.appendRow(newRow);
+        });
+    }
+
+    // 更新主單狀態
+    const now2 = new Date();
+    orderSheet.getRange(foundOrderRow, 2).setValue('CONFIRMED');
+    orderSheet.getRange(foundOrderRow, 11).setValue(now2); // UpdatedAt
+    orderSheet.getRange(foundOrderRow, 12).setValue(now2); // ConfirmedAt
+    orderSheet.getRange(foundOrderRow, 13).setValue(user.username); // ConfirmedBy
+
+    SpreadsheetApp.flush();
+    return { success: true, orderId };
+}
