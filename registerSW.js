@@ -1,1 +1,0 @@
-if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/inventory-system/sw.js', { scope: '/inventory-system/' })})}
