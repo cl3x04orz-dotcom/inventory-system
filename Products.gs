@@ -13,7 +13,7 @@ function getProductsService() {
     // [新增] 自動初始化擴充欄位
     var headerRow = productsSheet.getRange(1, 1, 1, productsSheet.getLastColumn()).getValues()[0];
     var headerStrs = headerRow.map(h => String(h || '').trim());
-    var newCols = ['是否上架', '圖片網址', '有效日期'];
+    var newCols = ['是否上架', '圖片網址', '有效日期', '分類'];
     newCols.forEach(col => {
         if (!headerStrs.includes(col)) {
             var nextCol = productsSheet.getLastColumn() + 1;
@@ -46,6 +46,7 @@ function getProductsService() {
     var idxActive = productData[0].findIndex(h => String(h || '').trim() === '是否上架');
     var idxImage = productData[0].findIndex(h => String(h || '').trim() === '圖片網址');
     var idxExpiry = productData[0].findIndex(h => String(h || '').trim() === '有效日期');
+    var idxCategory = productData[0].findIndex(h => String(h || '').trim() === '分類');
     
     if (idxName === -1) idxName = 1; // Fallback
     
@@ -115,6 +116,7 @@ function getProductsService() {
             isActive: idxActive !== -1 ? (row[idxActive] === true || row[idxActive] === 'TRUE' || row[idxActive] === '是') : true,
             imageUrl: idxImage !== -1 ? String(row[idxImage] || '').trim() : '',
             expiryDate: expiryStr,
+            category: idxCategory !== -1 ? String(row[idxCategory] || '').trim() : '',
             _fromSheet: 'Products'
         };
         

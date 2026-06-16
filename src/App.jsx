@@ -147,10 +147,9 @@ function AppContent() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [isOffline, setIsOffline] = useState(false);
     const [sessionManager, setSessionManager] = useState(null);
-    const [hasUpdate, setHasUpdate] = useState(null); // { local, server }
+    const [isInitializing, setIsInitializing] = useState(true);
+    const [showSplash, setShowSplash] = useState(true);
 
-    // 檢查版本更新 (透過 apiHandler: getVersion)
-    const checkCountRef = React.useRef(0);
     const [showHeader, setShowHeader] = useState(true);
     const [scrolled, setScrolled] = useState(false);
     const lastScrollY = React.useRef(0);
@@ -192,102 +191,6 @@ function AppContent() {
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
     }, [mobileMenuOpen]);
-
-    const lastCheckTimeRef = React.useRef(0);
-    const [lastCheckTime, setLastCheckTime] = useState(null);
-
-    useEffect(() => {
-        const checkUpdate = async () => {
-            // 如果是點餐訪客，直接跳過版本檢查，不干擾客戶點餐
-            if (user?.username === 'guest') return;
-
-            const now = Date.now();
-            if (now - lastCheckTimeRef.current < 5000) return; // 防抖 5 秒內不重複檢查
-            lastCheckTimeRef.current = now;
-
-            checkCountRef.current += 1;
-            const count = checkCountRef.current;
-            setLastCheckTime(new Date().toLocaleTimeString());
-
-            try {
-                console.log(`[VersionCheck #${count}] 開始檢查... 本地:${LOCAL_VERSION}`);
-                // cache-busting: 加 _t 參數避免 GAS response 被快取
-                const response = await fetch(`${GAS_API_URL}?t=${Date.now()}`, {
-                    method: 'POST',
-                    redirect: 'follow',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ action: 'getVersion', _t: Date.now() })
-                });
-                const res = await response.json();
-                console.log(`[VersionCheck #${count}] 伺服器回應:`, res.version);
-
-                if (res && res.version && String(res.version) !== String(LOCAL_VERSION)) {
-                    const serverVer = Number(res.version);
-                    const localVer = Number(LOCAL_VERSION);
-
-                    if (!isNaN(serverVer) && !isNaN(localVer)) {
-                        if (serverVer > localVer) {
-                            console.warn(`[VersionCheck] 偵測到新版本! (${LOCAL_VERSION} -> ${res.version})`);
-                            setHasUpdate({ local: LOCAL_VERSION, server: res.version });
-                        } else {
-                            console.log(`[VersionCheck] 本地版本較新或相同，無需更新 (${LOCAL_VERSION} >= ${res.version})`);
-                        }
-                    } else {
-                        // 字串不符（例如包含字母等特殊標記），只在 console 記錄，不彈出更新提示打擾使用者
-                        console.log(`[VersionCheck] 偵測到版本字串不同，但不進行強制更新提示 (${LOCAL_VERSION} != ${res.version})`);
-                    }
-                }
-            } catch (e) {
-                console.warn(`[VersionCheck #${count}] 檢查失敗:`, e);
-            }
-        };
-
-        // 初次檢查
-        const timer = setTimeout(checkUpdate, 2000);
-
-        // 定期檢查機制
-        let interval;
-        const startPolling = () => {
-            if (!interval) interval = setInterval(checkUpdate, 5 * 60 * 1000);
-        };
-        const stopPolling = () => {
-            if (interval) {
-                clearInterval(interval);
-                interval = null;
-            }
-        };
-
-        startPolling();
-
-        // 智慧型輪詢：根據視窗可見度切換
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                checkUpdate(); // 切回畫面時立刻檢查一次
-                startPolling(); // 恢復輪詢
-            } else {
-                stopPolling(); // 隱藏時暫停，節省 API 額度
-            }
-        };
-
-        const handleFocus = () => {
-            if (document.visibilityState === 'visible') {
-                checkUpdate();
-                startPolling();
-            }
-        };
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('focus', handleFocus);
-        window.addEventListener('pageshow', handleFocus);
-
-        return () => {
-            clearTimeout(timer);
-            stopPolling();
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-            window.removeEventListener('focus', handleFocus);
-            window.removeEventListener('pageshow', handleFocus);
-        };
-    }, []);
 
     // Activity Logger
     const { logActivity, logLogin, logLogout, logPageView } = useActivityLogger({
@@ -372,26 +275,64 @@ function AppContent() {
         return () => clearInterval(heartbeatInterval);
     }, [user, sessionManager]);
 
-    // Check for saved user session on component mount
+    // 初始化與 LIFF 自動登入邏輯 (載入遮罩期間執行)
     useEffect(() => {
-        const savedUser = safeSessionStorage.getItem('inventory_user');
-        if (savedUser) {
-            try {
-                const parsed = JSON.parse(savedUser);
-                // [Fix] Old session data might not have permissions. Force logout if undefined.
-                if (parsed && typeof parsed.permissions === 'undefined') {
-                    console.warn('Detected stale user data (no permissions). Clearing session.');
+        const initializeApp = async () => {
+            let currentUser = null;
+
+            // 1. 檢查是否有儲存的 user session
+            const savedUser = safeSessionStorage.getItem('inventory_user');
+            if (savedUser) {
+                try {
+                    const parsed = JSON.parse(savedUser);
+                    // [Fix] Old session data might not have permissions. Force logout if undefined.
+                    if (parsed && typeof parsed.permissions === 'undefined') {
+                        console.warn('Detected stale user data (no permissions). Clearing session.');
+                        safeSessionStorage.removeItem('inventory_user');
+                    } else {
+                        currentUser = parsed;
+                        setUser(parsed);
+                    }
+                } catch (e) {
+                    console.error('Failed to parse saved user session:', e);
                     safeSessionStorage.removeItem('inventory_user');
-                    setUser(null);
-                } else {
-                    setUser(parsed);
                 }
-            } catch (e) {
-                console.error('Failed to parse saved user session:', e);
-                safeSessionStorage.removeItem('inventory_user');
-                setUser(null);
             }
-        }
+
+            // 2. 判斷是否為 LIFF 頁面
+            const params = new URLSearchParams(window.location.search);
+            const isLiff = params.get('page') === 'liffOrder' || 
+                           (window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === 'liffOrder');
+
+            if (isLiff) {
+                if (!currentUser) {
+                    try {
+                        console.log('Detecting LIFF order request, logging in guest...');
+                        const res = await callGAS(GAS_API_URL, 'login', { username: 'guest', password: 'guest' });
+                        if (res && res.success) {
+                            handleLogin(res);
+                            setPage('liffOrder');
+                        } else {
+                            console.error('Auto login guest failed:', res?.error);
+                        }
+                    } catch (err) {
+                        console.error('Auto login guest error:', err);
+                    }
+                } else {
+                    setPage('liffOrder');
+                }
+            }
+
+            // 3. 初始化結束，淡出遮罩
+            setTimeout(() => {
+                setShowSplash(false);
+                setTimeout(() => {
+                    setIsInitializing(false);
+                }, 500); // 500ms 等待 CSS transition 動畫完成後卸載 DOM
+            }, 600);
+        };
+
+        initializeApp();
 
         const handleGlobalClick = () => {
             setOpenDropdown(null);
@@ -408,8 +349,10 @@ function AppContent() {
         }
     }, [page, user]);
 
-    // Auto-login for LIFF order page (guest account)
+    // 當使用者在 LIFF 頁面下主動登出 (user 變為 null) 時，再次自動登入 guest
     useEffect(() => {
+        if (isInitializing) return;
+
         const params = new URLSearchParams(window.location.search);
         const isLiff = params.get('page') === 'liffOrder' || 
                        (window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === 'liffOrder');
@@ -417,23 +360,19 @@ function AppContent() {
         if (isLiff && !user) {
             const autoLogin = async () => {
                 try {
-                    console.log('Detecting LIFF order request, logging in guest...');
+                    console.log('Re-logging in guest for LIFF order page...');
                     const res = await callGAS(GAS_API_URL, 'login', { username: 'guest', password: 'guest' });
                     if (res && res.success) {
                         handleLogin(res);
                         setPage('liffOrder');
-                    } else {
-                        console.error('Auto login guest failed:', res?.error);
                     }
                 } catch (err) {
                     console.error('Auto login guest error:', err);
                 }
             };
             autoLogin();
-        } else if (isLiff && user) {
-            setPage('liffOrder');
         }
-    }, [user]);
+    }, [user, isInitializing]);
 
     const checkPermission = (targetPage) => {
         if (!user) return false;
@@ -565,14 +504,46 @@ function AppContent() {
         );
     }
 
+    if (showSplash) {
+        return (
+            <div className="splash-screen">
+                <div className="splash-content">
+                    <img src={`${import.meta.env.BASE_URL}logo.png`} className="breathe-logo" alt="Logo" />
+                    <p className="loading-text">米立微系統 載入中...</p>
+                </div>
+            </div>
+        );
+    }
+
     if (!user) {
-        return <LoginPage onLogin={handleLogin} apiUrl={GAS_API_URL} />;
+        return (
+            <>
+                {isInitializing && (
+                    <div className="splash-screen fade-out">
+                        <div className="splash-content">
+                            <img src={`${import.meta.env.BASE_URL}logo.png`} className="breathe-logo" alt="Logo" />
+                            <p className="loading-text">米立微系統 載入中...</p>
+                        </div>
+                    </div>
+                )}
+                <LoginPage onLogin={handleLogin} apiUrl={GAS_API_URL} />
+            </>
+        );
     }
 
     // console.log('Current User:', user); 
 
     return (
         <div className="min-h-screen flex flex-col">
+            {isInitializing && (
+                <div className="splash-screen fade-out">
+                    <div className="splash-content">
+                        <img src={`${import.meta.env.BASE_URL}logo.png`} className="breathe-logo" alt="Logo" />
+                        <p className="loading-text">米立微系統 載入中...</p>
+                    </div>
+                </div>
+            )}
+
             {/* Offline Indicator */}
             {isOffline && (
                 <div className="bg-yellow-500 text-white text-center py-2 text-sm font-medium flex items-center justify-center gap-2">
@@ -581,34 +552,9 @@ function AppContent() {
                 </div>
             )}
 
-            {/* 版本更新通知 */}
-            {hasUpdate && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] w-[90%] max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-300">
-                    <div className="bg-blue-600 text-white p-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 border border-blue-400">
-                        <div className="flex items-center gap-3">
-                            <Activity size={20} className="animate-pulse" />
-                            <div>
-                                <p className="font-bold text-sm">系統版本有更新</p>
-                                <p className="text-[9px] opacity-70 font-mono">
-                                    {hasUpdate.local} → {hasUpdate.server}
-                                </p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={() => {
-                                // 強制帶參數刷新，破除手機瀏覽器快取
-                                window.location.href = window.location.href.split('?')[0] + '?v=' + Date.now();
-                            }}
-                            className="bg-white text-blue-600 px-4 py-1.5 rounded-xl font-bold text-xs hover:bg-blue-50 transition-colors shadow-sm whitespace-nowrap"
-                        >
-                            立即刷新
-                        </button>
-                    </div>
-                </div>
-            )}
+            {/* Navbar（客戶點餐頁不顯示）*/}
+            {page !== 'liffOrder' && <header className={`h-[76px] border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]/85 backdrop-blur-xl flex justify-between items-center px-6 sticky top-0 z-[60] transition-[transform,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.17,0.67,0.83,0.67)] ${showHeader ? 'translate-y-0' : '-translate-y-full'} ${scrolled ? 'shadow-lg border-transparent' : 'shadow-none'}`}>
 
-            {/* Navbar */}
-            <header className={`h-[76px] border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]/85 backdrop-blur-xl flex justify-between items-center px-6 sticky top-0 z-[60] transition-[transform,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.17,0.67,0.83,0.67)] ${showHeader ? 'translate-y-0' : '-translate-y-full'} ${scrolled ? 'shadow-lg border-transparent' : 'shadow-none'}`}>
                 <div className="flex items-center gap-3">
                     <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-11 w-auto object-contain brightness-0 dark:brightness-100 transition-transform hover:scale-105 cursor-pointer" onClick={() => handlePageChange('sales')} />
                 </div>
@@ -848,10 +794,12 @@ function AppContent() {
                         <LogOut size={20} />
                     </button>
                 </div>
-            </header>
+            </header>}
+
 
             {/* Main Content */}
-            <main className="flex-1 p-4 md:p-6 overflow-hidden">
+            <main className={`flex-1 overflow-hidden ${page === 'liffOrder' ? '' : 'p-4 md:p-6'}`}>
+
                 {checkPermission(page) ? (
                     <>
                         {page === 'sales' && <SalesPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}

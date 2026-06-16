@@ -74,3 +74,56 @@ body {
     scrollbar-width: thin;
     scrollbar-color: var(--border-secondary) transparent;
 }
+
+/* Splash Screen 啟動頁樣式 */
+.splash-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: var(--bg-primary); /* 自動適應當前主題背景色 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 99999; /* 壓在最上層 */
+    opacity: 1;
+    transition: opacity 0.5s ease-out;
+}
+
+.splash-screen.fade-out {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.splash-content {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.breathe-logo {
+    width: 120px;
+    height: auto;
+    animation: breathe 1.8s infinite ease-in-out;
+}
+
+.loading-text {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    letter-spacing: 1px;
+    font-weight: 500;
+}
+
+@keyframes breathe {
+    0%, 100% {
+        transform: scale(0.95);
+        opacity: 0.7;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 1;
+    }
+}

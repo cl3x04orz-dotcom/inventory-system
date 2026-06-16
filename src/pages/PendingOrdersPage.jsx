@@ -68,6 +68,19 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         }
     };
 
+    const handleDeleteOrder = async (orderId) => {
+        if (!window.confirm(`確定要【刪除】訂單 ${orderId} 嗎？\n此動作無法復原，通常用於客人誤按送出的情況。`)) return;
+        setLoading(true);
+        try {
+            const res = await callGAS(apiUrl, 'deletePendingOrder', { orderId }, user.token);
+            if (res?.error) throw new Error(res.error);
+            fetchOrders();
+        } catch (error) {
+            alert('刪除失敗: ' + error.message);
+            setLoading(false);
+        }
+    };
+
     const handleOpenEdit = (order) => {
         // 深拷貝 order 的 items，以免直接污染狀態
         setEditingOrder({
@@ -352,18 +365,24 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
                                 {/* Actions */}
                                 {order.status === 'PENDING' && (
-                                    <div className="grid grid-cols-2 gap-3 border-t border-[var(--border-primary)] pt-3 mt-auto">
+                                    <div className="grid grid-cols-3 gap-2 border-t border-[var(--border-primary)] pt-3 mt-auto">
+                                        <button
+                                            onClick={() => handleDeleteOrder(order.orderId)}
+                                            className="col-span-1 py-2 text-xs flex items-center justify-center gap-1 rounded-lg border border-red-200 dark:border-red-800/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors font-bold"
+                                        >
+                                            <Trash2 size={13} /> 刪除
+                                        </button>
                                         <button
                                             onClick={() => handleOpenEdit(order)}
                                             className="btn-secondary py-2 text-xs flex items-center justify-center gap-1"
                                         >
-                                            <Edit size={14} /> 修改訂單
+                                            <Edit size={14} /> 修改
                                         </button>
                                         <button
                                             onClick={() => handleConfirmOrder(order.orderId)}
                                             className="btn-primary py-2 text-xs flex items-center justify-center gap-1 bg-emerald-600 hover:bg-emerald-700 border-none"
                                         >
-                                            <CheckCircle size={14} /> 確認出貨
+                                            <CheckCircle size={14} /> 出貨
                                         </button>
                                     </div>
                                 )}

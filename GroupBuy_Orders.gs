@@ -14,8 +14,16 @@ function initGroupBuySheets_() {
     let orderSheet = ss.getSheetByName(GB_SHEET_NAME);
     if (!orderSheet) {
         orderSheet = ss.insertSheet(GB_SHEET_NAME);
-        orderSheet.appendRow(GB_HEADERS);
+        orderSheet.appendRow([...GB_HEADERS, 'PaymentMethod', 'TransferLastFive', 'PaymentStatus']);
         orderSheet.setFrozenRows(1);
+    } else {
+        // 自動偵測並補入缺少的付款欄位（不覆蓋現有資料）
+        const existingHeaders = orderSheet.getRange(1, 1, 1, orderSheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+        ['PaymentMethod', 'TransferLastFive', 'PaymentStatus'].forEach(col => {
+            if (!existingHeaders.includes(col)) {
+                orderSheet.getRange(1, orderSheet.getLastColumn() + 1).setValue(col);
+            }
+        });
     }
     let detailSheet = ss.getSheetByName(GB_DETAIL_SHEET_NAME);
     if (!detailSheet) {
@@ -36,7 +44,7 @@ function generateOrderId_() {
  * [Service] 客戶送出訂單 (寫入 PENDING，不扣庫存)
  */
 function savePendingOrderService(payload, user) {
-    const { customerName, customerPhone, deliveryAddress, sourceGroup, note, items } = payload;
+    const { customerName, customerPhone, deliveryAddress, sourceGroup, note, items, paymentMethod, transferLastFive } = payload;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
         throw new Error('訂單明細不得為空');
@@ -48,22 +56,33 @@ function savePendingOrderService(payload, user) {
 
     const totalAmount = items.reduce((sum, item) => sum + (Number(item.unitPrice) * Number(item.qty)), 0);
 
-    // 寫入主單
-    orderSheet.appendRow([
-        orderId,
-        'PENDING',
-        user.lineUserId || user.username || '',
-        customerName || '',
-        customerPhone || '',
-        deliveryAddress || '',
-        sourceGroup || '',
-        note || '',
-        totalAmount,
-        now,
-        now,
-        '',
-        ''
-    ]);
+    // 根據付款方式設定初始付款狀態
+    let paymentStatus = '';
+    if (paymentMethod === '現金') paymentStatus = '貨到付款';
+    else if (paymentMethod === '轉帳') paymentStatus = '待對帳';
+    else if (paymentMethod === 'LINE Pay') paymentStatus = '待確認';
+
+    // 動態找欄位 index，避免欄位順序不同造成錯誤
+    const headers = orderSheet.getRange(1, 1, 1, orderSheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    const row = new Array(headers.length).fill('');
+    const set = (name, val) => { const i = headers.indexOf(name); if (i >= 0) row[i] = val; };
+
+    set('OrderId', orderId);
+    set('Status', 'PENDING');
+    set('CustomerLineId', user.lineUserId || user.username || '');
+    set('CustomerName', customerName || '');
+    set('CustomerPhone', customerPhone || '');
+    set('DeliveryAddress', deliveryAddress || '');
+    set('SourceGroup', sourceGroup || '');
+    set('Note', note || '');
+    set('TotalAmount', totalAmount);
+    set('PaymentMethod', paymentMethod || '');
+    set('TransferLastFive', transferLastFive || '');
+    set('PaymentStatus', paymentStatus);
+    set('CreatedAt', now);
+    set('UpdatedAt', now);
+
+    orderSheet.appendRow(row);
 
     // 寫入明細
     items.forEach(item => {
@@ -93,6 +112,13 @@ function getPendingOrdersService(payload, user) {
 
     const orderRows = orderSheet.getDataRange().getValues();
     const detailRows = detailSheet.getDataRange().getValues();
+
+    // 動態讀取欄位 index
+    const orderHeaders = orderRows[0].map(h => String(h).trim());
+    const hIdx = name => orderHeaders.indexOf(name);
+    const pmIdx  = hIdx('PaymentMethod');
+    const tlIdx  = hIdx('TransferLastFive');
+    const psIdx  = hIdx('PaymentStatus');
 
     // 組織明細 Map
     const detailMap = {};
@@ -128,10 +154,13 @@ function getPendingOrdersService(payload, user) {
             sourceGroup: String(row[6] || ''),
             note: String(row[7] || ''),
             totalAmount: Number(row[8]) || 0,
-            createdAt: row[9] ? new Date(row[9]).toISOString() : '',
-            updatedAt: row[10] ? new Date(row[10]).toISOString() : '',
-            confirmedAt: row[11] ? new Date(row[11]).toISOString() : '',
-            confirmedBy: String(row[12] || ''),
+            paymentMethod: pmIdx >= 0 ? String(row[pmIdx] || '') : '',
+            transferLastFive: tlIdx >= 0 ? String(row[tlIdx] || '') : '',
+            paymentStatus: psIdx >= 0 ? String(row[psIdx] || '') : '',
+            createdAt: row[hIdx('CreatedAt')] ? new Date(row[hIdx('CreatedAt')]).toISOString() : '',
+            updatedAt: row[hIdx('UpdatedAt')] ? new Date(row[hIdx('UpdatedAt')]).toISOString() : '',
+            confirmedAt: row[hIdx('ConfirmedAt')] ? new Date(row[hIdx('ConfirmedAt')]).toISOString() : '',
+            confirmedBy: String(row[hIdx('ConfirmedBy')] || ''),
             items: detailMap[orderId] || []
         });
     }
@@ -307,6 +336,50 @@ function confirmPendingOrderService(payload, user) {
     orderSheet.getRange(foundOrderRow, 11).setValue(now2); // UpdatedAt
     orderSheet.getRange(foundOrderRow, 12).setValue(now2); // ConfirmedAt
     orderSheet.getRange(foundOrderRow, 13).setValue(user.username); // ConfirmedBy
+
+    SpreadsheetApp.flush();
+    return { success: true, orderId };
+}
+/**
+ * [Service] 刪除 PENDING 訂單（誤按返還用）
+ * 只有 BOSS 可以操作，且只能刪除狀態為 PENDING 的訂單
+ */
+function deletePendingOrderService(payload, user) {
+    if (user.role !== 'BOSS') throw new Error('權限不足');
+
+    const { orderId } = payload;
+    if (!orderId) throw new Error('缺少 orderId');
+
+    const { orderSheet, detailSheet } = initGroupBuySheets_();
+
+    // 找主單並確認狀態為 PENDING
+    const orderData = orderSheet.getDataRange().getValues();
+    const orderHeaders = orderData[0].map(h => String(h).trim());
+    const statusIdx = orderHeaders.indexOf('Status');
+
+    let foundOrderRow = -1;
+    for (let i = 1; i < orderData.length; i++) {
+        if (String(orderData[i][0]).trim() === orderId) {
+            const status = statusIdx >= 0 ? String(orderData[i][statusIdx]).trim() : String(orderData[i][1]).trim();
+            if (status !== 'PENDING') throw new Error('此訂單已非 PENDING 狀態，無法刪除');
+            foundOrderRow = i + 1; // 1-indexed
+            break;
+        }
+    }
+    if (foundOrderRow === -1) throw new Error('找不到訂單：' + orderId);
+
+    // 刪除明細（從下往上刪，避免位移）
+    const detailData = detailSheet.getDataRange().getValues();
+    const rowsToDelete = [];
+    for (let i = detailData.length - 1; i >= 1; i--) {
+        if (String(detailData[i][0]).trim() === orderId) {
+            rowsToDelete.push(i + 1);
+        }
+    }
+    rowsToDelete.forEach(r => detailSheet.deleteRow(r));
+
+    // 刪除主單
+    orderSheet.deleteRow(foundOrderRow);
 
     SpreadsheetApp.flush();
     return { success: true, orderId };

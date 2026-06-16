@@ -98,6 +98,7 @@ function apiHandler(request) {
         'getPendingOrders': 'sales_pending',
         'updatePendingOrder': 'sales_pending',
         'confirmPendingOrder': 'sales_pending',
+        'deletePendingOrder': 'sales_pending',
         
         // Finance (財務管理)
         'getExpenditures': null, // [Modification] Anyone can call, filtering happens in service
@@ -190,6 +191,7 @@ function apiHandler(request) {
             case 'getPendingOrders': return typeof getPendingOrdersService !== 'undefined' ? getPendingOrdersService(payload, user) : {error: '後端服務缺失: getPendingOrdersService'};
             case 'updatePendingOrder': return typeof updatePendingOrderService !== 'undefined' ? updatePendingOrderService(payload, user) : {error: '後端服務缺失: updatePendingOrderService'};
             case 'confirmPendingOrder': return typeof confirmPendingOrderService !== 'undefined' ? confirmPendingOrderService(payload, user) : {error: '後端服務缺失: confirmPendingOrderService'};
+            case 'deletePendingOrder': return typeof deletePendingOrderService !== 'undefined' ? deletePendingOrderService(payload, user) : {error: '後端服務缺失: deletePendingOrderService'};
             case 'getInventory': return typeof getInventoryService !== 'undefined' ? getInventoryService() : {error: '後端服務缺失: getInventoryService'}; 
             case 'getPurchaseSuggestions': return typeof getPurchaseSuggestionsService !== 'undefined' ? getPurchaseSuggestionsService() : {error: '後端服務缺失: getPurchaseSuggestionsService'}; 
             case 'addPurchase': return typeof addPurchaseService !== 'undefined' ? addPurchaseService(payload, user) : {error: '後端服務缺失: addPurchaseService (進貨功能)'}; 
