@@ -23,6 +23,7 @@ export default defineConfig({
   build: {
     target: 'es2020',
     cssMinify: false,
-    minify: false
+    minify: false,
+    assetsInlineLimit: 200 * 1024 // 200KB — 確保 logo.png (~124KB) 會被內嵌為 data URI
   }
 })

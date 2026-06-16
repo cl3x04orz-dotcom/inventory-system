@@ -1,9 +1,26 @@
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
+
+const version = process.env.VITE_APP_VERSION || Date.now().toString();
+process.env.VITE_APP_VERSION = version;
+
+console.log(`[GAS Build] Running vite build with VITE_APP_VERSION=${version}...`);
+try {
+  execSync('npx vite build', {
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      VITE_APP_VERSION: version
+    }
+  });
+} catch (error) {
+  console.error('Vite build failed:', error);
+  process.exit(1);
+}
 
 const distDir = './dist';
 const htmlFile = path.join(distDir, 'index.html');
-
 let html = fs.readFileSync(htmlFile, 'utf8');
 const assetsDir = path.join(distDir, 'assets');
 let output = html;

@@ -31,6 +31,7 @@ import ThemeToggle from './components/ThemeToggle';
 import SessionManager from './utils/SessionManager';
 import { callGAS } from './utils/api';
 import useActivityLogger from './hooks/useActivityLogger';
+import logoImg from './assets/logo.png';
 import {
     LayoutDashboard, ShoppingCart, Archive, LogOut, PackagePlus,
     FileText, ClipboardList, DollarSign, CheckSquare, Wallet, ChevronDown,
@@ -149,6 +150,8 @@ function AppContent() {
     const [sessionManager, setSessionManager] = useState(null);
     const [isInitializing, setIsInitializing] = useState(true);
     const [showSplash, setShowSplash] = useState(true);
+    const [hasUpdate, setHasUpdate] = useState(null);
+    const checkCountRef = React.useRef(0);
 
     const [showHeader, setShowHeader] = useState(true);
     const [scrolled, setScrolled] = useState(false);
@@ -191,6 +194,71 @@ function AppContent() {
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
     }, [mobileMenuOpen]);
+
+    // ========== Version Check (偵測伺服器端新版本) ==========
+    const lastCheckTimeRef = React.useRef(0);
+    useEffect(() => {
+        const checkUpdate = async () => {
+            if (user?.username === 'guest') return;
+            const now = Date.now();
+            if (now - lastCheckTimeRef.current < 5000) return;
+            lastCheckTimeRef.current = now;
+            checkCountRef.current += 1;
+            const count = checkCountRef.current;
+            try {
+                console.log(`[VersionCheck #${count}] 開始檢查... 本地:${LOCAL_VERSION}`);
+                const response = await fetch(`${GAS_API_URL}?t=${Date.now()}`, {
+                    method: 'POST',
+                    redirect: 'follow',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: 'getVersion', _t: Date.now() })
+                });
+                const res = await response.json();
+                console.log(`[VersionCheck #${count}] 伺服器回應:`, res.version);
+                if (res && res.version && String(res.version) !== String(LOCAL_VERSION)) {
+                    const serverVer = Number(res.version);
+                    const localVer = Number(LOCAL_VERSION);
+                    if (!isNaN(serverVer) && !isNaN(localVer)) {
+                        if (serverVer > localVer) {
+                            console.warn(`[VersionCheck] 偵測到新版本! (${LOCAL_VERSION} -> ${res.version})`);
+                            setHasUpdate({ local: LOCAL_VERSION, server: res.version });
+                        } else {
+                            console.log(`[VersionCheck] 本地版本較新或相同，無需更新 (${LOCAL_VERSION} >= ${res.version})`);
+                        }
+                    } else {
+                        console.log(`[VersionCheck] 偵測到版本字串不同，但不進行強制更新提示 (${LOCAL_VERSION} != ${res.version})`);
+                    }
+                }
+            } catch (e) {
+                console.warn(`[VersionCheck #${count}] 檢查失敗:`, e);
+            }
+        };
+
+        const timer = setTimeout(checkUpdate, 2000);
+        let interval;
+        const startPolling = () => { if (!interval) interval = setInterval(checkUpdate, 5 * 60 * 1000); };
+        const stopPolling = () => { if (interval) { clearInterval(interval); interval = null; } };
+        startPolling();
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') { checkUpdate(); startPolling(); }
+            else { stopPolling(); }
+        };
+        const handleFocus = () => {
+            if (document.visibilityState === 'visible') { checkUpdate(); startPolling(); }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('focus', handleFocus);
+        window.addEventListener('pageshow', handleFocus);
+
+        return () => {
+            clearTimeout(timer);
+            stopPolling();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('focus', handleFocus);
+            window.removeEventListener('pageshow', handleFocus);
+        };
+    }, []);
 
     // Activity Logger
     const { logActivity, logLogin, logLogout, logPageView } = useActivityLogger({
@@ -508,7 +576,7 @@ function AppContent() {
         return (
             <div className="splash-screen">
                 <div className="splash-content">
-                    <img src={`${import.meta.env.BASE_URL}logo.png`} className="breathe-logo" alt="Logo" />
+                    <img src={logoImg} className="breathe-logo" alt="Logo" />
                     <p className="loading-text">米立微系統 載入中...</p>
                 </div>
             </div>
@@ -521,7 +589,7 @@ function AppContent() {
                 {isInitializing && (
                     <div className="splash-screen fade-out">
                         <div className="splash-content">
-                            <img src={`${import.meta.env.BASE_URL}logo.png`} className="breathe-logo" alt="Logo" />
+                            <img src={logoImg} className="breathe-logo" alt="Logo" />
                             <p className="loading-text">米立微系統 載入中...</p>
                         </div>
                     </div>
@@ -538,7 +606,7 @@ function AppContent() {
             {isInitializing && (
                 <div className="splash-screen fade-out">
                     <div className="splash-content">
-                        <img src={`${import.meta.env.BASE_URL}logo.png`} className="breathe-logo" alt="Logo" />
+                        <img src={logoImg} className="breathe-logo" alt="Logo" />
                         <p className="loading-text">米立微系統 載入中...</p>
                     </div>
                 </div>
@@ -552,11 +620,36 @@ function AppContent() {
                 </div>
             )}
 
+            {/* Version Update Banner */}
+            {hasUpdate && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] w-[90%] max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div className="bg-blue-600 text-white p-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 border border-blue-400">
+                        <div className="flex items-center gap-3">
+                            <Activity size={20} className="animate-pulse" />
+                            <div>
+                                <p className="font-bold text-sm">系統版本有更新</p>
+                                <p className="text-[9px] opacity-70 font-mono">{hasUpdate.local} → {hasUpdate.server}</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => {
+                                const url = new URL(window.location.href);
+                                url.searchParams.set('v', new Date().getTime());
+                                window.location.href = url.toString();
+                            }}
+                            className="bg-white text-blue-600 px-4 py-1.5 rounded-xl font-bold text-xs hover:bg-blue-50 transition-colors shadow-sm whitespace-nowrap"
+                        >
+                            立即刷新
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Navbar（客戶點餐頁不顯示）*/}
             {page !== 'liffOrder' && <header className={`h-[76px] border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]/85 backdrop-blur-xl flex justify-between items-center px-6 sticky top-0 z-[60] transition-[transform,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.17,0.67,0.83,0.67)] ${showHeader ? 'translate-y-0' : '-translate-y-full'} ${scrolled ? 'shadow-lg border-transparent' : 'shadow-none'}`}>
 
                 <div className="flex items-center gap-3">
-                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-11 w-auto object-contain brightness-0 dark:brightness-100 transition-transform hover:scale-105 cursor-pointer" onClick={() => handlePageChange('sales')} />
+                    <img src={logoImg} alt="Logo" className="h-11 w-auto object-contain brightness-0 dark:brightness-100 transition-transform hover:scale-105 cursor-pointer" onClick={() => handlePageChange('sales')} />
                 </div>
 
                 {/* Header Actions (Logout on far right, others spread) */}
