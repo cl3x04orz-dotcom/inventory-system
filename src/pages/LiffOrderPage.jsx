@@ -6,10 +6,16 @@ import {
 } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import logoImg from '../assets/logo.png';
+import logoLiff from '../assets/logo_liff.jpg';
 
 // ── 品牌 Logo 元件 ──────────────────────────────────────────────
 const MilkZeroWasteLogo = () => (
-    <img src={logoImg} alt="米立微 Logo" className="w-9 h-9 flex-shrink-0 object-contain" />
+    <img 
+        src={logoLiff} 
+        alt="米立微 Logo" 
+        className="h-10 w-auto flex-shrink-0 object-contain" 
+        style={{ aspectRatio: '728/197' }}
+    />
 );
 
 // ── 店家設定（改這裡就好）─────────────────────────────────────
@@ -27,11 +33,13 @@ export default function LiffOrderPage({ user, apiUrl }) {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [cart, setCart] = useState({});
-    const [activeCategory, setActiveCategory] = useState('全部');
+    const [activeCategory, setActiveCategory] = useState('');
     const [sourceGroup, setSourceGroup] = useState('');
     const tabBarRef = useRef(null);
     const listRef = useRef(null);
     const sectionRefs = useRef({});
+    const isManualScrollRef = useRef(false);
+    const manualScrollTimeoutRef = useRef(null);
 
     // ── 口味規格 state ─────────────────────────────────────────────
     const [flavorSelections, setFlavorSelections] = useState({}); // { [productId]: { [flavor]: qty } }
@@ -61,7 +69,18 @@ export default function LiffOrderPage({ user, apiUrl }) {
         setLoading(true);
         try {
             const data = await callGAS(apiUrl, 'getProducts', {}, user.token);
-            if (Array.isArray(data)) setProducts(data.filter(p => p.isActive));
+            if (Array.isArray(data)) {
+                const activeProds = data.filter(p => p.isActive);
+                setProducts(activeProds);
+                
+                // 自動將第一個分類設為 Active
+                const cats = activeProds.map(p => p.category?.trim() || '其他');
+                const unique = [...new Set(cats)];
+                const firstCat = unique.filter(c => c !== '其他')[0] || (unique.includes('其他') ? '其他' : '');
+                if (firstCat) {
+                    setActiveCategory(firstCat);
+                }
+            }
         } catch (err) {
             console.error('Failed to load products:', err);
             alert('載入商品失敗: ' + err.message);
@@ -81,22 +100,29 @@ export default function LiffOrderPage({ user, apiUrl }) {
         const cats = products.map(p => p.category?.trim() || '其他');
         const unique = [...new Set(cats)];
         const without = unique.filter(c => c !== '其他');
-        return ['全部', ...without, ...(unique.includes('其他') ? ['其他'] : [])];
+        return [...without, ...(unique.includes('其他') ? ['其他'] : [])];
     }, [products]);
 
     const groupedProducts = useMemo(() => {
-        const order = categories.filter(c => c !== '全部');
         const map = {};
         products.forEach(p => {
             const cat = p.category?.trim() || '其他';
             if (!map[cat]) map[cat] = [];
             map[cat].push(p);
         });
-        return order.map(cat => ({ cat, items: map[cat] || [] })).filter(g => g.items.length > 0);
+        return categories.map(cat => ({ cat, items: map[cat] || [] })).filter(g => g.items.length > 0);
     }, [products, categories]);
 
     const handleCategoryChange = (cat) => {
         setActiveCategory(cat);
+
+        // 標記為手動點擊滾動，避免滾動監聽自動切換造成震盪
+        isManualScrollRef.current = true;
+        if (manualScrollTimeoutRef.current) clearTimeout(manualScrollTimeoutRef.current);
+        manualScrollTimeoutRef.current = setTimeout(() => {
+            isManualScrollRef.current = false;
+        }, 800); // 800ms 平滑滾動結束後恢復監聽
+
         // Tab 捲至中央
         if (tabBarRef.current) {
             const btn = tabBarRef.current.querySelector(`[data-cat="${CSS.escape(cat)}"]`);
@@ -105,13 +131,60 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 bar.scrollTo({ left: btn.offsetLeft - bar.offsetWidth / 2 + btn.offsetWidth / 2, behavior: 'smooth' });
             }
         }
-        // 捲至對應分類區塊
-        if (cat === '全部') {
-            listRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-        } else {
-            sectionRefs.current[cat]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // 捲至對應分類區塊（使用容器 scrollTo 代替 scrollIntoView，防止瀏覽器抖動與視窗位移）
+        const targetEl = sectionRefs.current[cat];
+        if (targetEl && listRef.current) {
+            listRef.current.scrollTo({
+                top: targetEl.offsetTop,
+                behavior: 'smooth'
+            });
         }
     };
+
+    // ── 滾動監聽 (Scroll Spy) ──────────────────────────────────────────
+    useEffect(() => {
+        if (loading || products.length === 0 || !listRef.current) return;
+
+        const scrollContainer = listRef.current;
+
+        const observerOptions = {
+            root: scrollContainer,
+            rootMargin: '-10% 0px -75% 0px', // 只偵測容器頂部下方一小段的區塊
+            threshold: 0
+        };
+
+        const handleIntersection = (entries) => {
+            if (isManualScrollRef.current) return;
+
+            const visibleEntry = entries.find(entry => entry.isIntersecting);
+            if (visibleEntry) {
+                const cat = visibleEntry.target.getAttribute('data-category');
+                if (cat) {
+                    setActiveCategory(cat);
+                    if (tabBarRef.current) {
+                        const btn = tabBarRef.current.querySelector(`[data-cat="${CSS.escape(cat)}"]`);
+                        if (btn) {
+                            const bar = tabBarRef.current;
+                            bar.scrollTo({
+                                left: btn.offsetLeft - bar.offsetWidth / 2 + btn.offsetWidth / 2,
+                                behavior: 'smooth'
+                            });
+                        }
+                    }
+                }
+            }
+        };
+
+        const observer = new IntersectionObserver(handleIntersection, observerOptions);
+        Object.values(sectionRefs.current).forEach(el => {
+            if (el) observer.observe(el);
+        });
+
+        return () => {
+            observer.disconnect();
+            if (manualScrollTimeoutRef.current) clearTimeout(manualScrollTimeoutRef.current);
+        };
+    }, [products, loading]);
 
 
     // ── 購物車 ───────────────────────────────────────────────────
@@ -665,34 +738,46 @@ export default function LiffOrderPage({ user, apiUrl }) {
     // 商品列表頁（捲動分類模式）
     return (
         <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
-            {/* Header */}
-            <div className="px-3 py-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)] flex justify-between items-center flex-shrink-0 z-10">
-                {/* 品牌區塊 - 置中 */}
-                <div className="flex-1 flex justify-center items-center gap-2">
-                    <MilkZeroWasteLogo />
-                    <div>
-                        <div className="flex items-baseline gap-1.5 leading-none">
-                            <span className="text-[16px] font-black tracking-tight text-[var(--text-primary)]">米立微</span>
-                            <span className="text-[10px] font-semibold tracking-wide text-[var(--text-secondary)] font-sans">Milkzerowaste</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-[3px]">
-                            <span className="text-[9px] tracking-wider text-[var(--text-tertiary)] font-medium">
-                                嚴選乳品・每日配送
+            {/* 頂部固定導覽列（結合 Header 與分類標籤以防止任何布局位移） */}
+            <div className="flex-shrink-0 flex flex-col z-10 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                {/* Header */}
+                <div className="h-[60px] px-3 flex justify-between items-center">
+                    {/* 品牌區塊 - 靠左 */}
+                    <div className="flex-1 flex justify-start items-center gap-3">
+                        <MilkZeroWasteLogo />
+                        {sourceGroup && (
+                            <span className="text-xs bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 font-bold px-2 py-0.5 rounded-lg border border-blue-100 dark:border-blue-900/30">
+                                {sourceGroup}
                             </span>
-                            {sourceGroup && (
-                                <>
-                                    <span className="text-[8px] text-[var(--text-tertiary)]">•</span>
-                                    <span className="text-[9px] text-blue-600 dark:text-blue-400 font-semibold">
-                                        {sourceGroup}
-                                    </span>
-                                </>
-                            )}
-                        </div>
+                        )}
                     </div>
+                    <button onClick={loadProducts} className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex-shrink-0">
+                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                    </button>
                 </div>
-                <button onClick={loadProducts} className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex-shrink-0">
-                    <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                </button>
+
+                {/* 分類 Tab 列 */}
+                {!loading && categories.length > 1 && (
+                    <div
+                        ref={tabBarRef}
+                        className="h-12 flex items-center gap-1.5 px-3 overflow-x-auto border-t border-[var(--border-primary)] relative"
+                        style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    >
+                        {categories.map(cat => (
+                            <button
+                                key={cat}
+                                data-cat={cat}
+                                onClick={() => handleCategoryChange(cat)}
+                                className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 whitespace-nowrap border ${activeCategory === cat
+                                        ? 'bg-[var(--text-primary)] text-[var(--bg-primary)] border-transparent shadow-sm'
+                                        : 'bg-transparent border-[var(--border-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                    }`}
+                            >
+                                {cat}
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {loading ? (
@@ -702,35 +787,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 </div>
             ) : (
                 <>
-                    {/* 分類 Tab 列 */}
-                    {categories.length > 1 && (
-                        <div
-                            ref={tabBarRef}
-                            className="flex-shrink-0 flex gap-1.5 px-3 py-2.5 overflow-x-auto bg-[var(--bg-secondary)] border-b border-[var(--border-primary)]"
-                            style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                        >
-                            {categories.map(cat => (
-                                <button
-                                    key={cat}
-                                    data-cat={cat}
-                                    onClick={() => handleCategoryChange(cat)}
-                                    className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 whitespace-nowrap border ${activeCategory === cat
-                                            ? 'bg-[var(--text-primary)] text-[var(--bg-primary)] border-transparent shadow-sm'
-                                            : 'bg-transparent border-[var(--border-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                                        }`}
-                                >
-                                    {cat}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-
                     {/* 商品列表（分類區塊捲動）*/}
-                    <div ref={listRef} className="flex-1 overflow-y-auto pb-28">
+                    <div ref={listRef} className="flex-1 overflow-y-auto pb-28 relative overscroll-contain">
                         {products.length === 0 ? (
                             <div className="text-center py-16 text-[var(--text-secondary)]">目前沒有商品</div>
                         ) : groupedProducts.map(({ cat, items }) => (
-                            <div key={cat} ref={el => { sectionRefs.current[cat] = el; }}>
+                            <div key={cat} ref={el => { sectionRefs.current[cat] = el; }} data-category={cat}>
                                 {/* 分類標題列 */}
                                 <div className="flex items-center gap-3 px-4 pt-5 pb-2.5">
                                     <span className="text-base font-extrabold text-[var(--text-primary)] whitespace-nowrap">{cat}</span>
