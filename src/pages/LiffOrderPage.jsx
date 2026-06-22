@@ -121,16 +121,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
             if (!map[cat]) map[cat] = [];
             map[cat].push(p);
         });
-        return categories.map(cat => {
-            const sortedItems = [...(map[cat] || [])].sort((a, b) => {
-                const aSoldOut = (a.stock !== undefined && a.stock !== null) ? a.stock <= 0 : false;
-                const bSoldOut = (b.stock !== undefined && b.stock !== null) ? b.stock <= 0 : false;
-                if (aSoldOut && !bSoldOut) return 1;
-                if (!aSoldOut && bSoldOut) return -1;
-                return 0;
-            });
-            return { cat, items: sortedItems };
-        }).filter(g => g.items.length > 0);
+        return categories.map(cat => ({ cat, items: map[cat] || [] })).filter(g => g.items.length > 0);
     }, [products, categories]);
 
     const handleCategoryChange = (cat) => {
@@ -840,13 +831,11 @@ export default function LiffOrderPage({ user, apiUrl }) {
                                             <div
                                                 key={product.id}
                                                 className={`flex bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden shadow-[0_3px_10px_rgba(0,0,0,0.04)] dark:shadow-[0_3px_10px_rgba(0,0,0,0.2)] transition-all duration-150 ${
-                                                    product.stock <= 0 ? 'opacity-65' : ''
-                                                } ${
                                                     animatingProductId === product.id ? 'scale-95' : 'scale-100'
                                                 }`}
                                             >
                                                 {/* 圖片（左側，全高）*/}
-                                                <div className="w-[100px] flex-shrink-0 bg-[var(--bg-tertiary)] relative" style={{ minHeight: 100 }}>
+                                                <div className="w-[100px] flex-shrink-0 bg-[var(--bg-tertiary)]" style={{ minHeight: 100 }}>
                                                     {product.imageUrl ? (
                                                         <img
                                                             src={product.imageUrl}
@@ -861,12 +850,6 @@ export default function LiffOrderPage({ user, apiUrl }) {
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center" style={{ minHeight: 100 }}>
                                                             <Package className="text-[var(--text-tertiary)]" size={28} />
-                                                        </div>
-                                                    )}
-                                                    {product.stock <= 0 && (
-                                                        <div className="absolute inset-0 bg-black/50 z-[2] flex flex-col items-center justify-center text-white gap-1 select-none">
-                                                            <span className="text-xs font-black tracking-wider bg-red-600/90 px-1.5 py-0.5 rounded shadow-sm">售罄</span>
-                                                            <span className="text-[9px] font-bold text-slate-200 uppercase tracking-widest">Sold Out</span>
                                                         </div>
                                                     )}
                                                 </div>
@@ -907,13 +890,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
                                                                 )}
                                                                 <button
                                                                     onClick={() => handleProductAction(product, true)}
-                                                                    disabled={product.stock <= 0}
-                                                                    className={`w-7 h-7 flex items-center justify-center rounded-lg shadow-sm transition-all duration-100 ${
-                                                                        product.stock <= 0
-                                                                            ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'
-                                                                            : qty > 0
-                                                                                ? 'bg-slate-700 text-white hover:bg-slate-800 active:scale-90'
-                                                                                : 'bg-blue-500 text-white hover:bg-blue-600 active:scale-90'
+                                                                    className={`w-7 h-7 flex items-center justify-center rounded-lg shadow-sm transition-all duration-100 active:scale-90 ${
+                                                                        qty > 0
+                                                                            ? 'bg-slate-700 text-white hover:bg-slate-800'
+                                                                            : 'bg-blue-500 text-white hover:bg-blue-600'
                                                                     }`}
                                                                 >
                                                                     <Plus size={13} />
