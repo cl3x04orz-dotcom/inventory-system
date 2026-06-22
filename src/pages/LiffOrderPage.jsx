@@ -45,6 +45,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
     const [cart, setCart] = useState({});
     const [activeCategory, setActiveCategory] = useState('');
     const [sourceGroup, setSourceGroup] = useState('');
+    const [animatingProductId, setAnimatingProductId] = useState(null);
     const tabBarRef = useRef(null);
     const listRef = useRef(null);
     const sectionRefs = useRef({});
@@ -120,7 +121,16 @@ export default function LiffOrderPage({ user, apiUrl }) {
             if (!map[cat]) map[cat] = [];
             map[cat].push(p);
         });
-        return categories.map(cat => ({ cat, items: map[cat] || [] })).filter(g => g.items.length > 0);
+        return categories.map(cat => {
+            const sortedItems = [...(map[cat] || [])].sort((a, b) => {
+                const aSoldOut = (a.stock !== undefined && a.stock !== null) ? a.stock <= 0 : false;
+                const bSoldOut = (b.stock !== undefined && b.stock !== null) ? b.stock <= 0 : false;
+                if (aSoldOut && !bSoldOut) return 1;
+                if (!aSoldOut && bSoldOut) return -1;
+                return 0;
+            });
+            return { cat, items: sortedItems };
+        }).filter(g => g.items.length > 0);
     }, [products, categories]);
 
     const handleCategoryChange = (cat) => {
@@ -199,6 +209,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
     // ── 購物車 ───────────────────────────────────────────────────
     const handleUpdateQty = (pid, delta) => {
+        setAnimatingProductId(pid);
+        setTimeout(() => {
+            setAnimatingProductId(prev => prev === pid ? null : prev);
+        }, 150);
         setCart(prev => {
             const qty = Math.max(0, (prev[pid] || 0) + delta);
             const next = { ...prev };
@@ -246,6 +260,11 @@ export default function LiffOrderPage({ user, apiUrl }) {
         if (!flavorModalProduct) return;
         const pid = flavorModalProduct.id;
         const total = Object.values(tempFlavorQty).reduce((a, b) => a + b, 0);
+
+        setAnimatingProductId(pid);
+        setTimeout(() => {
+            setAnimatingProductId(prev => prev === pid ? null : prev);
+        }, 150);
 
         setCart(prev => {
             const next = { ...prev };
@@ -768,24 +787,28 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
                 {/* 分類 Tab 列 */}
                 {!loading && categories.length > 1 && (
-                    <div
-                        ref={tabBarRef}
-                        className="h-12 px-3 border-t border-[var(--border-primary)] flex items-center gap-1.5 overflow-x-auto relative"
-                        style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                    >
-                        {categories.map(cat => (
-                            <button
-                                key={cat}
-                                data-cat={cat}
-                                onClick={() => handleCategoryChange(cat)}
-                                className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 whitespace-nowrap border ${activeCategory === cat
-                                        ? 'bg-[var(--text-primary)] text-[var(--bg-primary)] border-transparent shadow-sm'
-                                        : 'bg-transparent border-[var(--border-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                                    }`}
-                            >
-                                {cat}
-                            </button>
-                        ))}
+                    <div className="relative">
+                        <div
+                            ref={tabBarRef}
+                            className="h-12 px-3 border-t border-[var(--border-primary)] flex items-center gap-1.5 overflow-x-auto relative scrollbar-none"
+                            style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                        >
+                            {categories.map(cat => (
+                                <button
+                                    key={cat}
+                                    data-cat={cat}
+                                    onClick={() => handleCategoryChange(cat)}
+                                    className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 whitespace-nowrap border ${activeCategory === cat
+                                            ? 'bg-[var(--text-primary)] text-[var(--bg-primary)] border-transparent shadow-sm'
+                                            : 'bg-transparent border-[var(--border-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                        }`}
+                                >
+                                    {cat}
+                                </button>
+                            ))}
+                        </div>
+                        {/* 右側漸層遮罩，暗示可往右滑動 */}
+                        <div className="absolute right-0 top-[1px] bottom-0 w-8 bg-gradient-to-l from-[var(--bg-secondary)] to-transparent pointer-events-none z-10" />
                     </div>
                 )}
             </div>
@@ -810,16 +833,20 @@ export default function LiffOrderPage({ user, apiUrl }) {
                                 </div>
 
                                 {/* 該分類商品 */}
-                                <div className="px-3 space-y-2.5">
+                                <div className="px-4 space-y-2.5">
                                     {items.map(product => {
                                         const qty = cart[product.id] || 0;
                                         return (
                                             <div
                                                 key={product.id}
-                                                className="flex bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden shadow-sm"
+                                                className={`flex bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden shadow-[0_3px_10px_rgba(0,0,0,0.04)] dark:shadow-[0_3px_10px_rgba(0,0,0,0.2)] transition-all duration-150 ${
+                                                    product.stock <= 0 ? 'opacity-65' : ''
+                                                } ${
+                                                    animatingProductId === product.id ? 'scale-95' : 'scale-100'
+                                                }`}
                                             >
                                                 {/* 圖片（左側，全高）*/}
-                                                <div className="w-[100px] flex-shrink-0 bg-[var(--bg-tertiary)]" style={{ minHeight: 100 }}>
+                                                <div className="w-[100px] flex-shrink-0 bg-[var(--bg-tertiary)] relative" style={{ minHeight: 100 }}>
                                                     {product.imageUrl ? (
                                                         <img
                                                             src={product.imageUrl}
@@ -834,6 +861,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center" style={{ minHeight: 100 }}>
                                                             <Package className="text-[var(--text-tertiary)]" size={28} />
+                                                        </div>
+                                                    )}
+                                                    {product.stock <= 0 && (
+                                                        <div className="absolute inset-0 bg-black/50 z-[2] flex flex-col items-center justify-center text-white gap-1 select-none">
+                                                            <span className="text-xs font-black tracking-wider bg-red-600/90 px-1.5 py-0.5 rounded shadow-sm">售罄</span>
+                                                            <span className="text-[9px] font-bold text-slate-200 uppercase tracking-widest">Sold Out</span>
                                                         </div>
                                                     )}
                                                 </div>
@@ -874,7 +907,14 @@ export default function LiffOrderPage({ user, apiUrl }) {
                                                                 )}
                                                                 <button
                                                                     onClick={() => handleProductAction(product, true)}
-                                                                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-500 text-white hover:bg-blue-600 shadow-sm transition-all duration-100 active:scale-90"
+                                                                    disabled={product.stock <= 0}
+                                                                    className={`w-7 h-7 flex items-center justify-center rounded-lg shadow-sm transition-all duration-100 ${
+                                                                        product.stock <= 0
+                                                                            ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'
+                                                                            : qty > 0
+                                                                                ? 'bg-slate-700 text-white hover:bg-slate-800 active:scale-90'
+                                                                                : 'bg-blue-500 text-white hover:bg-blue-600 active:scale-90'
+                                                                    }`}
                                                                 >
                                                                     <Plus size={13} />
                                                                 </button>
@@ -906,7 +946,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                                 </div>
                                 <div>
                                     <div className="text-[10px] text-[var(--text-secondary)] font-semibold">已選 {totalQty} 件</div>
-                                    <div className="text-xl font-extrabold text-[var(--text-primary)] font-mono">${cartTotal}</div>
+                                    <div className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono">${cartTotal}</div>
                                 </div>
                             </div>
                             <button
