@@ -5,10 +5,11 @@ import {
     ChevronLeft, CreditCard, Banknote, Smartphone
 } from 'lucide-react';
 import { callGAS } from '../utils/api';
+import logoImg from '../assets/logo.png';
 
 // ── 品牌 Logo 元件 ──────────────────────────────────────────────
 const MilkZeroWasteLogo = () => (
-    <img src="/logo.png" alt="米立微 Logo" className="w-9 h-9 flex-shrink-0 object-contain" />
+    <img src={logoImg} alt="米立微 Logo" className="w-9 h-9 flex-shrink-0 object-contain" />
 );
 
 // ── 店家設定（改這裡就好）─────────────────────────────────────
