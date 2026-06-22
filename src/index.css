@@ -127,3 +127,13 @@ body {
         opacity: 1;
     }
 }
+
+/* LIFF 訂購頁專用：鎖定 body 捲動以避免 Safari/LINE 網址列動態收合與橡皮筋抖動 */
+html.liff-order-active,
+body.liff-order-active {
+    height: 100% !important;
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+    overscroll-behavior: none !important;
+}

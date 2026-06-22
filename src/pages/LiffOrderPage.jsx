@@ -29,6 +29,16 @@ const LINE_CONTACT_URL = 'https://line.me/R/ti/p/@839rpabi';
 const LS_KEY = 'mlw_customer'; // LocalStorage key
 
 export default function LiffOrderPage({ user, apiUrl }) {
+    // ── 鎖定 body / html 避免 iOS 橡皮筋 & 網址列跳動 ──────────────
+    useEffect(() => {
+        document.documentElement.classList.add('liff-order-active');
+        document.body.classList.add('liff-order-active');
+        return () => {
+            document.documentElement.classList.remove('liff-order-active');
+            document.body.classList.remove('liff-order-active');
+        };
+    }, []);
+
     // ── 商品 state ───────────────────────────────────────────────
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -739,7 +749,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
     return (
         <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
             {/* 頂部固定導覽列（結合 Header 與分類標籤以防止任何布局位移） */}
-            <div className="flex-shrink-0 flex flex-col z-10 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+            <div className="flex-shrink-0 flex flex-col z-10 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] shadow-sm">
                 {/* Header */}
                 <div className="h-[60px] px-3 flex justify-between items-center">
                     {/* 品牌區塊 - 靠左 */}
@@ -760,7 +770,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 {!loading && categories.length > 1 && (
                     <div
                         ref={tabBarRef}
-                        className="h-12 flex items-center gap-1.5 px-3 overflow-x-auto border-t border-[var(--border-primary)] relative"
+                        className="h-12 px-3 border-t border-[var(--border-primary)] flex items-center gap-1.5 overflow-x-auto relative"
                         style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                     >
                         {categories.map(cat => (
