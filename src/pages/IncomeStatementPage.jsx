@@ -23,6 +23,12 @@ export default function IncomeStatementPage({ user, apiUrl }) {
             const d = getLocalDateString();
             setStartDate(d);
             setEndDate(d);
+        } else if (type === 'YESTERDAY') {
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+            const d = getLocalDateString(yesterday);
+            setStartDate(d);
+            setEndDate(d);
         } else if (type === 'THIS_MONTH') {
             setStartDate(getFirstDayOfMonthString());
             setEndDate(getLocalDateString());
@@ -127,6 +133,7 @@ export default function IncomeStatementPage({ user, apiUrl }) {
                 <div className="flex gap-2 pb-2 overflow-x-auto no-scrollbar border-b border-dashed border-slate-200">
                     <span className="text-[10px] font-bold text-slate-400 self-center uppercase tracking-wider mr-2 whitespace-nowrap">快速切換:</span>
                     <button onClick={() => handleQuickDate('TODAY')} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 whitespace-nowrap active:scale-95 transition-transform">今天</button>
+                    <button onClick={() => handleQuickDate('YESTERDAY')} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 whitespace-nowrap active:scale-95 transition-transform">昨天</button>
                     <button onClick={() => handleQuickDate('THIS_MONTH')} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 whitespace-nowrap active:scale-95 transition-transform">本月</button>
                     <button onClick={() => handleQuickDate('LAST_MONTH')} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 whitespace-nowrap active:scale-95 transition-transform">上月</button>
                 </div>

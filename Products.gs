@@ -13,7 +13,11 @@ function getProductsService() {
     // [新增] 自動初始化擴充欄位
     var headerRow = productsSheet.getRange(1, 1, 1, productsSheet.getLastColumn()).getValues()[0];
     var headerStrs = headerRow.map(h => String(h || '').trim());
-    var newCols = ['是否上架', '圖片網址', '有效日期', '分類'];
+    var newCols = [
+        '是否上架', '圖片網址', '有效日期', '分類',
+        'has_flavor_attributes', 'flavor_choices', 'single_price',
+        'has_volume_pricing', 'volume_pricing_settings'
+    ];
     newCols.forEach(col => {
         if (!headerStrs.includes(col)) {
             var nextCol = productsSheet.getLastColumn() + 1;
@@ -24,6 +28,13 @@ function getProductsService() {
                 var trueValues = Array.from({length: rows}, () => [true]);
                 productsSheet.getRange(2, nextCol, rows, 1).setValues(trueValues);
                 // 在該欄設定資料驗證（核取方塊）
+                var rule = SpreadsheetApp.newDataValidation().requireCheckbox().build();
+                productsSheet.getRange(2, nextCol, rows, 1).setDataValidation(rule);
+            }
+            if ((col === 'has_flavor_attributes' || col === 'has_volume_pricing') && productsSheet.getLastRow() > 1) {
+                var rows = productsSheet.getLastRow() - 1;
+                var falseValues = Array.from({length: rows}, () => [false]);
+                productsSheet.getRange(2, nextCol, rows, 1).setValues(falseValues);
                 var rule = SpreadsheetApp.newDataValidation().requireCheckbox().build();
                 productsSheet.getRange(2, nextCol, rows, 1).setDataValidation(rule);
             }
@@ -47,6 +58,27 @@ function getProductsService() {
     var idxImage = productData[0].findIndex(h => String(h || '').trim() === '圖片網址');
     var idxExpiry = productData[0].findIndex(h => String(h || '').trim() === '有效日期');
     var idxCategory = productData[0].findIndex(h => String(h || '').trim() === '分類');
+    
+    var idxHasFlavor = productData[0].findIndex(h => {
+        var s = String(h || '').trim().toLowerCase();
+        return s === 'has_flavor_attributes' || s === '是否有多規格口味' || s === '多規格口味';
+    });
+    var idxFlavorChoices = productData[0].findIndex(h => {
+        var s = String(h || '').trim().toLowerCase();
+        return s === 'flavor_choices' || s === '規格口味選項' || s === '口味選項' || s === '口味';
+    });
+    var idxSinglePrice = productData[0].findIndex(h => {
+        var s = String(h || '').trim().toLowerCase();
+        return s === 'single_price' || s === '單件原價' || s === '原價';
+    });
+    var idxHasVolumePricing = productData[0].findIndex(h => {
+        var s = String(h || '').trim().toLowerCase();
+        return s === 'has_volume_pricing' || s === '是否啟用組合價' || s === '啟用組合價' || s === '是否啟用滿件組合價';
+    });
+    var idxVolumePricingSettings = productData[0].findIndex(h => {
+        var s = String(h || '').trim().toLowerCase();
+        return s === 'volume_pricing_settings' || s === '組合價設定' || s === '滿件組合價設定';
+    });
     
     if (idxName === -1) idxName = 1; // Fallback
     
@@ -117,8 +149,41 @@ function getProductsService() {
             imageUrl: idxImage !== -1 ? String(row[idxImage] || '').trim() : '',
             expiryDate: expiryStr,
             category: idxCategory !== -1 ? String(row[idxCategory] || '').trim() : '',
+            has_flavor_attributes: idxHasFlavor !== -1 ? (row[idxHasFlavor] === true || row[idxHasFlavor] === 'TRUE' || row[idxHasFlavor] === '是' || row[idxHasFlavor] === 1 || row[idxHasFlavor] === '1') : false,
+            flavor_choices: [],
+            single_price: 0,
+            has_volume_pricing: idxHasVolumePricing !== -1 ? (row[idxHasVolumePricing] === true || row[idxHasVolumePricing] === 'TRUE' || row[idxHasVolumePricing] === '是' || row[idxHasVolumePricing] === 1 || row[idxHasVolumePricing] === '1') : false,
+            volume_pricing_settings: null,
             _fromSheet: 'Products'
         };
+
+        // 解析多口味選項
+        if (idxFlavorChoices !== -1 && row[idxFlavorChoices]) {
+            var rawChoices = String(row[idxFlavorChoices]).trim();
+            if (rawChoices.startsWith('[') && rawChoices.endsWith(']')) {
+                try {
+                    p.flavor_choices = JSON.parse(rawChoices);
+                } catch (e) {
+                    p.flavor_choices = rawChoices.slice(1, -1).split(',').map(function(s) { return s.trim().replace(/^["']|["']$/g, ''); });
+                }
+            } else if (rawChoices) {
+                p.flavor_choices = rawChoices.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+            }
+        }
+
+        // 解析單件原價
+        var rawSinglePrice = idxSinglePrice !== -1 && row[idxSinglePrice] !== '' ? Number(row[idxSinglePrice]) : NaN;
+        p.single_price = !isNaN(rawSinglePrice) ? rawSinglePrice : Number(p.price) || 0;
+
+        // 解析組合價設定
+        if (idxVolumePricingSettings !== -1 && row[idxVolumePricingSettings]) {
+            var rawSettings = String(row[idxVolumePricingSettings]).trim();
+            try {
+                p.volume_pricing_settings = JSON.parse(rawSettings);
+            } catch (e) {
+                // Ignore parsing errors
+            }
+        }
         
         // 從 Inventory 取得實際庫存
         if (stockMap[productId]) {
@@ -196,7 +261,7 @@ function updateProductSortOrderService(payload) {
 function updateProductDetailsService(payload, user) {
     if (user.role !== 'BOSS') throw new Error('權限不足');
 
-    const { productId, isActive, imageUrl, expiryDate } = payload;
+    const { productId, isActive, imageUrl, expiryDate, has_flavor_attributes, flavor_choices, single_price, has_volume_pricing, volume_pricing_settings } = payload;
     if (!productId) throw new Error('缺少 productId');
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -218,6 +283,27 @@ function updateProductDetailsService(payload, user) {
     const idxImage = headers.findIndex(h => String(h || '').trim() === '圖片網址');
     const idxExpiry = headers.findIndex(h => String(h || '').trim() === '有效日期');
 
+    const idxHasFlavor = headers.findIndex(h => {
+        const s = String(h || '').trim().toLowerCase();
+        return s === 'has_flavor_attributes' || s === '是否有多規格口味' || s === '多規格口味';
+    });
+    const idxFlavorChoices = headers.findIndex(h => {
+        const s = String(h || '').trim().toLowerCase();
+        return s === 'flavor_choices' || s === '規格口味選項' || s === '口味選項' || s === '口味';
+    });
+    const idxSinglePrice = headers.findIndex(h => {
+        const s = String(h || '').trim().toLowerCase();
+        return s === 'single_price' || s === '單件原價' || s === '原價';
+    });
+    const idxHasVolumePricing = headers.findIndex(h => {
+        const s = String(h || '').trim().toLowerCase();
+        return s === 'has_volume_pricing' || s === '是否啟用組合價' || s === '啟用組合價' || s === '是否啟用滿件組合價';
+    });
+    const idxVolumePricingSettings = headers.findIndex(h => {
+        const s = String(h || '').trim().toLowerCase();
+        return s === 'volume_pricing_settings' || s === '組合價設定' || s === '滿件組合價設定';
+    });
+
     let foundRow = -1;
     for (let i = 1; i < data.length; i++) {
         const idVal = idColIdx !== -1 ? String(data[i][idColIdx] || '').trim() : '';
@@ -231,13 +317,32 @@ function updateProductDetailsService(payload, user) {
 
     // 逐欄更新
     if (idxActive !== -1 && isActive !== undefined) {
-        sheet.getRange(foundRow, idxActive + 1).setValue(isActive === true || isActive === 'true' || isActive === true);
+        sheet.getRange(foundRow, idxActive + 1).setValue(isActive === true || isActive === 'true');
     }
     if (idxImage !== -1 && imageUrl !== undefined) {
         sheet.getRange(foundRow, idxImage + 1).setValue(imageUrl || '');
     }
     if (idxExpiry !== -1 && expiryDate !== undefined) {
         sheet.getRange(foundRow, idxExpiry + 1).setValue(expiryDate || '');
+    }
+    if (idxHasFlavor !== -1 && has_flavor_attributes !== undefined) {
+        sheet.getRange(foundRow, idxHasFlavor + 1).setValue(has_flavor_attributes === true || has_flavor_attributes === 'true');
+    }
+    if (idxFlavorChoices !== -1 && flavor_choices !== undefined) {
+        sheet.getRange(foundRow, idxFlavorChoices + 1).setValue(Array.isArray(flavor_choices) ? JSON.stringify(flavor_choices) : (flavor_choices || ''));
+    }
+    if (idxSinglePrice !== -1 && single_price !== undefined) {
+        sheet.getRange(foundRow, idxSinglePrice + 1).setValue(single_price !== '' && single_price !== null && !isNaN(Number(single_price)) ? Number(single_price) : '');
+    }
+    if (idxHasVolumePricing !== -1 && has_volume_pricing !== undefined) {
+        sheet.getRange(foundRow, idxHasVolumePricing + 1).setValue(has_volume_pricing === true || has_volume_pricing === 'true');
+    }
+    if (idxVolumePricingSettings !== -1 && volume_pricing_settings !== undefined) {
+        var settingsStr = '';
+        if (volume_pricing_settings) {
+            settingsStr = typeof volume_pricing_settings === 'string' ? volume_pricing_settings : JSON.stringify(volume_pricing_settings);
+        }
+        sheet.getRange(foundRow, idxVolumePricingSettings + 1).setValue(settingsStr);
     }
 
     SpreadsheetApp.flush();

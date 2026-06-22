@@ -28,8 +28,13 @@ function initGroupBuySheets_() {
     let detailSheet = ss.getSheetByName(GB_DETAIL_SHEET_NAME);
     if (!detailSheet) {
         detailSheet = ss.insertSheet(GB_DETAIL_SHEET_NAME);
-        detailSheet.appendRow(GB_DETAIL_HEADERS);
+        detailSheet.appendRow([...GB_DETAIL_HEADERS, 'Remark']);
         detailSheet.setFrozenRows(1);
+    } else {
+        const existingDetailHeaders = detailSheet.getRange(1, 1, 1, detailSheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+        if (!existingDetailHeaders.includes('Remark') && !existingDetailHeaders.includes('備註') && !existingDetailHeaders.includes('商品備註')) {
+            detailSheet.getRange(1, detailSheet.getLastColumn() + 1).setValue('Remark');
+        }
     }
     return { orderSheet, detailSheet };
 }
@@ -87,14 +92,24 @@ function savePendingOrderService(payload, user) {
     // 寫入明細
     items.forEach(item => {
         const subtotal = Number(item.unitPrice) * Number(item.qty);
-        detailSheet.appendRow([
+        const detailHeaders = detailSheet.getRange(1, 1, 1, detailSheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+        const remarkIdx = detailHeaders.findIndex(h => h === 'Remark' || h === '備註' || h === '商品備註');
+        
+        const row = [
             orderId,
             item.productId || '',
             item.productName || '',
             Number(item.unitPrice) || 0,
             Number(item.qty) || 0,
             subtotal
-        ]);
+        ];
+        if (remarkIdx >= 0) {
+            while (row.length < remarkIdx) row.push('');
+            row[remarkIdx] = item.remark || '';
+        } else {
+            row.push(item.remark || '');
+        }
+        detailSheet.appendRow(row);
     });
 
     SpreadsheetApp.flush();
@@ -122,6 +137,9 @@ function getPendingOrdersService(payload, user) {
 
     // 組織明細 Map
     const detailMap = {};
+    const detailHeaders = detailRows[0].map(h => String(h).trim());
+    const dRemarkIdx = detailHeaders.findIndex(h => h === 'Remark' || h === '備註' || h === '商品備註');
+    
     for (let i = 1; i < detailRows.length; i++) {
         const row = detailRows[i];
         const oid = String(row[0] || '').trim();
@@ -132,7 +150,8 @@ function getPendingOrdersService(payload, user) {
             productName: String(row[2] || ''),
             unitPrice: Number(row[3]) || 0,
             qty: Number(row[4]) || 0,
-            subtotal: Number(row[5]) || 0
+            subtotal: Number(row[5]) || 0,
+            remark: dRemarkIdx >= 0 && row.length > dRemarkIdx ? String(row[dRemarkIdx] || '') : ''
         });
     }
 
@@ -218,14 +237,24 @@ function updatePendingOrderService(payload, user) {
 
         items.forEach(item => {
             const subtotal = Number(item.unitPrice) * Number(item.qty);
-            detailSheet.appendRow([
+            const detailHeaders = detailSheet.getRange(1, 1, 1, detailSheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+            const remarkIdx = detailHeaders.findIndex(h => h === 'Remark' || h === '備註' || h === '商品備註');
+            
+            const row = [
                 orderId,
                 item.productId || '',
                 item.productName || '',
                 Number(item.unitPrice) || 0,
                 Number(item.qty) || 0,
                 subtotal
-            ]);
+            ];
+            if (remarkIdx >= 0) {
+                while (row.length < remarkIdx) row.push('');
+                row[remarkIdx] = item.remark || '';
+            } else {
+                row.push(item.remark || '');
+            }
+            detailSheet.appendRow(row);
         });
     }
 
@@ -308,6 +337,11 @@ function confirmPendingOrderService(payload, user) {
 
     // 寫入 SalesDetails
     if (salesDetailSheet) {
+        const salesDetailHeaders = salesDetailSheet.getRange(1, 1, 1, salesDetailSheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+        if (!salesDetailHeaders.includes('Remark') && !salesDetailHeaders.includes('備註') && !salesDetailHeaders.includes('商品備註')) {
+            salesDetailSheet.getRange(1, salesDetailSheet.getLastColumn() + 1).setValue('Remark');
+        }
+        
         const detailHeaders = salesDetailSheet.getRange(1, 1, 1, salesDetailSheet.getLastColumn()).getValues()[0];
         const findDIdx = kws => detailHeaders.findIndex(h => kws.some(k => String(h || '').toLowerCase().includes(k)));
         const dIdIdx  = findDIdx(['saleid', '訂單', '編號', 'id']);
@@ -316,9 +350,13 @@ function confirmPendingOrderService(payload, user) {
         const dPriceIdx = findDIdx(['price', '單價', 'unitprice']);
         const dQtyIdx = findDIdx(['qty', 'quantity', '數量']);
         const dSubIdx = findDIdx(['subtotal', '小計', '金額']);
+        const dRemarkIdx = detailHeaders.findIndex(h => {
+            const s = String(h || '').trim().toLowerCase();
+            return s === 'remark' || s === '備註' || s === '商品備註';
+        });
 
         items.forEach(item => {
-            const colCount = Math.max(detailHeaders.length, 8);
+            const colCount = Math.max(detailHeaders.length, 9);
             const newRow = new Array(colCount).fill('');
             if (dIdIdx   !== -1) newRow[dIdIdx]   = orderId;
             if (dPidIdx  !== -1) newRow[dPidIdx]  = item.productId;
@@ -326,6 +364,7 @@ function confirmPendingOrderService(payload, user) {
             if (dPriceIdx !== -1) newRow[dPriceIdx] = item.unitPrice;
             if (dQtyIdx  !== -1) newRow[dQtyIdx]  = item.qty;
             if (dSubIdx  !== -1) newRow[dSubIdx]  = item.subtotal;
+            if (dRemarkIdx !== -1) newRow[dRemarkIdx] = item.remark;
             salesDetailSheet.appendRow(newRow);
         });
     }

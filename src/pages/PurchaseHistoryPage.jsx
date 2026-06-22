@@ -23,6 +23,12 @@ export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
             const d = getLocalDateString();
             setStartDate(d);
             setEndDate(d);
+        } else if (type === 'YESTERDAY') {
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+            const d = getLocalDateString(yesterday);
+            setStartDate(d);
+            setEndDate(d);
         } else if (type === 'THIS_MONTH') {
             setStartDate(getFirstDayOfMonthString());
             setEndDate(getLocalDateString());
@@ -176,6 +182,7 @@ export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
                         <span className="text-[10px] font-bold text-slate-400 self-center uppercase tracking-wider mr-2 whitespace-nowrap">快速切換:</span>
                         {[
                             { label: '今天', type: 'TODAY' },
+                            { label: '昨天', type: 'YESTERDAY' },
                             { label: '本月', type: 'THIS_MONTH' },
                             { label: '上月', type: 'LAST_MONTH' }
                         ].map((btn) => (
@@ -257,6 +264,7 @@ export default function PurchaseHistoryPage({ user, apiUrl, setPage }) {
                         <span className="text-[10px] font-bold text-slate-400 self-center uppercase tracking-wider mr-2 whitespace-nowrap">快速切換:</span>
                         {[
                             { label: '今天', type: 'TODAY' },
+                            { label: '昨天', type: 'YESTERDAY' },
                             { label: '本月', type: 'THIS_MONTH' },
                             { label: '上月', type: 'LAST_MONTH' }
                         ].map((btn) => (

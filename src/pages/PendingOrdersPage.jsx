@@ -97,19 +97,39 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         }));
     };
 
+    const calculateItemSubtotal = (productId, qty) => {
+        const prod = products.find(p => p.id === productId);
+        if (!prod) return 0;
+        
+        const singlePrice = Number(prod.single_price) || Number(prod.price);
+        if (prod.has_volume_pricing && prod.volume_pricing_settings) {
+            const targetQty = Number(prod.volume_pricing_settings.target_quantity);
+            const packagePrice = Number(prod.volume_pricing_settings.package_price);
+            
+            const groupCount = Math.floor(qty / targetQty);
+            const remainderCount = qty % targetQty;
+            return (groupCount * packagePrice) + (remainderCount * singlePrice);
+        } else {
+            return singlePrice * qty;
+        }
+    };
+
     const handleItemQtyChange = (productId, qty) => {
         setEditingOrder(prev => {
             const newItems = prev.items.map(item => {
                 if (item.productId === productId) {
                     const newQty = Math.max(0, Number(qty) || 0);
+                    const subtotal = calculateItemSubtotal(productId, newQty);
+                    const avgPrice = newQty > 0 ? (subtotal / newQty) : item.unitPrice;
                     return {
                         ...item,
                         qty: newQty,
-                        subtotal: newQty * item.unitPrice
+                        unitPrice: avgPrice,
+                        subtotal: subtotal
                     };
                 }
                 return item;
-            }).filter(item => item.qty > 0); // 若數量為 0，直接移除 (或可以在介面手動刪)
+            }).filter(item => item.qty > 0);
 
             const total = newItems.reduce((sum, item) => sum + item.subtotal, 0);
             return {
@@ -137,30 +157,34 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         if (!prod) return;
 
         setEditingOrder(prev => {
-            // 檢查是否已存在
             const existing = prev.items.find(item => item.productId === productId);
             let newItems = [];
             if (existing) {
                 newItems = prev.items.map(item => {
                     if (item.productId === productId) {
                         const newQty = item.qty + 1;
+                        const subtotal = calculateItemSubtotal(productId, newQty);
+                        const avgPrice = newQty > 0 ? (subtotal / newQty) : item.unitPrice;
                         return {
                             ...item,
                             qty: newQty,
-                            subtotal: newQty * item.unitPrice
+                            unitPrice: avgPrice,
+                            subtotal: subtotal
                         };
                     }
                     return item;
                 });
             } else {
+                const subtotal = calculateItemSubtotal(productId, 1);
                 newItems = [
                     ...prev.items,
                     {
                         productId: prod.id,
                         productName: prod.name,
-                        unitPrice: prod.price,
+                        unitPrice: subtotal,
                         qty: 1,
-                        subtotal: prod.price
+                        subtotal: subtotal,
+                        remark: ''
                     }
                 ];
             }
@@ -347,12 +371,19 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                         <div className="text-[10px] uppercase font-bold text-[var(--text-tertiary)] mb-2 tracking-wider">訂單商品明細</div>
                                         <div className="divide-y divide-[var(--border-primary)] divide-dashed space-y-2">
                                             {order.items.map((item, idx) => (
-                                                <div key={idx} className="flex justify-between items-center text-sm pt-2 first:pt-0">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="font-medium text-[var(--text-primary)]">{item.productName}</span>
-                                                        <span className="text-xs text-[var(--text-tertiary)] font-bold">x {item.qty}</span>
+                                                <div key={idx} className="flex flex-col pt-2 first:pt-0">
+                                                    <div className="flex justify-between items-center text-sm">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="font-medium text-[var(--text-primary)]">{item.productName}</span>
+                                                            <span className="text-xs text-[var(--text-tertiary)] font-bold">x {item.qty}</span>
+                                                        </div>
+                                                        <span className="font-mono text-[var(--text-secondary)]">${item.subtotal}</span>
                                                     </div>
-                                                    <span className="font-mono text-[var(--text-secondary)]">${item.subtotal}</span>
+                                                    {item.remark && (
+                                                        <div className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold ml-1">
+                                                            {item.remark}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
@@ -504,9 +535,22 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                     ) : (
                                         editingOrder.items.map((item, idx) => (
                                             <div key={idx} className="flex justify-between items-center p-3 text-sm hover:bg-[var(--bg-hover)]">
-                                                <div className="flex-1">
+                                                <div className="flex-1 mr-4">
                                                     <div className="font-bold text-[var(--text-primary)]">{item.productName}</div>
                                                     <div className="text-[10px] text-[var(--text-tertiary)] font-semibold mt-0.5">單價: ${item.unitPrice}</div>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="商品規格口味備註"
+                                                        className="input-field text-xs p-1 w-full mt-1.5 border-dashed"
+                                                        value={item.remark || ''}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            setEditingOrder(prev => ({
+                                                                ...prev,
+                                                                items: prev.items.map((it, i) => i === idx ? { ...it, remark: val } : it)
+                                                            }));
+                                                        }}
+                                                    />
                                                 </div>
 
                                                 <div className="flex items-center gap-4">

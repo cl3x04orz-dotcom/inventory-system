@@ -150,7 +150,7 @@ function AppContent() {
     const [sessionManager, setSessionManager] = useState(null);
     const [isInitializing, setIsInitializing] = useState(true);
     const [showSplash, setShowSplash] = useState(true);
-    const [hasUpdate, setHasUpdate] = useState(null);
+    // hasUpdate 已不再用於顯示 Banner，改為自動強制重載
     const checkCountRef = React.useRef(0);
 
     const [showHeader, setShowHeader] = useState(true);
@@ -218,15 +218,12 @@ function AppContent() {
                 if (res && res.version && String(res.version) !== String(LOCAL_VERSION)) {
                     const serverVer = Number(res.version);
                     const localVer = Number(LOCAL_VERSION);
-                    if (!isNaN(serverVer) && !isNaN(localVer)) {
-                        if (serverVer > localVer) {
-                            console.warn(`[VersionCheck] 偵測到新版本! (${LOCAL_VERSION} -> ${res.version})`);
-                            setHasUpdate({ local: LOCAL_VERSION, server: res.version });
-                        } else {
-                            console.log(`[VersionCheck] 本地版本較新或相同，無需更新 (${LOCAL_VERSION} >= ${res.version})`);
-                        }
-                    } else {
-                        console.log(`[VersionCheck] 偵測到版本字串不同，但不進行強制更新提示 (${LOCAL_VERSION} != ${res.version})`);
+                    if (!isNaN(serverVer) && !isNaN(localVer) && serverVer > localVer) {
+                        console.warn(`[VersionCheck] 偵測到新版本 (${LOCAL_VERSION} -> ${res.version})，強制重載！`);
+                        // 直接強制重載，不讓使用者選擇（市場客/團購客看不懂更新通知）
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('_v', res.version);
+                        window.location.replace(url.toString());
                     }
                 }
             } catch (e) {
@@ -620,30 +617,7 @@ function AppContent() {
                 </div>
             )}
 
-            {/* Version Update Banner */}
-            {hasUpdate && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] w-[90%] max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-300">
-                    <div className="bg-blue-600 text-white p-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 border border-blue-400">
-                        <div className="flex items-center gap-3">
-                            <Activity size={20} className="animate-pulse" />
-                            <div>
-                                <p className="font-bold text-sm">系統版本有更新</p>
-                                <p className="text-[9px] opacity-70 font-mono">{hasUpdate.local} → {hasUpdate.server}</p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={() => {
-                                const url = new URL(window.location.href);
-                                url.searchParams.set('v', new Date().getTime());
-                                window.location.href = url.toString();
-                            }}
-                            className="bg-white text-blue-600 px-4 py-1.5 rounded-xl font-bold text-xs hover:bg-blue-50 transition-colors shadow-sm whitespace-nowrap"
-                        >
-                            立即刷新
-                        </button>
-                    </div>
-                </div>
-            )}
+            {/* Version Update Banner 已移除：偵測到新版本直接自動強制重載 */}
 
             {/* Navbar（客戶點餐頁不顯示）*/}
             {page !== 'liffOrder' && <header className={`h-[76px] border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]/85 backdrop-blur-xl flex justify-between items-center px-6 sticky top-0 z-[60] transition-[transform,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.17,0.67,0.83,0.67)] ${showHeader ? 'translate-y-0' : '-translate-y-full'} ${scrolled ? 'shadow-lg border-transparent' : 'shadow-none'}`}>

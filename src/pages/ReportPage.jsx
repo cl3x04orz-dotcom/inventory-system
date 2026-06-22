@@ -420,6 +420,12 @@ export default function ReportPage({ user, apiUrl, setPage }) {
             const d = getLocalDateString();
             setStartDate(d);
             setEndDate(d);
+        } else if (type === 'YESTERDAY') {
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+            const d = getLocalDateString(yesterday);
+            setStartDate(d);
+            setEndDate(d);
         } else if (type === 'THIS_MONTH') {
             setStartDate(getFirstDayOfMonthString());
             setEndDate(getLocalDateString());
@@ -553,6 +559,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                         <div className="flex-1 flex bg-white p-1 rounded-xl border border-slate-100 shadow-inner max-w-sm">
                             {[
                                 { label: '今天', type: 'TODAY' },
+                                { label: '昨天', type: 'YESTERDAY' },
                                 { label: '本月', type: 'THIS_MONTH' },
                                 { label: '上月', type: 'LAST_MONTH' }
                             ].map((btn) => (

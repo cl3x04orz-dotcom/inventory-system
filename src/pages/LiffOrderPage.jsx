@@ -6,45 +6,54 @@ import {
 } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
+// ── 品牌 Logo 元件 ──────────────────────────────────────────────
+const MilkZeroWasteLogo = () => (
+    <img src="/logo.png" alt="米立微 Logo" className="w-9 h-9 flex-shrink-0 object-contain" />
+);
+
 // ── 店家設定（改這裡就好）─────────────────────────────────────
 const BANK_INFO = {
     bank: '玉山銀行 (808)',
     account: '0934979271826',
     name: '張庭瑜',
 };
-const LINE_PAY_URL   = 'https://line.me/ti/p/kjGUUdBqLE';
+const LINE_PAY_URL = 'https://line.me/ti/p/kjGUUdBqLE';
 const LINE_CONTACT_URL = 'https://line.me/R/ti/p/@839rpabi';
 const LS_KEY = 'mlw_customer'; // LocalStorage key
 
 export default function LiffOrderPage({ user, apiUrl }) {
     // ── 商品 state ───────────────────────────────────────────────
-    const [products, setProducts]         = useState([]);
-    const [loading, setLoading]           = useState(true);
-    const [cart, setCart]                 = useState({});
+    const [products, setProducts] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [cart, setCart] = useState({});
     const [activeCategory, setActiveCategory] = useState('全部');
-    const [sourceGroup, setSourceGroup]   = useState('');
-    const tabBarRef   = useRef(null);
-    const listRef     = useRef(null);
+    const [sourceGroup, setSourceGroup] = useState('');
+    const tabBarRef = useRef(null);
+    const listRef = useRef(null);
     const sectionRefs = useRef({});
 
+    // ── 口味規格 state ─────────────────────────────────────────────
+    const [flavorSelections, setFlavorSelections] = useState({}); // { [productId]: { [flavor]: qty } }
+    const [flavorModalProduct, setFlavorModalProduct] = useState(null);
+    const [tempFlavorQty, setTempFlavorQty] = useState({});
 
     // ── 步驟機制 ─────────────────────────────────────────────────
     // 'shop' | 'form' | 'confirm' | 'success'
     const [step, setStep] = useState('shop');
 
     // ── 表單 state ───────────────────────────────────────────────
-    const [customerName,     setCustomerName]     = useState('');
-    const [customerPhone,    setCustomerPhone]    = useState('');
-    const [deliveryAddress,  setDeliveryAddress]  = useState('');
-    const [note,             setNote]             = useState('');
-    const [paymentMethod,    setPaymentMethod]    = useState('現金');
+    const [customerName, setCustomerName] = useState('');
+    const [customerPhone, setCustomerPhone] = useState('');
+    const [deliveryAddress, setDeliveryAddress] = useState('');
+    const [note, setNote] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState('現金');
     const [transferLastFive, setTransferLastFive] = useState('');
 
     // ── 送出 state ───────────────────────────────────────────────
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [orderId,   setOrderId]   = useState('');
+    const [orderId, setOrderId] = useState('');
     const [orderTime, setOrderTime] = useState('');
-    const [copied,    setCopied]    = useState(false);
+    const [copied, setCopied] = useState(false);
 
     // ── 載入商品 ─────────────────────────────────────────────────
     const loadProducts = async () => {
@@ -114,30 +123,131 @@ export default function LiffOrderPage({ user, apiUrl }) {
         });
     };
 
+    const handleProductAction = (product, isPlus) => {
+        if (product.has_flavor_attributes) {
+            setFlavorModalProduct(product);
+            const currentFlavors = flavorSelections[product.id] || {};
+            const initialTemp = {};
+            product.flavor_choices.forEach(f => {
+                initialTemp[f] = currentFlavors[f] || 0;
+            });
+            const currentTotal = Object.values(initialTemp).reduce((a, b) => a + b, 0);
+            if (isPlus && currentTotal === 0 && product.flavor_choices.length > 0) {
+                initialTemp[product.flavor_choices[0]] = 1;
+            }
+            setTempFlavorQty(initialTemp);
+        } else {
+            handleUpdateQty(product.id, isPlus ? 1 : -1);
+        }
+    };
+
+    const handleUpdateTempFlavorQty = (flavor, delta) => {
+        setTempFlavorQty(prev => {
+            const val = Math.max(0, (prev[flavor] || 0) + delta);
+            return { ...prev, [flavor]: val };
+        });
+    };
+
+    const getFlavorRemark = (productId, pFlavorSelections) => {
+        const selections = pFlavorSelections[productId];
+        if (!selections) return '';
+        const items = Object.entries(selections)
+            .filter(([_, qty]) => qty > 0)
+            .map(([flavor, qty]) => `${flavor}x${qty}`);
+        if (items.length === 0) return '';
+        return `【口味備註：${items.join(', ')}】`;
+    };
+
+    const handleConfirmFlavors = () => {
+        if (!flavorModalProduct) return;
+        const pid = flavorModalProduct.id;
+        const total = Object.values(tempFlavorQty).reduce((a, b) => a + b, 0);
+
+        setCart(prev => {
+            const next = { ...prev };
+            if (total === 0) {
+                delete next[pid];
+            } else {
+                next[pid] = total;
+            }
+            return next;
+        });
+
+        setFlavorSelections(prev => {
+            const next = { ...prev };
+            if (total === 0) {
+                delete next[pid];
+            } else {
+                next[pid] = tempFlavorQty;
+            }
+            return next;
+        });
+
+        setFlavorModalProduct(null);
+    };
+
     const totalQty = Object.values(cart).reduce((s, q) => s + q, 0);
 
     const cartTotal = useMemo(() =>
         Object.entries(cart).reduce((s, [pid, qty]) => {
             const p = products.find(x => x.id === pid);
-            return s + (p ? p.price * qty : 0);
+            if (!p) return s;
+            if (p.has_volume_pricing && p.volume_pricing_settings) {
+                const targetQty = Number(p.volume_pricing_settings.target_quantity);
+                const packagePrice = Number(p.volume_pricing_settings.package_price);
+                const singlePrice = Number(p.single_price) || Number(p.price);
+
+                const groupCount = Math.floor(qty / targetQty);
+                const remainderCount = qty % targetQty;
+                return s + (groupCount * packagePrice) + (remainderCount * singlePrice);
+            } else {
+                const singlePrice = Number(p.single_price) || Number(p.price);
+                return s + (singlePrice * qty);
+            }
         }, 0),
-    [cart, products]);
+        [cart, products]);
 
     const cartItems = useMemo(() =>
         Object.entries(cart).map(([pid, qty]) => {
             const p = products.find(x => x.id === pid);
-            return { id: pid, name: p?.name ?? pid, price: p?.price ?? 0, qty };
+            let subtotal = 0;
+            let displayPrice = p?.price ?? 0;
+
+            if (p) {
+                const singlePrice = Number(p.single_price) || Number(p.price);
+                if (p.has_volume_pricing && p.volume_pricing_settings) {
+                    const targetQty = Number(p.volume_pricing_settings.target_quantity);
+                    const packagePrice = Number(p.volume_pricing_settings.package_price);
+
+                    const groupCount = Math.floor(qty / targetQty);
+                    const remainderCount = qty % targetQty;
+                    subtotal = (groupCount * packagePrice) + (remainderCount * singlePrice);
+                } else {
+                    subtotal = singlePrice * qty;
+                }
+                displayPrice = qty > 0 ? (subtotal / qty) : singlePrice;
+            }
+
+            const remark = p?.has_flavor_attributes ? getFlavorRemark(pid, flavorSelections) : '';
+            return {
+                id: pid,
+                name: p?.name ?? pid,
+                price: displayPrice,
+                qty,
+                remark,
+                subtotal
+            };
         }),
-    [cart, products]);
+        [cart, products, flavorSelections]);
 
     // ── 進入填寫步驟：從 LocalStorage 自動帶入舊資料 ─────────────
     const handleProceedToForm = () => {
         try {
             const saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
-            if (saved.name)    setCustomerName(saved.name);
-            if (saved.phone)   setCustomerPhone(saved.phone);
+            if (saved.name) setCustomerName(saved.name);
+            if (saved.phone) setCustomerPhone(saved.phone);
             if (saved.address) setDeliveryAddress(saved.address);
-        } catch (_) {}
+        } catch (_) { }
         setStep('form');
     };
 
@@ -154,7 +264,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 customerName, customerPhone, deliveryAddress, sourceGroup, note,
                 paymentMethod, transferLastFive,
                 items: cartItems.map(i => ({
-                    productId: i.id, productName: i.name, unitPrice: i.price, qty: i.qty
+                    productId: i.id, productName: i.name, unitPrice: i.price, qty: i.qty, remark: i.remark
                 }))
             }, user.token);
 
@@ -264,7 +374,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 >
                     {/* LINE icon */}
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                        <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/>
+                        <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
                     </svg>
                     加入官方 LINE 聯繫
                 </button>
@@ -306,8 +416,11 @@ export default function LiffOrderPage({ user, apiUrl }) {
                                 <div>
                                     <span className="font-semibold text-[var(--text-primary)]">{item.name}</span>
                                     <span className="text-[var(--text-secondary)] ml-2">× {item.qty}</span>
+                                    {item.remark && (
+                                        <div className="text-xs text-blue-600 dark:text-blue-400 font-medium mt-0.5">{item.remark}</div>
+                                    )}
                                 </div>
-                                <span className="font-mono font-bold text-[var(--text-primary)]">${(item.price * item.qty)}</span>
+                                <span className="font-mono font-bold text-[var(--text-primary)]">${item.subtotal}</span>
                             </div>
                         ))}
                         <div className="flex justify-between items-center px-4 py-3 bg-[var(--bg-tertiary)]">
@@ -323,9 +436,9 @@ export default function LiffOrderPage({ user, apiUrl }) {
                         </div>
                         {[
                             { label: '收件人', value: customerName },
-                            { label: '電話',   value: customerPhone },
-                            { label: '地址',   value: deliveryAddress || '（未填）' },
-                            { label: '備註',   value: note || '（無）' },
+                            { label: '電話', value: customerPhone },
+                            { label: '地址', value: deliveryAddress || '（未填）' },
+                            { label: '備註', value: note || '（無）' },
                         ].map(({ label, value }) => (
                             <div key={label} className="flex gap-3 px-4 py-2.5 border-b border-[var(--border-primary)] last:border-0 text-sm">
                                 <span className="text-[var(--text-secondary)] w-14 shrink-0">{label}</span>
@@ -380,9 +493,9 @@ export default function LiffOrderPage({ user, apiUrl }) {
             (paymentMethod !== '轉帳' || transferLastFive.trim().length === 5);
 
         const paymentOptions = [
-            { value: '現金',    Icon: Banknote,    label: '現金',       desc: '自備零錢，現場不找零' },
-            { value: '轉帳',    Icon: CreditCard,  label: '銀行轉帳',   desc: `${BANK_INFO.bank} ‧ ${BANK_INFO.name}` },
-            { value: 'LINE Pay', Icon: Smartphone, label: 'LINE Pay',   desc: '個人 LINE 轉帳付款' },
+            { value: '現金', Icon: Banknote, label: '現金', desc: '自備零錢，現場不找零' },
+            { value: '轉帳', Icon: CreditCard, label: '銀行轉帳', desc: `${BANK_INFO.bank} ‧ ${BANK_INFO.name}` },
+            { value: 'LINE Pay', Icon: Smartphone, label: 'LINE Pay', desc: '個人 LINE 轉帳付款' },
         ];
 
         return (
@@ -461,11 +574,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
                                 return (
                                     <label
                                         key={value}
-                                        className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
-                                            active
+                                        className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${active
                                                 ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/15'
                                                 : 'border-[var(--border-primary)] bg-[var(--bg-secondary)] hover:border-blue-300'
-                                        }`}
+                                            }`}
                                     >
                                         <input type="radio" name="payment" value={value} checked={active} onChange={() => setPaymentMethod(value)} className="hidden" />
                                         <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${active ? 'bg-blue-600 text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'}`}>
@@ -537,11 +649,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 <div className="p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] flex-shrink-0">
                     <button
                         onClick={() => { if (canProceed) setStep('confirm'); }}
-                        className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
-                            canProceed
+                        className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${canProceed
                                 ? 'btn-primary shadow-md shadow-blue-500/20'
                                 : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed'
-                        }`}
+                            }`}
                     >
                         下一步：確認訂單明細 <ArrowRight size={16} />
                     </button>
@@ -554,22 +665,32 @@ export default function LiffOrderPage({ user, apiUrl }) {
     return (
         <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
             {/* Header */}
-            <div className="px-4 py-3 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] flex justify-between items-center flex-shrink-0">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-lg select-none">
-                        🌾
-                    </div>
+            <div className="px-3 py-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)] flex justify-between items-center flex-shrink-0 z-10">
+                {/* 品牌區塊 - 置中 */}
+                <div className="flex-1 flex justify-center items-center gap-2">
+                    <MilkZeroWasteLogo />
                     <div>
-                        <h2 className="text-base font-extrabold text-[var(--text-primary)] leading-tight">米立微 團購一鍵下單</h2>
-                        {sourceGroup && (
-                            <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
-                                {sourceGroup}
+                        <div className="flex items-baseline gap-1.5 leading-none">
+                            <span className="text-[16px] font-black tracking-tight text-[var(--text-primary)]">米立微</span>
+                            <span className="text-[10px] font-semibold tracking-wide text-[var(--text-secondary)] font-sans">Milkzerowaste</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-[3px]">
+                            <span className="text-[9px] tracking-wider text-[var(--text-tertiary)] font-medium">
+                                嚴選乳品・每日配送
                             </span>
-                        )}
+                            {sourceGroup && (
+                                <>
+                                    <span className="text-[8px] text-[var(--text-tertiary)]">•</span>
+                                    <span className="text-[9px] text-blue-600 dark:text-blue-400 font-semibold">
+                                        {sourceGroup}
+                                    </span>
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
-                <button onClick={loadProducts} className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-                    <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
+                <button onClick={loadProducts} className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex-shrink-0">
+                    <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
                 </button>
             </div>
 
@@ -592,11 +713,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
                                     key={cat}
                                     data-cat={cat}
                                     onClick={() => handleCategoryChange(cat)}
-                                    className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 whitespace-nowrap border ${
-                                        activeCategory === cat
+                                    className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 whitespace-nowrap border ${activeCategory === cat
                                             ? 'bg-[var(--text-primary)] text-[var(--bg-primary)] border-transparent shadow-sm'
                                             : 'bg-transparent border-[var(--border-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                                    }`}
+                                        }`}
                                 >
                                     {cat}
                                 </button>
@@ -648,35 +768,50 @@ export default function LiffOrderPage({ user, apiUrl }) {
                                                 {/* 內容（右側）*/}
                                                 <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                                                     <div>
-                                                        <h3 className="font-bold text-sm text-[var(--text-primary)] leading-snug">{product.name}</h3>
-                                                        <div className="text-[10px] text-[var(--text-tertiary)] font-mono mt-0.5">ID: {product.id}</div>
+                                                        <h3 className="font-extrabold text-[18px] text-[var(--text-primary)] leading-snug">{product.name}</h3>
                                                         {product.expiryDate && (
                                                             <span className="inline-block text-[10px] text-orange-600 bg-orange-50 dark:bg-orange-900/10 px-1.5 py-0.5 rounded mt-1">
                                                                 有效: {product.expiryDate}
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="flex justify-between items-center mt-2">
-                                                        <span className="text-base font-extrabold text-blue-600 font-mono">${product.price}</span>
-                                                        <div className="flex items-center gap-0.5">
-                                                            {qty > 0 && (
-                                                                <>
-                                                                    <button
-                                                                        onClick={() => handleUpdateQty(product.id, -1)}
-                                                                        className="w-7 h-7 flex items-center justify-center rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
-                                                                    >
-                                                                        <Minus size={13} />
-                                                                    </button>
-                                                                    <span className="w-7 text-center font-bold font-mono text-sm">{qty}</span>
-                                                                </>
-                                                            )}
-                                                            <button
-                                                                onClick={() => handleUpdateQty(product.id, 1)}
-                                                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-500 text-white hover:bg-blue-600 shadow-sm transition-colors"
-                                                            >
-                                                                <Plus size={13} />
-                                                            </button>
+                                                    <div className="flex flex-col mt-1.5">
+                                                        <div className="flex justify-between items-center">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-sm font-bold text-blue-600 font-mono">
+                                                                    ${product.has_volume_pricing ? (product.single_price || product.price) : product.price}
+                                                                </span>
+                                                                {product.has_volume_pricing && product.volume_pricing_settings && (
+                                                                    <span className="text-[10px] text-red-500 font-bold leading-none mt-0.5">
+                                                                        任選 {product.volume_pricing_settings.target_quantity} 入 ${product.volume_pricing_settings.package_price}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center gap-0.5">
+                                                                {qty > 0 && (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={() => handleProductAction(product, false)}
+                                                                            className="w-7 h-7 flex items-center justify-center rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-100 active:scale-90"
+                                                                        >
+                                                                            <Minus size={13} />
+                                                                        </button>
+                                                                        <span className="w-7 text-center font-bold font-mono text-sm">{qty}</span>
+                                                                    </>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => handleProductAction(product, true)}
+                                                                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-500 text-white hover:bg-blue-600 shadow-sm transition-all duration-100 active:scale-90"
+                                                                >
+                                                                    <Plus size={13} />
+                                                                </button>
+                                                            </div>
                                                         </div>
+                                                        {qty > 0 && product.has_flavor_attributes && (
+                                                            <div className="text-[10px] text-blue-600 dark:text-blue-400 font-medium mt-1.5 select-none cursor-pointer" onClick={() => handleProductAction(product, true)}>
+                                                                {getFlavorRemark(product.id, flavorSelections)}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -710,6 +845,82 @@ export default function LiffOrderPage({ user, apiUrl }) {
                         </div>
                     )}
                 </>
+            )}
+
+            {/* 多規格口味選擇彈窗 */}
+            {flavorModalProduct && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                    <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-primary)] shadow-2xl w-full max-w-sm flex flex-col overflow-hidden glass-panel">
+                        <div className="p-4 border-b border-[var(--border-primary)] flex justify-between items-center bg-[var(--bg-tertiary)]">
+                            <div>
+                                <h3 className="text-base font-bold text-[var(--text-primary)]">{flavorModalProduct.name}</h3>
+                                <p className="text-xs text-[var(--text-secondary)] mt-0.5">請選擇規格口味與數量</p>
+                            </div>
+                            <button
+                                onClick={() => setFlavorModalProduct(null)}
+                                className="text-[var(--text-secondary)] hover:text-red-500 p-1.5 rounded-lg hover:bg-[var(--bg-hover)]"
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                        </div>
+
+                        <div className="p-4 space-y-4 max-h-[50vh] overflow-y-auto">
+                            {flavorModalProduct.flavor_choices.map(flavor => {
+                                const count = tempFlavorQty[flavor] || 0;
+                                return (
+                                    <div key={flavor} className="flex justify-between items-center py-1">
+                                        <span className="font-semibold text-sm text-[var(--text-primary)]">{flavor}</span>
+                                        <div className="flex items-center gap-1 bg-[var(--bg-primary)] rounded-lg p-0.5 border border-[var(--border-primary)] shadow-sm">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleUpdateTempFlavorQty(flavor, -1)}
+                                                className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-100 active:scale-90"
+                                            >
+                                                <Minus size={12} />
+                                            </button>
+                                            <span className="w-8 text-center font-bold font-mono text-sm">{count}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleUpdateTempFlavorQty(flavor, 1)}
+                                                className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-100 active:scale-90"
+                                            >
+                                                <Plus size={12} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+
+                            {/* 總計與優惠提示 */}
+                            <div className="bg-[var(--bg-tertiary)] p-3 rounded-xl border border-[var(--border-primary)] text-xs space-y-1 mt-2">
+                                <div className="flex justify-between font-bold text-[var(--text-primary)]">
+                                    <span>本次已選總數：</span>
+                                    <span className="font-mono text-sm text-blue-600">{Object.values(tempFlavorQty).reduce((a, b) => a + b, 0)} 件</span>
+                                </div>
+                                {flavorModalProduct.has_volume_pricing && flavorModalProduct.volume_pricing_settings && (
+                                    <div className="text-red-500 font-semibold mt-1">
+                                        ※ 本商品享組合價：任選 {flavorModalProduct.volume_pricing_settings.target_quantity} 入 ${flavorModalProduct.volume_pricing_settings.package_price}（可口味混搭）
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="p-4 border-t border-[var(--border-primary)] flex gap-3 bg-[var(--bg-tertiary)]">
+                            <button
+                                onClick={() => setFlavorModalProduct(null)}
+                                className="btn-secondary py-2.5 rounded-xl text-sm font-bold flex-1 transition-all duration-100 active:scale-95"
+                            >
+                                取消
+                            </button>
+                            <button
+                                onClick={handleConfirmFlavors}
+                                className="btn-primary py-2.5 rounded-xl text-sm font-bold flex-1 shadow-md shadow-blue-500/20 transition-all duration-100 active:scale-95"
+                            >
+                                確認加入
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
