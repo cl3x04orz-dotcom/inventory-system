@@ -15,16 +15,22 @@ export default function PermissionControlPage({ user, apiUrl }) {
             group: '銷售管理',
             items: [
                 { key: 'sales_entry', label: '商品銷售登錄' },
-                { key: 'sales_report', label: '銷售查詢報表' },
+                { key: 'sales_report', label: '銷售查詢報表' }
+            ]
+        },
+        {
+            group: '團購管理',
+            items: [
                 { key: 'sales_liff', label: '團購一鍵下單' },
-                { key: 'sales_pending', label: '待確認訂單審核' }
+                { key: 'sales_pending', label: '待確認訂單審核' },
+                { key: 'products', label: '商品屬性管理' }
             ]
         },
         {
             group: '進貨管理',
             items: [
                 { key: 'purchase_entry', label: '商品進貨登錄' },
-                { id: 'view_purchase_history', label: '進貨查詢報表' },
+                { key: 'purchase_history', label: '進貨查詢報表' },
             ]
         },
         {

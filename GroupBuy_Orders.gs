@@ -6,20 +6,30 @@
 
 const GB_SHEET_NAME = 'GroupBuy_Orders';
 const GB_DETAIL_SHEET_NAME = 'GroupBuy_OrderDetails';
-const GB_HEADERS = ['OrderId', 'Status', 'CustomerLineId', 'CustomerName', 'CustomerPhone', 'DeliveryAddress', 'SourceGroup', 'Note', 'TotalAmount', 'CreatedAt', 'UpdatedAt', 'ConfirmedAt', 'ConfirmedBy'];
+const GB_BINDINGS_SHEET_NAME = 'GroupBuy_GroupBindings';
+const GB_HEADERS = ['OrderId', 'Status', 'CustomerLineId', 'CustomerName', 'CustomerPhone', 'DeliveryAddress', 'SourceGroup', 'Note', 'TotalAmount', 'CreatedAt', 'UpdatedAt', 'ConfirmedAt', 'ConfirmedBy', 'LineDisplayName'];
 const GB_DETAIL_HEADERS = ['OrderId', 'ProductId', 'ProductName', 'UnitPrice', 'Qty', 'Subtotal'];
 
 function initGroupBuySheets_() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // 初始化大樓群組綁定表
+    let bindingSheet = ss.getSheetByName(GB_BINDINGS_SHEET_NAME);
+    if (!bindingSheet) {
+        bindingSheet = ss.insertSheet(GB_BINDINGS_SHEET_NAME);
+        bindingSheet.appendRow(['GroupId', 'GroupName', 'UpdatedAt']);
+        bindingSheet.setFrozenRows(1);
+    }
+
     let orderSheet = ss.getSheetByName(GB_SHEET_NAME);
     if (!orderSheet) {
         orderSheet = ss.insertSheet(GB_SHEET_NAME);
         orderSheet.appendRow([...GB_HEADERS, 'PaymentMethod', 'TransferLastFive', 'PaymentStatus']);
         orderSheet.setFrozenRows(1);
     } else {
-        // 自動偵測並補入缺少的付款欄位（不覆蓋現有資料）
+        // 自動偵測並補入缺少的付款與 LINE 暱稱欄位（不覆蓋現有資料）
         const existingHeaders = orderSheet.getRange(1, 1, 1, orderSheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
-        ['PaymentMethod', 'TransferLastFive', 'PaymentStatus'].forEach(col => {
+        ['PaymentMethod', 'TransferLastFive', 'PaymentStatus', 'LineDisplayName'].forEach(col => {
             if (!existingHeaders.includes(col)) {
                 orderSheet.getRange(1, orderSheet.getLastColumn() + 1).setValue(col);
             }
@@ -49,7 +59,7 @@ function generateOrderId_() {
  * [Service] 客戶送出訂單 (寫入 PENDING，不扣庫存)
  */
 function savePendingOrderService(payload, user) {
-    const { customerName, customerPhone, deliveryAddress, sourceGroup, note, items, paymentMethod, transferLastFive } = payload;
+    const { customerName, customerPhone, deliveryAddress, sourceGroup, note, items, paymentMethod, transferLastFive, lineDisplayName, lineUserId } = payload;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
         throw new Error('訂單明細不得為空');
@@ -74,7 +84,7 @@ function savePendingOrderService(payload, user) {
 
     set('OrderId', orderId);
     set('Status', 'PENDING');
-    set('CustomerLineId', user.lineUserId || user.username || '');
+    set('CustomerLineId', lineUserId || user.lineUserId || user.username || '');
     set('CustomerName', customerName || '');
     set('CustomerPhone', customerPhone || '');
     set('DeliveryAddress', deliveryAddress || '');
@@ -84,6 +94,7 @@ function savePendingOrderService(payload, user) {
     set('PaymentMethod', paymentMethod || '');
     set('TransferLastFive', transferLastFive || '');
     set('PaymentStatus', paymentStatus);
+    set('LineDisplayName', lineDisplayName || '');
     set('CreatedAt', now);
     set('UpdatedAt', now);
 
@@ -134,6 +145,7 @@ function getPendingOrdersService(payload, user) {
     const pmIdx  = hIdx('PaymentMethod');
     const tlIdx  = hIdx('TransferLastFive');
     const psIdx  = hIdx('PaymentStatus');
+    const ldnIdx = hIdx('LineDisplayName');
 
     // 組織明細 Map
     const detailMap = {};
@@ -176,6 +188,7 @@ function getPendingOrdersService(payload, user) {
             paymentMethod: pmIdx >= 0 ? String(row[pmIdx] || '') : '',
             transferLastFive: tlIdx >= 0 ? String(row[tlIdx] || '') : '',
             paymentStatus: psIdx >= 0 ? String(row[psIdx] || '') : '',
+            lineDisplayName: ldnIdx >= 0 ? String(row[ldnIdx] || '') : '',
             createdAt: row[hIdx('CreatedAt')] ? new Date(row[hIdx('CreatedAt')]).toISOString() : '',
             updatedAt: row[hIdx('UpdatedAt')] ? new Date(row[hIdx('UpdatedAt')]).toISOString() : '',
             confirmedAt: row[hIdx('ConfirmedAt')] ? new Date(row[hIdx('ConfirmedAt')]).toISOString() : '',
@@ -423,3 +436,157 @@ function deletePendingOrderService(payload, user) {
     SpreadsheetApp.flush();
     return { success: true, orderId };
 }
+
+/**
+ * [Service] 取得所有群組對照綁定
+ */
+function getGroupBindingsService(payload, user) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(GB_BINDINGS_SHEET_NAME);
+    if (!sheet) return {};
+
+    const rows = sheet.getDataRange().getValues();
+    const bindings = {};
+    for (let i = 1; i < rows.length; i++) {
+        const gid = String(rows[i][0] || '').trim();
+        const gname = String(rows[i][1] || '').trim();
+        if (gid) {
+            bindings[gid] = gname;
+        }
+    }
+    return bindings;
+}
+
+/**
+ * [Service] 新增或更新群組對照綁定
+ */
+function saveGroupBindingService(payload, user) {
+    const { groupId, groupName } = payload;
+    if (!groupId || !groupName) throw new Error('缺少群組 ID 或名稱');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(GB_BINDINGS_SHEET_NAME);
+    if (!sheet) {
+        sheet = ss.insertSheet(GB_BINDINGS_SHEET_NAME);
+        sheet.appendRow(['GroupId', 'GroupName', 'UpdatedAt']);
+        sheet.setFrozenRows(1);
+    }
+
+    const rows = sheet.getDataRange().getValues();
+    let foundRow = -1;
+    for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][0] || '').trim() === String(groupId).trim()) {
+            foundRow = i + 1;
+            break;
+        }
+    }
+
+    const now = new Date();
+    if (foundRow !== -1) {
+        sheet.getRange(foundRow, 2, 1, 2).setValues([[groupName, now]]);
+    } else {
+        sheet.appendRow([groupId, groupName, now]);
+    }
+    SpreadsheetApp.flush();
+    return { success: true };
+}
+
+/**
+ * [Service] 管理員快速變更訂單狀態或付款狀態
+ */
+function updateOrderStatusService(payload, user) {
+    if (user.role !== 'BOSS') throw new Error('權限不足');
+    const { orderId, status, paymentStatus } = payload;
+    if (!orderId) throw new Error('缺少 orderId');
+
+    const { orderSheet } = initGroupBuySheets_();
+    const orderData = orderSheet.getDataRange().getValues();
+
+    let foundOrderRow = -1;
+    for (let i = 1; i < orderData.length; i++) {
+        if (String(orderData[i][0]).trim() === orderId) {
+            foundOrderRow = i + 1;
+            break;
+        }
+    }
+    if (foundOrderRow === -1) throw new Error('找不到訂單：' + orderId);
+
+    const now = new Date();
+    const orderHeaders = orderSheet.getRange(1, 1, 1, orderSheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+
+    if (status !== undefined) {
+        const sIdx = orderHeaders.indexOf('Status');
+        if (sIdx >= 0) orderSheet.getRange(foundOrderRow, sIdx + 1).setValue(status);
+    }
+    if (paymentStatus !== undefined) {
+        const psIdx = orderHeaders.indexOf('PaymentStatus');
+        if (psIdx >= 0) orderSheet.getRange(foundOrderRow, psIdx + 1).setValue(paymentStatus);
+    }
+
+    const uIdx = orderHeaders.indexOf('UpdatedAt');
+    if (uIdx >= 0) orderSheet.getRange(foundOrderRow, uIdx + 1).setValue(now);
+
+    SpreadsheetApp.flush();
+    return { success: true };
+}
+
+/**
+ * [Service] 管理員使用密碼登入 (免 Token)
+ */
+function loginAdminByPassword(payload) {
+    const { password } = payload;
+    if (password !== 'mlw888') {
+        return { error: '密碼錯誤' };
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Users');
+    if (!sheet) return { error: '使用者資料庫不存在' };
+
+    const data = sheet.getDataRange().getValues();
+    let bossUser = null;
+    for (let i = 1; i < data.length; i++) {
+        if (data[i][3] === 'BOSS') {
+            bossUser = {
+                username: data[i][1],
+                role: data[i][3],
+                status: data[i][4],
+                permissions: []
+            };
+            try {
+                if (data[i][6]) {
+                    bossUser.permissions = JSON.parse(data[i][6]);
+                }
+            } catch (_) {}
+            break;
+        }
+    }
+
+    if (!bossUser) {
+        return { error: '找不到 BOSS 權限帳號，請確認 Users 表設定' };
+    }
+
+    if (bossUser.status !== 'ACTIVE') {
+        return { error: 'BOSS 帳號已被停用' };
+    }
+
+    // 簽發 JWT Token (12小時)
+    const tokenPayload = {
+        username: bossUser.username,
+        role: bossUser.role,
+        permissions: bossUser.permissions,
+        timestamp: new Date().getTime(),
+        exp: new Date().getTime() + (12 * 60 * 60 * 1000)
+    };
+
+    const token = createJWT(tokenPayload);
+
+    return {
+        success: true,
+        token: token,
+        username: bossUser.username,
+        role: bossUser.role,
+        permissions: bossUser.permissions
+    };
+}
+

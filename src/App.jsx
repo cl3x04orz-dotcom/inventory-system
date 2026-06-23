@@ -25,6 +25,7 @@ import PayrollPage from './pages/PayrollPage';
 import ActivityLogPage from './pages/ActivityLogPage';
 import LiffOrderPage from './pages/LiffOrderPage';
 import PendingOrdersPage from './pages/PendingOrdersPage';
+import ProductManagementPage from './pages/ProductManagementPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './contexts/ThemeContext';
 import ThemeToggle from './components/ThemeToggle';
@@ -35,7 +36,8 @@ import logoImg from './assets/logo.png';
 import {
     LayoutDashboard, ShoppingCart, Archive, LogOut, PackagePlus,
     FileText, ClipboardList, DollarSign, CheckSquare, Wallet, ChevronDown,
-    TrendingUp, BarChart2, Users, Activity, PieChart, Shield, WifiOff, Menu
+    TrendingUp, BarChart2, Users, Activity, PieChart, Shield, WifiOff, Menu,
+    Edit2
 } from 'lucide-react';
 
 // Google Apps Script (GAS) API Endpoint
@@ -465,6 +467,8 @@ function AppContent() {
                 return user.username === 'guest' || user.role === 'BOSS' || perms.includes('sales_liff');
             case 'pendingOrders':
                 return perms.includes('sales_pending') || user.role === 'BOSS';
+            case 'products':
+                return perms.includes('products') || user.role === 'BOSS';
             case 'sales':
                 return perms.includes('sales_entry') || perms.includes('sales');
             case 'report':
@@ -646,15 +650,20 @@ function AppContent() {
                             <div className="fixed top-20 left-0 right-0 mx-auto w-[94%] max-w-md bg-[var(--bg-secondary)] backdrop-blur-xl border border-[var(--border-primary)] rounded-2xl shadow-2xl overflow-y-auto max-h-[80vh] animate-in fade-in slide-in-from-top-4 duration-200 z-[100]">
                                 <div className="p-2.5 flex flex-col gap-1.5">
                                     {/* 銷售管理 Group */}
-                                    {(user.role === 'BOSS' || checkPermission('sales') || checkPermission('report') || checkPermission('liffOrder') || checkPermission('pendingOrders')) && (
+                                    {(user.role === 'BOSS' || checkPermission('sales') || checkPermission('report')) && (
                                         <MobileNavGroup label="銷售" icon={ShoppingCart}>
                                             {checkPermission('sales') && <NavItem label="商品銷售登錄" icon={ShoppingCart} onClick={() => handlePageChange('sales')} active={page === 'sales'} />}
                                             {checkPermission('report') && <NavItem label="銷售查詢報表" icon={FileText} onClick={() => handlePageChange('report')} active={page === 'report'} />}
-                                            {checkPermission('liffOrder') && <NavItem label="團購一鍵下單" icon={ShoppingCart} onClick={() => handlePageChange('liffOrder')} active={page === 'liffOrder'} />}
-                                            {checkPermission('pendingOrders') && <NavItem label="待確認訂單審核" icon={ClipboardList} onClick={() => handlePageChange('pendingOrders')} active={page === 'pendingOrders'} />}
                                         </MobileNavGroup>
                                     )}
-                                    {/* ...其餘 Mobile 選單項目保持不變... */}
+                                    {/* 團購管理 Group */}
+                                    {(user.role === 'BOSS' || checkPermission('liffOrder') || checkPermission('pendingOrders') || checkPermission('products')) && (
+                                        <MobileNavGroup label="團購" icon={Users}>
+                                            {checkPermission('liffOrder') && <NavItem label="團購一鍵下單" icon={ShoppingCart} onClick={() => handlePageChange('liffOrder')} active={page === 'liffOrder'} />}
+                                            {checkPermission('pendingOrders') && <NavItem label="待確認訂單審核" icon={ClipboardList} onClick={() => handlePageChange('pendingOrders')} active={page === 'pendingOrders'} />}
+                                            {checkPermission('products') && <NavItem label="商品屬性管理" icon={Edit2} onClick={() => handlePageChange('products')} active={page === 'products'} />}
+                                        </MobileNavGroup>
+                                    )}
                                     {(user.role === 'BOSS' || checkPermission('purchase') || checkPermission('purchaseHistory')) && (
                                         <MobileNavGroup label="進貨" icon={PackagePlus}>
                                             {checkPermission('purchase') && <NavItem label="商品進貨登錄" icon={PackagePlus} onClick={() => handlePageChange('purchase')} active={page === 'purchase'} />}
@@ -705,24 +714,39 @@ function AppContent() {
                     </div>
 
                     {/* Desktop Navigation (Fixed Grid - Consistent Positioning) */}
-                    <nav className="hidden md:grid grid-cols-7 flex-1 items-center mx-12 lg:mx-20 max-w-6xl whitespace-nowrap">
+                    <nav className="hidden md:grid grid-cols-8 flex-1 items-center mx-12 lg:mx-20 max-w-6xl whitespace-nowrap">
                         {/* Column 1: 銷售 */}
                         <div className="flex justify-center">
                             {/* 銷售管理 Group */}
-                            {(user.role === 'BOSS' || checkPermission('sales') || checkPermission('report') || checkPermission('liffOrder') || checkPermission('pendingOrders')) && (
+                            {(user.role === 'BOSS' || checkPermission('sales') || checkPermission('report')) && (
                                 <NavDropdown
                                     id="sales"
                                     label="銷售"
                                     icon={ShoppingCart}
                                     openDropdown={openDropdown}
                                     setOpenDropdown={setOpenDropdown}
-                                    active={['sales', 'report', 'liffOrder', 'pendingOrders'].includes(page)}
+                                    active={['sales', 'report'].includes(page)}
                                 >
                                     {checkPermission('sales') && <NavItem label="商品銷售登錄" icon={ShoppingCart} onClick={() => handlePageChange('sales')} active={page === 'sales'} />}
                                     {checkPermission('report') && <NavItem label="銷售查詢報表" icon={FileText} onClick={() => handlePageChange('report')} active={page === 'report'} />}
-                                    <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+                                </NavDropdown>
+                            )}
+                        </div>
+
+                        {/* Column 2: 團購 */}
+                        <div className="flex justify-center">
+                            {(user.role === 'BOSS' || checkPermission('liffOrder') || checkPermission('pendingOrders') || checkPermission('products')) && (
+                                <NavDropdown
+                                    id="groupbuy"
+                                    label="團購"
+                                    icon={Users}
+                                    openDropdown={openDropdown}
+                                    setOpenDropdown={setOpenDropdown}
+                                    active={['liffOrder', 'pendingOrders', 'products'].includes(page)}
+                                >
                                     {checkPermission('liffOrder') && <NavItem label="團購一鍵下單" icon={ShoppingCart} onClick={() => handlePageChange('liffOrder')} active={page === 'liffOrder'} />}
                                     {checkPermission('pendingOrders') && <NavItem label="待確認訂單審核" icon={ClipboardList} onClick={() => handlePageChange('pendingOrders')} active={page === 'pendingOrders'} />}
+                                    {checkPermission('products') && <NavItem label="商品屬性管理" icon={Edit2} onClick={() => handlePageChange('products')} active={page === 'products'} />}
                                 </NavDropdown>
                             )}
                         </div>
@@ -897,6 +921,7 @@ function AppContent() {
                         {page === 'activityLog' && <ActivityLogPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'liffOrder' && <LiffOrderPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'pendingOrders' && <PendingOrdersPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'products' && <ProductManagementPage user={user} apiUrl={GAS_API_URL} />}
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full text-slate-400">

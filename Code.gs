@@ -1,7 +1,7 @@
 /**
  * Serves the React App
  */
-const APP_VERSION = '1782140202243';
+const APP_VERSION = '1782212494375';
  // 版本號：A2:3/24
 
 function doGet(e) {
@@ -32,6 +32,7 @@ function apiHandler(request) {
     if (action === 'login') return login(payload);
     if (action === 'register') return register(payload);
     if (action === 'checkInit') return typeof checkDbInit !== 'undefined' ? checkDbInit() : { success: true };
+    if (action === 'loginAdminByPassword') return typeof loginAdminByPassword !== 'undefined' ? loginAdminByPassword(payload) : { error: '後端服務缺失: loginAdminByPassword' };
 
     // 身份驗證失敗攔截
     if (!user) {
@@ -99,6 +100,9 @@ function apiHandler(request) {
         'updatePendingOrder': 'sales_pending',
         'confirmPendingOrder': 'sales_pending',
         'deletePendingOrder': 'sales_pending',
+        'getGroupBindings': null,
+        'saveGroupBinding': 'sales_pending',
+        'updateOrderStatus': 'sales_pending',
         
         // Finance (財務管理)
         'getExpenditures': null, // [Modification] Anyone can call, filtering happens in service
@@ -192,6 +196,9 @@ function apiHandler(request) {
             case 'updatePendingOrder': return typeof updatePendingOrderService !== 'undefined' ? updatePendingOrderService(payload, user) : {error: '後端服務缺失: updatePendingOrderService'};
             case 'confirmPendingOrder': return typeof confirmPendingOrderService !== 'undefined' ? confirmPendingOrderService(payload, user) : {error: '後端服務缺失: confirmPendingOrderService'};
             case 'deletePendingOrder': return typeof deletePendingOrderService !== 'undefined' ? deletePendingOrderService(payload, user) : {error: '後端服務缺失: deletePendingOrderService'};
+            case 'getGroupBindings': return typeof getGroupBindingsService !== 'undefined' ? getGroupBindingsService(payload, user) : {error: '後端服務缺失: getGroupBindingsService'};
+            case 'saveGroupBinding': return typeof saveGroupBindingService !== 'undefined' ? saveGroupBindingService(payload, user) : {error: '後端服務缺失: saveGroupBindingService'};
+            case 'updateOrderStatus': return typeof updateOrderStatusService !== 'undefined' ? updateOrderStatusService(payload, user) : {error: '後端服務缺失: updateOrderStatusService'};
             case 'getInventory': return typeof getInventoryService !== 'undefined' ? getInventoryService() : {error: '後端服務缺失: getInventoryService'}; 
             case 'getPurchaseSuggestions': return typeof getPurchaseSuggestionsService !== 'undefined' ? getPurchaseSuggestionsService() : {error: '後端服務缺失: getPurchaseSuggestionsService'}; 
             case 'addPurchase': return typeof addPurchaseService !== 'undefined' ? addPurchaseService(payload, user) : {error: '後端服務缺失: addPurchaseService (進貨功能)'}; 
