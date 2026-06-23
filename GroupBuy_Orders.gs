@@ -27,9 +27,10 @@ function initGroupBuySheets_() {
         orderSheet.appendRow([...GB_HEADERS, 'PaymentMethod', 'TransferLastFive', 'PaymentStatus']);
         orderSheet.setFrozenRows(1);
     } else {
-        // 自動偵測並補入缺少的付款與 LINE 暱稱欄位（不覆蓋現有資料）
+        // 自動偵測並補入所有 GB_HEADERS 中定義但工作表中缺少的欄位，以及付款與 LINE 相關欄位
         const existingHeaders = orderSheet.getRange(1, 1, 1, orderSheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
-        ['PaymentMethod', 'TransferLastFive', 'PaymentStatus', 'LineDisplayName'].forEach(col => {
+        const allRequiredHeaders = [...GB_HEADERS, 'PaymentMethod', 'TransferLastFive', 'PaymentStatus'];
+        allRequiredHeaders.forEach(col => {
             if (!existingHeaders.includes(col)) {
                 orderSheet.getRange(1, orderSheet.getLastColumn() + 1).setValue(col);
             }
@@ -142,10 +143,24 @@ function getPendingOrdersService(payload, user) {
     // 動態讀取欄位 index
     const orderHeaders = orderRows[0].map(h => String(h).trim());
     const hIdx = name => orderHeaders.indexOf(name);
+    
+    const oIdIdx = hIdx('OrderId');
+    const statusIdx = hIdx('Status');
+    const cliIdx = hIdx('CustomerLineId');
+    const cnIdx  = hIdx('CustomerName');
+    const cpIdx  = hIdx('CustomerPhone');
+    const daIdx  = hIdx('DeliveryAddress');
+    const sgIdx  = hIdx('SourceGroup');
+    const nIdx   = hIdx('Note');
+    const taIdx  = hIdx('TotalAmount');
     const pmIdx  = hIdx('PaymentMethod');
     const tlIdx  = hIdx('TransferLastFive');
     const psIdx  = hIdx('PaymentStatus');
     const ldnIdx = hIdx('LineDisplayName');
+    const caIdx  = hIdx('CreatedAt');
+    const uaIdx  = hIdx('UpdatedAt');
+    const cfaIdx = hIdx('ConfirmedAt');
+    const cfbIdx = hIdx('ConfirmedBy');
 
     // 組織明細 Map
     const detailMap = {};
@@ -170,29 +185,29 @@ function getPendingOrdersService(payload, user) {
     const orders = [];
     for (let i = 1; i < orderRows.length; i++) {
         const row = orderRows[i];
-        const orderId = String(row[0] || '').trim();
-        const rowStatus = String(row[1] || '').trim();
+        const orderId = oIdIdx >= 0 ? String(row[oIdIdx] || '').trim() : '';
+        const rowStatus = statusIdx >= 0 ? String(row[statusIdx] || '').trim() : '';
         if (!orderId) continue;
         if (status && rowStatus !== status) continue;
 
         orders.push({
             orderId,
             status: rowStatus,
-            customerLineId: String(row[2] || ''),
-            customerName: String(row[3] || ''),
-            customerPhone: String(row[4] || ''),
-            deliveryAddress: String(row[5] || ''),
-            sourceGroup: String(row[6] || ''),
-            note: String(row[7] || ''),
-            totalAmount: Number(row[8]) || 0,
+            customerLineId: cliIdx >= 0 ? String(row[cliIdx] || '') : '',
+            customerName: cnIdx >= 0 ? String(row[cnIdx] || '') : '',
+            customerPhone: cpIdx >= 0 ? String(row[cpIdx] || '') : '',
+            deliveryAddress: daIdx >= 0 ? String(row[daIdx] || '') : '',
+            sourceGroup: sgIdx >= 0 ? String(row[sgIdx] || '') : '',
+            note: nIdx >= 0 ? String(row[nIdx] || '') : '',
+            totalAmount: taIdx >= 0 ? Number(row[taIdx]) || 0 : 0,
             paymentMethod: pmIdx >= 0 ? String(row[pmIdx] || '') : '',
             transferLastFive: tlIdx >= 0 ? String(row[tlIdx] || '') : '',
             paymentStatus: psIdx >= 0 ? String(row[psIdx] || '') : '',
             lineDisplayName: ldnIdx >= 0 ? String(row[ldnIdx] || '') : '',
-            createdAt: row[hIdx('CreatedAt')] ? new Date(row[hIdx('CreatedAt')]).toISOString() : '',
-            updatedAt: row[hIdx('UpdatedAt')] ? new Date(row[hIdx('UpdatedAt')]).toISOString() : '',
-            confirmedAt: row[hIdx('ConfirmedAt')] ? new Date(row[hIdx('ConfirmedAt')]).toISOString() : '',
-            confirmedBy: String(row[hIdx('ConfirmedBy')] || ''),
+            createdAt: caIdx >= 0 && row[caIdx] ? new Date(row[caIdx]).toISOString() : '',
+            updatedAt: uaIdx >= 0 && row[uaIdx] ? new Date(row[uaIdx]).toISOString() : '',
+            confirmedAt: cfaIdx >= 0 && row[cfaIdx] ? new Date(row[cfaIdx]).toISOString() : '',
+            confirmedBy: cfbIdx >= 0 ? String(row[cfbIdx] || '') : '',
             items: detailMap[orderId] || []
         });
     }
@@ -225,17 +240,26 @@ function updatePendingOrderService(payload, user) {
     const now = new Date();
     const totalAmount = (items || []).reduce((sum, item) => sum + (Number(item.unitPrice) * Number(item.qty)), 0);
 
-    // 更新主單欄位 (保留 OrderId, Status, CustomerLineId, CreatedAt 不動)
-    orderSheet.getRange(foundOrderRow, 4, 1, 6).setValues([[
-        customerName || orderData[foundOrderRow-1][3],
-        customerPhone || orderData[foundOrderRow-1][4],
-        deliveryAddress || orderData[foundOrderRow-1][5],
-        orderData[foundOrderRow-1][6], // sourceGroup 不改
-        note !== undefined ? note : orderData[foundOrderRow-1][7],
-        totalAmount
-    ]]);
-    // 更新 UpdatedAt (col 11)
-    orderSheet.getRange(foundOrderRow, 11).setValue(now);
+    // 動態更新主單欄位
+    const headers = orderSheet.getRange(1, 1, 1, orderSheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    const setVal = (name, val) => {
+        const idx = headers.indexOf(name);
+        if (idx >= 0) {
+            orderSheet.getRange(foundOrderRow, idx + 1).setValue(val);
+        }
+    };
+    
+    const oNameIdx = headers.indexOf('CustomerName');
+    const oPhoneIdx = headers.indexOf('CustomerPhone');
+    const oAddrIdx = headers.indexOf('DeliveryAddress');
+    const oNoteIdx = headers.indexOf('Note');
+
+    setVal('CustomerName', customerName || (oNameIdx >= 0 ? orderData[foundOrderRow-1][oNameIdx] : ''));
+    setVal('CustomerPhone', customerPhone || (oPhoneIdx >= 0 ? orderData[foundOrderRow-1][oPhoneIdx] : ''));
+    setVal('DeliveryAddress', deliveryAddress !== undefined ? deliveryAddress : (oAddrIdx >= 0 ? orderData[foundOrderRow-1][oAddrIdx] : ''));
+    setVal('Note', note !== undefined ? note : (oNoteIdx >= 0 ? orderData[foundOrderRow-1][oNoteIdx] : ''));
+    setVal('TotalAmount', totalAmount);
+    setVal('UpdatedAt', now);
 
     // 清除舊明細並重寫
     if (items && items.length > 0) {
@@ -297,7 +321,15 @@ function confirmPendingOrderService(payload, user) {
         }
     }
     if (foundOrderRow === -1) throw new Error('找不到訂單：' + orderId);
-    if (orderRecord[1] !== 'PENDING') throw new Error('此訂單已不是 PENDING 狀態');
+    const orderHeaders = orderSheet.getRange(1, 1, 1, orderSheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    const hIdx = name => orderHeaders.indexOf(name);
+    const statusIdx = hIdx('Status');
+    const cnIdx = hIdx('CustomerName');
+    const taIdx = hIdx('TotalAmount');
+    const daIdx = hIdx('DeliveryAddress');
+    const sgIdx = hIdx('SourceGroup');
+
+    if (statusIdx >= 0 && orderRecord[statusIdx] !== 'PENDING') throw new Error('此訂單已不是 PENDING 狀態');
 
     // 讀取明細
     const detailData = detailSheet.getDataRange().getValues();
@@ -320,10 +352,10 @@ function confirmPendingOrderService(payload, user) {
     const salesDetailSheet = ss.getSheetByName('SalesDetails');
     const now = new Date();
 
-    const customerName = String(orderRecord[3] || '');
-    const totalAmount = Number(orderRecord[8]) || 0;
-    const deliveryAddress = String(orderRecord[5] || '');
-    const sourceGroup = String(orderRecord[6] || '');
+    const customerName = cnIdx >= 0 ? String(orderRecord[cnIdx] || '') : '';
+    const totalAmount = taIdx >= 0 ? Number(orderRecord[taIdx]) || 0 : 0;
+    const deliveryAddress = daIdx >= 0 ? String(orderRecord[daIdx] || '') : '';
+    const sourceGroup = sgIdx >= 0 ? String(orderRecord[sgIdx] || '') : '';
 
     // 寫入 Sales 主單（使用 orderId 作為 SaleID）
     if (salesSheet) {
@@ -384,10 +416,16 @@ function confirmPendingOrderService(payload, user) {
 
     // 更新主單狀態
     const now2 = new Date();
-    orderSheet.getRange(foundOrderRow, 2).setValue('CONFIRMED');
-    orderSheet.getRange(foundOrderRow, 11).setValue(now2); // UpdatedAt
-    orderSheet.getRange(foundOrderRow, 12).setValue(now2); // ConfirmedAt
-    orderSheet.getRange(foundOrderRow, 13).setValue(user.username); // ConfirmedBy
+    const setOrderVal = (name, val) => {
+        const idx = hIdx(name);
+        if (idx >= 0) {
+            orderSheet.getRange(foundOrderRow, idx + 1).setValue(val);
+        }
+    };
+    setOrderVal('Status', 'CONFIRMED');
+    setOrderVal('UpdatedAt', now2);
+    setOrderVal('ConfirmedAt', now2);
+    setOrderVal('ConfirmedBy', user.username);
 
     SpreadsheetApp.flush();
     return { success: true, orderId };

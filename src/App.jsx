@@ -221,11 +221,15 @@ function AppContent() {
                     const serverVer = Number(res.version);
                     const localVer = Number(LOCAL_VERSION);
                     if (!isNaN(serverVer) && !isNaN(localVer) && serverVer > localVer) {
-                        console.warn(`[VersionCheck] 偵測到新版本 (${LOCAL_VERSION} -> ${res.version})，強制重載！`);
-                        // 直接強制重載，不讓使用者選擇（市場客/團購客看不懂更新通知）
                         const url = new URL(window.location.href);
-                        url.searchParams.set('_v', res.version);
-                        window.location.replace(url.toString());
+                        const lastReloadVersion = url.searchParams.get('_v');
+                        if (lastReloadVersion !== String(res.version)) {
+                            console.warn(`[VersionCheck] 偵測到新版本 (${LOCAL_VERSION} -> ${res.version})，強制重載！`);
+                            url.searchParams.set('_v', res.version);
+                            window.location.replace(url.toString());
+                        } else {
+                            console.warn(`[VersionCheck] 已嘗試重載至版本 ${res.version}，但快取尚未更新，停止重複重載以防止無限刷新。`);
+                        }
                     }
                 }
             } catch (e) {

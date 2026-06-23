@@ -36779,7 +36779,7 @@ const useActivityLogger = ({ user, apiUrl: apiUrl2, enabled = true }) => {
   };
 };
 const GAS_API_URL = window.GAS_API_URL || "https://script.google.com/macros/s/AKfycbw0sN21nJXfjezYL446-wgwTbLOCUziFGOEN8qsXYg7cYHsN5R4Sgn2dSyzoGtH0Xb5/exec";
-const LOCAL_VERSION = "1782212494375";
+const LOCAL_VERSION = "1782213546029";
 console.log("--- 系統偵錯資訊 ---");
 console.log("Base URL:", "/");
 if (!GAS_API_URL || GAS_API_URL.includes("YOUR_SCRIPT_ID")) {
@@ -36931,10 +36931,15 @@ function AppContent() {
           const serverVer = Number(res.version);
           const localVer = Number(LOCAL_VERSION);
           if (!isNaN(serverVer) && !isNaN(localVer) && serverVer > localVer) {
-            console.warn(`[VersionCheck] 偵測到新版本 (${LOCAL_VERSION} -> ${res.version})，強制重載！`);
             const url = new URL(window.location.href);
-            url.searchParams.set("_v", res.version);
-            window.location.replace(url.toString());
+            const lastReloadVersion = url.searchParams.get("_v");
+            if (lastReloadVersion !== String(res.version)) {
+              console.warn(`[VersionCheck] 偵測到新版本 (${LOCAL_VERSION} -> ${res.version})，強制重載！`);
+              url.searchParams.set("_v", res.version);
+              window.location.replace(url.toString());
+            } else {
+              console.warn(`[VersionCheck] 已嘗試重載至版本 ${res.version}，但快取尚未更新，停止重複重載以防止無限刷新。`);
+            }
           }
         }
       } catch (e) {
