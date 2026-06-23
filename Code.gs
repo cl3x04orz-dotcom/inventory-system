@@ -1,7 +1,7 @@
 /**
  * Serves the React App
  */
-const APP_VERSION = '1782212494375';
+const APP_VERSION = '1782212746973';
  // 版本號：A2:3/24
 
 function doGet(e) {
