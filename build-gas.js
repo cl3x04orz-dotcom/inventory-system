@@ -41,6 +41,7 @@ if (fs.existsSync(assetsDir)) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inventory System</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"><\/script>
   <style>${css}</style>
 </head>
 <body>

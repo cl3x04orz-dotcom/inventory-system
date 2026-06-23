@@ -57,6 +57,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [cart, setCart] = useState({});
   const [activeCategory, setActiveCategory] = useState("");
   const [sourceGroup, setSourceGroup] = useState("");
+  const [liffDebug, setLiffDebug] = useState(null); // 暫時 debug 用
   const [animatingProductId, setAnimatingProductId] = useState(null);
   const tabBarRef = useRef(null);
   const listRef = useRef(null);
@@ -133,11 +134,70 @@ export default function LiffOrderPage({ user, apiUrl }) {
     }
   };
 
+  // ── LIFF 初始化與自動群組 ID / 暱稱獲取 ──────────────────────────────
+  const initLiffAndFetchInfo = async () => {
+    const debug = { sdkLoaded: !!window.liff, initOk: false, isInClient: false, isLoggedIn: false, context: null, error: null };
+
+    if (!window.liff) {
+      debug.error = 'LIFF SDK not loaded (window.liff is undefined)';
+      setLiffDebug(debug);
+      console.warn(debug.error);
+      return;
+    }
+    
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const liffId = import.meta.env.VITE_LIFF_ID || params.get("liffId") || "2010308873-ur2zL2cc";
+      debug.liffId = liffId;
+      
+      console.log("Initializing LIFF with ID:", liffId);
+      await window.liff.init({ liffId });
+      debug.initOk = true;
+      debug.isInClient = window.liff.isInClient();
+      debug.isLoggedIn = window.liff.isLoggedIn();
+      
+      if (!window.liff.isLoggedIn()) {
+        debug.error = 'Not logged in, redirecting to login...';
+        setLiffDebug(debug);
+        window.liff.login();
+        return;
+      }
+      
+      // 1. 獲取 LINE 使用者資訊
+      const profile = await window.liff.getProfile();
+      debug.profile = { displayName: profile?.displayName, userId: profile?.userId };
+      if (profile?.displayName) {
+        const saved = localStorage.getItem(LS_KEY);
+        if (!saved) setCustomerName(profile.displayName);
+      }
+      
+      // 2. 獲取 LINE 聊天室與群組 context
+      const context = window.liff.getContext();
+      debug.context = context ? { type: context.type, groupId: context.groupId || null, roomId: context.roomId || null, userId: context.userId || null } : null;
+      console.log("LIFF context:", context);
+      if (context) {
+        const gid = context.groupId || context.roomId || "";
+        if (gid) {
+          setSourceGroup(gid);
+          debug.detectedGroupId = gid;
+        }
+      }
+    } catch (err) {
+      debug.error = err?.message || String(err);
+      console.error("LIFF init failed:", err);
+    }
+    setLiffDebug(debug);
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setSourceGroup(params.get("grp") || "");
+    const urlGrp = params.get("grp") || "";
+    if (urlGrp) {
+      setSourceGroup(urlGrp);
+    }
     loadGroupBindings();
     if (user?.token) loadProducts();
+    initLiffAndFetchInfo();
   }, [apiUrl, user?.token]);
 
   useEffect(() => {
@@ -1116,7 +1176,22 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   return (
     <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
+      {/* 🔧 LIFF Debug Panel - 診斷用，確認後可移除 */}
+      {liffDebug && (
+        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', color: '#0f0', fontFamily: 'monospace', fontSize: '11px', padding: '8px 10px', maxHeight: '40vh', overflowY: 'auto' }}>
+          <div style={{ color: '#ff0', fontWeight: 'bold', marginBottom: 4 }}>🔧 LIFF Debug</div>
+          <div>sdkLoaded: {String(liffDebug.sdkLoaded)}</div>
+          <div>liffId: {liffDebug.liffId || '-'}</div>
+          <div>initOk: {String(liffDebug.initOk)}</div>
+          <div>isInClient: {String(liffDebug.isInClient)}</div>
+          <div>isLoggedIn: {String(liffDebug.isLoggedIn)}</div>
+          <div>context: {JSON.stringify(liffDebug.context)}</div>
+          <div>detectedGroupId: <span style={{ color: liffDebug.detectedGroupId ? '#0ff' : '#f44' }}>{liffDebug.detectedGroupId || '(none)'}</span></div>
+          {liffDebug.error && <div style={{ color: '#f66' }}>error: {liffDebug.error}</div>}
+        </div>
+      )}
       {/* 頂部固定導覽列 */}
+
       <div className="flex-shrink-0 flex flex-col z-10 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] shadow-sm">
         {/* Header */}
         <div className="h-[60px] px-3 flex justify-between items-center">
