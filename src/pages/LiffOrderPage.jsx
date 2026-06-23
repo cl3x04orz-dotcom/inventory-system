@@ -143,26 +143,50 @@ export default function LiffOrderPage({ user, apiUrl }) {
       const params = new URLSearchParams(window.location.search);
       const liffId = import.meta.env.VITE_LIFF_ID || params.get("liffId") || "2010308873-ur2zL2cc";
       await window.liff.init({ liffId });
+
+      // ★ 關鍵：在 login redirect 之前先抓 context，存入 sessionStorage
+      // 因為 login redirect 後會跳到外部瀏覽器，getContext() 就失效了
+      const context = window.liff.getContext();
+      if (context) {
+        const gid = context.groupId || context.roomId || "";
+        if (gid) {
+          sessionStorage.setItem("liff_group_id", gid);
+          setSourceGroup(gid);
+        }
+      }
+
+      // login redirect 後回來，從 sessionStorage 還原 groupId
+      if (!window.liff.getContext()?.groupId) {
+        const savedGid = sessionStorage.getItem("liff_group_id");
+        if (savedGid) setSourceGroup(savedGid);
+      }
+
       if (!window.liff.isLoggedIn()) {
         window.liff.login();
         return;
       }
+
       // 1. 獲取 LINE 使用者資訊
       const profile = await window.liff.getProfile();
       if (profile?.displayName) {
         const saved = localStorage.getItem(LS_KEY);
         if (!saved) setCustomerName(profile.displayName);
       }
-      // 2. 獲取 LINE 聊天室與群組 context
-      const context = window.liff.getContext();
-      if (context) {
-        const gid = context.groupId || context.roomId || "";
-        if (gid) setSourceGroup(gid);
+
+      // 2. 再次確認 groupId（in-client 環境下 context 應該有值）
+      const ctx2 = window.liff.getContext();
+      if (ctx2) {
+        const gid2 = ctx2.groupId || ctx2.roomId || "";
+        if (gid2) {
+          sessionStorage.setItem("liff_group_id", gid2);
+          setSourceGroup(gid2);
+        }
       }
     } catch (err) {
       console.error("LIFF init failed:", err);
     }
   };
+
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
