@@ -34188,6 +34188,19 @@ function LiffOrderPage({ user, apiUrl: apiUrl2 }) {
       const params = new URLSearchParams(window.location.search);
       const liffId = {}.VITE_LIFF_ID || params.get("liffId") || "2010308873-ur2zL2cc";
       await window.liff.init({ liffId });
+      const context = window.liff.getContext();
+      if (context) {
+        const gid = context.groupId || context.roomId || "";
+        if (gid) {
+          sessionStorage.setItem("liff_group_id", gid);
+          setSourceGroup(gid);
+        }
+      }
+      if (!window.liff.getContext()?.groupId) {
+        const savedGid = sessionStorage.getItem("liff_group_id");
+        if (savedGid)
+          setSourceGroup(savedGid);
+      }
       if (!window.liff.isLoggedIn()) {
         window.liff.login();
         return;
@@ -34198,11 +34211,13 @@ function LiffOrderPage({ user, apiUrl: apiUrl2 }) {
         if (!saved)
           setCustomerName(profile.displayName);
       }
-      const context = window.liff.getContext();
-      if (context) {
-        const gid = context.groupId || context.roomId || "";
-        if (gid)
-          setSourceGroup(gid);
+      const ctx2 = window.liff.getContext();
+      if (ctx2) {
+        const gid2 = ctx2.groupId || ctx2.roomId || "";
+        if (gid2) {
+          sessionStorage.setItem("liff_group_id", gid2);
+          setSourceGroup(gid2);
+        }
       }
     } catch (err) {
       console.error("LIFF init failed:", err);
@@ -36813,7 +36828,7 @@ const useActivityLogger = ({ user, apiUrl: apiUrl2, enabled = true }) => {
   };
 };
 const GAS_API_URL = window.GAS_API_URL || "https://script.google.com/macros/s/AKfycbw0sN21nJXfjezYL446-wgwTbLOCUziFGOEN8qsXYg7cYHsN5R4Sgn2dSyzoGtH0Xb5/exec";
-const LOCAL_VERSION = "1782223796179";
+const LOCAL_VERSION = "1782224888670";
 console.log("--- 系統偵錯資訊 ---");
 console.log("Base URL:", "/");
 if (!GAS_API_URL || GAS_API_URL.includes("YOUR_SCRIPT_ID")) {
