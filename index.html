@@ -34124,7 +34124,6 @@ function LiffOrderPage({ user, apiUrl: apiUrl2 }) {
   const [cart, setCart] = reactExports.useState({});
   const [activeCategory, setActiveCategory] = reactExports.useState("");
   const [sourceGroup, setSourceGroup] = reactExports.useState("");
-  const [liffDebug, setLiffDebug] = reactExports.useState(null);
   const [animatingProductId, setAnimatingProductId] = reactExports.useState(null);
   const tabBarRef = reactExports.useRef(null);
   const listRef = reactExports.useRef(null);
@@ -34181,50 +34180,33 @@ function LiffOrderPage({ user, apiUrl: apiUrl2 }) {
     }
   };
   const initLiffAndFetchInfo = async () => {
-    const debug = { sdkLoaded: !!window.liff, initOk: false, isInClient: false, isLoggedIn: false, context: null, error: null };
     if (!window.liff) {
-      debug.error = "LIFF SDK not loaded (window.liff is undefined)";
-      setLiffDebug(debug);
-      console.warn(debug.error);
+      console.warn("LINE LIFF SDK is not loaded.");
       return;
     }
     try {
       const params = new URLSearchParams(window.location.search);
       const liffId = {}.VITE_LIFF_ID || params.get("liffId") || "2010308873-ur2zL2cc";
-      debug.liffId = liffId;
-      console.log("Initializing LIFF with ID:", liffId);
       await window.liff.init({ liffId });
-      debug.initOk = true;
-      debug.isInClient = window.liff.isInClient();
-      debug.isLoggedIn = window.liff.isLoggedIn();
       if (!window.liff.isLoggedIn()) {
-        debug.error = "Not logged in, redirecting to login...";
-        setLiffDebug(debug);
         window.liff.login();
         return;
       }
       const profile = await window.liff.getProfile();
-      debug.profile = { displayName: profile?.displayName, userId: profile?.userId };
       if (profile?.displayName) {
         const saved = localStorage.getItem(LS_KEY);
         if (!saved)
           setCustomerName(profile.displayName);
       }
       const context = window.liff.getContext();
-      debug.context = context ? { type: context.type, groupId: context.groupId || null, roomId: context.roomId || null, userId: context.userId || null } : null;
-      console.log("LIFF context:", context);
       if (context) {
         const gid = context.groupId || context.roomId || "";
-        if (gid) {
+        if (gid)
           setSourceGroup(gid);
-          debug.detectedGroupId = gid;
-        }
       }
     } catch (err) {
-      debug.error = err?.message || String(err);
       console.error("LIFF init failed:", err);
     }
-    setLiffDebug(debug);
   };
   reactExports.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -35076,41 +35058,6 @@ ${itemsText}
     ] });
   }
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]", children: [
-    liffDebug && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 9999, background: "rgba(0,0,0,0.85)", color: "#0f0", fontFamily: "monospace", fontSize: "11px", padding: "8px 10px", maxHeight: "40vh", overflowY: "auto" }, children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { color: "#ff0", fontWeight: "bold", marginBottom: 4 }, children: "🔧 LIFF Debug" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-        "sdkLoaded: ",
-        String(liffDebug.sdkLoaded)
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-        "liffId: ",
-        liffDebug.liffId || "-"
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-        "initOk: ",
-        String(liffDebug.initOk)
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-        "isInClient: ",
-        String(liffDebug.isInClient)
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-        "isLoggedIn: ",
-        String(liffDebug.isLoggedIn)
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-        "context: ",
-        JSON.stringify(liffDebug.context)
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-        "detectedGroupId: ",
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { color: liffDebug.detectedGroupId ? "#0ff" : "#f44" }, children: liffDebug.detectedGroupId || "(none)" })
-      ] }),
-      liffDebug.error && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { color: "#f66" }, children: [
-        "error: ",
-        liffDebug.error
-      ] })
-    ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-shrink-0 flex flex-col z-10 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] shadow-sm", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "h-[60px] px-3 flex justify-between items-center", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 flex justify-start items-center gap-3", children: [
@@ -36866,7 +36813,7 @@ const useActivityLogger = ({ user, apiUrl: apiUrl2, enabled = true }) => {
   };
 };
 const GAS_API_URL = window.GAS_API_URL || "https://script.google.com/macros/s/AKfycbw0sN21nJXfjezYL446-wgwTbLOCUziFGOEN8qsXYg7cYHsN5R4Sgn2dSyzoGtH0Xb5/exec";
-const LOCAL_VERSION = "1782223365094";
+const LOCAL_VERSION = "1782223796179";
 console.log("--- 系統偵錯資訊 ---");
 console.log("Base URL:", "/");
 if (!GAS_API_URL || GAS_API_URL.includes("YOUR_SCRIPT_ID")) {
