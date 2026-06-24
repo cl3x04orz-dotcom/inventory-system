@@ -1,7 +1,7 @@
 /**
  * Serves the React App
  */
-const APP_VERSION = '1782224888670';
+const APP_VERSION = '1782291739620';
  // 版本號：A2:3/24
 
 function doGet(e) {
@@ -103,6 +103,8 @@ function apiHandler(request) {
         'getGroupBindings': null,
         'saveGroupBinding': 'sales_pending',
         'updateOrderStatus': 'sales_pending',
+        'getBuildingSettings': null,
+        'saveBuildingSettings': 'sales_pending',
         
         // Finance (財務管理)
         'getExpenditures': null, // [Modification] Anyone can call, filtering happens in service
@@ -199,6 +201,8 @@ function apiHandler(request) {
             case 'getGroupBindings': return typeof getGroupBindingsService !== 'undefined' ? getGroupBindingsService(payload, user) : {error: '後端服務缺失: getGroupBindingsService'};
             case 'saveGroupBinding': return typeof saveGroupBindingService !== 'undefined' ? saveGroupBindingService(payload, user) : {error: '後端服務缺失: saveGroupBindingService'};
             case 'updateOrderStatus': return typeof updateOrderStatusService !== 'undefined' ? updateOrderStatusService(payload, user) : {error: '後端服務缺失: updateOrderStatusService'};
+            case 'getBuildingSettings': return typeof getBuildingSettingsService !== 'undefined' ? getBuildingSettingsService(payload, user) : {error: '後端服務缺失: getBuildingSettingsService'};
+            case 'saveBuildingSettings': return typeof saveBuildingSettingsService !== 'undefined' ? saveBuildingSettingsService(payload, user) : {error: '後端服務缺失: saveBuildingSettingsService'};
             case 'getInventory': return typeof getInventoryService !== 'undefined' ? getInventoryService() : {error: '後端服務缺失: getInventoryService'}; 
             case 'getPurchaseSuggestions': return typeof getPurchaseSuggestionsService !== 'undefined' ? getPurchaseSuggestionsService() : {error: '後端服務缺失: getPurchaseSuggestionsService'}; 
             case 'addPurchase': return typeof addPurchaseService !== 'undefined' ? addPurchaseService(payload, user) : {error: '後端服務缺失: addPurchaseService (進貨功能)'}; 

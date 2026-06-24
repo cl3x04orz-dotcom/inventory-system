@@ -628,3 +628,98 @@ function loginAdminByPassword(payload) {
     };
 }
 
+function initBuildingSettingsSheet_() {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName('Building_Settings');
+    if (!sheet) {
+        sheet = ss.insertSheet('Building_Settings');
+        sheet.appendRow(['building', 'start_time', 'end_time']);
+        sheet.setFrozenRows(1);
+        
+        // Add default "一般散客" row
+        sheet.appendRow(['一般散客', '', '']);
+        
+        // Populate from existing bindings if possible
+        const bindingsSheet = ss.getSheetByName('GroupBuy_GroupBindings');
+        if (bindingsSheet) {
+            try {
+                const rows = bindingsSheet.getDataRange().getValues();
+                const uniqueBuildings = new Set();
+                for (let i = 1; i < rows.length; i++) {
+                    const bname = String(rows[i][1] || '').trim();
+                    if (bname && bname !== '一般散客') {
+                        uniqueBuildings.add(bname);
+                    }
+                }
+                uniqueBuildings.forEach(bname => {
+                    sheet.appendRow([bname, '', '']);
+                });
+            } catch (err) {
+                console.error('Failed to import existing buildings:', err);
+            }
+        }
+    }
+    return sheet;
+}
+
+function getBuildingSettingsService(payload, user) {
+    const sheet = initBuildingSettingsSheet_();
+    const rows = sheet.getDataRange().getValues();
+    const settings = [];
+    
+    const formatDate = (val) => {
+        if (!val) return '';
+        if (val instanceof Date) {
+            const pad = n => String(n).padStart(2, '0');
+            return `${val.getFullYear()}/${pad(val.getMonth()+1)}/${pad(val.getDate())} ${pad(val.getHours())}:${pad(val.getMinutes())}`;
+        }
+        return String(val);
+    };
+
+    for (let i = 1; i < rows.length; i++) {
+        const bname = String(rows[i][0] || '').trim();
+        if (!bname) continue;
+        
+        settings.push({
+            building: bname,
+            start_time: formatDate(rows[i][1]),
+            end_time: formatDate(rows[i][2])
+        });
+    }
+    return settings;
+}
+
+function saveBuildingSettingsService(payload, user) {
+    if (user.role !== 'BOSS') throw new Error('權限不足');
+    const { building, start_time, end_time } = payload;
+    if (!building) throw new Error('缺少大樓名稱');
+    
+    const sheet = initBuildingSettingsSheet_();
+    const data = sheet.getDataRange().getValues();
+    let foundRow = -1;
+    for (let i = 1; i < data.length; i++) {
+        if (String(data[i][0]).trim() === String(building).trim()) {
+            foundRow = i + 1;
+            break;
+        }
+    }
+    
+    const parseDate = (str) => {
+        if (!str) return '';
+        const d = new Date(str.replace(/\//g, '-'));
+        return isNaN(d.getTime()) ? str : d;
+    };
+    
+    const sDate = parseDate(start_time);
+    const eDate = parseDate(end_time);
+    
+    if (foundRow !== -1) {
+        sheet.getRange(foundRow, 2).setValue(sDate);
+        sheet.getRange(foundRow, 3).setValue(eDate);
+    } else {
+        sheet.appendRow([building, sDate, eDate]);
+    }
+    SpreadsheetApp.flush();
+    return { success: true };
+}
+
