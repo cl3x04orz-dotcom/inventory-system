@@ -34174,33 +34174,58 @@ function LiffOrderPage({ user, apiUrl: apiUrl2 }) {
   const [buildingSettings, setBuildingSettings] = reactExports.useState([]);
   const [successOrderTotal, setSuccessOrderTotal] = reactExports.useState(0);
   const [isNightOrder, setIsNightOrder] = reactExports.useState(false);
-  const loadAllData = async () => {
+  const [isSettingsLoading, setIsSettingsLoading] = reactExports.useState(true);
+  const loadProductsOnly = async () => {
     setLoading(true);
     try {
-      const initData = await callGAS(apiUrl2, "getLiffInitData", {}, user?.token);
-      if (initData) {
-        if (Array.isArray(initData.products)) {
-          const activeProds = initData.products.filter((p) => p.isActive);
-          setProducts(activeProds);
-          const cats = activeProds.map((p) => p.category?.trim() || "其他");
-          const unique = [...new Set(cats)];
-          const firstCat = unique.filter((c) => c !== "其他")[0] || (unique.includes("其他") ? "其他" : "");
-          if (firstCat) {
-            setActiveCategory(firstCat);
-          }
-        }
-        if (initData.groupBindings && typeof initData.groupBindings === "object") {
-          setGroupBindings(initData.groupBindings);
-        }
-        if (Array.isArray(initData.buildingSettings)) {
-          setBuildingSettings(initData.buildingSettings);
+      const prods = await callGAS(apiUrl2, "getProducts", {}, user?.token);
+      if (Array.isArray(prods)) {
+        const activeProds = prods.filter((p) => p.isActive);
+        setProducts(activeProds);
+        const cats = activeProds.map((p) => p.category?.trim() || "其他");
+        const unique = [...new Set(cats)];
+        const firstCat = unique.filter((c) => c !== "其他")[0] || (unique.includes("其他") ? "其他" : "");
+        if (firstCat) {
+          setActiveCategory(firstCat);
         }
       }
     } catch (err) {
-      console.error("Failed to load initialization data:", err);
-      alert("載入資料失敗: " + err.message);
+      console.error("Failed to load products:", err);
+      alert("載入商品失敗: " + err.message);
     } finally {
       setLoading(false);
+    }
+  };
+  const loadSettingsInBackground = async () => {
+    setIsSettingsLoading(true);
+    try {
+      const [bindings, settings] = await Promise.all([
+        callGAS(apiUrl2, "getGroupBindings", {}, user?.token),
+        callGAS(apiUrl2, "getBuildingSettings", {}, user?.token)
+      ]);
+      if (bindings && typeof bindings === "object") {
+        setGroupBindings(bindings);
+      }
+      if (Array.isArray(settings)) {
+        setBuildingSettings(settings);
+      }
+    } catch (err) {
+      console.error("Failed to load background settings:", err);
+    } finally {
+      setIsSettingsLoading(false);
+    }
+  };
+  const loadAllData = async () => {
+    setLoading(true);
+    setIsSettingsLoading(true);
+    try {
+      await Promise.all([
+        loadProductsOnly(),
+        loadSettingsInBackground()
+      ]);
+    } finally {
+      setLoading(false);
+      setIsSettingsLoading(false);
     }
   };
   const getGroupBuyStatus = () => {
@@ -34291,20 +34316,25 @@ function LiffOrderPage({ user, apiUrl: apiUrl2 }) {
       const liffReady = await initLiffAndFetchInfo();
       if (!liffReady)
         return;
-      await loadAllData();
-      const params = new URLSearchParams(window.location.search);
-      const buildingParam = params.get("building") || "";
-      const urlGrp = params.get("grp") || "";
-      if (buildingParam) {
-        setUrlBuilding(buildingParam);
-        setSelectedBuilding(buildingParam);
-      }
-      if (urlGrp) {
-        setSourceGroup(urlGrp);
-      }
+      await loadProductsOnly();
+      loadSettingsInBackground();
     };
     init();
   }, [apiUrl2, user?.token]);
+  reactExports.useEffect(() => {
+    if (isSettingsLoading)
+      return;
+    const params = new URLSearchParams(window.location.search);
+    const buildingParam = params.get("building") || "";
+    const urlGrp = params.get("grp") || "";
+    if (buildingParam) {
+      setUrlBuilding(buildingParam);
+      setSelectedBuilding(buildingParam);
+    }
+    if (urlGrp) {
+      setSourceGroup(urlGrp);
+    }
+  }, [isSettingsLoading]);
   const lockedBuilding = reactExports.useMemo(() => {
     if (urlBuilding && urlBuilding !== "一般散客")
       return urlBuilding;
@@ -35077,15 +35107,19 @@ ${itemsText}
                   className: "w-full bg-[var(--bg-secondary)] p-2.5 rounded-xl border border-[var(--border-primary)] text-sm font-bold text-[var(--text-primary)] focus:outline-none",
                   value: selectedBuilding,
                   onChange: (e) => setSelectedBuilding(e.target.value),
-                  disabled: !!lockedBuilding,
+                  disabled: !!lockedBuilding || isSettingsLoading,
                   children: [
-                    /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "", children: "-- 請選擇收件大樓 --" }),
-                    knownBuildings.map((bname) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: bname, children: bname }, bname)),
-                    /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "其它", children: "其它（自行填寫）" })
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "", children: isSettingsLoading ? "-- 大樓設定載入中... --" : "-- 請選擇收件大樓 --" }),
+                    !isSettingsLoading && knownBuildings.map((bname) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: bname, children: bname }, bname)),
+                    !isSettingsLoading && /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "其它", children: "其它（自行填寫）" })
                   ]
                 }
               ),
-              !!lockedBuilding && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-blue-500 font-medium", children: "※ 已自動鎖定您所在的群組大樓" })
+              isSettingsLoading && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[10px] text-amber-600 font-medium flex items-center gap-1 mt-1 animate-pulse", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(RefreshCw, { className: "animate-spin", size: 10 }),
+                "大樓開團設定載入中，請稍候..."
+              ] }),
+              !isSettingsLoading && !!lockedBuilding && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-blue-500 font-medium", children: "※ 已自動鎖定您所在的群組大樓" })
             ] }),
             selectedBuilding === "其它" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "text-xs font-bold text-[var(--text-secondary)]", children: [
@@ -35232,18 +35266,22 @@ ${itemsText}
           paymentMethod === "LINE Pay" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-emerald-50 dark:bg-emerald-900/15 border border-emerald-200 dark:border-emerald-700/30 rounded-xl px-4 py-3 text-xs text-emerald-700 dark:text-emerald-300", children: "送出訂單後，系統將自動開啟 LINE，請完成個人轉帳。" })
         ] })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] flex-shrink-0", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] flex-shrink-0", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
         "button",
         {
           onClick: () => {
-            if (canProceed)
+            if (canProceed && !isSettingsLoading)
               setStep("confirm");
           },
-          className: `w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${canProceed ? "btn-primary shadow-md shadow-blue-500/20" : "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed"}`,
-          children: [
+          disabled: !canProceed || isSettingsLoading,
+          className: `w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${canProceed && !isSettingsLoading ? "btn-primary shadow-md shadow-blue-500/20" : "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed"}`,
+          children: isSettingsLoading ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(RefreshCw, { className: "animate-spin", size: 16 }),
+            " 大樓開團設定載入中..."
+          ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
             "下一步：確認訂單明細 ",
             /* @__PURE__ */ jsxRuntimeExports.jsx(ArrowRight, { size: 16 })
-          ]
+          ] })
         }
       ) })
     ] });
