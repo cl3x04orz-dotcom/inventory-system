@@ -164,7 +164,7 @@ function AppContent() {
         const threshold = 50; // 捲動門檻 (px)
         const handleScroll = () => {
             const currentScrollY = window.scrollY;
-            
+
             // 更新陰影狀態
             setScrolled(currentScrollY > 10);
 
@@ -185,7 +185,7 @@ function AppContent() {
             if (delta > threshold && currentScrollY > 76) {
                 if (!mobileMenuOpen) setShowHeader(false);
                 lastScrollY.current = currentScrollY;
-            } 
+            }
             // 往上滑動且超過門檻：顯示
             else if (delta < -threshold) {
                 setShowHeader(true);
@@ -308,8 +308,8 @@ function AppContent() {
 
             // 2. 判斷是否為 LIFF 頁面
             const params = new URLSearchParams(window.location.search);
-            const isLiff = params.get('page') === 'liffOrder' || 
-                           (window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === 'liffOrder');
+            const isLiff = params.get('page') === 'liffOrder' ||
+                (window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === 'liffOrder');
 
             let isQuickLiff = false;
             if (isLiff) {
@@ -380,9 +380,9 @@ function AppContent() {
         if (isInitializing) return;
 
         const params = new URLSearchParams(window.location.search);
-        const isLiff = params.get('page') === 'liffOrder' || 
-                       (window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === 'liffOrder');
-        
+        const isLiff = params.get('page') === 'liffOrder' ||
+            (window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === 'liffOrder');
+
         if (isLiff && !user) {
             const autoLogin = async () => {
                 if (window.GAS_GUEST_TOKEN) {

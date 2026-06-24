@@ -98,44 +98,71 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [buildingSettings, setBuildingSettings] = useState([]);
   const [successOrderTotal, setSuccessOrderTotal] = useState(0);
   const [isNightOrder, setIsNightOrder] = useState(false);
+  const [isSettingsLoading, setIsSettingsLoading] = useState(true);
 
 
 
-  // ── 載入商品與初始化資料 ─────────────────────────────────────────
-  const loadAllData = async () => {
+  // ── 階段一：快速載入商品 ─────────────────────────────────────────
+  const loadProductsOnly = async () => {
     setLoading(true);
     try {
-      const initData = await callGAS(apiUrl, "getLiffInitData", {}, user?.token);
-      if (initData) {
-        // A. 處理商品
-        if (Array.isArray(initData.products)) {
-          const activeProds = initData.products.filter((p) => p.isActive);
-          setProducts(activeProds);
+      const prods = await callGAS(apiUrl, "getProducts", {}, user?.token);
+      if (Array.isArray(prods)) {
+        const activeProds = prods.filter((p) => p.isActive);
+        setProducts(activeProds);
 
-          // 自動將第一個分類設為 Active
-          const cats = activeProds.map((p) => p.category?.trim() || "其他");
-          const unique = [...new Set(cats)];
-          const firstCat =
-            unique.filter((c) => c !== "其他")[0] ||
-            (unique.includes("其他") ? "其他" : "");
-          if (firstCat) {
-            setActiveCategory(firstCat);
-          }
-        }
-        // B. 處理群組對照表
-        if (initData.groupBindings && typeof initData.groupBindings === "object") {
-          setGroupBindings(initData.groupBindings);
-        }
-        // C. 處理大樓開團時間設定
-        if (Array.isArray(initData.buildingSettings)) {
-          setBuildingSettings(initData.buildingSettings);
+        // 自動將第一個分類設為 Active
+        const cats = activeProds.map((p) => p.category?.trim() || "其他");
+        const unique = [...new Set(cats)];
+        const firstCat =
+          unique.filter((c) => c !== "其他")[0] ||
+          (unique.includes("其他") ? "其他" : "");
+        if (firstCat) {
+          setActiveCategory(firstCat);
         }
       }
     } catch (err) {
-      console.error("Failed to load initialization data:", err);
-      alert("載入資料失敗: " + err.message);
+      console.error("Failed to load products:", err);
+      alert("載入商品失敗: " + err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ── 階段二：背景默默下載大樓設定與群組綁定 ──────────────────────────
+  const loadSettingsInBackground = async () => {
+    setIsSettingsLoading(true);
+    try {
+      const [bindings, settings] = await Promise.all([
+        callGAS(apiUrl, "getGroupBindings", {}, user?.token),
+        callGAS(apiUrl, "getBuildingSettings", {}, user?.token)
+      ]);
+      
+      if (bindings && typeof bindings === "object") {
+        setGroupBindings(bindings);
+      }
+      if (Array.isArray(settings)) {
+        setBuildingSettings(settings);
+      }
+    } catch (err) {
+      console.error("Failed to load background settings:", err);
+    } finally {
+      setIsSettingsLoading(false);
+    }
+  };
+
+  // ── 同時重整全部資料 ───────────────────────────────────────────────
+  const loadAllData = async () => {
+    setLoading(true);
+    setIsSettingsLoading(true);
+    try {
+      await Promise.all([
+        loadProductsOnly(),
+        loadSettingsInBackground()
+      ]);
+    } finally {
+      setLoading(false);
+      setIsSettingsLoading(false);
     }
   };
 
@@ -143,7 +170,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
     const currentBuildingName = (selectedBuilding && selectedBuilding !== "其它") ? selectedBuilding : "一般散客";
     const setting = buildingSettings.find(s => s.building === currentBuildingName);
     if (!setting) return { status: 'open', message: '' };
-    
+
     const { start_time, end_time } = setting;
     if (!start_time && !end_time) return { status: 'open', message: '' };
 
@@ -243,22 +270,31 @@ export default function LiffOrderPage({ user, apiUrl }) {
       const liffReady = await initLiffAndFetchInfo();
       if (!liffReady) return;
 
-      // 2. 只有在確定不進行登入轉址時，才執行一次連線取得全部資料，大幅縮短載入時間
-      await loadAllData();
+      // 2. 只有在確定不進行登入轉址時，才連線取得商品（秒開）
+      await loadProductsOnly();
 
-      const params = new URLSearchParams(window.location.search);
-      const buildingParam = params.get("building") || "";
-      const urlGrp = params.get("grp") || "";
-      if (buildingParam) {
-        setUrlBuilding(buildingParam);
-        setSelectedBuilding(buildingParam);
-      }
-      if (urlGrp) {
-        setSourceGroup(urlGrp);
-      }
+      // 3. 背景默默下載大樓開團與群組設定
+      loadSettingsInBackground();
     };
     init();
   }, [apiUrl, user?.token]);
+
+  // ── 背景設定載入完成後的參數處理 ───────────────────────────────────────
+  useEffect(() => {
+    if (isSettingsLoading) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const buildingParam = params.get("building") || "";
+    const urlGrp = params.get("grp") || "";
+
+    if (buildingParam) {
+      setUrlBuilding(buildingParam);
+      setSelectedBuilding(buildingParam);
+    }
+    if (urlGrp) {
+      setSourceGroup(urlGrp);
+    }
+  }, [isSettingsLoading]);
 
   // ── 鎖定與已知大樓邏輯 ──────────────────────────────────────────
   const lockedBuilding = useMemo(() => {
@@ -588,7 +624,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
         }
       }
       if (saved.phone) setCustomerPhone(saved.phone);
- 
+
       const isLocked = !!lockedBuilding;
 
       if (saved.building !== undefined || saved.detailAddress !== undefined) {
@@ -647,10 +683,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
           }
         }
       }
-    } catch (_) {}
+    } catch (_) { }
     setStep("form");
   };
- 
+
   // ── 送出訂單 ─────────────────────────────────────────────────
   const handleSubmitOrder = async () => {
     setIsSubmitting(true);
@@ -678,7 +714,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
           console.warn("Failed to get LIFF profile for submitting order:", e);
         }
       }
- 
+
       const res = await callGAS(
         apiUrl,
         "savePendingOrder",
@@ -721,7 +757,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
         const currentMin = hour * 60 + min;
         const startMin = 8 * 60; // 08:00
         const endMin = 22 * 60;  // 22:00
-        
+
         if (currentMin >= startMin && currentMin <= endMin) {
           shouldSendLiffMsg = true;
         } else {
@@ -1154,17 +1190,25 @@ export default function LiffOrderPage({ user, apiUrl }) {
                   className="w-full bg-[var(--bg-secondary)] p-2.5 rounded-xl border border-[var(--border-primary)] text-sm font-bold text-[var(--text-primary)] focus:outline-none"
                   value={selectedBuilding}
                   onChange={(e) => setSelectedBuilding(e.target.value)}
-                  disabled={!!lockedBuilding}
+                  disabled={!!lockedBuilding || isSettingsLoading}
                 >
-                  <option value="">-- 請選擇收件大樓 --</option>
-                  {knownBuildings.map((bname) => (
+                  <option value="">
+                    {isSettingsLoading ? "-- 大樓設定載入中... --" : "-- 請選擇收件大樓 --"}
+                  </option>
+                  {!isSettingsLoading && knownBuildings.map((bname) => (
                     <option key={bname} value={bname}>
                       {bname}
                     </option>
                   ))}
-                  <option value="其它">其它（自行填寫）</option>
+                  {!isSettingsLoading && <option value="其它">其它（自行填寫）</option>}
                 </select>
-                {!!lockedBuilding && (
+                {isSettingsLoading && (
+                  <div className="text-[10px] text-amber-600 font-medium flex items-center gap-1 mt-1 animate-pulse">
+                    <RefreshCw className="animate-spin" size={10} />
+                    大樓開團設定載入中，請稍候...
+                  </div>
+                )}
+                {!isSettingsLoading && !!lockedBuilding && (
                   <div className="text-[10px] text-blue-500 font-medium">
                     ※ 已自動鎖定您所在的群組大樓
                   </div>
@@ -1225,11 +1269,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 return (
                   <label
                     key={value}
-                    className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
-                      active
+                    className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${active
                         ? "border-blue-500 bg-blue-50 dark:bg-blue-900/15"
                         : "border-[var(--border-primary)] bg-[var(--bg-secondary)] hover:border-blue-300"
-                    }`}
+                      }`}
                   >
                     <input
                       type="radio"
@@ -1332,15 +1375,23 @@ export default function LiffOrderPage({ user, apiUrl }) {
         <div className="p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] flex-shrink-0">
           <button
             onClick={() => {
-              if (canProceed) setStep("confirm");
+              if (canProceed && !isSettingsLoading) setStep("confirm");
             }}
-            className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
-              canProceed
+            disabled={!canProceed || isSettingsLoading}
+            className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${canProceed && !isSettingsLoading
                 ? "btn-primary shadow-md shadow-blue-500/20"
                 : "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed"
-            }`}
+              }`}
           >
-            下一步：確認訂單明細 <ArrowRight size={16} />
+            {isSettingsLoading ? (
+              <>
+                <RefreshCw className="animate-spin" size={16} /> 大樓開團設定載入中...
+              </>
+            ) : (
+              <>
+                下一步：確認訂單明細 <ArrowRight size={16} />
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -1374,13 +1425,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
         {/* 團購限時防呆 Banner 提示 */}
         {gbStatus.message && (
-          <div className={`px-4 py-2 text-xs font-bold text-center border-t border-[var(--border-primary)] ${
-            gbStatus.status === 'upcoming' 
-              ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' 
+          <div className={`px-4 py-2 text-xs font-bold text-center border-t border-[var(--border-primary)] ${gbStatus.status === 'upcoming'
+              ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
               : gbStatus.status === 'ended'
                 ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
                 : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-          }`}>
+            }`}>
             {gbStatus.message}
           </div>
         )}
@@ -1402,11 +1452,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
                   key={cat}
                   data-cat={cat}
                   onClick={() => handleCategoryChange(cat)}
-                  className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 whitespace-nowrap border ${
-                    activeCategory === cat
+                  className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 whitespace-nowrap border ${activeCategory === cat
                       ? "bg-[var(--text-primary)] text-[var(--bg-primary)] border-transparent shadow-sm"
                       : "bg-transparent border-[var(--border-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                  }`}
+                    }`}
                 >
                   {cat}
                 </button>
@@ -1545,11 +1594,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
                                     onClick={() =>
                                       handleProductAction(product, true)
                                     }
-                                    className={`w-7 h-7 flex items-center justify-center rounded-lg shadow-sm transition-all duration-100 active:scale-90 ${
-                                      qty > 0
+                                    className={`w-7 h-7 flex items-center justify-center rounded-lg shadow-sm transition-all duration-100 active:scale-90 ${qty > 0
                                         ? "bg-slate-700 text-white hover:bg-slate-800"
                                         : "bg-blue-500 text-white hover:bg-blue-600"
-                                    }`}
+                                      }`}
                                   >
                                     <Plus size={13} />
                                   </button>
