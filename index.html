@@ -34132,7 +34132,7 @@ const BANK_INFO = {
 const LINE_PAY_URL = "https://line.me/ti/p/kjGUUdBqLE";
 const LINE_CONTACT_URL = "https://line.me/R/ti/p/@839rpabi";
 const LS_KEY = "mlw_customer";
-function LiffOrderPage({ user, apiUrl: apiUrl2, onLoaded }) {
+function LiffOrderPage({ user, apiUrl: apiUrl2 }) {
   reactExports.useEffect(() => {
     document.documentElement.classList.add("liff-order-active");
     document.body.classList.add("liff-order-active");
@@ -34201,9 +34201,6 @@ function LiffOrderPage({ user, apiUrl: apiUrl2, onLoaded }) {
       alert("載入資料失敗: " + err.message);
     } finally {
       setLoading(false);
-      if (typeof onLoaded === "function") {
-        onLoaded();
-      }
     }
   };
   const getGroupBuyStatus = () => {
@@ -37577,23 +37574,15 @@ function AppContent() {
           isQuickLiff = true;
         }
       }
-      if (isLiff) {
-        const safetyTimeout = setTimeout(() => {
-          setShowSplash(false);
-          setIsInitializing(false);
-        }, 5e3);
-        window.liffSafetyTimeout = safetyTimeout;
-      } else {
-        const elapsed = Date.now() - startTime;
-        const minDelay = isQuickLiff ? 100 : 600;
-        const remaining = Math.max(0, minDelay - elapsed);
+      const elapsed = Date.now() - startTime;
+      const minDelay = isQuickLiff ? 100 : 600;
+      const remaining = Math.max(0, minDelay - elapsed);
+      setTimeout(() => {
+        setShowSplash(false);
         setTimeout(() => {
-          setShowSplash(false);
-          setTimeout(() => {
-            setIsInitializing(false);
-          }, 500);
-        }, remaining);
-      }
+          setIsInitializing(false);
+        }, 500);
+      }, remaining);
     };
     initializeApp();
     const handleGlobalClick = () => {
@@ -38012,22 +38001,7 @@ function AppContent() {
       page === "permissionControl" && /* @__PURE__ */ jsxRuntimeExports.jsx(PermissionControlPage, { user, apiUrl: GAS_API_URL, logActivity }),
       page === "payroll" && /* @__PURE__ */ jsxRuntimeExports.jsx(PayrollPage, { user, apiUrl: GAS_API_URL, logActivity }),
       page === "activityLog" && /* @__PURE__ */ jsxRuntimeExports.jsx(ActivityLogPage, { user, apiUrl: GAS_API_URL }),
-      page === "liffOrder" && /* @__PURE__ */ jsxRuntimeExports.jsx(
-        LiffOrderPage,
-        {
-          user,
-          apiUrl: GAS_API_URL,
-          onLoaded: () => {
-            if (window.liffSafetyTimeout) {
-              clearTimeout(window.liffSafetyTimeout);
-            }
-            setShowSplash(false);
-            setTimeout(() => {
-              setIsInitializing(false);
-            }, 500);
-          }
-        }
-      ),
+      page === "liffOrder" && /* @__PURE__ */ jsxRuntimeExports.jsx(LiffOrderPage, { user, apiUrl: GAS_API_URL }),
       page === "pendingOrders" && /* @__PURE__ */ jsxRuntimeExports.jsx(PendingOrdersPage, { user, apiUrl: GAS_API_URL }),
       page === "groupBuySettings" && /* @__PURE__ */ jsxRuntimeExports.jsx(GroupBuySettingsPage, { user, apiUrl: GAS_API_URL }),
       page === "products" && /* @__PURE__ */ jsxRuntimeExports.jsx(ProductManagementPage, { user, apiUrl: GAS_API_URL })
