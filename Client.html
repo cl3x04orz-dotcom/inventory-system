@@ -37334,7 +37334,6 @@ const useActivityLogger = ({ user, apiUrl: apiUrl2, enabled = true }) => {
   };
 };
 const GAS_API_URL = window.GAS_API_URL || "https://script.google.com/macros/s/AKfycbw0sN21nJXfjezYL446-wgwTbLOCUziFGOEN8qsXYg7cYHsN5R4Sgn2dSyzoGtH0Xb5/exec";
-const LOCAL_VERSION = "1782300449803";
 console.log("--- 系統偵錯資訊 ---");
 console.log("Base URL:", "/");
 if (!GAS_API_URL || GAS_API_URL.includes("YOUR_SCRIPT_ID")) {
@@ -37433,7 +37432,6 @@ function AppContent() {
   const [sessionManager, setSessionManager] = reactExports.useState(null);
   const [isInitializing, setIsInitializing] = reactExports.useState(true);
   const [showSplash, setShowSplash] = reactExports.useState(true);
-  const checkCountRef = React$3.useRef(0);
   const [showHeader, setShowHeader] = reactExports.useState(true);
   const [scrolled, setScrolled] = reactExports.useState(false);
   const lastScrollY = React$3.useRef(0);
@@ -37461,92 +37459,6 @@ function AppContent() {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, [mobileMenuOpen]);
-  const lastCheckTimeRef = React$3.useRef(0);
-  const userRef = React$3.useRef(user);
-  reactExports.useEffect(() => {
-    userRef.current = user;
-  }, [user]);
-  reactExports.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const isLiff = params.get("page") === "liffOrder" || window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === "liffOrder";
-    if (isLiff)
-      return;
-    const checkUpdate = async () => {
-      if (userRef.current?.username === "guest")
-        return;
-      const now2 = Date.now();
-      if (now2 - lastCheckTimeRef.current < 5e3)
-        return;
-      lastCheckTimeRef.current = now2;
-      checkCountRef.current += 1;
-      const count = checkCountRef.current;
-      try {
-        console.log(`[VersionCheck #${count}] 開始檢查... 本地:${LOCAL_VERSION}`);
-        const response = await fetch(`${GAS_API_URL}?t=${Date.now()}`, {
-          method: "POST",
-          redirect: "follow",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ action: "getVersion", _t: Date.now() })
-        });
-        const res = await response.json();
-        console.log(`[VersionCheck #${count}] 伺服器回應:`, res.version);
-        if (res && res.version && String(res.version) !== String(LOCAL_VERSION)) {
-          const serverVer = Number(res.version);
-          const localVer = Number(LOCAL_VERSION);
-          if (!isNaN(serverVer) && !isNaN(localVer) && serverVer > localVer) {
-            const url = new URL(window.location.href);
-            const lastReloadVersion = url.searchParams.get("_v");
-            if (lastReloadVersion !== String(res.version)) {
-              console.warn(`[VersionCheck] 偵測到新版本 (${LOCAL_VERSION} -> ${res.version})，強制重載！`);
-              url.searchParams.set("_v", res.version);
-              window.location.replace(url.toString());
-            } else {
-              console.warn(`[VersionCheck] 已嘗試重載至版本 ${res.version}，但快取尚未更新，停止重複重載以防止無限刷新。`);
-            }
-          }
-        }
-      } catch (e) {
-        console.warn(`[VersionCheck #${count}] 檢查失敗:`, e);
-      }
-    };
-    const timer = setTimeout(checkUpdate, 2e3);
-    let interval;
-    const startPolling = () => {
-      if (!interval)
-        interval = setInterval(checkUpdate, 5 * 60 * 1e3);
-    };
-    const stopPolling = () => {
-      if (interval) {
-        clearInterval(interval);
-        interval = null;
-      }
-    };
-    startPolling();
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        checkUpdate();
-        startPolling();
-      } else {
-        stopPolling();
-      }
-    };
-    const handleFocus = () => {
-      if (document.visibilityState === "visible") {
-        checkUpdate();
-        startPolling();
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("focus", handleFocus);
-    window.addEventListener("pageshow", handleFocus);
-    return () => {
-      clearTimeout(timer);
-      stopPolling();
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("focus", handleFocus);
-      window.removeEventListener("pageshow", handleFocus);
-    };
-  }, []);
   const { logActivity, logLogin, logLogout, logPageView } = useActivityLogger({
     user,
     apiUrl: GAS_API_URL,
