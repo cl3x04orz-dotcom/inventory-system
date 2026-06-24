@@ -35081,14 +35081,14 @@ ${itemsText}
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx(FileText, { size: 12 }),
-              " 備註（理想送達時段）"
+              " 備註"
             ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsx(
               "textarea",
               {
                 className: "input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)]",
                 rows: 2,
-                placeholder: "例：希望下午 2:00 ~ 3:30 之間送達",
+                placeholder: "",
                 value: note,
                 onChange: (e) => setNote(e.target.value)
               }
@@ -37279,7 +37279,7 @@ const useActivityLogger = ({ user, apiUrl: apiUrl2, enabled = true }) => {
   };
 };
 const GAS_API_URL = window.GAS_API_URL || "https://script.google.com/macros/s/AKfycbw0sN21nJXfjezYL446-wgwTbLOCUziFGOEN8qsXYg7cYHsN5R4Sgn2dSyzoGtH0Xb5/exec";
-const LOCAL_VERSION = "1782292189350";
+const LOCAL_VERSION = "1782298592912";
 console.log("--- 系統偵錯資訊 ---");
 console.log("Base URL:", "/");
 if (!GAS_API_URL || GAS_API_URL.includes("YOUR_SCRIPT_ID")) {

@@ -1155,12 +1155,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
             </div>
             <div className="space-y-1">
               <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
-                <FileText size={12} /> 備註（理想送達時段）
+                <FileText size={12} /> 備註
               </label>
               <textarea
                 className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)]"
                 rows={2}
-                placeholder="例：希望下午 2:00 ~ 3:30 之間送達"
+                placeholder=""
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
               />
