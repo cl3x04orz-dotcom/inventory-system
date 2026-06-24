@@ -37538,6 +37538,8 @@ function AppContent() {
           safeSessionStorage.removeItem("inventory_user");
         }
       }
+      const params = new URLSearchParams(window.location.search);
+      const isLiff = params.get("page") === "liffOrder" || window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === "liffOrder";
       let isQuickLiff = false;
       if (isLiff) {
         if (!currentUser) {
@@ -37599,8 +37601,8 @@ function AppContent() {
     if (isInitializing)
       return;
     const params = new URLSearchParams(window.location.search);
-    const isLiff2 = params.get("page") === "liffOrder" || window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === "liffOrder";
-    if (isLiff2 && !user) {
+    const isLiff = params.get("page") === "liffOrder" || window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === "liffOrder";
+    if (isLiff && !user) {
       const autoLogin = async () => {
         if (window.GAS_GUEST_TOKEN) {
           console.log("Re-using pre-injected guest token...");
