@@ -34255,7 +34255,7 @@ function LiffOrderPage({ user, apiUrl: apiUrl2 }) {
   const initLiffAndFetchInfo = async () => {
     if (!window.liff) {
       console.warn("LINE LIFF SDK is not loaded.");
-      return;
+      return true;
     }
     try {
       const params = new URLSearchParams(window.location.search);
@@ -34276,7 +34276,7 @@ function LiffOrderPage({ user, apiUrl: apiUrl2 }) {
       }
       if (!window.liff.isLoggedIn()) {
         window.liff.login();
-        return;
+        return false;
       }
       const profile = await window.liff.getProfile();
       if (profile?.displayName) {
@@ -34292,17 +34292,22 @@ function LiffOrderPage({ user, apiUrl: apiUrl2 }) {
           setSourceGroup(gid2);
         }
       }
+      return true;
     } catch (err) {
       console.error("LIFF init failed:", err);
+      return true;
     }
   };
   reactExports.useEffect(() => {
     const init = async () => {
+      const liffReady = await initLiffAndFetchInfo();
+      if (!liffReady)
+        return;
+      await loadGroupBindings();
+      await loadBuildingSettings();
       const params = new URLSearchParams(window.location.search);
       const buildingParam = params.get("building") || "";
       const urlGrp = params.get("grp") || "";
-      await loadGroupBindings();
-      await loadBuildingSettings();
       if (buildingParam) {
         setUrlBuilding(buildingParam);
         setSelectedBuilding(buildingParam);
@@ -34312,7 +34317,6 @@ function LiffOrderPage({ user, apiUrl: apiUrl2 }) {
       }
       if (user?.token)
         loadProducts();
-      await initLiffAndFetchInfo();
     };
     init();
   }, [apiUrl2, user?.token]);
@@ -34696,7 +34700,7 @@ function LiffOrderPage({ user, apiUrl: apiUrl2 }) {
           customerName,
           customerPhone,
           deliveryAddress: getFullAddress(),
-          sourceGroup,
+          sourceGroup: selectedBuilding === "其它" ? otherBuildingText.trim() : selectedBuilding || "一般散客",
           note,
           paymentMethod,
           transferLastFive,

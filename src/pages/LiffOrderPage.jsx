@@ -196,7 +196,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const initLiffAndFetchInfo = async () => {
     if (!window.liff) {
       console.warn("LINE LIFF SDK is not loaded.");
-      return;
+      return true; // Standalone browser test fallback
     }
     try {
       const params = new URLSearchParams(window.location.search);
@@ -222,7 +222,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
       if (!window.liff.isLoggedIn()) {
         window.liff.login();
-        return;
+        return false; // Redirecting, abort active requests
       }
 
       // 1. 獲取 LINE 使用者資訊
@@ -241,19 +241,27 @@ export default function LiffOrderPage({ user, apiUrl }) {
           setSourceGroup(gid2);
         }
       }
+      return true;
     } catch (err) {
       console.error("LIFF init failed:", err);
+      return true;
     }
   };
 
 
   useEffect(() => {
     const init = async () => {
+      // 1. 先確認 LIFF 狀態，如果需要登入轉址，直接中斷後續的 fetch 請求
+      const liffReady = await initLiffAndFetchInfo();
+      if (!liffReady) return;
+
+      // 2. 只有在確定不進行登入轉址時，才執行後續連線取得資料的動作
+      await loadGroupBindings();
+      await loadBuildingSettings();
+
       const params = new URLSearchParams(window.location.search);
       const buildingParam = params.get("building") || "";
       const urlGrp = params.get("grp") || "";
-      await loadGroupBindings();
-      await loadBuildingSettings();
       if (buildingParam) {
         setUrlBuilding(buildingParam);
         setSelectedBuilding(buildingParam);
@@ -262,7 +270,6 @@ export default function LiffOrderPage({ user, apiUrl }) {
         setSourceGroup(urlGrp);
       }
       if (user?.token) loadProducts();
-      await initLiffAndFetchInfo();
     };
     init();
   }, [apiUrl, user?.token]);
@@ -693,7 +700,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
           customerName,
           customerPhone,
           deliveryAddress: getFullAddress(),
-          sourceGroup,
+          sourceGroup: selectedBuilding === "其它" ? otherBuildingText.trim() : (selectedBuilding || "一般散客"),
           note,
           paymentMethod,
           transferLastFive,
