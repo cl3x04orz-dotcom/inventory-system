@@ -306,33 +306,45 @@ function AppContent() {
                 }
             }
 
-            // 2. 判斷是否為 LIFF 頁面
-            const params = new URLSearchParams(window.location.search);
-            const isLiff = params.get('page') === 'liffOrder' || 
-                           (window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === 'liffOrder');
-
+            let isQuickLiff = false;
             if (isLiff) {
                 if (!currentUser) {
-                    try {
-                        console.log('Detecting LIFF order request, logging in guest...');
-                        const res = await callGAS(GAS_API_URL, 'login', { username: 'guest', password: 'guest' });
-                        if (res && res.success) {
-                            handleLogin(res);
-                            setPage('liffOrder');
-                        } else {
-                            console.error('Auto login guest failed:', res?.error);
+                    if (window.GAS_GUEST_TOKEN) {
+                        console.log('Using pre-injected guest token');
+                        const res = {
+                            success: true,
+                            token: window.GAS_GUEST_TOKEN,
+                            username: 'guest',
+                            role: 'EMPLOYEE',
+                            permissions: ['sales_liff']
+                        };
+                        handleLogin(res);
+                        setPage('liffOrder');
+                        isQuickLiff = true;
+                    } else {
+                        try {
+                            console.log('Detecting LIFF order request, logging in guest...');
+                            const res = await callGAS(GAS_API_URL, 'login', { username: 'guest', password: 'guest' });
+                            if (res && res.success) {
+                                handleLogin(res);
+                                setPage('liffOrder');
+                            } else {
+                                console.error('Auto login guest failed:', res?.error);
+                            }
+                        } catch (err) {
+                            console.error('Auto login guest error:', err);
                         }
-                    } catch (err) {
-                        console.error('Auto login guest error:', err);
                     }
                 } else {
                     setPage('liffOrder');
+                    isQuickLiff = true;
                 }
             }
 
             // 3. 初始化結束，淡出遮罩 (確保 guest 登入完成且 user 狀態已設定，才開始淡出，避免 LoginPage 閃爍)
             const elapsed = Date.now() - startTime;
-            const remaining = Math.max(0, 600 - elapsed);
+            const minDelay = isQuickLiff ? 100 : 600;
+            const remaining = Math.max(0, minDelay - elapsed);
             setTimeout(() => {
                 setShowSplash(false);
                 setTimeout(() => {
@@ -368,6 +380,19 @@ function AppContent() {
         
         if (isLiff && !user) {
             const autoLogin = async () => {
+                if (window.GAS_GUEST_TOKEN) {
+                    console.log('Re-using pre-injected guest token...');
+                    const res = {
+                        success: true,
+                        token: window.GAS_GUEST_TOKEN,
+                        username: 'guest',
+                        role: 'EMPLOYEE',
+                        permissions: ['sales_liff']
+                    };
+                    handleLogin(res);
+                    setPage('liffOrder');
+                    return;
+                }
                 try {
                     console.log('Re-logging in guest for LIFF order page...');
                     const res = await callGAS(GAS_API_URL, 'login', { username: 'guest', password: 'guest' });
@@ -522,7 +547,6 @@ function AppContent() {
             <div className="splash-screen">
                 <div className="splash-content">
                     <img src={logoImg} className="breathe-logo" alt="Logo" />
-                    <p className="loading-text">米立微系統 載入中...</p>
                 </div>
             </div>
         );
@@ -535,7 +559,6 @@ function AppContent() {
                     <div className="splash-screen fade-out">
                         <div className="splash-content">
                             <img src={logoImg} className="breathe-logo" alt="Logo" />
-                            <p className="loading-text">米立微系統 載入中...</p>
                         </div>
                     </div>
                 )}
@@ -552,7 +575,6 @@ function AppContent() {
                 <div className="splash-screen fade-out">
                     <div className="splash-content">
                         <img src={logoImg} className="breathe-logo" alt="Logo" />
-                        <p className="loading-text">米立微系統 載入中...</p>
                     </div>
                 </div>
             )}

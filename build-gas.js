@@ -95,6 +95,7 @@ const gasParamsScript = `
   <script>
     window.GAS_PARAMETERS = <?!= typeof parameters !== 'undefined' ? parameters : '{}' ?>;
     window.GAS_API_URL = <?!= typeof currentApiUrl !== 'undefined' ? JSON.stringify(currentApiUrl) : '""' ?>;
+    window.GAS_GUEST_TOKEN = <?!= typeof guestToken !== 'undefined' ? JSON.stringify(guestToken) : '""' ?>;
   </script>
 `;
 output = output.replace(/([\s\S]*)(<\/head>\s*<body>)/i, `$1$2${gasParamsScript}`);

@@ -1,13 +1,33 @@
 /**
  * Serves the React App
  */
-const APP_VERSION = '1782301990154';
+const APP_VERSION = '1782302852943';
  // 版本號：A2:3/24
 
 function doGet(e) {
     const template = HtmlService.createTemplateFromFile('Client');
     template.parameters = JSON.stringify(e && e.parameter ? e.parameter : {});
     template.currentApiUrl = ScriptApp.getService().getUrl();
+    
+    // 如果是 LIFF 頁面，預先生成 guest Token 注入 HTML，免去前端一次 AJAX 登入連線
+    let guestToken = '';
+    const isLiff = e && e.parameter && (e.parameter.page === 'liffOrder' || e.parameter.building || e.parameter.grp);
+    if (isLiff) {
+        try {
+            var tokenPayload = {
+                username: 'guest',
+                role: 'EMPLOYEE',
+                permissions: ['sales_liff'],
+                timestamp: new Date().getTime(),
+                exp: new Date().getTime() + (12 * 60 * 60 * 1000) // 12 小時
+            };
+            guestToken = createJWT(tokenPayload);
+        } catch(err) {
+            console.error('Failed to pre-generate guest token in doGet:', err);
+        }
+    }
+    template.guestToken = guestToken;
+    
     return template.evaluate()
         .addMetaTag('viewport', 'width=device-width, initial-scale=1')
         .setTitle('Inventory System')
@@ -105,6 +125,7 @@ function apiHandler(request) {
         'updateOrderStatus': 'sales_pending',
         'getBuildingSettings': null,
         'saveBuildingSettings': 'sales_pending',
+        'getLiffInitData': null,
         
         // Finance (財務管理)
         'getExpenditures': null, // [Modification] Anyone can call, filtering happens in service
@@ -203,6 +224,12 @@ function apiHandler(request) {
             case 'updateOrderStatus': return typeof updateOrderStatusService !== 'undefined' ? updateOrderStatusService(payload, user) : {error: '後端服務缺失: updateOrderStatusService'};
             case 'getBuildingSettings': return typeof getBuildingSettingsService !== 'undefined' ? getBuildingSettingsService(payload, user) : {error: '後端服務缺失: getBuildingSettingsService'};
             case 'saveBuildingSettings': return typeof saveBuildingSettingsService !== 'undefined' ? saveBuildingSettingsService(payload, user) : {error: '後端服務缺失: saveBuildingSettingsService'};
+            case 'getLiffInitData':
+                return {
+                    products: typeof getProductsService !== 'undefined' ? getProductsService() : [],
+                    groupBindings: typeof getGroupBindingsService !== 'undefined' ? getGroupBindingsService(payload, user) : {},
+                    buildingSettings: typeof getBuildingSettingsService !== 'undefined' ? getBuildingSettingsService(payload, user) : []
+                };
             case 'getInventory': return typeof getInventoryService !== 'undefined' ? getInventoryService() : {error: '後端服務缺失: getInventoryService'}; 
             case 'getPurchaseSuggestions': return typeof getPurchaseSuggestionsService !== 'undefined' ? getPurchaseSuggestionsService() : {error: '後端服務缺失: getPurchaseSuggestionsService'}; 
             case 'addPurchase': return typeof addPurchaseService !== 'undefined' ? addPurchaseService(payload, user) : {error: '後端服務缺失: addPurchaseService (進貨功能)'}; 

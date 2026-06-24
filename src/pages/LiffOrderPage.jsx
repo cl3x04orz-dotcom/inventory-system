@@ -101,53 +101,41 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
 
 
-  // ── 載入商品 ─────────────────────────────────────────────────
-  const loadProducts = async () => {
+  // ── 載入商品與初始化資料 ─────────────────────────────────────────
+  const loadAllData = async () => {
     setLoading(true);
     try {
-      const data = await callGAS(apiUrl, "getProducts", {}, user.token);
-      if (Array.isArray(data)) {
-        const activeProds = data.filter((p) => p.isActive);
-        setProducts(activeProds);
+      const initData = await callGAS(apiUrl, "getLiffInitData", {}, user?.token);
+      if (initData) {
+        // A. 處理商品
+        if (Array.isArray(initData.products)) {
+          const activeProds = initData.products.filter((p) => p.isActive);
+          setProducts(activeProds);
 
-        // 自動將第一個分類設為 Active
-        const cats = activeProds.map((p) => p.category?.trim() || "其他");
-        const unique = [...new Set(cats)];
-        const firstCat =
-          unique.filter((c) => c !== "其他")[0] ||
-          (unique.includes("其他") ? "其他" : "");
-        if (firstCat) {
-          setActiveCategory(firstCat);
+          // 自動將第一個分類設為 Active
+          const cats = activeProds.map((p) => p.category?.trim() || "其他");
+          const unique = [...new Set(cats)];
+          const firstCat =
+            unique.filter((c) => c !== "其他")[0] ||
+            (unique.includes("其他") ? "其他" : "");
+          if (firstCat) {
+            setActiveCategory(firstCat);
+          }
+        }
+        // B. 處理群組對照表
+        if (initData.groupBindings && typeof initData.groupBindings === "object") {
+          setGroupBindings(initData.groupBindings);
+        }
+        // C. 處理大樓開團時間設定
+        if (Array.isArray(initData.buildingSettings)) {
+          setBuildingSettings(initData.buildingSettings);
         }
       }
     } catch (err) {
-      console.error("Failed to load products:", err);
-      alert("載入商品失敗: " + err.message);
+      console.error("Failed to load initialization data:", err);
+      alert("載入資料失敗: " + err.message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadGroupBindings = async () => {
-    try {
-      const data = await callGAS(apiUrl, "getGroupBindings", {}, user?.token);
-      if (data && typeof data === "object") {
-        setGroupBindings(data);
-      }
-    } catch (e) {
-      console.error("Failed to load group bindings:", e);
-    }
-  };
-
-  // ── LIFF 初始化與自動群組 ID / 暱稱獲取 ──────────────────────────────
-  const loadBuildingSettings = async () => {
-    try {
-      const data = await callGAS(apiUrl, "getBuildingSettings", {}, user?.token);
-      if (Array.isArray(data)) {
-        setBuildingSettings(data);
-      }
-    } catch (e) {
-      console.error("Failed to load building settings:", e);
     }
   };
 
@@ -255,15 +243,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
       const liffReady = await initLiffAndFetchInfo();
       if (!liffReady) return;
 
-      // 2. 只有在確定不進行登入轉址時，才併發執行後續連線取得資料的動作，大幅縮短載入時間
-      const promises = [
-        loadGroupBindings(),
-        loadBuildingSettings()
-      ];
-      if (user?.token) {
-        promises.push(loadProducts());
-      }
-      await Promise.all(promises);
+      // 2. 只有在確定不進行登入轉址時，才執行一次連線取得全部資料，大幅縮短載入時間
+      await loadAllData();
 
       const params = new URLSearchParams(window.location.search);
       const buildingParam = params.get("building") || "";
@@ -1383,7 +1364,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
-              onClick={loadProducts}
+              onClick={loadAllData}
               className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             >
               <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
