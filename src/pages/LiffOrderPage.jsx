@@ -40,6 +40,9 @@ const LINE_PAY_URL = "https://line.me/ti/p/kjGUUdBqLE";
 const LINE_CONTACT_URL = "https://line.me/R/ti/p/@839rpabi";
 const LS_KEY = "mlw_customer"; // LocalStorage key
 
+// 全域鎖：防止 React 嚴格模式或重複 Render 觸發多次 LIFF 初始化與登入轉址
+let isLiffInitStarted = false;
+
 export default function LiffOrderPage({ user, apiUrl }) {
   // ── 鎖定 body / html 避免 iOS 橡皮筋 & 網址列跳動 ──────────────
   useEffect(() => {
@@ -248,6 +251,9 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   useEffect(() => {
     const init = async () => {
+      if (isLiffInitStarted) return;
+      isLiffInitStarted = true;
+
       // 1. 先確認 LIFF 狀態，如果需要登入轉址，直接中斷後續的 fetch 請求
       const liffReady = await initLiffAndFetchInfo();
       if (!liffReady) return;

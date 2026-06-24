@@ -1,29 +1,30 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/postcss'
-import { viteSingleFile } from 'vite-plugin-singlefile' // ⭕ 引入內聯單檔案插件
 
 // https://vite.dev/config/
-export default defineConfig({
-  base: '/inventory-system/',
-  plugins: [
-    react(),
-    viteSingleFile() // ⭕ 核心：取代原本的 VitePWA，強迫將代碼融合成單一網頁
-  ],
-  css: {
-    postcss: {
-      plugins: [
-        tailwindcss(),
-      ],
+export default defineConfig(({ mode }) => {
+  const isProd = mode === 'production';
+  return {
+    base: isProd ? 'https://cl3x04orz-dotcom.github.io/inventory-system/' : '/inventory-system/',
+    plugins: [
+      react()
+    ],
+    css: {
+      postcss: {
+        plugins: [
+          tailwindcss(),
+        ],
+      },
     },
-  },
-  define: {
-    __BUILD_TIME__: JSON.stringify(process.env.VITE_APP_VERSION || Date.now().toString()),
-  },
-  build: {
-    target: 'es2020',
-    cssMinify: false,
-    minify: false,
-    assetsInlineLimit: 200 * 1024 // 200KB — 確保 logo.png (~124KB) 會被內嵌為 data URI
-  }
+    define: {
+      __BUILD_TIME__: JSON.stringify(process.env.VITE_APP_VERSION || Date.now().toString()),
+    },
+    build: {
+      target: 'es2020',
+      cssMinify: true,
+      minify: true,
+      assetsInlineLimit: 4096
+    }
+  };
 })

@@ -1,8 +1,40 @@
 /**
  * Serves the React App
  */
-const APP_VERSION = '1782307704374';
+const APP_VERSION = '1782308751922';
  // 版本號：A2:3/24
+
+// ── CacheService Helper 函數 ───────────────────────────────────────
+function getCachedData(key) {
+    try {
+        const cache = CacheService.getScriptCache();
+        const cached = cache.get(key);
+        if (cached) {
+            return JSON.parse(cached);
+        }
+    } catch (e) {
+        console.warn("Read cache failed for key: " + key, e);
+    }
+    return null;
+}
+
+function setCachedData(key, data, ttlSeconds) {
+    try {
+        const cache = CacheService.getScriptCache();
+        cache.put(key, JSON.stringify(data), ttlSeconds || 600); // 預設 10 分鐘
+    } catch (e) {
+        console.warn("Set cache failed for key: " + key, e);
+    }
+}
+
+function clearCache(key) {
+    try {
+        const cache = CacheService.getScriptCache();
+        cache.remove(key);
+    } catch (e) {
+        console.warn("Clear cache failed for key: " + key, e);
+    }
+}
 
 function doGet(e) {
     const template = HtmlService.createTemplateFromFile('Client');
@@ -211,8 +243,22 @@ function apiHandler(request) {
 
             // Inventory & Purchase
             case 'getProducts': return typeof getProductsService !== 'undefined' ? getProductsService() : {error: '後端服務缺失: getProductsService'}; 
-            case 'updateProductSortOrder': return typeof updateProductSortOrderService !== 'undefined' ? updateProductSortOrderService(payload) : {error: '後端服務缺失: updateProductSortOrderService'};
-            case 'updateProductDetails': return typeof updateProductDetailsService !== 'undefined' ? updateProductDetailsService(payload, user) : {error: '後端服務缺失: updateProductDetailsService'};
+            case 'updateProductSortOrder':
+                {
+                    const res = typeof updateProductSortOrderService !== 'undefined' ? updateProductSortOrderService(payload) : {error: '後端服務缺失: updateProductSortOrderService'};
+                    if (res && !res.error) {
+                        clearCache('liff_products');
+                    }
+                    return res;
+                }
+            case 'updateProductDetails':
+                {
+                    const res = typeof updateProductDetailsService !== 'undefined' ? updateProductDetailsService(payload, user) : {error: '後端服務缺失: updateProductDetailsService'};
+                    if (res && !res.error) {
+                        clearCache('liff_products');
+                    }
+                    return res;
+                }
             // Group Buy Orders (團購)
             case 'savePendingOrder': return typeof savePendingOrderService !== 'undefined' ? savePendingOrderService(payload, user) : {error: '後端服務缺失: savePendingOrderService'};
             case 'getPendingOrders': return typeof getPendingOrdersService !== 'undefined' ? getPendingOrdersService(payload, user) : {error: '後端服務缺失: getPendingOrdersService'};
@@ -220,15 +266,46 @@ function apiHandler(request) {
             case 'confirmPendingOrder': return typeof confirmPendingOrderService !== 'undefined' ? confirmPendingOrderService(payload, user) : {error: '後端服務缺失: confirmPendingOrderService'};
             case 'deletePendingOrder': return typeof deletePendingOrderService !== 'undefined' ? deletePendingOrderService(payload, user) : {error: '後端服務缺失: deletePendingOrderService'};
             case 'getGroupBindings': return typeof getGroupBindingsService !== 'undefined' ? getGroupBindingsService(payload, user) : {error: '後端服務缺失: getGroupBindingsService'};
-            case 'saveGroupBinding': return typeof saveGroupBindingService !== 'undefined' ? saveGroupBindingService(payload, user) : {error: '後端服務缺失: saveGroupBindingService'};
+            case 'saveGroupBinding':
+                {
+                    const res = typeof saveGroupBindingService !== 'undefined' ? saveGroupBindingService(payload, user) : {error: '後端服務缺失: saveGroupBindingService'};
+                    if (res && !res.error) {
+                        clearCache('liff_group_bindings');
+                    }
+                    return res;
+                }
             case 'updateOrderStatus': return typeof updateOrderStatusService !== 'undefined' ? updateOrderStatusService(payload, user) : {error: '後端服務缺失: updateOrderStatusService'};
             case 'getBuildingSettings': return typeof getBuildingSettingsService !== 'undefined' ? getBuildingSettingsService(payload, user) : {error: '後端服務缺失: getBuildingSettingsService'};
-            case 'saveBuildingSettings': return typeof saveBuildingSettingsService !== 'undefined' ? saveBuildingSettingsService(payload, user) : {error: '後端服務缺失: saveBuildingSettingsService'};
+            case 'saveBuildingSettings':
+                {
+                    const res = typeof saveBuildingSettingsService !== 'undefined' ? saveBuildingSettingsService(payload, user) : {error: '後端服務缺失: saveBuildingSettingsService'};
+                    if (res && !res.error) {
+                        clearCache('liff_building_settings');
+                    }
+                    return res;
+                }
             case 'getLiffInitData':
                 {
-                    const products = typeof getProductsService !== 'undefined' ? getProductsService() : [];
-                    let groupBindings = typeof getGroupBindingsService !== 'undefined' ? getGroupBindingsService(payload, user) : {};
-                    let buildingSettings = typeof getBuildingSettingsService !== 'undefined' ? getBuildingSettingsService(payload, user) : [];
+                    // 1. 商品列表快取
+                    let products = getCachedData('liff_products');
+                    if (!products) {
+                        products = typeof getProductsService !== 'undefined' ? getProductsService() : [];
+                        setCachedData('liff_products', products, 600); // 10 分鐘
+                    }
+
+                    // 2. 群組對照快取
+                    let groupBindings = getCachedData('liff_group_bindings');
+                    if (!groupBindings) {
+                        groupBindings = typeof getGroupBindingsService !== 'undefined' ? getGroupBindingsService(payload, user) : {};
+                        setCachedData('liff_group_bindings', groupBindings, 600);
+                    }
+
+                    // 3. 大樓設定快取
+                    let buildingSettings = getCachedData('liff_building_settings');
+                    if (!buildingSettings) {
+                        buildingSettings = typeof getBuildingSettingsService !== 'undefined' ? getBuildingSettingsService(payload, user) : [];
+                        setCachedData('liff_building_settings', buildingSettings, 600);
+                    }
                     
                     let targetBuilding = '';
                     if (payload) {
