@@ -225,11 +225,48 @@ function apiHandler(request) {
             case 'getBuildingSettings': return typeof getBuildingSettingsService !== 'undefined' ? getBuildingSettingsService(payload, user) : {error: '後端服務缺失: getBuildingSettingsService'};
             case 'saveBuildingSettings': return typeof saveBuildingSettingsService !== 'undefined' ? saveBuildingSettingsService(payload, user) : {error: '後端服務缺失: saveBuildingSettingsService'};
             case 'getLiffInitData':
-                return {
-                    products: typeof getProductsService !== 'undefined' ? getProductsService() : [],
-                    groupBindings: typeof getGroupBindingsService !== 'undefined' ? getGroupBindingsService(payload, user) : {},
-                    buildingSettings: typeof getBuildingSettingsService !== 'undefined' ? getBuildingSettingsService(payload, user) : []
-                };
+                {
+                    const products = typeof getProductsService !== 'undefined' ? getProductsService() : [];
+                    let groupBindings = typeof getGroupBindingsService !== 'undefined' ? getGroupBindingsService(payload, user) : {};
+                    let buildingSettings = typeof getBuildingSettingsService !== 'undefined' ? getBuildingSettingsService(payload, user) : [];
+                    
+                    let targetBuilding = '';
+                    if (payload) {
+                        if (payload.building) {
+                            targetBuilding = String(payload.building).trim();
+                        } else if (payload.grp) {
+                            const grpStr = String(payload.grp).trim();
+                            if (groupBindings && groupBindings[grpStr]) {
+                                targetBuilding = groupBindings[grpStr];
+                            }
+                        }
+                    }
+                    
+                    if (targetBuilding) {
+                        // 1. 大樓設定只回傳該大樓的設定（以及一般散客設定作為備用）
+                        if (Array.isArray(buildingSettings)) {
+                            buildingSettings = buildingSettings.filter(function(s) {
+                                return s.building === targetBuilding || s.building === '一般散客';
+                            });
+                        }
+                        // 2. 群組對照表也可以只回傳跟該大樓相關的
+                        if (groupBindings && typeof groupBindings === 'object') {
+                            const filteredBindings = {};
+                            for (let k in groupBindings) {
+                                if (groupBindings[k] === targetBuilding) {
+                                    filteredBindings[k] = targetBuilding;
+                                }
+                            }
+                            groupBindings = filteredBindings;
+                        }
+                    }
+                    
+                    return {
+                        products: products,
+                        groupBindings: groupBindings,
+                        buildingSettings: buildingSettings
+                    };
+                }
             case 'getInventory': return typeof getInventoryService !== 'undefined' ? getInventoryService() : {error: '後端服務缺失: getInventoryService'}; 
             case 'getPurchaseSuggestions': return typeof getPurchaseSuggestionsService !== 'undefined' ? getPurchaseSuggestionsService() : {error: '後端服務缺失: getPurchaseSuggestionsService'}; 
             case 'addPurchase': return typeof addPurchaseService !== 'undefined' ? addPurchaseService(payload, user) : {error: '後端服務缺失: addPurchaseService (進貨功能)'}; 

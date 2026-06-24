@@ -98,71 +98,53 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [buildingSettings, setBuildingSettings] = useState([]);
   const [successOrderTotal, setSuccessOrderTotal] = useState(0);
   const [isNightOrder, setIsNightOrder] = useState(false);
-  const [isSettingsLoading, setIsSettingsLoading] = useState(true);
-
-
-
-  // ── 階段一：快速載入商品 ─────────────────────────────────────────
-  const loadProductsOnly = async () => {
+  // ── 載入商品與初始化資料（單次 API，後端已過濾） ─────────────────────────────────────────
+  const loadAllData = async () => {
     setLoading(true);
     try {
-      const prods = await callGAS(apiUrl, "getProducts", {}, user?.token);
-      if (Array.isArray(prods)) {
-        const activeProds = prods.filter((p) => p.isActive);
-        setProducts(activeProds);
+      const params = new URLSearchParams(window.location.search);
+      const buildingParam = params.get("building") || "";
+      const urlGrp = params.get("grp") || "";
 
-        // 自動將第一個分類設為 Active
-        const cats = activeProds.map((p) => p.category?.trim() || "其他");
-        const unique = [...new Set(cats)];
-        const firstCat =
-          unique.filter((c) => c !== "其他")[0] ||
-          (unique.includes("其他") ? "其他" : "");
-        if (firstCat) {
-          setActiveCategory(firstCat);
+      const initData = await callGAS(
+        apiUrl,
+        "getLiffInitData",
+        {
+          building: buildingParam,
+          grp: urlGrp
+        },
+        user?.token
+      );
+      if (initData) {
+        // A. 處理商品
+        if (Array.isArray(initData.products)) {
+          const activeProds = initData.products.filter((p) => p.isActive);
+          setProducts(activeProds);
+
+          // 自動將第一個分類設為 Active
+          const cats = activeProds.map((p) => p.category?.trim() || "其他");
+          const unique = [...new Set(cats)];
+          const firstCat =
+            unique.filter((c) => c !== "其他")[0] ||
+            (unique.includes("其他") ? "其他" : "");
+          if (firstCat) {
+            setActiveCategory(firstCat);
+          }
+        }
+        // B. 處理群組對照表
+        if (initData.groupBindings && typeof initData.groupBindings === "object") {
+          setGroupBindings(initData.groupBindings);
+        }
+        // C. 處理大樓開團時間設定
+        if (Array.isArray(initData.buildingSettings)) {
+          setBuildingSettings(initData.buildingSettings);
         }
       }
     } catch (err) {
-      console.error("Failed to load products:", err);
-      alert("載入商品失敗: " + err.message);
+      console.error("Failed to load initialization data:", err);
+      alert("載入資料失敗: " + err.message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  // ── 階段二：背景默默下載大樓設定與群組綁定 ──────────────────────────
-  const loadSettingsInBackground = async () => {
-    setIsSettingsLoading(true);
-    try {
-      const [bindings, settings] = await Promise.all([
-        callGAS(apiUrl, "getGroupBindings", {}, user?.token),
-        callGAS(apiUrl, "getBuildingSettings", {}, user?.token)
-      ]);
-      
-      if (bindings && typeof bindings === "object") {
-        setGroupBindings(bindings);
-      }
-      if (Array.isArray(settings)) {
-        setBuildingSettings(settings);
-      }
-    } catch (err) {
-      console.error("Failed to load background settings:", err);
-    } finally {
-      setIsSettingsLoading(false);
-    }
-  };
-
-  // ── 同時重整全部資料 ───────────────────────────────────────────────
-  const loadAllData = async () => {
-    setLoading(true);
-    setIsSettingsLoading(true);
-    try {
-      await Promise.all([
-        loadProductsOnly(),
-        loadSettingsInBackground()
-      ]);
-    } finally {
-      setLoading(false);
-      setIsSettingsLoading(false);
     }
   };
 
@@ -270,31 +252,22 @@ export default function LiffOrderPage({ user, apiUrl }) {
       const liffReady = await initLiffAndFetchInfo();
       if (!liffReady) return;
 
-      // 2. 只有在確定不進行登入轉址時，才連線取得商品（秒開）
-      await loadProductsOnly();
+      // 2. 執行初始化載入（單次 API，後端已過濾）
+      await loadAllData();
 
-      // 3. 背景默默下載大樓開團與群組設定
-      loadSettingsInBackground();
+      const params = new URLSearchParams(window.location.search);
+      const buildingParam = params.get("building") || "";
+      const urlGrp = params.get("grp") || "";
+      if (buildingParam) {
+        setUrlBuilding(buildingParam);
+        setSelectedBuilding(buildingParam);
+      }
+      if (urlGrp) {
+        setSourceGroup(urlGrp);
+      }
     };
     init();
   }, [apiUrl, user?.token]);
-
-  // ── 背景設定載入完成後的參數處理 ───────────────────────────────────────
-  useEffect(() => {
-    if (isSettingsLoading) return;
-
-    const params = new URLSearchParams(window.location.search);
-    const buildingParam = params.get("building") || "";
-    const urlGrp = params.get("grp") || "";
-
-    if (buildingParam) {
-      setUrlBuilding(buildingParam);
-      setSelectedBuilding(buildingParam);
-    }
-    if (urlGrp) {
-      setSourceGroup(urlGrp);
-    }
-  }, [isSettingsLoading]);
 
   // ── 鎖定與已知大樓邏輯 ──────────────────────────────────────────
   const lockedBuilding = useMemo(() => {
@@ -1190,25 +1163,17 @@ export default function LiffOrderPage({ user, apiUrl }) {
                   className="w-full bg-[var(--bg-secondary)] p-2.5 rounded-xl border border-[var(--border-primary)] text-sm font-bold text-[var(--text-primary)] focus:outline-none"
                   value={selectedBuilding}
                   onChange={(e) => setSelectedBuilding(e.target.value)}
-                  disabled={!!lockedBuilding || isSettingsLoading}
+                  disabled={!!lockedBuilding}
                 >
-                  <option value="">
-                    {isSettingsLoading ? "-- 大樓設定載入中... --" : "-- 請選擇收件大樓 --"}
-                  </option>
-                  {!isSettingsLoading && knownBuildings.map((bname) => (
+                  <option value="">-- 請選擇收件大樓 --</option>
+                  {knownBuildings.map((bname) => (
                     <option key={bname} value={bname}>
                       {bname}
                     </option>
                   ))}
-                  {!isSettingsLoading && <option value="其它">其它（自行填寫）</option>}
+                  <option value="其它">其它（自行填寫）</option>
                 </select>
-                {isSettingsLoading && (
-                  <div className="text-[10px] text-amber-600 font-medium flex items-center gap-1 mt-1 animate-pulse">
-                    <RefreshCw className="animate-spin" size={10} />
-                    大樓開團設定載入中，請稍候...
-                  </div>
-                )}
-                {!isSettingsLoading && !!lockedBuilding && (
+                {!!lockedBuilding && (
                   <div className="text-[10px] text-blue-500 font-medium">
                     ※ 已自動鎖定您所在的群組大樓
                   </div>
@@ -1375,23 +1340,14 @@ export default function LiffOrderPage({ user, apiUrl }) {
         <div className="p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] flex-shrink-0">
           <button
             onClick={() => {
-              if (canProceed && !isSettingsLoading) setStep("confirm");
+              if (canProceed) setStep("confirm");
             }}
-            disabled={!canProceed || isSettingsLoading}
-            className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${canProceed && !isSettingsLoading
+            className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${canProceed
                 ? "btn-primary shadow-md shadow-blue-500/20"
                 : "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed"
               }`}
           >
-            {isSettingsLoading ? (
-              <>
-                <RefreshCw className="animate-spin" size={16} /> 大樓開團設定載入中...
-              </>
-            ) : (
-              <>
-                下一步：確認訂單明細 <ArrowRight size={16} />
-              </>
-            )}
+            下一步：確認訂單明細 <ArrowRight size={16} />
           </button>
         </div>
       </div>
