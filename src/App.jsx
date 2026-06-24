@@ -306,6 +306,11 @@ function AppContent() {
                 }
             }
 
+            // 2. 判斷是否為 LIFF 頁面
+            const params = new URLSearchParams(window.location.search);
+            const isLiff = params.get('page') === 'liffOrder' || 
+                           (window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === 'liffOrder');
+
             let isQuickLiff = false;
             if (isLiff) {
                 if (!currentUser) {
