@@ -255,9 +255,15 @@ export default function LiffOrderPage({ user, apiUrl }) {
       const liffReady = await initLiffAndFetchInfo();
       if (!liffReady) return;
 
-      // 2. 只有在確定不進行登入轉址時，才執行後續連線取得資料的動作
-      await loadGroupBindings();
-      await loadBuildingSettings();
+      // 2. 只有在確定不進行登入轉址時，才併發執行後續連線取得資料的動作，大幅縮短載入時間
+      const promises = [
+        loadGroupBindings(),
+        loadBuildingSettings()
+      ];
+      if (user?.token) {
+        promises.push(loadProducts());
+      }
+      await Promise.all(promises);
 
       const params = new URLSearchParams(window.location.search);
       const buildingParam = params.get("building") || "";
@@ -269,7 +275,6 @@ export default function LiffOrderPage({ user, apiUrl }) {
       if (urlGrp) {
         setSourceGroup(urlGrp);
       }
-      if (user?.token) loadProducts();
     };
     init();
   }, [apiUrl, user?.token]);

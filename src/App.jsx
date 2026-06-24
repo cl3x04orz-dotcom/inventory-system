@@ -284,6 +284,7 @@ function AppContent() {
     // 初始化與 LIFF 自動登入邏輯 (載入遮罩期間執行)
     useEffect(() => {
         const initializeApp = async () => {
+            const startTime = Date.now();
             let currentUser = null;
 
             // 1. 檢查是否有儲存的 user session
@@ -329,13 +330,15 @@ function AppContent() {
                 }
             }
 
-            // 3. 初始化結束，淡出遮罩
+            // 3. 初始化結束，淡出遮罩 (確保 guest 登入完成且 user 狀態已設定，才開始淡出，避免 LoginPage 閃爍)
+            const elapsed = Date.now() - startTime;
+            const remaining = Math.max(0, 600 - elapsed);
             setTimeout(() => {
                 setShowSplash(false);
                 setTimeout(() => {
                     setIsInitializing(false);
                 }, 500); // 500ms 等待 CSS transition 動畫完成後卸載 DOM
-            }, 600);
+            }, remaining);
         };
 
         initializeApp();

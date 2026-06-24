@@ -34303,8 +34303,14 @@ function LiffOrderPage({ user, apiUrl: apiUrl2 }) {
       const liffReady = await initLiffAndFetchInfo();
       if (!liffReady)
         return;
-      await loadGroupBindings();
-      await loadBuildingSettings();
+      const promises = [
+        loadGroupBindings(),
+        loadBuildingSettings()
+      ];
+      if (user?.token) {
+        promises.push(loadProducts());
+      }
+      await Promise.all(promises);
       const params = new URLSearchParams(window.location.search);
       const buildingParam = params.get("building") || "";
       const urlGrp = params.get("grp") || "";
@@ -34315,8 +34321,6 @@ function LiffOrderPage({ user, apiUrl: apiUrl2 }) {
       if (urlGrp) {
         setSourceGroup(urlGrp);
       }
-      if (user?.token)
-        loadProducts();
     };
     init();
   }, [apiUrl2, user?.token]);
@@ -37535,6 +37539,7 @@ function AppContent() {
   }, [user, sessionManager]);
   reactExports.useEffect(() => {
     const initializeApp = async () => {
+      const startTime = Date.now();
       let currentUser = null;
       const savedUser = safeSessionStorage.getItem("inventory_user");
       if (savedUser) {
@@ -37572,12 +37577,14 @@ function AppContent() {
           setPage("liffOrder");
         }
       }
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, 600 - elapsed);
       setTimeout(() => {
         setShowSplash(false);
         setTimeout(() => {
           setIsInitializing(false);
         }, 500);
-      }, 600);
+      }, remaining);
     };
     initializeApp();
     const handleGlobalClick = () => {
