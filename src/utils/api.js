@@ -10,7 +10,7 @@ export const callGAS = async (apiUrl, action, payload, token = null) => {
         const response = await fetch(apiUrl, {
             method: 'POST',
             redirect: 'follow', // GAS requirement
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({
                 action,
                 payload,

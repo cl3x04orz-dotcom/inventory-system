@@ -145,7 +145,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
       }
     } catch (err) {
       console.error("Failed to load initialization data:", err);
-      alert("載入資料失敗: " + err.message);
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -250,17 +250,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
 
   useEffect(() => {
+    let active = true;
     const init = async () => {
       if (isLiffInitStarted) return;
       isLiffInitStarted = true;
 
-      // 1. 先確認 LIFF 狀態，如果需要登入轉址，直接中斷後續的 fetch 請求
-      const liffReady = await initLiffAndFetchInfo();
-      if (!liffReady) return;
-
-      // 2. 執行初始化載入（單次 API，後端已過濾）
-      await loadAllData();
-
+      // 先解析 URL 參數，讓 loadAllData 能帶正確的 building/grp
       const params = new URLSearchParams(window.location.search);
       const buildingParam = params.get("building") || "";
       const urlGrp = params.get("grp") || "";
@@ -271,8 +266,46 @@ export default function LiffOrderPage({ user, apiUrl }) {
       if (urlGrp) {
         setSourceGroup(urlGrp);
       }
+
+      let liffReady = false;
+      let loadError = null;
+
+      // ★ 並行：LIFF init 與 GAS API 同時跑，互不阻塞
+      // 使用獨立 Promise，不使用 Promise.all 承接，以防其中一個 reject 影響另一個
+      const p1 = initLiffAndFetchInfo()
+        .then((res) => {
+          liffReady = res;
+        })
+        .catch((err) => {
+          console.error("LIFF init error in background:", err);
+        });
+
+      const p2 = loadAllData()
+        .catch((err) => {
+          loadError = err;
+        });
+
+      await Promise.all([p1, p2]);
+
+      if (!active) return;
+
+      // 如果正在重導向跳轉到 LINE 登入頁，直接忽略所有 API 載入錯誤，因為頁面即將銷毀
+      if (!liffReady) {
+        console.log("LIFF is redirecting, ignoring API load error.");
+        return;
+      }
+
+      // 如果 LIFF 已就緒（沒有跳轉），但資料載入失敗，才彈出警告
+      if (loadError) {
+        console.error("Initialization data load failed:", loadError);
+        alert("載入資料失敗: " + loadError.message);
+      }
     };
     init();
+
+    return () => {
+      active = false;
+    };
   }, [apiUrl, user?.token]);
 
   // ── 鎖定與已知大樓邏輯 ──────────────────────────────────────────
