@@ -153,8 +153,7 @@ function AppContent() {
     const [sessionManager, setSessionManager] = useState(null);
     const [isInitializing, setIsInitializing] = useState(true);
     const [showSplash, setShowSplash] = useState(true);
-    // hasUpdate 已不再用於顯示 Banner，改為自動強制重載
-    const checkCountRef = React.useRef(0);
+
 
     const [showHeader, setShowHeader] = useState(true);
     const [scrolled, setScrolled] = useState(false);
@@ -198,71 +197,6 @@ function AppContent() {
         return () => window.removeEventListener('scroll', handleScroll);
     }, [mobileMenuOpen]);
 
-    // ========== Version Check (偵測伺服器端新版本) ==========
-    const lastCheckTimeRef = React.useRef(0);
-    useEffect(() => {
-        const checkUpdate = async () => {
-            if (user?.username === 'guest') return;
-            const now = Date.now();
-            if (now - lastCheckTimeRef.current < 5000) return;
-            lastCheckTimeRef.current = now;
-            checkCountRef.current += 1;
-            const count = checkCountRef.current;
-            try {
-                console.log(`[VersionCheck #${count}] 開始檢查... 本地:${LOCAL_VERSION}`);
-                const response = await fetch(`${GAS_API_URL}?t=${Date.now()}`, {
-                    method: 'POST',
-                    redirect: 'follow',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ action: 'getVersion', _t: Date.now() })
-                });
-                const res = await response.json();
-                console.log(`[VersionCheck #${count}] 伺服器回應:`, res.version);
-                if (res && res.version && String(res.version) !== String(LOCAL_VERSION)) {
-                    const serverVer = Number(res.version);
-                    const localVer = Number(LOCAL_VERSION);
-                    if (!isNaN(serverVer) && !isNaN(localVer) && serverVer > localVer) {
-                        const url = new URL(window.location.href);
-                        const lastReloadVersion = url.searchParams.get('_v');
-                        if (lastReloadVersion !== String(res.version)) {
-                            console.warn(`[VersionCheck] 偵測到新版本 (${LOCAL_VERSION} -> ${res.version})，強制重載！`);
-                            url.searchParams.set('_v', res.version);
-                            window.location.replace(url.toString());
-                        } else {
-                            console.warn(`[VersionCheck] 已嘗試重載至版本 ${res.version}，但快取尚未更新，停止重複重載以防止無限刷新。`);
-                        }
-                    }
-                }
-            } catch (e) {
-                console.warn(`[VersionCheck #${count}] 檢查失敗:`, e);
-            }
-        };
-
-        const timer = setTimeout(checkUpdate, 2000);
-        let interval;
-        const startPolling = () => { if (!interval) interval = setInterval(checkUpdate, 5 * 60 * 1000); };
-        const stopPolling = () => { if (interval) { clearInterval(interval); interval = null; } };
-        startPolling();
-
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') { checkUpdate(); startPolling(); }
-            else { stopPolling(); }
-        };
-        const handleFocus = () => {
-            if (document.visibilityState === 'visible') { checkUpdate(); startPolling(); }
-        };
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('focus', handleFocus);
-        window.addEventListener('pageshow', handleFocus);
-
-        return () => {
-            clearTimeout(timer);
-            stopPolling();
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-            window.removeEventListener('focus', handleFocus);
-            window.removeEventListener('pageshow', handleFocus);
-        };
-    }, []);
 
     // Activity Logger
     const { logActivity, logLogin, logLogout, logPageView } = useActivityLogger({

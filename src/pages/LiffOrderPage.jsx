@@ -248,25 +248,48 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const buildingParam = params.get("building") || "";
-    if (buildingParam) {
-      setUrlBuilding(buildingParam);
-      setSelectedBuilding(buildingParam);
-    }
-    const urlGrp = params.get("grp") || "";
-    if (urlGrp) {
-      setSourceGroup(urlGrp);
-    }
-    loadGroupBindings();
-    loadBuildingSettings();
-    if (user?.token) loadProducts();
-    initLiffAndFetchInfo();
+    const init = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const buildingParam = params.get("building") || "";
+      const urlGrp = params.get("grp") || "";
+      await loadGroupBindings();
+      await loadBuildingSettings();
+      if (buildingParam) {
+        setUrlBuilding(buildingParam);
+        setSelectedBuilding(buildingParam);
+      }
+      if (urlGrp) {
+        setSourceGroup(urlGrp);
+      }
+      if (user?.token) loadProducts();
+      await initLiffAndFetchInfo();
+    };
+    init();
   }, [apiUrl, user?.token]);
+
+  // ── 鎖定與已知大樓邏輯 ──────────────────────────────────────────
+  const lockedBuilding = useMemo(() => {
+    if (urlBuilding && urlBuilding !== "一般散客") return urlBuilding;
+    if (sourceGroup && groupBindings[sourceGroup] && groupBindings[sourceGroup] !== "一般散客") {
+      return groupBindings[sourceGroup];
+    }
+    return "";
+  }, [urlBuilding, sourceGroup, groupBindings]);
+
+  const knownBuildings = useMemo(() => {
+    const list = new Set();
+    buildingSettings.forEach((s) => {
+      if (s.building && s.building !== "一般散客") list.add(s.building);
+    });
+    Object.values(groupBindings).forEach((b) => {
+      if (b && b !== "一般散客") list.add(b);
+    });
+    if (urlBuilding && urlBuilding !== "一般散客") list.add(urlBuilding);
+    return Array.from(list);
+  }, [buildingSettings, groupBindings, urlBuilding]);
 
   useEffect(() => {
     if (urlBuilding) {
-      setSelectedBuilding(urlBuilding);
       const matchedGid = Object.keys(groupBindings).find(
         (key) => groupBindings[key] === urlBuilding
       );
@@ -275,10 +298,14 @@ export default function LiffOrderPage({ user, apiUrl }) {
       } else {
         setSourceGroup(urlBuilding);
       }
-    } else if (sourceGroup && groupBindings[sourceGroup]) {
-      setSelectedBuilding(groupBindings[sourceGroup]);
     }
-  }, [urlBuilding, sourceGroup, groupBindings]);
+  }, [urlBuilding, groupBindings]);
+
+  useEffect(() => {
+    if (lockedBuilding) {
+      setSelectedBuilding(lockedBuilding);
+    }
+  }, [lockedBuilding]);
 
   // ── 分類邏輯 ─────────────────────────────────────────────────
   const categories = useMemo(() => {
@@ -569,21 +596,50 @@ export default function LiffOrderPage({ user, apiUrl }) {
       }
       if (saved.phone) setCustomerPhone(saved.phone);
  
-      if (saved.address) {
+      const isLocked = !!lockedBuilding;
+
+      if (saved.building !== undefined || saved.detailAddress !== undefined) {
+        const savedBuilding = saved.building || "";
+        const savedDetail = saved.detailAddress || "";
+
+        if (isLocked) {
+          setSelectedBuilding(lockedBuilding);
+          setDetailAddress(savedDetail);
+        } else {
+          if (knownBuildings.includes(savedBuilding)) {
+            setSelectedBuilding(savedBuilding);
+            setDetailAddress(savedDetail);
+          } else if (savedBuilding) {
+            setSelectedBuilding("其它");
+            setOtherBuildingText(savedBuilding);
+            setDetailAddress(savedDetail);
+          } else {
+            setDetailAddress(savedDetail);
+          }
+        }
+      } else if (saved.address) {
         const addr = String(saved.address).trim();
         let matched = false;
- 
-        if (sourceGroup && groupBindings[sourceGroup]) {
-          const lockBName = groupBindings[sourceGroup];
-          if (addr.startsWith(lockBName)) {
-            setDetailAddress(addr.slice(lockBName.length).trim());
+
+        if (isLocked) {
+          setSelectedBuilding(lockedBuilding);
+          if (addr.startsWith(lockedBuilding)) {
+            setDetailAddress(addr.slice(lockedBuilding.length).trim());
           } else {
-            setDetailAddress(addr);
+            let foundOther = false;
+            for (const bName of knownBuildings) {
+              if (bName && addr.startsWith(bName)) {
+                setDetailAddress(addr.slice(bName.length).trim());
+                foundOther = true;
+                break;
+              }
+            }
+            if (!foundOther) {
+              setDetailAddress(addr);
+            }
           }
-          matched = true;
         } else {
-          const bindingsList = Object.values(groupBindings);
-          for (const bName of bindingsList) {
+          for (const bName of knownBuildings) {
             if (bName && addr.startsWith(bName)) {
               setSelectedBuilding(bName);
               setDetailAddress(addr.slice(bName.length).trim());
@@ -591,12 +647,11 @@ export default function LiffOrderPage({ user, apiUrl }) {
               break;
             }
           }
-        }
- 
-        if (!matched) {
-          setSelectedBuilding("其它");
-          setOtherBuildingText(addr);
-          setDetailAddress("");
+          if (!matched) {
+            setSelectedBuilding("其它");
+            setOtherBuildingText(addr);
+            setDetailAddress("");
+          }
         }
       }
     } catch (_) {}
@@ -613,6 +668,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
         JSON.stringify({
           name: customerName,
           phone: customerPhone,
+          building: selectedBuilding === "其它" ? otherBuildingText.trim() : selectedBuilding,
+          detailAddress: detailAddress.trim(),
           address: getFullAddress(),
         }),
       );
@@ -828,7 +885,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
         <p className="text-center text-xs text-[var(--text-secondary)]">
           若訂單有任何疑問，歡迎透過 LINE 與我們聯繫。
         </p>
-        {(!urlBuilding || urlBuilding === "一般散客" || selectedBuilding === "其它") ? (
+        {(!selectedBuilding || selectedBuilding === "一般散客" || selectedBuilding === "其它") ? (
           <button
             onClick={() => window.open(getOaMessageUrl(), "_blank")}
             className="w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 text-white shadow-md shadow-emerald-500/20 hover:opacity-95 active:scale-95 transition-all"
@@ -1104,20 +1161,17 @@ export default function LiffOrderPage({ user, apiUrl }) {
                   className="w-full bg-[var(--bg-secondary)] p-2.5 rounded-xl border border-[var(--border-primary)] text-sm font-bold text-[var(--text-primary)] focus:outline-none"
                   value={selectedBuilding}
                   onChange={(e) => setSelectedBuilding(e.target.value)}
-                  disabled={(!!urlBuilding && urlBuilding !== "一般散客") || !!(sourceGroup && groupBindings[sourceGroup])}
+                  disabled={!!lockedBuilding}
                 >
                   <option value="">-- 請選擇收件大樓 --</option>
-                  {urlBuilding && urlBuilding !== "一般散客" && !Object.values(groupBindings).includes(urlBuilding) && (
-                    <option value={urlBuilding}>{urlBuilding}</option>
-                  )}
-                  {Object.values(groupBindings).map((bname) => (
+                  {knownBuildings.map((bname) => (
                     <option key={bname} value={bname}>
                       {bname}
                     </option>
                   ))}
                   <option value="其它">其它（自行填寫）</option>
                 </select>
-                {((urlBuilding && urlBuilding !== "一般散客") || (sourceGroup && groupBindings[sourceGroup])) && (
+                {!!lockedBuilding && (
                   <div className="text-[10px] text-blue-500 font-medium">
                     ※ 已自動鎖定您所在的群組大樓
                   </div>
