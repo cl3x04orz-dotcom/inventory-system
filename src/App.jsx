@@ -346,16 +346,12 @@ function AppContent() {
                 }
             }
 
-            // 3. 初始化結束，淡出遮罩 (確保 guest 登入完成且 user 狀態已設定，才開始淡出，避免 LoginPage 閃爍)
-            const elapsed = Date.now() - startTime;
-            const minDelay = isQuickLiff ? 100 : 600;
-            const remaining = Math.max(0, minDelay - elapsed);
+            // 3. 初始化結束，立刻淡出遮罩（不人工 delay）
+            // 商品資料由 LiffOrderPage 自己用 skeleton loading 處理，不卡在這裡
+            setShowSplash(false);
             setTimeout(() => {
-                setShowSplash(false);
-                setTimeout(() => {
-                    setIsInitializing(false);
-                }, 500); // 500ms 等待 CSS transition 動畫完成後卸載 DOM
-            }, remaining);
+                setIsInitializing(false);
+            }, 400);
         };
 
         initializeApp();
