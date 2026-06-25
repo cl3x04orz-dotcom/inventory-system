@@ -1194,7 +1194,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
           </button>
           <div>
             <h2 className="text-lg font-bold text-[var(--text-primary)]">
-              填寫資料
+              配送資訊
             </h2>
             <p className="text-xs text-[var(--text-secondary)]">
               {totalQty} 件商品，合計 ${cartTotal}
@@ -1241,18 +1241,6 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 {/* 一般用戶：直接顯示地址與公司，隱藏大外框與任何大樓欄位 */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
-                    <MapPin size={12} /> 外送完整地址 <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm"
-                    placeholder="請輸入收件路名、門牌與樓層"
-                    value={detailAddress}
-                    onChange={(e) => setDetailAddress(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
                     公司 / 機關單位名稱 <span className="text-[var(--text-secondary)] text-[10px] font-normal">(選填)</span>
                   </label>
                   <input
@@ -1261,6 +1249,18 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     placeholder="例：xx醫院x樓護理站（若無免填）"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                    <MapPin size={12} /> 外送完整地址 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm"
+                    placeholder="請輸入收件路名、門牌與樓層"
+                    value={detailAddress}
+                    onChange={(e) => setDetailAddress(e.target.value)}
                   />
                 </div>
               </>
