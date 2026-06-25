@@ -980,10 +980,38 @@ function parseLocalYMD_(dateStr) {
 
 // ── 溫存觸發器 (Warmup / Keep-Warm) ──────────────────────────────
 /**
- * 溫存函數，用於防止 GAS 容器冷卻
+ * 溫存函數，定時在背景讀取試算表並重新整理快取，徹底消除冷啟動與試算表讀取延遲
  */
 function warmup() {
   console.log('Keep-warm ping: ' + new Date().toISOString());
+  try {
+    // 1. 預熱商品快取
+    if (typeof getProductsService !== 'undefined') {
+      const products = getProductsService();
+      if (products && products.length > 0) {
+        setCachedData('liff_products', products, 21600); // 6 小時
+      }
+    }
+    
+    // 2. 預熱群組對照快取
+    if (typeof getGroupBindingsService !== 'undefined') {
+      const groupBindings = getGroupBindingsService();
+      if (groupBindings) {
+        setCachedData('liff_group_bindings', groupBindings, 21600); // 6 小時
+      }
+    }
+    
+    // 3. 預熱大樓設定快取
+    if (typeof getBuildingSettingsService !== 'undefined') {
+      const buildingSettings = getBuildingSettingsService();
+      if (buildingSettings && buildingSettings.length > 0) {
+        setCachedData('liff_building_settings', buildingSettings, 21600); // 6 小時
+      }
+    }
+    console.log('✅ Background cache pre-warmed successfully.');
+  } catch (e) {
+    console.error('Failed to pre-warm cache in warmup:', e);
+  }
 }
 
 /**
