@@ -348,6 +348,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
     }
   }, [lockedBuilding]);
 
+  const isGeneralUser = selectedBuilding === "一般用戶" || selectedBuilding === "一般散客";
+
   // ── 分類邏輯 ─────────────────────────────────────────────────
   const categories = useMemo(() => {
     const cats = products.map((p) => p.category?.trim() || "其他");
@@ -1201,7 +1203,11 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 <select
                   className="w-full bg-[var(--bg-secondary)] p-2.5 rounded-xl border border-[var(--border-primary)] text-sm font-bold text-[var(--text-primary)] focus:outline-none"
                   value={selectedBuilding}
-                  onChange={(e) => setSelectedBuilding(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedBuilding(val);
+                    setDetailAddress(""); // 當大樓切換時，自動清空輸入框防止舊資料混淆
+                  }}
                   disabled={!!lockedBuilding}
                 >
                   <option value="">-- 請選擇收件大樓 --</option>
@@ -1212,7 +1218,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                   ))}
                   <option value="其它">其它（自行填寫）</option>
                 </select>
-                {!!lockedBuilding && (
+                {!!lockedBuilding && !isGeneralUser && (
                   <div className="text-[10px] text-blue-500 font-medium">
                     ※ 已自動鎖定您所在的群組大樓
                   </div>
@@ -1236,13 +1242,13 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
               <div className="space-y-1">
                 <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
-                  <MapPin size={12} /> 詳細樓層戶號{" "}
+                  <MapPin size={12} /> {isGeneralUser ? "外送完整地址 / 單位名稱" : "詳細樓層戶號"}{" "}
                   <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm"
-                  placeholder="例：A棟 12樓之3 / 3樓 305室"
+                  placeholder={isGeneralUser ? "請輸入完整外送地址、公司或機關名稱" : "例：A棟 12樓之3 / 3樓 305室"}
                   value={detailAddress}
                   onChange={(e) => setDetailAddress(e.target.value)}
                 />
