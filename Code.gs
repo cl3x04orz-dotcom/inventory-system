@@ -290,21 +290,21 @@ function apiHandler(request) {
                     let products = getCachedData('liff_products');
                     if (!products) {
                         products = typeof getProductsService !== 'undefined' ? getProductsService() : [];
-                        setCachedData('liff_products', products, 600); // 10 分鐘
+                        setCachedData('liff_products', products, 21600); // 6 小時
                     }
 
                     // 2. 群組對照快取
                     let groupBindings = getCachedData('liff_group_bindings');
                     if (!groupBindings) {
                         groupBindings = typeof getGroupBindingsService !== 'undefined' ? getGroupBindingsService(payload, user) : {};
-                        setCachedData('liff_group_bindings', groupBindings, 600);
+                        setCachedData('liff_group_bindings', groupBindings, 21600); // 6 小時
                     }
 
                     // 3. 大樓設定快取
                     let buildingSettings = getCachedData('liff_building_settings');
                     if (!buildingSettings) {
                         buildingSettings = typeof getBuildingSettingsService !== 'undefined' ? getBuildingSettingsService(payload, user) : [];
-                        setCachedData('liff_building_settings', buildingSettings, 600);
+                        setCachedData('liff_building_settings', buildingSettings, 21600); // 6 小時
                     }
                     
                     let targetBuilding = '';
@@ -976,4 +976,30 @@ function parseLocalYMD_(dateStr) {
   const m = parseInt(parts[1], 10) - 1;
   const d = parseInt(parts[2], 10);
   return new Date(y, m, d);
+}
+
+// ── 溫存觸發器 (Warmup / Keep-Warm) ──────────────────────────────
+/**
+ * 溫存函數，用於防止 GAS 容器冷卻
+ */
+function warmup() {
+  console.log('Keep-warm ping: ' + new Date().toISOString());
+}
+
+/**
+ * 註冊定時溫存觸發器（每 10 分鐘執行一次）
+ * 請在 Google Apps Script 編輯器中手動執行此函數一次
+ */
+function registerWarmupTrigger() {
+  const triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'warmup') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  ScriptApp.newTrigger('warmup')
+    .timeBased()
+    .everyMinutes(10)
+    .create();
+  console.log('✅ 溫存觸發器註冊成功！每 10 分鐘會執行一次 warmup() 以防容器冷啟動。');
 }
