@@ -1265,11 +1265,11 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 </div>
               </>
             ) : (
-              /* 大樓用戶：顯示大外框、大樓唯讀名稱與詳細樓層戶號 */
-              <div className="space-y-3 p-3.5 bg-[var(--bg-tertiary)] rounded-2xl border border-[var(--border-primary)]">
+              /* 大樓用戶：與收件人姓名電話同層級展示，移除大外框與底色 */
+              <>
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
-                    <MapPin size={12} /> 送達大樓 / 社區 <span className="text-red-500">*</span>
+                    <MapPin size={12} /> 送達大樓 / 社區 / 單位 <span className="text-red-500">*</span>
                   </label>
                   <div className="w-full bg-[var(--bg-secondary)] p-3 rounded-xl border border-[var(--border-primary)] text-sm font-bold text-[var(--text-primary)] select-none">
                     {selectedBuilding}
@@ -1293,17 +1293,17 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
-                    <MapPin size={12} /> 詳細樓層戶號 <span className="text-red-500">*</span>
+                    <MapPin size={12} /> 樓層 / 戶號 <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm"
-                    placeholder="例：A棟 12樓之3 / 3樓 305室"
+                    placeholder="例：A棟12樓之3、3樓305室"
                     value={detailAddress}
                     onChange={(e) => setDetailAddress(e.target.value)}
                   />
                 </div>
-              </div>
+              </>
             )}
             <div className="space-y-1">
               <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
