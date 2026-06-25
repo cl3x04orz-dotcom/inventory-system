@@ -1049,8 +1049,6 @@ export default function LiffOrderPage({ user, apiUrl }) {
             {[
               { label: "收件人", value: customerName },
               { label: "電話", value: customerPhone },
-              { label: "地址", value: getFullAddress() || "（未填）" },
-              { label: "備註", value: note || "（無）" },
             ].map(({ label, value }) => (
               <div
                 key={label}
@@ -1064,6 +1062,32 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 </span>
               </div>
             ))}
+
+            {/* 地址欄位獨立渲染，支援一般用戶的換行顯示與過濾大樓字眼 */}
+            <div className="flex gap-3 px-4 py-2.5 border-b border-[var(--border-primary)] text-sm">
+              <span className="text-[var(--text-secondary)] w-14 shrink-0">地址</span>
+              <span className="text-[var(--text-primary)] font-medium flex flex-col">
+                {isGeneralUser ? (
+                  <>
+                    <span>{detailAddress.trim() || "（未填）"}</span>
+                    {companyName.trim() && (
+                      <span className="text-xs text-[var(--text-secondary)] font-normal mt-0.5">
+                        {companyName.trim()}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span>{getFullAddress() || "（未填）"}</span>
+                )}
+              </span>
+            </div>
+
+            <div className="flex gap-3 px-4 py-2.5 text-sm">
+              <span className="text-[var(--text-secondary)] w-14 shrink-0">備註</span>
+              <span className="text-[var(--text-primary)] font-medium">
+                {note || "（無）"}
+              </span>
+            </div>
           </div>
 
           {/* 付款方式 */}
@@ -1211,61 +1235,62 @@ export default function LiffOrderPage({ user, apiUrl }) {
               />
             </div>
 
-            {/* 大樓選單與詳細戶號 */}
-            <div className="space-y-3 p-3.5 bg-[var(--bg-tertiary)] rounded-2xl border border-[var(--border-primary)]">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
-                  <MapPin size={12} /> 送達大樓 / 社區{" "}
-                  <span className="text-red-500">*</span>
-                </label>
-                <div className="w-full bg-[var(--bg-secondary)] p-3 rounded-xl border border-[var(--border-primary)] text-sm font-bold text-[var(--text-primary)] select-none">
-                  {selectedBuilding || "一般用戶"}
-                </div>
-              </div>
-
-              {selectedBuilding === "其它" && (
+            {/* 根據一般用戶與大樓用戶分流顯示 */}
+            {isGeneralUser ? (
+              <>
+                {/* 一般用戶：直接顯示地址與公司，隱藏大外框與任何大樓欄位 */}
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-[var(--text-secondary)]">
-                    自填大樓名稱 <span className="text-red-500">*</span>
+                  <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                    <MapPin size={12} /> 外送完整地址 <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm"
-                    placeholder="請輸入大樓/社區名稱"
-                    value={otherBuildingText}
-                    onChange={(e) => setOtherBuildingText(e.target.value)}
+                    placeholder="請輸入收件路名、門牌與樓層"
+                    value={detailAddress}
+                    onChange={(e) => setDetailAddress(e.target.value)}
                   />
                 </div>
-              )}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                    公司 / 機關單位名稱 <span className="text-[var(--text-secondary)] text-[10px] font-normal">(選填)</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm"
+                    placeholder="例：xx醫院x樓護理站（若無免填）"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                  />
+                </div>
+              </>
+            ) : (
+              /* 大樓用戶：顯示大外框、大樓唯讀名稱與詳細樓層戶號 */
+              <div className="space-y-3 p-3.5 bg-[var(--bg-tertiary)] rounded-2xl border border-[var(--border-primary)]">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                    <MapPin size={12} /> 送達大樓 / 社區 <span className="text-red-500">*</span>
+                  </label>
+                  <div className="w-full bg-[var(--bg-secondary)] p-3 rounded-xl border border-[var(--border-primary)] text-sm font-bold text-[var(--text-primary)] select-none">
+                    {selectedBuilding}
+                  </div>
+                </div>
 
-              {isGeneralUser ? (
-                <>
+                {selectedBuilding === "其它" && (
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
-                      <MapPin size={12} /> 外送完整地址 <span className="text-red-500">*</span>
+                    <label className="text-xs font-bold text-[var(--text-secondary)]">
+                      自填大樓名稱 <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm"
-                      placeholder="請輸入收件路名、門牌與樓層"
-                      value={detailAddress}
-                      onChange={(e) => setDetailAddress(e.target.value)}
+                      placeholder="請輸入大樓/社區名稱"
+                      value={otherBuildingText}
+                      onChange={(e) => setOtherBuildingText(e.target.value)}
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
-                      公司 / 機關單位名稱 <span className="text-[var(--text-secondary)] text-[10px] font-normal">(選填)</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm"
-                      placeholder="例：xx醫院x樓護理站（若無免填）"
-                      value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                    />
-                  </div>
-                </>
-              ) : (
+                )}
+
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
                     <MapPin size={12} /> 詳細樓層戶號 <span className="text-red-500">*</span>
@@ -1278,8 +1303,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     onChange={(e) => setDetailAddress(e.target.value)}
                   />
                 </div>
-              )}
-            </div>
+              </div>
+            )}
             <div className="space-y-1">
               <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
                 <FileText size={12} /> 備註
