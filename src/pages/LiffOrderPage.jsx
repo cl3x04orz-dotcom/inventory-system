@@ -92,9 +92,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   // ── 大樓群組綁定與管理員 State ──────────────────────────────
   const [groupBindings, setGroupBindings] = useState({});
-  const [selectedBuilding, setSelectedBuilding] = useState("");
+  const [selectedBuilding, setSelectedBuilding] = useState("一般用戶");
   const [otherBuildingText, setOtherBuildingText] = useState("");
   const [detailAddress, setDetailAddress] = useState("");
+  const [companyName, setCompanyName] = useState("");
 
   // ── 新增：網址大樓參數、大樓時段設定與下單資訊 ───────────────
   const [urlBuilding, setUrlBuilding] = useState("");
@@ -614,6 +615,17 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const getFullAddress = () => {
     const bName =
       selectedBuilding === "其它" ? otherBuildingText.trim() : selectedBuilding;
+    
+    // 如果是一般用戶，大樓名是 "一般用戶" 或 "一般散客"，後面拼上外送地址與公司名稱
+    if (bName === "一般用戶" || bName === "一般散客") {
+      const baseAddr = detailAddress.trim();
+      const comp = companyName.trim();
+      if (comp) {
+        return `${bName} ${baseAddr} (${comp})`;
+      }
+      return `${bName} ${baseAddr}`;
+    }
+
     if (!bName) return detailAddress.trim();
     return `${bName} ${detailAddress.trim()}`;
   };
@@ -644,20 +656,25 @@ export default function LiffOrderPage({ user, apiUrl }) {
       if (saved.building !== undefined || saved.detailAddress !== undefined) {
         const savedBuilding = saved.building || "";
         const savedDetail = saved.detailAddress || "";
+        const savedCompany = saved.companyName || "";
 
         if (isLocked) {
           setSelectedBuilding(lockedBuilding);
           setDetailAddress(savedDetail);
+          setCompanyName(savedCompany);
         } else {
           if (knownBuildings.includes(savedBuilding)) {
             setSelectedBuilding(savedBuilding);
             setDetailAddress(savedDetail);
+            setCompanyName(savedCompany);
           } else if (savedBuilding) {
             setSelectedBuilding("其它");
             setOtherBuildingText(savedBuilding);
             setDetailAddress(savedDetail);
+            setCompanyName(savedCompany);
           } else {
             setDetailAddress(savedDetail);
+            setCompanyName(savedCompany);
           }
         }
       } else if (saved.address) {
@@ -713,6 +730,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
           phone: customerPhone,
           building: selectedBuilding === "其它" ? otherBuildingText.trim() : selectedBuilding,
           detailAddress: detailAddress.trim(),
+          companyName: isGeneralUser ? companyName.trim() : "",
           address: getFullAddress(),
         }),
       );
@@ -1200,29 +1218,9 @@ export default function LiffOrderPage({ user, apiUrl }) {
                   <MapPin size={12} /> 送達大樓 / 社區{" "}
                   <span className="text-red-500">*</span>
                 </label>
-                <select
-                  className="w-full bg-[var(--bg-secondary)] p-2.5 rounded-xl border border-[var(--border-primary)] text-sm font-bold text-[var(--text-primary)] focus:outline-none"
-                  value={selectedBuilding}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSelectedBuilding(val);
-                    setDetailAddress(""); // 當大樓切換時，自動清空輸入框防止舊資料混淆
-                  }}
-                  disabled={!!lockedBuilding}
-                >
-                  <option value="">-- 請選擇收件大樓 --</option>
-                  {knownBuildings.map((bname) => (
-                    <option key={bname} value={bname}>
-                      {bname}
-                    </option>
-                  ))}
-                  <option value="其它">其它（自行填寫）</option>
-                </select>
-                {!!lockedBuilding && !isGeneralUser && (
-                  <div className="text-[10px] text-blue-500 font-medium">
-                    ※ 已自動鎖定您所在的群組大樓
-                  </div>
-                )}
+                <div className="w-full bg-[var(--bg-secondary)] p-3 rounded-xl border border-[var(--border-primary)] text-sm font-bold text-[var(--text-primary)] select-none">
+                  {selectedBuilding || "一般用戶"}
+                </div>
               </div>
 
               {selectedBuilding === "其它" && (
@@ -1240,19 +1238,47 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 </div>
               )}
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
-                  <MapPin size={12} /> {isGeneralUser ? "外送完整地址 / 單位名稱" : "詳細樓層戶號"}{" "}
-                  <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm"
-                  placeholder={isGeneralUser ? "請輸入完整外送地址、公司或機關名稱" : "例：A棟 12樓之3 / 3樓 305室"}
-                  value={detailAddress}
-                  onChange={(e) => setDetailAddress(e.target.value)}
-                />
-              </div>
+              {isGeneralUser ? (
+                <>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                      <MapPin size={12} /> 外送完整地址 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm"
+                      placeholder="請輸入收件路名、門牌與樓層"
+                      value={detailAddress}
+                      onChange={(e) => setDetailAddress(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                      公司 / 機關單位名稱 <span className="text-[var(--text-secondary)] text-[10px] font-normal">(選填)</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm"
+                      placeholder="例：xx醫院x樓護理站（若無免填）"
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                    <MapPin size={12} /> 詳細樓層戶號 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm"
+                    placeholder="例：A棟 12樓之3 / 3樓 305室"
+                    value={detailAddress}
+                    onChange={(e) => setDetailAddress(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
             <div className="space-y-1">
               <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
