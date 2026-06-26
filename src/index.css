@@ -137,3 +137,9 @@ body.liff-order-active {
     width: 100% !important;
     overscroll-behavior: none !important;
 }
+
+/* 解決 iOS Safari/WKWebView 滾動卡死與平滑度優化 */
+.overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+}

@@ -852,136 +852,138 @@ export default function LiffOrderPage({ user, apiUrl }) {
   // ════════════════════════════════════════════════════════════
   if (step === "success") {
     return (
-      <div className="max-w-md mx-auto p-5 flex flex-col gap-5 pb-10">
-        <div className="flex flex-col items-center text-center pt-6 pb-2">
-          <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-4 text-emerald-600">
-            <CheckCircle size={44} />
-          </div>
-          <h2 className="text-2xl font-bold text-[var(--text-primary)]">
-            感謝您的購買！
-          </h2>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">
-            我們已收到您的訂單，請耐心等候。
-          </p>
-        </div>
-
-        {/* 訂單資訊 */}
-        <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl divide-y divide-[var(--border-primary)] text-sm font-mono">
-          {[
-            { label: "訂單編號", value: orderId, bold: true },
-            { label: "完成時間", value: orderTime },
-            { label: "付款方式", value: paymentMethod },
-          ].map(({ label, value, bold }) => (
-            <div key={label} className="flex justify-between px-4 py-3">
-              <span className="text-[var(--text-secondary)]">{label}</span>
-              <span
-                className={`text-[var(--text-primary)] ${bold ? "font-bold" : ""}`}
-              >
-                {value}
-              </span>
+      <div className="max-w-md mx-auto flex flex-col h-[100dvh] bg-[var(--bg-primary)]">
+        <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-5 pb-10">
+          <div className="flex flex-col items-center text-center pt-6 pb-2">
+            <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-4 text-emerald-600">
+              <CheckCircle size={44} />
             </div>
-          ))}
-        </div>
-
-        {/* 夜間靜音提示 */}
-        {isNightOrder && (
-          <div className="bg-slate-50 dark:bg-slate-900/15 border border-slate-200 dark:border-slate-700/30 rounded-xl p-4 text-sm text-slate-800 dark:text-slate-300">
-            <p className="font-bold mb-1">貼心提示</p>
-            <p>訂單已成功送出！因夜深了，系統將不打擾群組鄰居，明早會為您排單出貨。</p>
-          </div>
-        )}
-
-        {/* 付款說明 */}
-        {paymentMethod === "現金" && (
-          <div className="bg-amber-50 dark:bg-amber-900/15 border border-amber-200 dark:border-amber-700/30 rounded-xl p-4 text-sm text-amber-800 dark:text-amber-300">
-            <p className="font-bold mb-1">現金注意事項</p>
-            <p>採現金支付，請自備零錢，現場不找零。</p>
-          </div>
-        )}
-        {paymentMethod === "轉帳" && (
-          <div className="bg-blue-50 dark:bg-blue-900/15 border border-blue-200 dark:border-blue-700/30 rounded-xl p-4 space-y-3">
-            <p className="font-bold text-sm text-blue-800 dark:text-blue-300">
-              請轉帳至以下帳戶
+            <h2 className="text-2xl font-bold text-[var(--text-primary)]">
+              感謝您的購買！
+            </h2>
+            <p className="text-sm text-[var(--text-secondary)] mt-1">
+              我們已收到您的訂單，請耐心等候。
             </p>
-            <div className="space-y-1.5 text-sm">
-              <div className="flex justify-between text-[var(--text-primary)]">
-                <span className="text-[var(--text-secondary)]">銀行</span>
-                <span className="font-semibold">{BANK_INFO.bank}</span>
+          </div>
+
+          {/* 訂單資訊 */}
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl divide-y divide-[var(--border-primary)] text-sm font-mono">
+            {[
+              { label: "訂單編號", value: orderId, bold: true },
+              { label: "完成時間", value: orderTime },
+              { label: "付款方式", value: paymentMethod },
+            ].map(({ label, value, bold }) => (
+              <div key={label} className="flex justify-between px-4 py-3">
+                <span className="text-[var(--text-secondary)]">{label}</span>
+                <span
+                  className={`text-[var(--text-primary)] ${bold ? "font-bold" : ""}`}
+                >
+                  {value}
+                </span>
               </div>
-              <div className="flex justify-between items-center text-[var(--text-primary)]">
-                <span className="text-[var(--text-secondary)]">帳號</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold tracking-wider">
-                    {BANK_INFO.account}
-                  </span>
-                  <button
-                    onClick={() => handleCopy(BANK_INFO.account)}
-                    className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-lg font-semibold"
-                  >
-                    {copied ? "已複製！" : "複製"}
-                  </button>
+            ))}
+          </div>
+
+          {/* 夜間靜音提示 */}
+          {isNightOrder && (
+            <div className="bg-slate-50 dark:bg-slate-900/15 border border-slate-200 dark:border-slate-700/30 rounded-xl p-4 text-sm text-slate-800 dark:text-slate-300">
+              <p className="font-bold mb-1">貼心提示</p>
+              <p>訂單已成功送出！因夜深了，系統將不打擾群組鄰居，明早會為您排單出貨。</p>
+            </div>
+          )}
+
+          {/* 付款說明 */}
+          {paymentMethod === "現金" && (
+            <div className="bg-amber-50 dark:bg-amber-900/15 border border-amber-200 dark:border-amber-700/30 rounded-xl p-4 text-sm text-amber-800 dark:text-amber-300">
+              <p className="font-bold mb-1">現金注意事項</p>
+              <p>採現金支付，請自備零錢，現場不找零。</p>
+            </div>
+          )}
+          {paymentMethod === "轉帳" && (
+            <div className="bg-blue-50 dark:bg-blue-900/15 border border-blue-200 dark:border-blue-700/30 rounded-xl p-4 space-y-3">
+              <p className="font-bold text-sm text-blue-800 dark:text-blue-300">
+                請轉帳至以下帳戶
+              </p>
+              <div className="space-y-1.5 text-sm">
+                <div className="flex justify-between text-[var(--text-primary)]">
+                  <span className="text-[var(--text-secondary)]">銀行</span>
+                  <span className="font-semibold">{BANK_INFO.bank}</span>
+                </div>
+                <div className="flex justify-between items-center text-[var(--text-primary)]">
+                  <span className="text-[var(--text-secondary)]">帳號</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold tracking-wider">
+                      {BANK_INFO.account}
+                    </span>
+                    <button
+                      onClick={() => handleCopy(BANK_INFO.account)}
+                      className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-lg font-semibold"
+                    >
+                      {copied ? "已複製！" : "複製"}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex justify-between text-[var(--text-primary)]">
+                  <span className="text-[var(--text-secondary)]">戶名</span>
+                  <span className="font-semibold">{BANK_INFO.name}</span>
                 </div>
               </div>
-              <div className="flex justify-between text-[var(--text-primary)]">
-                <span className="text-[var(--text-secondary)]">戶名</span>
-                <span className="font-semibold">{BANK_INFO.name}</span>
-              </div>
             </div>
-          </div>
-        )}
-        {paymentMethod === "LINE Pay" && (
-          <div className="bg-emerald-50 dark:bg-emerald-900/15 border border-emerald-200 dark:border-emerald-700/30 rounded-xl p-4 text-sm text-emerald-800 dark:text-emerald-300 space-y-2">
-            <p className="font-bold">LINE 個人轉帳</p>
-            <p>已開啟 LINE 轉帳頁面，完成付款後請告知我們。</p>
-            <button
-              onClick={() => window.open(LINE_PAY_URL, "_blank")}
-              className="text-xs underline underline-offset-2"
-            >
-              重新開啟 LINE 轉帳
-            </button>
-          </div>
-        )}
+          )}
+          {paymentMethod === "LINE Pay" && (
+            <div className="bg-emerald-50 dark:bg-emerald-900/15 border border-emerald-200 dark:border-emerald-700/30 rounded-xl p-4 text-sm text-emerald-800 dark:text-emerald-300 space-y-2">
+              <p className="font-bold">LINE 個人轉帳</p>
+              <p>已開啟 LINE 轉帳頁面，完成付款後請告知我們。</p>
+              <button
+                onClick={() => window.open(LINE_PAY_URL, "_blank")}
+                className="text-xs underline underline-offset-2"
+              >
+                重新開啟 LINE 轉帳
+              </button>
+            </div>
+          )}
 
-        {/* 聯繫 LINE */}
-        <p className="text-center text-xs text-[var(--text-secondary)]">
-          若訂單有任何疑問，歡迎透過 LINE 與我們聯繫。
-        </p>
-        {(!selectedBuilding || selectedBuilding === "一般散客" || selectedBuilding === "其它") ? (
+          {/* 聯繫 LINE */}
+          <p className="text-center text-xs text-[var(--text-secondary)]">
+            若訂單有任何疑問，歡迎透過 LINE 與我們聯繫。
+          </p>
+          {(!selectedBuilding || selectedBuilding === "一般散客" || selectedBuilding === "其它") ? (
+            <button
+              onClick={() => window.open(getOaMessageUrl(), "_blank")}
+              className="w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 text-white shadow-md shadow-emerald-500/20 hover:opacity-95 active:scale-95 transition-all flex-shrink-0"
+              style={{ background: "#06C755" }}
+            >
+              一鍵回報小幫手
+            </button>
+          ) : (
+            <button
+              onClick={() => window.open(LINE_CONTACT_URL, "_blank")}
+              className="w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 text-white flex-shrink-0"
+              style={{ background: "#06C755" }}
+            >
+              {/* LINE icon */}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
+              </svg>
+              加入官方 LINE 聯繫
+            </button>
+          )}
           <button
-            onClick={() => window.open(getOaMessageUrl(), "_blank")}
-            className="w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 text-white shadow-md shadow-emerald-500/20 hover:opacity-95 active:scale-95 transition-all"
-            style={{ background: "#06C755" }}
+            onClick={() => {
+              setStep("shop");
+              setCustomerName("");
+              setCustomerPhone("");
+              setDeliveryAddress("");
+              setNote("");
+              setPaymentMethod("現金");
+              setTransferLastFive("");
+              setIsNightOrder(false);
+            }}
+            className="w-full py-3 rounded-xl font-bold btn-secondary flex-shrink-0"
           >
-            一鍵回報小幫手
+            繼續購物
           </button>
-        ) : (
-          <button
-            onClick={() => window.open(LINE_CONTACT_URL, "_blank")}
-            className="w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 text-white"
-            style={{ background: "#06C755" }}
-          >
-            {/* LINE icon */}
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-              <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
-            </svg>
-            加入官方 LINE 聯繫
-          </button>
-        )}
-        <button
-          onClick={() => {
-            setStep("shop");
-            setCustomerName("");
-            setCustomerPhone("");
-            setDeliveryAddress("");
-            setNote("");
-            setPaymentMethod("現金");
-            setTransferLastFive("");
-            setIsNightOrder(false);
-          }}
-          className="w-full py-3 rounded-xl font-bold btn-secondary"
-        >
-          繼續購物
-        </button>
+        </div>
       </div>
     );
   }
