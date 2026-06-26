@@ -54,32 +54,6 @@ export default function LiffOrderPage({ user, apiUrl }) {
     };
   }, []);
 
-  // ── 監聽步驟切換，重設所有滾動容器的位置（終極防爆防白屏版） ──────────
-  useEffect(() => {
-    // 用 setTimeout(..., 0) 強制把歸零動作推到隊伍最後面，確保 DOM 已經完全渲染完畢
-    const timer = setTimeout(() => {
-      try {
-        // 1. 安全執行 window 置頂，若 WebView 擋下則不影響後續執行
-        if (typeof window !== 'undefined') {
-          window.scrollTo(0, 0);
-        }
-        
-        // 2. 獲取節點並進行嚴格的「存在性檢查」
-        const scrollContainers = document.querySelectorAll(".overflow-y-auto");
-        if (scrollContainers && scrollContainers.length > 0) {
-          for (let i = 0; i < scrollContainers.length; i++) {
-            if (scrollContainers[i]) {
-              scrollContainers[i].scrollTop = 0;
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Scroll reset error handled safely:", error);
-      }
-    }, 50); // 延遲 50 毫秒，給手機瀏覽器充足的時間換頁與渲染
-
-    return () => clearTimeout(timer); // 清除定時器，防止記憶體洩漏
-  }, [step]);
 
   // ── 商品 state ───────────────────────────────────────────────
   const [products, setProducts] = useState([]);
@@ -1043,7 +1017,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
           </h2>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div key="page-confirm" className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* 商品清單 */}
           <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden">
             <div className="px-4 py-2.5 border-b border-[var(--border-primary)] text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
@@ -1245,7 +1219,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-6">
+        <div key="page-info" className="flex-1 overflow-y-auto p-5 space-y-6">
           {/* 收件資訊 */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
