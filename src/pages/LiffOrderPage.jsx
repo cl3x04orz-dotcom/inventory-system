@@ -627,7 +627,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
     }
 
     if (!bName) return detailAddress.trim();
-    return `${bName} ${detailAddress.trim()}`;
+    return `${bName} - ${detailAddress.trim()}`;
   };
 
 
@@ -1151,12 +1151,13 @@ export default function LiffOrderPage({ user, apiUrl }) {
   // 填寫資料頁
   // ════════════════════════════════════════════════════════════
   if (step === "form") {
+    const isPhoneValid = /^09\d{8}$/.test(customerPhone.trim());
     const isBuildingValid =
       selectedBuilding &&
       (selectedBuilding !== "其它" || otherBuildingText.trim());
     const canProceed =
       customerName.trim() &&
-      customerPhone.trim() &&
+      isPhoneValid &&
       isBuildingValid &&
       detailAddress.trim() &&
       (paymentMethod !== "轉帳" || transferLastFive.trim().length === 5);
@@ -1223,16 +1224,24 @@ export default function LiffOrderPage({ user, apiUrl }) {
             </div>
             <div className="space-y-1">
               <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
-                <Phone size={12} /> 聯絡電話{" "}
-                <span className="text-red-500">*</span>
+                <Phone size={12} /> 聯絡電話 <span className="text-red-500">*</span>
               </label>
               <input
                 type="tel"
                 className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)]"
-                placeholder="請輸入手機號碼"
+                placeholder="請輸入 10 位數手機號碼 (如：0912345678)"
                 value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, ""); // 只允許數字
+                  setCustomerPhone(val);
+                }}
+                maxLength={10}
               />
+              {customerPhone.trim() && !/^09\d{8}$/.test(customerPhone.trim()) && (
+                <p className="text-[11px] text-red-500 font-medium">
+                  ⚠️ 請輸入正確的 10 位數手機號碼 (09 開頭)
+                </p>
+              )}
             </div>
 
             {/* 根據一般用戶與大樓用戶分流顯示 */}
