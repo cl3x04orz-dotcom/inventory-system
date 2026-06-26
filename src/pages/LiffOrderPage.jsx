@@ -1293,12 +1293,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
-                    <MapPin size={12} /> 樓層 / 戶號 <span className="text-red-500">*</span>
+                    <MapPin size={12} /> 樓層 / 戶號 / 科室 <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm"
-                    placeholder="例：A棟12樓之3、3樓305室"
+                    placeholder="例：A棟12樓之3、3樓305室、5樓總務部辦公室"
                     value={detailAddress}
                     onChange={(e) => setDetailAddress(e.target.value)}
                   />
