@@ -1393,35 +1393,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
             )}
 
             {paymentMethod === "轉帳" && (
-              <div className="bg-blue-50 dark:bg-blue-900/15 border border-blue-200 dark:border-blue-700/30 rounded-xl p-4 space-y-3">
-                <div className="text-xs font-bold text-blue-800 dark:text-blue-300">
-                  匯款帳號
-                </div>
-                <div className="space-y-1.5 text-xs text-[var(--text-primary)]">
-                  <div className="flex justify-between">
-                    <span className="text-[var(--text-secondary)]">銀行</span>
-                    <span className="font-semibold">{BANK_INFO.bank}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[var(--text-secondary)]">帳號</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold tracking-wider">
-                        {BANK_INFO.account}
-                      </span>
-                      <button
-                        onClick={() => handleCopy(BANK_INFO.account)}
-                        className="text-[10px] bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-lg font-semibold"
-                      >
-                        {copied ? "已複製" : "複製"}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[var(--text-secondary)]">戶名</span>
-                    <span className="font-semibold">{BANK_INFO.name}</span>
-                  </div>
-                </div>
-                <div className="space-y-1.5 pt-1 border-t border-blue-200 dark:border-blue-700/30">
+              <div className="bg-blue-50 dark:bg-blue-900/15 border border-blue-200 dark:border-blue-700/30 rounded-xl p-4">
+                <div className="space-y-1.5">
                   <label className="text-xs font-bold text-blue-800 dark:text-blue-300">
                     您的帳戶後 5 碼 <span className="text-red-500">*</span>
                   </label>
