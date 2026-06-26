@@ -850,7 +850,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
   // ════════════════════════════════════════════════════════════
   if (step === "success") {
     return (
-      <div className="max-w-md mx-auto flex flex-col h-[100dvh] bg-[var(--bg-primary)]">
+      <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
         <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-5 pb-10">
           <div className="flex flex-col items-center text-center pt-6 pb-2">
             <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-4 text-emerald-600">
@@ -1000,8 +1000,11 @@ export default function LiffOrderPage({ user, apiUrl }) {
   // ════════════════════════════════════════════════════════════
   if (step === "confirm") {
     return (
-      <div className="max-w-md mx-auto flex flex-col h-[100dvh] bg-[var(--bg-primary)]">
-        <div className="p-4 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] flex items-center gap-3 flex-shrink-0">
+      <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
+        <div 
+          className="p-4 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] flex items-center gap-3 flex-shrink-0"
+          style={{ touchAction: "none" }}
+        >
           <button
             onClick={() => setStep("form")}
             className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -1130,7 +1133,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
           </div>
         </div>
 
-        <div className="p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] grid grid-cols-2 gap-3 flex-shrink-0">
+        <div 
+          className="p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] grid grid-cols-2 gap-3 flex-shrink-0"
+          style={{ touchAction: "none" }}
+        >
           <button
             onClick={() => setStep("form")}
             className="btn-secondary py-3 rounded-xl font-bold"
@@ -1190,9 +1196,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
     ];
 
     return (
-      <div className="max-w-md mx-auto flex flex-col h-[100dvh] bg-[var(--bg-primary)]">
+      <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
         {/* Header */}
-        <div className="p-4 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] flex items-center gap-3 flex-shrink-0">
+        <div 
+          className="p-4 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] flex items-center gap-3 flex-shrink-0"
+          style={{ touchAction: "none" }}
+        >
           <button
             onClick={() => setStep("shop")}
             className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -1420,7 +1429,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
         </div>
 
         {/* 下一步 */}
-        <div className="p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] flex-shrink-0">
+        <div 
+          className="p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] flex-shrink-0"
+          style={{ touchAction: "none" }}
+        >
           <button
             onClick={() => {
               if (canProceed) setStep("confirm");
@@ -1441,7 +1453,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
     <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
       {/* 頂部固定導覽列 */}
 
-      <div className="flex-shrink-0 flex flex-col z-10 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] shadow-sm">
+      <div 
+        className="flex-shrink-0 flex flex-col z-10 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] shadow-sm"
+        style={{ touchAction: "pan-x" }}
+      >
         {/* Header */}
         <div className="h-[60px] px-3 flex justify-between items-center">
           <div className="flex-1 flex justify-start items-center gap-3">
@@ -1669,7 +1684,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
           {/* 浮動購物車 */}
           {totalQty > 0 && (
-            <div className="absolute bottom-0 left-0 right-0 bg-[var(--bg-secondary)]/95 backdrop-blur-sm border-t border-[var(--border-primary)] shadow-2xl px-4 py-3 flex justify-between items-center">
+            <div 
+              className="absolute bottom-0 left-0 right-0 bg-[var(--bg-secondary)]/95 backdrop-blur-sm border-t border-[var(--border-primary)] shadow-2xl px-4 py-3 flex justify-between items-center"
+              style={{ touchAction: "none" }}
+            >
               <div className="flex items-center gap-3">
                 <div className="relative bg-blue-100 dark:bg-blue-900/30 text-blue-600 p-2.5 rounded-full">
                   <ShoppingCart size={20} />
