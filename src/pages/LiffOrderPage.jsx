@@ -102,9 +102,6 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [buildingSettings, setBuildingSettings] = useState([]);
   const [successOrderTotal, setSuccessOrderTotal] = useState(0);
   const [isNightOrder, setIsNightOrder] = useState(false);
-  // ── LINE Pay 感謝頁 3 秒自動跳轉狀態 ─────────────────────────
-  const [countdown, setCountdown] = useState(3);
-  const [hasRedirected, setHasRedirected] = useState(false);
   // ── 載入商品與初始化資料（單次 API，後端已過濾） ─────────────────────────────────────────
   const loadAllData = async () => {
     setLoading(true);
@@ -841,27 +838,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
     }
   };
 
-  // ── LINE Pay 感謝頁 3 秒自動跳轉機制 ──────────────────────────────
-  useEffect(() => {
-    if (step === "success" && paymentMethod === "LINE Pay") {
-      setCountdown(3);
-      setHasRedirected(false);
-    }
-  }, [step, paymentMethod]);
 
-  useEffect(() => {
-    if (step !== "success" || paymentMethod !== "LINE Pay" || hasRedirected) return;
-
-    if (countdown > 0) {
-      const timer = setTimeout(() => {
-        setCountdown((prev) => prev - 1);
-      }, 1000);
-      return () => clearTimeout(timer);
-    } else {
-      setHasRedirected(true);
-      window.open(LINE_PAY_URL, "_blank");
-    }
-  }, [step, paymentMethod, countdown, hasRedirected]);
 
   const getOaMessageUrl = () => {
     const text = `訂單已提交！\n【訂單編號】#${orderId}\n【訂購姓名】${customerName}\n【合計金額】$${successOrderTotal || 0}\n【轉帳後五碼】${transferLastFive || "無"}\n※ 詳細明細小幫手已在後台收到囉！`;
@@ -972,13 +949,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
             <div className="w-full">
               <button
                 onClick={() => {
-                  setHasRedirected(true);
                   window.open(LINE_PAY_URL, "_blank");
                 }}
                 className="w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 text-white shadow-md shadow-emerald-500/20 hover:opacity-95 active:scale-95 transition-all flex-shrink-0"
                 style={{ background: "#06C755" }}
               >
-                前往官方 LINE 客服 {countdown > 0 ? `(${countdown}s...)` : ""}
+                前往官方 LINE 付款 ➔
               </button>
             </div>
           ) : (
