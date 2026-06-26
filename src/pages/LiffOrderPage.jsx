@@ -928,18 +928,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
               </div>
             </div>
           )}
-          {paymentMethod === "LINE Pay" && (
-            <div className="bg-emerald-50 dark:bg-emerald-900/15 border border-emerald-200 dark:border-emerald-700/30 rounded-xl p-4 text-sm text-emerald-800 dark:text-emerald-300 space-y-2">
-              <p className="font-bold">LINE 個人轉帳</p>
-              <p>已開啟 LINE 轉帳頁面，完成付款後請告知我們。</p>
-              <button
-                onClick={() => window.open(LINE_PAY_URL, "_blank")}
-                className="text-xs underline underline-offset-2"
-              >
-                重新開啟 LINE 轉帳
-              </button>
-            </div>
-          )}
+
 
           {/* 聯繫 LINE */}
           <p className="text-center text-xs text-[var(--text-secondary)]">
@@ -1354,83 +1343,85 @@ export default function LiffOrderPage({ user, apiUrl }) {
               付款方式
             </h3>
             <div className="space-y-2">
-              {paymentOptions.map(({ value, Icon, label, desc }) => {
+              {paymentOptions.map(({ value, Icon, label: optLabel, desc }) => {
                 const active = paymentMethod === value;
                 return (
-                  <label
+                  <div
                     key={value}
-                    className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${active
+                    className={`flex flex-col rounded-xl border transition-all overflow-hidden ${active
                         ? "border-blue-500 bg-blue-50 dark:bg-blue-900/15"
                         : "border-[var(--border-primary)] bg-[var(--bg-secondary)] hover:border-blue-300"
                       }`}
                   >
-                    <input
-                      type="radio"
-                      name="payment"
-                      value={value}
-                      checked={active}
-                      onChange={() => setPaymentMethod(value)}
-                      className="hidden"
-                    />
-                    <div
-                      className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${active ? "bg-blue-600 text-white" : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"}`}
-                    >
-                      <Icon size={18} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm text-[var(--text-primary)]">
-                        {label}
+                    <label className="flex items-center gap-3 p-3.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="payment"
+                        value={value}
+                        checked={active}
+                        onChange={() => setPaymentMethod(value)}
+                        className="hidden"
+                      />
+                      <div
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${active ? "bg-blue-600 text-white" : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"}`}
+                      >
+                        <Icon size={18} />
                       </div>
-                      <div className="text-xs text-[var(--text-secondary)] truncate">
-                        {desc}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-[var(--text-primary)]">
+                          {optLabel}
+                        </div>
+                        <div className="text-xs text-[var(--text-secondary)] truncate">
+                          {desc}
+                        </div>
                       </div>
-                    </div>
-                    <div
-                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${active ? "border-blue-500" : "border-[var(--border-primary)]"}`}
-                    >
-                      {active && (
-                        <div className="w-2 h-2 rounded-full bg-blue-500" />
-                      )}
-                    </div>
-                  </label>
+                      <div
+                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${active ? "border-blue-500" : "border-[var(--border-primary)]"}`}
+                      >
+                        {active && (
+                          <div className="w-2 h-2 rounded-full bg-blue-500" />
+                        )}
+                      </div>
+                    </label>
+
+                    {/* 抽屜伸縮內容 */}
+                    {active && (
+                      <div className="px-4 pb-3.5 border-t border-blue-100 dark:border-blue-900/30 pt-3 bg-white/40 dark:bg-black/10">
+                        {value === "現金" && (
+                          <div className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+                            ※ 採現金支付，請自備零錢，現場不找零。
+                          </div>
+                        )}
+                        {value === "轉帳" && (
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-blue-800 dark:text-blue-300">
+                              您的帳戶後 5 碼 <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="tel"
+                              maxLength={5}
+                              className="input-field w-full p-3 rounded-xl border border-blue-300 dark:border-blue-600 bg-white dark:bg-blue-900/20 text-center font-mono tracking-[0.5em] text-lg focus:bg-white focus:outline-none"
+                              placeholder="_ _ _ _ _"
+                              value={transferLastFive}
+                              onChange={(e) =>
+                                setTransferLastFive(
+                                  e.target.value.replace(/\D/g, "").slice(0, 5),
+                                )
+                              }
+                            />
+                          </div>
+                        )}
+                        {value === "LINE Pay" && (
+                          <div className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">
+                            ※ 送出訂單後，下一頁將引導您手動點擊進行付款。
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
-
-            {/* 付款方式展開內容 */}
-            {paymentMethod === "現金" && (
-              <div className="bg-amber-50 dark:bg-amber-900/15 border border-amber-200 dark:border-amber-700/30 rounded-xl px-4 py-3 text-xs text-amber-700 dark:text-amber-300">
-                ※ 採現金支付，請自備零錢，現場不找零。
-              </div>
-            )}
-
-            {paymentMethod === "轉帳" && (
-              <div className="bg-blue-50 dark:bg-blue-900/15 border border-blue-200 dark:border-blue-700/30 rounded-xl p-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-blue-800 dark:text-blue-300">
-                    您的帳戶後 5 碼 <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    maxLength={5}
-                    className="input-field w-full p-3 rounded-xl border border-blue-300 dark:border-blue-600 bg-white dark:bg-blue-900/20 text-center font-mono tracking-[0.5em] text-lg"
-                    placeholder="_ _ _ _ _"
-                    value={transferLastFive}
-                    onChange={(e) =>
-                      setTransferLastFive(
-                        e.target.value.replace(/\D/g, "").slice(0, 5),
-                      )
-                    }
-                  />
-                </div>
-              </div>
-            )}
-
-            {paymentMethod === "LINE Pay" && (
-              <div className="bg-emerald-50 dark:bg-emerald-900/15 border border-emerald-200 dark:border-emerald-700/30 rounded-xl px-4 py-3 text-xs text-emerald-700 dark:text-emerald-300">
-                送出訂單後，系統將自動開啟 LINE，請完成個人轉帳。
-              </div>
-            )}
           </div>
         </div>
 
