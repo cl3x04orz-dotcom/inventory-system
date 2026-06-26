@@ -1122,8 +1122,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 </div>
               )}
               {paymentMethod === "LINE Pay" && (
-                <div className="text-xs text-emerald-600">
-                  送出後將自動開啟 LINE 轉帳
+                <div className="text-xs text-emerald-600 font-medium">
+                  ※ 送出訂單後，請於下一頁點擊按鈕進行個人轉帳付款。
                 </div>
               )}
             </div>
@@ -1176,19 +1176,16 @@ export default function LiffOrderPage({ user, apiUrl }) {
         value: "現金",
         Icon: Banknote,
         label: "現金",
-        desc: "自備零錢，現場不找零",
       },
       {
         value: "轉帳",
         Icon: CreditCard,
         label: "銀行轉帳",
-        desc: `${BANK_INFO.bank} ‧ ${BANK_INFO.name}`,
       },
       {
         value: "LINE Pay",
         Icon: Smartphone,
         label: "LINE Pay",
-        desc: "個人 LINE 轉帳付款",
       },
     ];
 
@@ -1343,7 +1340,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
               付款方式
             </h3>
             <div className="space-y-2">
-              {paymentOptions.map(({ value, Icon, label: optLabel, desc }) => {
+              {paymentOptions.map(({ value, Icon, label: optLabel }) => {
                 const active = paymentMethod === value;
                 return (
                   <div
@@ -1370,9 +1367,6 @@ export default function LiffOrderPage({ user, apiUrl }) {
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-sm text-[var(--text-primary)]">
                           {optLabel}
-                        </div>
-                        <div className="text-xs text-[var(--text-secondary)] truncate">
-                          {desc}
                         </div>
                       </div>
                       <div
