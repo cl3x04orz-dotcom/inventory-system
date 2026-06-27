@@ -86,18 +86,22 @@ function apiHandler(request) {
     if (action === 'checkInit') return typeof checkDbInit !== 'undefined' ? checkDbInit() : { success: true };
     if (action === 'loginAdminByPassword') return typeof loginAdminByPassword !== 'undefined' ? loginAdminByPassword(payload) : { error: '後端服務缺失: loginAdminByPassword' };
 
-    // 身份驗證失敗攔截
-    if (!user) {
-        return { error: 'Unauthorized: No valid token provided' };
-    }
-    if (user.__expired) {
-        return { error: 'TokenExpired' }; // 特殊錯誤碼讓前端強制登出
-    }
+    // 身份驗證失敗攔截 (LIFF 公開路徑可豁免驗證)
+    const publicLiffActions = ['v1_getMember', 'v1_saveMember', 'v1_getOrders', 'v1_reorder', 'getLiffInitData', 'savePendingOrder'];
     
-    // [Fix] 抗體機制：一旦發現 Token 內帶有不合法的亂碼名稱 (如 ???)，視為壞死通行證，強制前端登出洗掉 Token
-    if (user.username && user.username.includes('?')) {
-        console.warn(`[Security] 偵測到壞死 Token (使用者: ${user.username})，已觸發強制登出。`);
-        return { error: 'TokenExpired' }; 
+    if (!publicLiffActions.includes(action)) {
+        if (!user) {
+            return { error: 'Unauthorized: No valid token provided' };
+        }
+        if (user.__expired) {
+            return { error: 'TokenExpired' }; // 特殊錯誤碼讓前端強制登出
+        }
+        
+        // [Fix] 抗體機制：一旦發現 Token 內帶有不合法的亂碼名稱 (如 ???)，視為壞死通行證，強制前端登出洗掉 Token
+        if (user.username && user.username.includes('?')) {
+            console.warn(`[Security] 偵測到壞死 Token (使用者: ${user.username})，已觸發強制登出。`);
+            return { error: 'TokenExpired' }; 
+        }
     }
 
     // Token 展延機制
@@ -206,9 +210,9 @@ function apiHandler(request) {
     };
 
     // 進行授權校驗 (Authorization)
-    if (user.role !== 'BOSS') {
+    if (!user || user.role !== 'BOSS') {
         const requiredPerm = actionToPermission[action];
-        const userPerms = user.permissions || [];
+        const userPerms = user ? (user.permissions || []) : [];
         
         // 檢查是否具有「細分權限」或是「大類別權限」(相容舊格式)
         // 例如：若使用者擁有舊的 'sales' 權限，則也能通過 check (sales_entry -> sales)
@@ -228,9 +232,9 @@ function apiHandler(request) {
         if (payload && typeof payload === 'object') {
             payload.serverTimestamp = new Date();
             if (!payload.operator) {
-                payload.operator = user.displayName || user.name || user.username || 'Unknown';
+                payload.operator = user ? (user.displayName || user.name || user.username || 'Unknown') : 'System';
             }
-            payload.userRole = user.role;
+            payload.userRole = user ? user.role : 'Guest';
         }
 
         switch (action) {
