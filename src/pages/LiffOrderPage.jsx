@@ -1636,7 +1636,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
               </div>
               <div className="flex-1 bg-gradient-to-br from-gray-50 to-slate-50 dark:from-gray-800 dark:to-slate-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col justify-between">
                 <div className="text-xs text-gray-500 dark:text-gray-400 font-bold flex items-center gap-1"><CheckCircle size={14}/> 會員等級</div>
-                <div className="text-base font-bold text-[var(--text-primary)] mt-1">{memberProfile?.MemberLevel || '一般會員'}</div>
+                <div className="text-base font-bold text-[var(--text-primary)] mt-1">{
+                  !memberProfile?.MemberLevel || memberProfile.MemberLevel.toUpperCase() === 'GENERAL' ? '一般會員' : 
+                  memberProfile.MemberLevel.toUpperCase() === 'VIP' ? 'VIP 會員' : 
+                  memberProfile.MemberLevel.toUpperCase() === 'VVIP' ? 'VVIP 會員' : 
+                  memberProfile.MemberLevel
+                }</div>
               </div>
             </div>
 
@@ -1806,7 +1811,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
               </div>
               <div className="flex-1 bg-gradient-to-br from-gray-50 to-slate-50 dark:from-gray-800 dark:to-slate-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col justify-between">
                 <div className="text-xs text-gray-500 dark:text-gray-400 font-bold flex items-center gap-1"><CheckCircle size={14}/> 會員等級</div>
-                <div className="text-base font-bold text-[var(--text-primary)] mt-1">{memberProfile?.MemberLevel || '一般會員'}</div>
+                <div className="text-base font-bold text-[var(--text-primary)] mt-1">{
+                  !memberProfile?.MemberLevel || memberProfile.MemberLevel.toUpperCase() === 'GENERAL' ? '一般會員' : 
+                  memberProfile.MemberLevel.toUpperCase() === 'VIP' ? 'VIP 會員' : 
+                  memberProfile.MemberLevel.toUpperCase() === 'VVIP' ? 'VVIP 會員' : 
+                  memberProfile.MemberLevel
+                }</div>
               </div>
             </div>
 
