@@ -144,7 +144,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
         <button onClick={() => {
             if (lineUserId) {
                 setIsMemberLoading(true);
-                memberApi.getOrders(API_URL, { userId: lineUserId }).then(res => {
+                memberApi.getOrders(apiUrl, { userId: lineUserId }).then(res => {
                     if (res && res.success) setOrders(res.orders || []);
                     setIsMemberLoading(false);
                 }).catch(err => setIsMemberLoading(false));
@@ -294,7 +294,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
         
         // 呼叫後端 API 取得會員資料
         try {
-          const mRes = await memberApi.getMember(API_URL, {
+          const mRes = await memberApi.getMember(apiUrl, {
             userId: profile.userId,
             displayName: profile.displayName || "",
             pictureUrl: profile.pictureUrl || ""
@@ -362,7 +362,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const syncMemberToCloud = async () => {
     if (!lineUserId) return;
     try {
-      await memberApi.saveMember(API_URL, {
+      await memberApi.saveMember(apiUrl, {
         userId: lineUserId,
         displayName: customerName,
         pictureUrl: linePictureUrl,
@@ -1719,7 +1719,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                       onClick={async () => {
                         setIsMemberLoading(true);
                         try {
-                          const res = await memberApi.reorder(API_URL, { orderId: o.OrderId });
+                          const res = await memberApi.reorder(apiUrl, { orderId: o.OrderId });
                           if (res && res.success) {
                             setCart(res.cart || {});
                             if (res.delivery) {
