@@ -81,3 +81,11 @@ export const callGAS = async (apiUrl, action, payload, token = null) => {
         throw error;
     }
 };
+
+// 米立微會員中心 V1 - API Helpers
+export const memberApi = {
+    getMember: (apiUrl, payload) => callGAS(apiUrl, 'v1_getMember', payload),
+    saveMember: (apiUrl, payload) => callGAS(apiUrl, 'v1_saveMember', payload),
+    getOrders: (apiUrl, payload) => callGAS(apiUrl, 'v1_getOrders', payload),
+    reorder: (apiUrl, payload) => callGAS(apiUrl, 'v1_reorder', payload),
+};

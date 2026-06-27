@@ -15,8 +15,12 @@ import {
   CreditCard,
   Banknote,
   Smartphone,
+  Clock,
+  History,
+  RotateCcw,
+  Home,
 } from "lucide-react";
-import { callGAS } from "../utils/api";
+import { callGAS, memberApi } from "../utils/api";
 import logoImg from "../assets/logo.png";
 import logoLiff from "../assets/logo_liff.jpg";
 
@@ -103,6 +107,61 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [buildingSettings, setBuildingSettings] = useState([]);
   const [successOrderTotal, setSuccessOrderTotal] = useState(0);
   const [isNightOrder, setIsNightOrder] = useState(false);
+  const [isReorder, setIsReorder] = useState(false);
+
+  // 會員中心狀態
+  const [memberProfile, setMemberProfile] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [isMemberLoading, setIsMemberLoading] = useState(false);
+  const [lineUserId, setLineUserId] = useState("");
+  const [linePictureUrl, setLinePictureUrl] = useState("");
+
+  const renderBottomNav = () => {
+    if (step === "success") return null;
+    return (
+      <div className="flex-shrink-0 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] flex justify-around items-center h-[60px] pb-safe z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+        <button onClick={() => setStep("shop")} className={`flex flex-col items-center justify-center flex-1 h-full ${step === 'shop' ? 'text-blue-600 dark:text-blue-400' : 'text-[var(--text-tertiary)]'}`}>
+          <Home size={22} />
+          <span className="text-[10px] mt-1 font-bold">首頁</span>
+        </button>
+        <button onClick={() => {
+            if (Object.keys(cart).length === 0) {
+                alert('購物車是空的');
+                return;
+            }
+            setStep("form");
+        }} className={`flex flex-col items-center justify-center flex-1 h-full relative ${step === 'form' || step === 'confirm' ? 'text-blue-600 dark:text-blue-400' : 'text-[var(--text-tertiary)]'}`}>
+          <div className="relative">
+            <ShoppingCart size={22} />
+            {Object.keys(cart).length > 0 && (
+              <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-[var(--bg-secondary)]">
+                {Object.values(cart).reduce((a, b) => a + b, 0)}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] mt-1 font-bold">購物車</span>
+        </button>
+        <button onClick={() => {
+            if (lineUserId) {
+                setIsMemberLoading(true);
+                memberApi.getOrders(API_URL, { userId: lineUserId }).then(res => {
+                    if (res && res.success) setOrders(res.orders || []);
+                    setIsMemberLoading(false);
+                }).catch(err => setIsMemberLoading(false));
+            }
+            setStep("orders");
+        }} className={`flex flex-col items-center justify-center flex-1 h-full ${step === 'orders' ? 'text-blue-600 dark:text-blue-400' : 'text-[var(--text-tertiary)]'}`}>
+          <FileText size={22} />
+          <span className="text-[10px] mt-1 font-bold">訂單</span>
+        </button>
+        <button onClick={() => setStep("member")} className={`flex flex-col items-center justify-center flex-1 h-full ${step === 'member' ? 'text-blue-600 dark:text-blue-400' : 'text-[var(--text-tertiary)]'}`}>
+          <User size={22} />
+          <span className="text-[10px] mt-1 font-bold">會員</span>
+        </button>
+      </div>
+    );
+  };
+
   // ── 載入商品與初始化資料（單次 API，後端已過濾） ─────────────────────────────────────────
   const loadAllData = async () => {
     setLoading(true);
@@ -229,9 +288,59 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
       // 1. 獲取 LINE 使用者資訊
       const profile = await window.liff.getProfile();
-      if (profile?.displayName) {
-        const saved = localStorage.getItem(LS_KEY);
-        if (!saved) setCustomerName(profile.displayName);
+      if (profile?.userId) {
+        setLineUserId(profile.userId);
+        if (profile.pictureUrl) setLinePictureUrl(profile.pictureUrl);
+        
+        // 呼叫後端 API 取得會員資料
+        try {
+          const mRes = await memberApi.getMember(API_URL, {
+            userId: profile.userId,
+            displayName: profile.displayName || "",
+            pictureUrl: profile.pictureUrl || ""
+          });
+          if (mRes && mRes.success && mRes.member) {
+            setMemberProfile(mRes.member);
+            // 雲端資料與本地 LocalStorage 進行合併
+            const savedStr = localStorage.getItem(LS_KEY);
+            let savedObj = savedStr ? JSON.parse(savedStr) : {};
+            
+            // 後端若有存檔，以後端為主
+            if (mRes.member.ReceiverName) {
+              setCustomerName(mRes.member.ReceiverName);
+              savedObj.name = mRes.member.ReceiverName;
+            } else if (profile.displayName && !savedObj.name) {
+              setCustomerName(profile.displayName);
+              savedObj.name = profile.displayName;
+            } else if (savedObj.name) {
+              setCustomerName(savedObj.name);
+            }
+            
+            if (mRes.member.Phone) {
+              setCustomerPhone(mRes.member.Phone);
+              savedObj.phone = mRes.member.Phone;
+            } else if (savedObj.phone) setCustomerPhone(savedObj.phone);
+            
+            if (mRes.member.Community) {
+              setSelectedBuilding(mRes.member.Community);
+              savedObj.building = mRes.member.Community;
+            } else if (savedObj.building) setSelectedBuilding(savedObj.building);
+            
+            if (mRes.member.FloorRoom) {
+              setDetailAddress(mRes.member.FloorRoom);
+              savedObj.detailAddress = mRes.member.FloorRoom;
+            } else if (savedObj.detailAddress) setDetailAddress(savedObj.detailAddress);
+            
+            localStorage.setItem(LS_KEY, JSON.stringify(savedObj));
+          }
+        } catch (mErr) {
+          console.error("Fetch member failed:", mErr);
+          // Fallback 至純本地機制
+          if (profile.displayName) {
+            const saved = localStorage.getItem(LS_KEY);
+            if (!saved) setCustomerName(profile.displayName);
+          }
+        }
       }
 
       // 2. 再次確認 groupId（in-client 環境下 context 應該有值）
@@ -250,6 +359,32 @@ export default function LiffOrderPage({ user, apiUrl }) {
     }
   };
 
+  const syncMemberToCloud = async () => {
+    if (!lineUserId) return;
+    try {
+      await memberApi.saveMember(API_URL, {
+        userId: lineUserId,
+        displayName: customerName,
+        pictureUrl: linePictureUrl,
+        receiverName: customerName,
+        phone: customerPhone,
+        community: selectedBuilding,
+        floorRoom: detailAddress,
+        remark: note
+      });
+    } catch (err) {
+      console.warn("Sync member failed", err);
+    }
+  };
+
+  // 會員資料自動同步 (Debounce)
+  useEffect(() => {
+    if (!lineUserId || step !== "form") return;
+    const timer = setTimeout(() => {
+      syncMemberToCloud();
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [customerName, customerPhone, selectedBuilding, detailAddress, note, step, lineUserId]);
 
   useEffect(() => {
     let active = true;
@@ -1436,7 +1571,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
         >
           <button
             onClick={() => {
-              if (canProceed) setStep("confirm");
+              if (canProceed) {
+                syncMemberToCloud();
+                setStep("confirm");
+              }
             }}
             className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${canProceed
                 ? "btn-primary shadow-md shadow-blue-500/20"
@@ -1446,6 +1584,245 @@ export default function LiffOrderPage({ user, apiUrl }) {
             下一步：確認訂單明細 <ArrowRight size={16} />
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (step === "member") {
+    return (
+      <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
+        <div className="h-[60px] px-4 flex items-center bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] shadow-sm">
+          <button onClick={() => setStep("shop")} className="p-2 -ml-2 text-[var(--text-secondary)]">
+            <ChevronLeft size={24} />
+          </button>
+          <h2 className="ml-2 font-bold text-lg">會員中心</h2>
+        </div>
+        <div className="flex-1 overflow-y-auto pb-6" style={{ WebkitOverflowScrolling: "touch" }}>
+          {/* Profile & Greeting Section */}
+          <div className="bg-[var(--bg-secondary)] px-6 pt-6 pb-6 mb-2 border-b border-[var(--border-primary)] flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+                  👋 {memberProfile?.DisplayName || customerName || "會員您好"}
+                </div>
+                <div className="text-sm text-[var(--text-secondary)] mt-1">歡迎回來！</div>
+              </div>
+              <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow flex-shrink-0">
+                {linePictureUrl ? (
+                  <img src={linePictureUrl} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    <User size={28} />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 配送日小卡 */}
+            <div className="mt-1 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30 rounded-xl p-4 flex justify-between items-center">
+              <div>
+                <div className="text-xs text-blue-600 dark:text-blue-400 font-bold mb-1">今天配送日</div>
+                <div className="text-lg font-bold text-[var(--text-primary)]">6/28</div>
+                <div className="text-xs text-[var(--text-secondary)]">下午15:00~17:00</div>
+              </div>
+              <Package size={32} className="text-blue-200 dark:text-blue-800" />
+            </div>
+
+            {/* 奶包金 & 會員卡 */}
+            <div className="flex gap-3 mt-1">
+              <div className="flex-1 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-100 dark:border-amber-800/30 rounded-xl p-4">
+                <div className="text-xs text-amber-700 dark:text-amber-500 font-bold flex items-center gap-1 mb-1"><Banknote size={14}/> 奶包金餘額</div>
+                <div className="text-2xl font-black text-amber-600 dark:text-amber-400">${memberProfile?.WalletBalance || 0}</div>
+              </div>
+              <div className="flex-1 bg-gradient-to-br from-gray-50 to-slate-50 dark:from-gray-800 dark:to-slate-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col justify-between">
+                <div className="text-xs text-gray-500 dark:text-gray-400 font-bold flex items-center gap-1"><CheckCircle size={14}/> 會員等級</div>
+                <div className="text-base font-bold text-[var(--text-primary)] mt-1">{memberProfile?.MemberLevel || '一般會員'}</div>
+              </div>
+            </div>
+
+            {/* 快捷操作按鈕 */}
+            <div className="flex gap-3 mt-1">
+              <button onClick={() => setStep("shop")} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400"><RotateCcw size={20}/></div>
+                <span className="text-xs font-bold text-[var(--text-primary)]">再訂一次</span>
+              </button>
+              <button onClick={() => {
+                  const ordersHeader = document.getElementById("orders-header");
+                  if (ordersHeader) ordersHeader.scrollIntoView({ behavior: 'smooth' });
+                }} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400"><History size={20}/></div>
+                <span className="text-xs font-bold text-[var(--text-primary)]">查看訂單</span>
+              </button>
+              <button className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-tr from-transparent to-rose-500/10 pointer-events-none"></div>
+                <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-900/50 flex items-center justify-center text-rose-600 dark:text-rose-400"><Package size={20}/></div>
+                <span className="text-xs font-bold text-[var(--text-primary)]">最新優惠</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        {renderBottomNav()}
+      </div>
+    );
+  }
+
+  if (step === "orders") {
+    return (
+      <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
+        <div className="h-[60px] px-4 flex items-center bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] shadow-sm">
+          <h2 className="font-bold text-lg">我的訂單</h2>
+        </div>
+        <div className="flex-1 overflow-y-auto pb-6 pt-4" style={{ WebkitOverflowScrolling: "touch" }}>
+          <div className="px-3 flex flex-col gap-3">
+            {isMemberLoading ? (
+              <div className="py-10 flex flex-col items-center justify-center text-[var(--text-tertiary)]">
+                <RefreshCw size={24} className="animate-spin mb-2" />
+                <span className="text-sm">載入中...</span>
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="py-10 text-center text-[var(--text-tertiary)] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">
+                <Package size={32} className="mx-auto mb-2 opacity-50" />
+                沒有訂單紀錄
+              </div>
+            ) : (
+              orders.map(o => (
+                <div key={o.OrderId} className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl overflow-hidden shadow-sm">
+                  <div className="px-4 py-3 border-b border-[var(--border-primary)] flex justify-between items-center bg-[var(--bg-tertiary)]">
+                    <span className="text-sm font-medium text-[var(--text-secondary)]">{o.OrderId}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                      o.Status === 'CONFIRMED' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                    }`}>{o.Status}</span>
+                  </div>
+                  <div className="p-4 flex flex-col gap-2 text-sm text-[var(--text-secondary)]">
+                    <div className="flex gap-2"><Clock size={16} className="mt-0.5 opacity-70 flex-shrink-0"/> <span>{new Date(o.CreatedAt).toLocaleString()}</span></div>
+                    <div className="flex gap-2"><MapPin size={16} className="mt-0.5 opacity-70 flex-shrink-0"/> <span className="line-clamp-2">{o.DeliveryAddress}</span></div>
+                    <div className="flex gap-2"><CreditCard size={16} className="mt-0.5 opacity-70 flex-shrink-0"/> <span>{o.PaymentMethod} ({o.PaymentStatus || '未付款'})</span></div>
+                    {o.Note && <div className="flex gap-2"><FileText size={16} className="mt-0.5 opacity-70 flex-shrink-0"/> <span>{o.Note}</span></div>}
+                    
+                    <div className="mt-2 pt-2 border-t border-[var(--border-primary)]">
+                      <div className="font-bold text-[var(--text-primary)] mb-2 flex justify-between">
+                        <span>訂單內容</span>
+                        <span className="text-blue-600">Total: ${o.TotalAmount}</span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        {o.items?.map((item, i) => (
+                          <div key={i} className="text-xs flex justify-between">
+                            <span className="truncate flex-1">{item.ProductName} {item.Remark ? `(${item.Remark})` : ''}</span>
+                            <span className="flex-shrink-0 ml-2">x {item.Qty}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-3 border-t border-[var(--border-primary)] bg-[var(--bg-tertiary)]">
+                    <button 
+                      onClick={async () => {
+                        setIsMemberLoading(true);
+                        try {
+                          const res = await memberApi.reorder(API_URL, { orderId: o.OrderId });
+                          if (res && res.success) {
+                            setCart(res.cart || {});
+                            if (res.delivery) {
+                              setSelectedBuilding(res.delivery.community || "");
+                              setDetailAddress(res.delivery.floorRoom || "");
+                            }
+                            if (res.payment) setPaymentMethod(res.payment.method || "");
+                            if (res.remark) setNote(res.remark.note || "");
+                            
+                            setIsReorder(true);
+                            setStep("confirm");
+                          } else {
+                            alert("讀取訂單失敗");
+                          }
+                        } catch (err) {
+                          alert("網路連線錯誤");
+                        } finally {
+                          setIsMemberLoading(false);
+                        }
+                      }}
+                      className="w-full py-2 flex items-center justify-center gap-2 rounded-lg font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
+                    >
+                      <RotateCcw size={16} /> 再訂一次
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+        {renderBottomNav()}
+      </div>
+    );
+  }
+
+  if (step === "member") {
+    return (
+      <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
+        <div className="h-[60px] px-4 flex items-center bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] shadow-sm">
+          <h2 className="font-bold text-lg">會員中心</h2>
+        </div>
+        <div className="flex-1 overflow-y-auto pb-6" style={{ WebkitOverflowScrolling: "touch" }}>
+          {/* Profile & Greeting Section */}
+          <div className="bg-[var(--bg-secondary)] px-6 pt-6 pb-6 mb-2 border-b border-[var(--border-primary)] flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+                  👋 {memberProfile?.DisplayName || customerName || "會員您好"}
+                </div>
+                <div className="text-sm text-[var(--text-secondary)] mt-1">歡迎回來！</div>
+              </div>
+              <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow flex-shrink-0">
+                {linePictureUrl ? (
+                  <img src={linePictureUrl} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    <User size={28} />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 配送日小卡 */}
+            <div className="mt-1 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30 rounded-xl p-4 flex justify-between items-center">
+              <div>
+                <div className="text-xs text-blue-600 dark:text-blue-400 font-bold mb-1">今天配送日</div>
+                <div className="text-lg font-bold text-[var(--text-primary)]">6/28</div>
+                <div className="text-xs text-[var(--text-secondary)]">下午15:00~17:00</div>
+              </div>
+              <Package size={32} className="text-blue-200 dark:text-blue-800" />
+            </div>
+
+            {/* 奶包金 & 會員卡 */}
+            <div className="flex gap-3 mt-1">
+              <div className="flex-1 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-100 dark:border-amber-800/30 rounded-xl p-4">
+                <div className="text-xs text-amber-700 dark:text-amber-500 font-bold flex items-center gap-1 mb-1"><Banknote size={14}/> 奶包金餘額</div>
+                <div className="text-2xl font-black text-amber-600 dark:text-amber-400">${memberProfile?.WalletBalance || 0}</div>
+              </div>
+              <div className="flex-1 bg-gradient-to-br from-gray-50 to-slate-50 dark:from-gray-800 dark:to-slate-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col justify-between">
+                <div className="text-xs text-gray-500 dark:text-gray-400 font-bold flex items-center gap-1"><CheckCircle size={14}/> 會員等級</div>
+                <div className="text-base font-bold text-[var(--text-primary)] mt-1">{memberProfile?.MemberLevel || '一般會員'}</div>
+              </div>
+            </div>
+
+            {/* 快捷操作按鈕 */}
+            <div className="flex gap-3 mt-1">
+              <button onClick={() => setStep("shop")} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400"><RotateCcw size={20}/></div>
+                <span className="text-xs font-bold text-[var(--text-primary)]">再訂一次</span>
+              </button>
+              <button onClick={() => setStep("orders")} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400"><History size={20}/></div>
+                <span className="text-xs font-bold text-[var(--text-primary)]">查看訂單</span>
+              </button>
+              <button className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-tr from-transparent to-rose-500/10 pointer-events-none"></div>
+                <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-900/50 flex items-center justify-center text-rose-600 dark:text-rose-400"><Package size={20}/></div>
+                <span className="text-xs font-bold text-[var(--text-primary)]">最新優惠</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        {renderBottomNav()}
       </div>
     );
   }

@@ -196,7 +196,13 @@ function apiHandler(request) {
         
         // Activity Logging (操作紀錄)
         'logActivity': null, // 所有人都可以記錄自己的活動
-        'getActivityLogs': 'system_activity_logs' // 需要特殊權限才能查看
+        'getActivityLogs': 'system_activity_logs', // 需要特殊權限才能查看
+
+        // 米立微會員中心 V1 (開放給前端會員)
+        'v1_getMember': null,
+        'v1_saveMember': null,
+        'v1_getOrders': null,
+        'v1_reorder': null
     };
 
     // 進行授權校驗 (Authorization)
@@ -229,6 +235,12 @@ function apiHandler(request) {
 
         switch (action) {
             case 'getMe': return user;
+
+            // 米立微會員中心 V1
+            case 'v1_getMember': return typeof v1_getMemberService !== 'undefined' ? v1_getMemberService(payload) : {error: 'Service missing'};
+            case 'v1_saveMember': return typeof v1_saveMemberService !== 'undefined' ? v1_saveMemberService(payload) : {error: 'Service missing'};
+            case 'v1_getOrders': return typeof v1_getOrdersService !== 'undefined' ? v1_getOrdersService(payload) : {error: 'Service missing'};
+            case 'v1_reorder': return typeof v1_reorderService !== 'undefined' ? v1_reorderService(payload) : {error: 'Service missing'};
             
             // 庫存與異動
             case 'adjustInventory': return typeof adjustInventoryService !== 'undefined' ? adjustInventoryService(payload, user) : {error: 'Service missing'};
