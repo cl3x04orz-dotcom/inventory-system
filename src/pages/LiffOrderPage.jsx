@@ -2062,8 +2062,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
           {/* 浮動購物車 */}
           {totalQty > 0 && (
-            <div 
-              className="absolute bottom-0 left-0 right-0 bg-[var(--bg-secondary)]/95 backdrop-blur-sm border-t border-[var(--border-primary)] shadow-2xl px-4 py-3 flex justify-between items-center"
+            <div
+              className="absolute bottom-[60px] left-0 right-0 bg-[var(--bg-secondary)]/95 backdrop-blur-sm border-t border-[var(--border-primary)] shadow-2xl px-4 py-3 flex justify-between items-center"
               style={{ touchAction: "none" }}
             >
               <div className="flex items-center gap-3">
@@ -2201,7 +2201,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
           </div>
         </div>
       )}
-
+      {renderBottomNav()}
     </div>
   );
 }
