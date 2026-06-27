@@ -1647,8 +1647,14 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 <span className="text-xs font-bold text-[var(--text-primary)]">再訂一次</span>
               </button>
               <button onClick={() => {
-                  const ordersHeader = document.getElementById("orders-header");
-                  if (ordersHeader) ordersHeader.scrollIntoView({ behavior: 'smooth' });
+                  if (lineUserId) {
+                      setIsMemberLoading(true);
+                      memberApi.getOrders(apiUrl, { userId: lineUserId }).then(res => {
+                          if (res && res.success) setOrders(res.orders || []);
+                          setIsMemberLoading(false);
+                      }).catch(err => setIsMemberLoading(false));
+                  }
+                  setStep("orders");
                 }} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
                 <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400"><History size={20}/></div>
                 <span className="text-xs font-bold text-[var(--text-primary)]">查看訂單</span>
