@@ -10,9 +10,9 @@ const GB_BINDINGS_SHEET_NAME = 'GroupBuy_GroupBindings';
 const GB_MEMBERS_SHEET_NAME = 'GroupBuy_Members';
 const GB_WALLET_TX_SHEET_NAME = 'GroupBuy_WalletTransactions';
 const GB_NOTIF_LOGS_SHEET_NAME = 'GroupBuy_NotificationLogs';
-const GB_HEADERS = ['OrderId', 'Status', 'CustomerLineId', 'CustomerName', 'CustomerPhone', 'DeliveryAddress', 'SourceGroup', 'Note', 'TotalAmount', 'Source', 'ExpectedDeliveryDate', 'ActualDeliveryDate', 'CreatedAt', 'UpdatedAt', 'ConfirmedAt', 'ConfirmedBy', 'LineDisplayName', 'AcceptedAt', 'PaidAt', 'DeliveringAt', 'DeliveredAt'];
+const GB_HEADERS = ['OrderId', 'OrderNo', 'OrderVersion', 'CommunityId', 'CampaignId', 'CommunityNameSnapshot', 'CampaignNameSnapshot', 'CampaignTypeSnapshot', 'DeliveryDateSnapshot', 'DeliveryTimeSnapshot', 'PaymentMethodSnapshot', 'DeliveryInstructionSnapshot', 'Status', 'DeliveryStatus', 'CustomerLineId', 'CustomerName', 'CustomerPhone', 'DeliveryAddress', 'SourceGroup', 'Note', 'TotalAmount', 'Source', 'ExpectedDeliveryDate', 'ActualDeliveryDate', 'CreatedAt', 'UpdatedAt', 'ConfirmedAt', 'ConfirmedBy', 'LineDisplayName', 'AcceptedAt', 'PaidAt', 'DeliveringAt', 'DeliveredAt'];
 const GB_DETAIL_HEADERS = ['OrderId', 'ProductId', 'ProductName', 'UnitPrice', 'Qty', 'Subtotal'];
-const GB_MEMBERS_HEADERS = ['MemberNo', 'MemberId', 'DisplayName', 'PictureUrl', 'ReceiverName', 'Phone', 'Community', 'FloorRoom', 'DetailAddress', 'Remark', 'MemberStatus', 'WalletBalance', 'WalletTransactions', 'TotalOrders', 'TotalAmount', 'LastOrderAt', 'LastLoginAt', 'LoginHistory', 'MemberLevel', 'ReferredBy', 'CouponIds', 'DefaultPayment', 'FavoriteProducts', 'CreatedAt', 'UpdatedAt'];
+const GB_MEMBERS_HEADERS = ['MemberNo', 'MemberId', 'DisplayName', 'PictureUrl', 'ReceiverName', 'Phone', 'Community', 'FloorRoom', 'DetailAddress', 'Remark', 'MemberStatus', 'WalletBalance', 'WalletTransactions', 'TotalOrders', 'TotalAmount', 'LastOrderAt', 'LastLoginAt', 'LoginHistory', 'MemberLevel', 'ReferredBy', 'CouponIds', 'DefaultPayment', 'FavoriteProducts', 'DefaultCommunityId', 'CreatedAt', 'UpdatedAt'];
 
 function initGroupBuySheets_() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();

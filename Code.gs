@@ -87,7 +87,7 @@ function apiHandler(request) {
     if (action === 'loginAdminByPassword') return typeof loginAdminByPassword !== 'undefined' ? loginAdminByPassword(payload) : { error: '後端服務缺失: loginAdminByPassword' };
 
     // 身份驗證失敗攔截 (LIFF 公開路徑可豁免驗證)
-    const publicLiffActions = ['v1_getMember', 'v1_saveMember', 'v1_getOrders', 'v1_reorder', 'getLiffInitData', 'savePendingOrder'];
+    const publicLiffActions = ['v1_getMember', 'v1_saveMember', 'v1_getOrders', 'v1_reorder', 'getLiffInitData', 'savePendingOrder', 'v2_getLiffInitData', 'v2_createOrder', 'v2_getCommunities', 'v2_getCampaigns'];
     
     if (!publicLiffActions.includes(action)) {
         if (!user) {
@@ -162,6 +162,8 @@ function apiHandler(request) {
         'getBuildingSettings': null,
         'saveBuildingSettings': 'sales_pending',
         'getLiffInitData': null,
+        'v2_getLiffInitData': null,
+        'v2_createOrder': null,
         
         // Finance (財務管理)
         'getExpenditures': null, // [Modification] Anyone can call, filtering happens in service
@@ -276,6 +278,12 @@ function apiHandler(request) {
                     return res;
                 }
             // Group Buy Orders (團購)
+            case 'v2_getLiffInitData': return typeof v2_getLiffInitDataService !== 'undefined' ? v2_getLiffInitDataService(payload) : {error: '後端服務缺失: v2_getLiffInitDataService'};
+            case 'v2_createOrder': return typeof v2_createOrderService !== 'undefined' ? v2_createOrderService(payload) : {error: '後端服務缺失: v2_createOrderService'};
+            case 'v2_getCommunities': return typeof v2_getCommunitiesService !== 'undefined' ? v2_getCommunitiesService(payload) : {error: '後端服務缺失: v2_getCommunitiesService'};
+            case 'v2_getCampaigns': return typeof v2_getCampaignsService !== 'undefined' ? v2_getCampaignsService(payload) : {error: '後端服務缺失: v2_getCampaignsService'};
+            case 'v2_saveCommunity': return typeof v2_saveCommunityService !== 'undefined' ? v2_saveCommunityService(payload, user) : {error: '後端服務缺失: v2_saveCommunityService'};
+            case 'v2_saveCampaign': return typeof v2_saveCampaignService !== 'undefined' ? v2_saveCampaignService(payload, user) : {error: '後端服務缺失: v2_saveCampaignService'};
             case 'savePendingOrder': return typeof savePendingOrderService !== 'undefined' ? savePendingOrderService(payload, user) : {error: '後端服務缺失: savePendingOrderService'};
             case 'getPendingOrders': return typeof getPendingOrdersService !== 'undefined' ? getPendingOrdersService(payload, user) : {error: '後端服務缺失: getPendingOrdersService'};
             case 'updatePendingOrder': return typeof updatePendingOrderService !== 'undefined' ? updatePendingOrderService(payload, user) : {error: '後端服務缺失: updatePendingOrderService'};

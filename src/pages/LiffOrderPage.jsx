@@ -162,19 +162,24 @@ export default function LiffOrderPage({ user, apiUrl }) {
     );
   };
 
+  // ── 新增：V2 架構狀態 ─────────────────────────────────────────
+  const [currentCommunity, setCurrentCommunity] = useState(null);
+  const [activeCampaign, setActiveCampaign] = useState(null);
+  const [nextOpenTime, setNextOpenTime] = useState(null);
+
   // ── 載入商品與初始化資料（單次 API，後端已過濾） ─────────────────────────────────────────
   const loadAllData = async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams(window.location.search);
-      const buildingParam = params.get("building") || "";
+      const cParam = params.get("c") || "";
       const urlGrp = params.get("grp") || "";
 
       const initData = await callGAS(
         apiUrl,
-        "getLiffInitData",
+        "v2_getLiffInitData",
         {
-          building: buildingParam,
+          c: cParam,
           grp: urlGrp
         },
         user?.token
@@ -195,13 +200,17 @@ export default function LiffOrderPage({ user, apiUrl }) {
             setActiveCategory(firstCat);
           }
         }
-        // B. 處理群組對照表
-        if (initData.groupBindings && typeof initData.groupBindings === "object") {
-          setGroupBindings(initData.groupBindings);
+        // B. 處理 V2 社區與檔期資料
+        if (initData.community) {
+          setCurrentCommunity(initData.community);
+          // 為了相容部分舊邏輯，將 selectedBuilding 設為 CommunityName
+          setSelectedBuilding(initData.community.CommunityName);
         }
-        // C. 處理大樓開團時間設定
-        if (Array.isArray(initData.buildingSettings)) {
-          setBuildingSettings(initData.buildingSettings);
+        if (initData.activeCampaign) {
+          setActiveCampaign(initData.activeCampaign);
+        }
+        if (initData.nextOpenTime) {
+          setNextOpenTime(initData.nextOpenTime);
         }
       }
     } catch (err) {
@@ -885,11 +894,13 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
       const res = await callGAS(
         apiUrl,
-        "savePendingOrder",
+        "v2_createOrder",
         {
           customerName,
           customerPhone,
           deliveryAddress: getFullAddress(),
+          CommunityId: currentCommunity?.CommunityId || "",
+          CampaignId: activeCampaign?.CampaignId || "",
           sourceGroup: selectedBuilding === "其它" ? otherBuildingText.trim() : (selectedBuilding || "一般散客"),
           note,
           paymentMethod,
