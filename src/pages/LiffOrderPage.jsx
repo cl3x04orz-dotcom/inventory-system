@@ -44,6 +44,16 @@ const LINE_PAY_URL = "https://line.me/ti/p/kjGUUdBqLE";
 const LINE_CONTACT_URL = "https://line.me/R/ti/p/@839rpabi";
 const LS_KEY = "mlw_customer"; // LocalStorage key
 
+// 自動補 0 輔助函數 (針對 Google Sheets 可能將 09xx 當成數字導致遺失首 0)
+const formatTaiwanPhone = (phone) => {
+  if (!phone) return "";
+  let str = String(phone).replace(/\D/g, "");
+  if (str.length === 9 && str.startsWith("9")) {
+    str = "0" + str;
+  }
+  return str;
+};
+
 // 全域鎖：防止 React 嚴格模式或重複 Render 觸發多次 LIFF 初始化與登入轉址
 let isLiffInitStarted = false;
 
@@ -329,9 +339,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
             }
             
             if (mRes.member.Phone) {
-              setCustomerPhone(mRes.member.Phone);
-              savedObj.phone = mRes.member.Phone;
-            } else if (savedObj.phone) setCustomerPhone(savedObj.phone);
+              const formattedPhone = formatTaiwanPhone(mRes.member.Phone);
+              setCustomerPhone(formattedPhone);
+              savedObj.phone = formattedPhone;
+            } else if (savedObj.phone) setCustomerPhone(formatTaiwanPhone(savedObj.phone));
             
             if (mRes.member.Community) {
               setSelectedBuilding(mRes.member.Community);
@@ -797,7 +808,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
           }
         }
       }
-      if (saved.phone) setCustomerPhone(saved.phone);
+      if (saved.phone) setCustomerPhone(formatTaiwanPhone(saved.phone));
 
       const isLocked = !!lockedBuilding;
 
