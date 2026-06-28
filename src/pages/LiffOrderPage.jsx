@@ -185,9 +185,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
         user?.token
       );
       if (initData) {
+        // V2 回傳包裝在 data 屬性內
+        const resData = initData.data || initData;
+        
         // A. 處理商品
-        if (Array.isArray(initData.products)) {
-          const activeProds = initData.products.filter((p) => p.isActive);
+        if (Array.isArray(resData.products)) {
+          const activeProds = resData.products.filter((p) => p.isActive);
           setProducts(activeProds);
 
           // 自動將第一個分類設為 Active
@@ -201,16 +204,16 @@ export default function LiffOrderPage({ user, apiUrl }) {
           }
         }
         // B. 處理 V2 社區與檔期資料
-        if (initData.community) {
-          setCurrentCommunity(initData.community);
+        if (resData.community) {
+          setCurrentCommunity(resData.community);
           // 為了相容部分舊邏輯，將 selectedBuilding 設為 CommunityName
-          setSelectedBuilding(initData.community.CommunityName);
+          setSelectedBuilding(resData.community.CommunityName);
         }
-        if (initData.activeCampaign) {
-          setActiveCampaign(initData.activeCampaign);
+        if (resData.activeCampaign) {
+          setActiveCampaign(resData.activeCampaign);
         }
-        if (initData.nextOpenTime) {
-          setNextOpenTime(initData.nextOpenTime);
+        if (resData.nextOpenTime) {
+          setNextOpenTime(resData.nextOpenTime);
         }
       }
     } catch (err) {

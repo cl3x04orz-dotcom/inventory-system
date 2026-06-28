@@ -85,10 +85,17 @@ function v2_getLiffInitDataService(payload) {
         }
     }
     
+    let products = getCachedData('liff_products');
+    if (!products) {
+        products = typeof getProductsService !== 'undefined' ? getProductsService() : [];
+        setCachedData('liff_products', products, 21600); // 6 小時
+    }
+    
     return ApiResponse.success({
         community: activeComm,
         activeCampaign: activeCampaign,
-        nextOpenTime: nextCampaign ? nextCampaign.startTime : null
+        nextOpenTime: nextCampaign ? nextCampaign.startTime : null,
+        products: products
     });
 }
 
