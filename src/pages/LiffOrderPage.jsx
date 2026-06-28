@@ -1316,16 +1316,22 @@ export default function LiffOrderPage({ user, apiUrl }) {
   // 填寫資料頁
   // ════════════════════════════════════════════════════════════
   if (step === "form") {
-    const isPhoneValid = /^09\d{8}$/.test(customerPhone.trim());
+    const safePhone = String(customerPhone || "");
+    const safeName = String(customerName || "");
+    const safeAddress = String(detailAddress || "");
+    const safeOther = String(otherBuildingText || "");
+    const safeTransfer = String(transferLastFive || "");
+
+    const isPhoneValid = /^09\d{8}$/.test(safePhone.trim());
     const isBuildingValid =
       selectedBuilding &&
-      (selectedBuilding !== "其它" || otherBuildingText.trim());
+      (selectedBuilding !== "其它" || safeOther.trim());
     const canProceed =
-      customerName.trim() &&
+      safeName.trim() &&
       isPhoneValid &&
       isBuildingValid &&
-      detailAddress.trim() &&
-      (paymentMethod !== "轉帳" || transferLastFive.trim().length === 5);
+      safeAddress.trim() &&
+      (paymentMethod !== "轉帳" || safeTransfer.trim().length === 5);
 
     const paymentOptions = [
       {
@@ -1402,7 +1408,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 }}
                 maxLength={10}
               />
-              {customerPhone.trim() && !/^09\d{8}$/.test(customerPhone.trim()) && (
+              {safePhone.trim() && !/^09\d{8}$/.test(safePhone.trim()) && (
                 <p className="text-[11px] text-red-500 font-medium">
                   ⚠️ 請輸入正確的 10 位數手機號碼 (09 開頭)
                 </p>
