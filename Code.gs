@@ -201,9 +201,6 @@ function apiHandler(request) {
         'updateUserStatus': 'system_config',
         
         // Activity Logging (操作紀錄)
-        'logActivity': null, // 所有人都可以記錄自己的活動
-        'getActivityLogs': 'system_activity_logs', // 需要特殊權限才能查看
-
         // 米立微會員中心 V1 (開放給前端會員)
         'v1_getMember': null,
         'v1_saveMember': null,
@@ -423,9 +420,6 @@ function apiHandler(request) {
             case 'markPayableAsPaid': return typeof markPayableAsPaidService !== 'undefined' ? markPayableAsPaidService(payload) : {error: 'Service missing'};
 
             // Activity Logging (操作紀錄)
-            case 'logActivity': return typeof logActivityService !== 'undefined' ? logActivityService(payload) : {error: 'Service missing'};
-            case 'getActivityLogs': return typeof getActivityLogsService !== 'undefined' ? getActivityLogsService(payload, user.role, user.username) : {error: 'Service missing'};
-
             default: 
                 // [Hex Debug] 若發生未知動作，記錄其 Hex 編碼以檢查有無不可見字元
                 var actionHex = "";
@@ -477,7 +471,7 @@ function login(payload) {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
     if (!sheet) return { error: "使用者資料庫不存在" };
 
-    var data = sheet.getDataRange().getDisplayValues();
+    var data = sheet.getDataRange().getValues();
     
     for (var i = 1; i < data.length; i++) {
         var rowUser = data[i][1]; 
@@ -547,7 +541,7 @@ function getUsersService() {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
     if (!sheet) return [];
   
-    var data = sheet.getDataRange().getDisplayValues();
+    var data = sheet.getDataRange().getValues();
     var users = [];
     
     for (var i = 1; i < data.length; i++) {

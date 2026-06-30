@@ -32,7 +32,6 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import ThemeToggle from './components/ThemeToggle';
 import SessionManager from './utils/SessionManager';
 import { callGAS } from './utils/api';
-import useActivityLogger from './hooks/useActivityLogger';
 import logoImg from './assets/logo.png';
 import {
     LayoutDashboard, ShoppingCart, Archive, LogOut, PackagePlus,
@@ -202,12 +201,6 @@ function AppContent() {
 
 
     // Activity Logger
-    const { logActivity, logLogin, logLogout, logPageView } = useActivityLogger({
-        user,
-        apiUrl: GAS_API_URL,
-        enabled: !!user
-    });
-
     // Initialize SessionManager
     useEffect(() => {
         if (user) {
@@ -215,7 +208,6 @@ function AppContent() {
                 idleTimeout: 30 * 60 * 1000, // 30 分鐘
                 onLogout: (reason) => {
                     console.log('Session timeout:', reason);
-                    logLogout(reason);
                     handleLogout();
                     if (reason === 'IDLE_TIMEOUT') {
                         alert('閒置時間過長,已自動登出');
@@ -371,7 +363,6 @@ function AppContent() {
     // Log page changes
     useEffect(() => {
         if (user && page) {
-            logPageView(page);
         }
     }, [page, user]);
 
@@ -515,14 +506,12 @@ function AppContent() {
         if (!prevUserRef.current && user) {
             // 使用 setTimeout 確保 hook 內部的 state 已更新
             setTimeout(() => {
-                if (logLogin) logLogin();
             }, 500);
         }
         prevUserRef.current = user;
-    }, [user, logLogin]);
+    }, [user]);
 
     const handleLogout = () => {
-        if (logLogout) logLogout('MANUAL');
         setUser(null);
         safeSessionStorage.removeItem('inventory_user');
         if (sessionManager) {
@@ -866,31 +855,31 @@ function AppContent() {
 
                 {checkPermission(page) ? (
                     <>
-                        {page === 'sales' && <SalesPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'inventory' && <InventoryPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'purchase' && <PurchasePage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'sales' && <SalesPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'inventory' && <InventoryPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'purchase' && <PurchasePage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'report' && (
                             <ErrorBoundary>
-                                <ReportPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} setPage={handlePageChange} />
+                                <ReportPage user={user} apiUrl={GAS_API_URL} setPage={handlePageChange} />
                             </ErrorBoundary>
                         )}
-                        {page === 'purchaseHistory' && <PurchaseHistoryPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} setPage={handlePageChange} />}
-                        {page === 'adjustHistory' && <AdjustmentHistoryPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'valuation' && <InventoryValuationPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'stocktake' && <StocktakePage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'stocktakeHistory' && <StocktakeHistoryPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'receivable' && <ReceivablePage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'payable' && <PayablePage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'salesRanking' && <SalesRankingPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'customerRanking' && <CustomerRankingPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'customerAnalytics' && <CustomerAnalyticsPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'profitAnalysis' && <ProfitAnalysisPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'turnoverRate' && <TurnoverRatePage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'costCalculation' && <CostCalculationPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'expenditureManagement' && <ExpenditureManagementPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'incomeStatement' && <IncomeStatementPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'permissionControl' && <PermissionControlPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
-                        {page === 'payroll' && <PayrollPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'purchaseHistory' && <PurchaseHistoryPage user={user} apiUrl={GAS_API_URL} setPage={handlePageChange} />}
+                        {page === 'adjustHistory' && <AdjustmentHistoryPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'valuation' && <InventoryValuationPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'stocktake' && <StocktakePage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'stocktakeHistory' && <StocktakeHistoryPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'receivable' && <ReceivablePage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'payable' && <PayablePage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'salesRanking' && <SalesRankingPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'customerRanking' && <CustomerRankingPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'customerAnalytics' && <CustomerAnalyticsPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'profitAnalysis' && <ProfitAnalysisPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'turnoverRate' && <TurnoverRatePage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'costCalculation' && <CostCalculationPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'expenditureManagement' && <ExpenditureManagementPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'incomeStatement' && <IncomeStatementPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'permissionControl' && <PermissionControlPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'payroll' && <PayrollPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'activityLog' && <ActivityLogPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'liffOrder' && <LiffOrderPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'pendingOrders' && <PendingOrdersPage user={user} apiUrl={GAS_API_URL} />}
