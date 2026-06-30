@@ -25,7 +25,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     const fetchOrders = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await callGAS(apiUrl, 'getPendingOrders', { status: activeTab }, user.token);
+            const data = await callGAS(apiUrl, 'v2_getOrders', { status: activeTab }, user.token);
             if (Array.isArray(data)) {
                 setOrders(data);
             }
@@ -74,7 +74,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
         setLoading(true);
         try {
-            const res = await callGAS(apiUrl, 'confirmPendingOrder', { orderId }, user.token);
+            const res = await callGAS(apiUrl, 'v2_confirmOrder', { orderId }, user.token);
             if (res && res.error) {
                 throw new Error(res.error);
             }
@@ -90,7 +90,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         if (!window.confirm(`確定要【刪除】訂單 ${orderId} 嗎？\n此動作無法復原，通常用於客人誤按送出的情況。`)) return;
         setLoading(true);
         try {
-            const res = await callGAS(apiUrl, 'deletePendingOrder', { orderId }, user.token);
+            const res = await callGAS(apiUrl, 'v2_deleteOrder', { orderId }, user.token);
             if (res?.error) throw new Error(res.error);
             fetchOrders();
         } catch (error) {
@@ -225,7 +225,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
         setIsSaving(true);
         try {
-            const res = await callGAS(apiUrl, 'updatePendingOrder', {
+            const res = await callGAS(apiUrl, 'v2_updateOrder', {
                 orderId: editingOrder.orderId,
                 customerName: editingOrder.customerName,
                 customerPhone: editingOrder.customerPhone,

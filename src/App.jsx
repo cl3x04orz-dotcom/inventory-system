@@ -24,9 +24,7 @@ import PermissionControlPage from './pages/PermissionControlPage';
 import PayrollPage from './pages/PayrollPage';
 import ActivityLogPage from './pages/ActivityLogPage';
 import LiffOrderPage from './pages/LiffOrderPage';
-import PendingOrdersPage from './pages/PendingOrdersPage';
 import ProductManagementPage from './pages/ProductManagementPage';
-import GroupBuySettingsPage from './pages/GroupBuySettingsPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './contexts/ThemeContext';
 import ThemeToggle from './components/ThemeToggle';
@@ -617,11 +615,9 @@ function AppContent() {
                                         </MobileNavGroup>
                                     )}
                                     {/* 團購管理 Group */}
-                                    {(user.role === 'BOSS' || checkPermission('liffOrder') || checkPermission('pendingOrders') || checkPermission('products')) && (
+                                    {(user.role === 'BOSS' || checkPermission('liffOrder')  || checkPermission('products')) && (
                                         <MobileNavGroup label="團購" icon={Users}>
                                             {checkPermission('liffOrder') && <NavItem label="團購一鍵下單" icon={ShoppingCart} onClick={() => handlePageChange('liffOrder')} active={page === 'liffOrder'} />}
-                                            {checkPermission('pendingOrders') && <NavItem label="待確認訂單審核" icon={ClipboardList} onClick={() => handlePageChange('pendingOrders')} active={page === 'pendingOrders'} />}
-                                            {checkPermission('groupBuySettings') && <NavItem label="開團時段與網址" icon={Link} onClick={() => handlePageChange('groupBuySettings')} active={page === 'groupBuySettings'} />}
                                             {checkPermission('products') && <NavItem label="商品屬性管理" icon={Edit2} onClick={() => handlePageChange('products')} active={page === 'products'} />}
                                         </MobileNavGroup>
                                     )}
@@ -696,18 +692,16 @@ function AppContent() {
 
                         {/* Column 2: 團購 */}
                         <div className="flex justify-center">
-                            {(user.role === 'BOSS' || checkPermission('liffOrder') || checkPermission('pendingOrders') || checkPermission('products')) && (
+                            {(user.role === 'BOSS' || checkPermission('liffOrder')  || checkPermission('products')) && (
                                 <NavDropdown
                                     id="groupbuy"
                                     label="團購"
                                     icon={Users}
                                     openDropdown={openDropdown}
                                     setOpenDropdown={setOpenDropdown}
-                                    active={['liffOrder', 'pendingOrders', 'groupBuySettings', 'products'].includes(page)}
+                                    active={['liffOrder', 'products'].includes(page)}
                                 >
                                     {checkPermission('liffOrder') && <NavItem label="團購一鍵下單" icon={ShoppingCart} onClick={() => handlePageChange('liffOrder')} active={page === 'liffOrder'} />}
-                                    {checkPermission('pendingOrders') && <NavItem label="待確認訂單審核" icon={ClipboardList} onClick={() => handlePageChange('pendingOrders')} active={page === 'pendingOrders'} />}
-                                    {checkPermission('groupBuySettings') && <NavItem label="開團時段與網址" icon={Link} onClick={() => handlePageChange('groupBuySettings')} active={page === 'groupBuySettings'} />}
                                     {checkPermission('products') && <NavItem label="商品屬性管理" icon={Edit2} onClick={() => handlePageChange('products')} active={page === 'products'} />}
                                 </NavDropdown>
                             )}
@@ -882,8 +876,6 @@ function AppContent() {
                         {page === 'payroll' && <PayrollPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'activityLog' && <ActivityLogPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'liffOrder' && <LiffOrderPage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'pendingOrders' && <PendingOrdersPage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'groupBuySettings' && <GroupBuySettingsPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'products' && <ProductManagementPage user={user} apiUrl={GAS_API_URL} />}
                     </>
                 ) : (

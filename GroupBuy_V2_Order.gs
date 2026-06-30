@@ -131,3 +131,112 @@ function v2_createOrderService(payload) {
 
     return ApiResponse.success({ orderId, orderNo });
 }
+
+// --- Migrated Admin Order Services ---
+function savePendingOrderService(payload, user) {
+    const { customerName, customerPhone, deliveryAddress, sourceGroup, note, items, paymentMethod, transferLastFive, lineDisplayName, lineUserId, source } = payload;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+        throw new Error('訂單明細不得為空');
+    }
+
+    const { orderSheet, detailSheet } = initGroupBuySheets_();
+    const orderId = generateOrderId_();
+    const now = new Date();
+
+    const totalAmount = items.reduce((sum, item) => sum + (Number(item.unitPrice) * Number(item.qty)), 0);
+
+    // 根據付款方式設定初始付款狀態
+    let paymentStatus = '';
+    if (paymentMethod === '現金') paymentStatus = '貨到付款';
+    else if (paymentMethod === '轉帳') paymentStatus = '待對帳';
+    else if (paymentMethod === 'LINE Pay') paymentStatus = '待確認';
+
+    // 動態找欄位 index，避免欄位順序不同造成錯誤
+    const headers = orderSheet.getRange(1, 1, 1, orderSheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    const row = new Array(headers.length).fill('');
+    const set = (name, val) => { const i = headers.indexOf(name); if (i >= 0) row[i] = val; };
+
+    set('OrderId', orderId);
+    set('Status', 'PENDING');
+    set('CustomerLineId', lineUserId || user.lineUserId || user.username || '');
+    set('CustomerName', customerName || '');
+    set('CustomerPhone', customerPhone || '');
+    set('DeliveryAddress', deliveryAddress || '');
+    set('SourceGroup', sourceGroup || '');
+    set('Note', note || '');
+    set('TotalAmount', totalAmount);
+    set('PaymentMethod', paymentMethod || '');
+    set('TransferLastFive', transferLastFive || '');
+    set('PaymentStatus', paymentStatus);
+    set('LineDisplayName', lineDisplayName || '');
+    set('Source', source || 'NORMAL');
+    set('CreatedAt', now);
+    set('UpdatedAt', now);
+
+    orderSheet.appendRow(row);
+
+    // 寫入明細
+    items.forEach(item => {
+        const subtotal = Number(item.unitPrice) * Number(item.qty);
+        const detailHeaders = detailSheet.getRange(1, 1, 1, detailSheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+        const remarkIdx = detailHeaders.findIndex(h => h === 'Remark' || h === '備註' || h === '商品備註');
+        
+        const row = [
+            orderId,
+            item.productId || '',
+            item.productName || '',
+            Number(item.unitPrice) || 0,
+            Number(item.qty) || 0,
+            subtotal
+        ];
+        if (remarkIdx >= 0) {
+            while (row.length < remarkIdx) row.push('');
+            row[remarkIdx] = item.remark || '';
+        } else {
+            row.push(item.remark || '');
+        }
+        detailSheet.appendRow(row);
+    });
+
+    SpreadsheetApp.flush();
+    return { success: true, orderId };
+}
+
+        return String(val);
+    };
+
+    for (let i = 1; i < rows.length; i++) {
+        const bname = String(rows[i][0] || '').trim();
+        if (!bname) continue;
+        
+        settings.push({
+            building: bname,
+            start_time: formatDate(rows[i][1]),
+            end_time: formatDate(rows[i][2])
+        });
+    }
+    return settings;
+}
+
+    }
+    
+    const parseDate = (str) => {
+        if (!str) return '';
+        const d = new Date(str.replace(/\//g, '-'));
+        return isNaN(d.getTime()) ? str : d;
+    };
+    
+    const sDate = parseDate(start_time);
+    const eDate = parseDate(end_time);
+    
+    if (foundRow !== -1) {
+        sheet.getRange(foundRow, 2).setValue(sDate);
+        sheet.getRange(foundRow, 3).setValue(eDate);
+    } else {
+        sheet.appendRow([building, sDate, eDate]);
+    }
+    SpreadsheetApp.flush();
+    return { success: true };
+}
+

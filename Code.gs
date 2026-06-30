@@ -87,7 +87,7 @@ function apiHandler(request) {
     if (action === 'loginAdminByPassword') return typeof loginAdminByPassword !== 'undefined' ? loginAdminByPassword(payload) : { error: '後端服務缺失: loginAdminByPassword' };
 
     // 身份驗證失敗攔截 (LIFF 公開路徑可豁免驗證)
-    const publicLiffActions = ['v1_getMember', 'v1_saveMember', 'v1_getOrders', 'v1_reorder', 'getLiffInitData', 'savePendingOrder', 'v2_getLiffInitData', 'v2_createOrder', 'v2_getCommunities', 'v2_getCampaigns'];
+    const publicLiffActions = ['v1_getMember', 'v1_saveMember', 'v1_getOrders', 'v1_reorder', 'getLiffInitData', 'v2_getLiffInitData', 'v2_createOrder', 'v2_getCommunities', 'v2_getCampaigns'];
     
     if (!publicLiffActions.includes(action)) {
         if (!user) {
@@ -150,15 +150,10 @@ function apiHandler(request) {
         'updateProductSortOrder': 'system_config',
         'updateProductDetails': 'system_config',
         
-        // Group Buy Orders (團購)
-        'savePendingOrder': null, // 任何登入使用者可下單
-        'getPendingOrders': 'sales_pending',
-        'updatePendingOrder': 'sales_pending',
-        'confirmPendingOrder': 'sales_pending',
-        'deletePendingOrder': 'sales_pending',
-        'getGroupBindings': null,
-        'saveGroupBinding': 'sales_pending',
-        'updateOrderStatus': 'sales_pending',
+        // Group Buy Orders (團購)        'v2_getOrders': 'sales_pending',
+        'v2_updateOrder': 'sales_pending',
+        'v2_confirmOrder': 'sales_pending',
+        'v2_deleteOrder': 'sales_pending',        'v2_updateOrderStatus': 'sales_pending',
         'getBuildingSettings': null,
         'saveBuildingSettings': 'sales_pending',
         'getLiffInitData': null,
@@ -280,14 +275,10 @@ function apiHandler(request) {
             case 'v2_getCommunities': return typeof v2_getCommunitiesService !== 'undefined' ? v2_getCommunitiesService(payload) : {error: '後端服務缺失: v2_getCommunitiesService'};
             case 'v2_getCampaigns': return typeof v2_getCampaignsService !== 'undefined' ? v2_getCampaignsService(payload) : {error: '後端服務缺失: v2_getCampaignsService'};
             case 'v2_saveCommunity': return typeof v2_saveCommunityService !== 'undefined' ? v2_saveCommunityService(payload, user) : {error: '後端服務缺失: v2_saveCommunityService'};
-            case 'v2_saveCampaign': return typeof v2_saveCampaignService !== 'undefined' ? v2_saveCampaignService(payload, user) : {error: '後端服務缺失: v2_saveCampaignService'};
-            case 'savePendingOrder': return typeof savePendingOrderService !== 'undefined' ? savePendingOrderService(payload, user) : {error: '後端服務缺失: savePendingOrderService'};
-            case 'getPendingOrders': return typeof getPendingOrdersService !== 'undefined' ? getPendingOrdersService(payload, user) : {error: '後端服務缺失: getPendingOrdersService'};
-            case 'updatePendingOrder': return typeof updatePendingOrderService !== 'undefined' ? updatePendingOrderService(payload, user) : {error: '後端服務缺失: updatePendingOrderService'};
-            case 'confirmPendingOrder': return typeof confirmPendingOrderService !== 'undefined' ? confirmPendingOrderService(payload, user) : {error: '後端服務缺失: confirmPendingOrderService'};
-            case 'deletePendingOrder': return typeof deletePendingOrderService !== 'undefined' ? deletePendingOrderService(payload, user) : {error: '後端服務缺失: deletePendingOrderService'};
-            case 'getGroupBindings': return typeof getGroupBindingsService !== 'undefined' ? getGroupBindingsService(payload, user) : {error: '後端服務缺失: getGroupBindingsService'};
-            case 'saveGroupBinding':
+            case 'v2_saveCampaign': return typeof v2_saveCampaignService !== 'undefined' ? v2_saveCampaignService(payload, user) : {error: '後端服務缺失: v2_saveCampaignService'};            case 'v2_getOrders': return typeof v2_getOrdersService !== 'undefined' ? v2_getOrdersService(payload, user) : {error: '後端服務缺失: v2_getOrdersService'};
+            case 'v2_updateOrder': return typeof v2_updateOrderService !== 'undefined' ? v2_updateOrderService(payload, user) : {error: '後端服務缺失: v2_updateOrderService'};
+            case 'v2_confirmOrder': return typeof v2_confirmOrderService !== 'undefined' ? v2_confirmOrderService(payload, user) : {error: '後端服務缺失: v2_confirmOrderService'};
+            case 'v2_deleteOrder': return typeof v2_deleteOrderService !== 'undefined' ? v2_deleteOrderService(payload, user) : {error: '後端服務缺失: v2_deleteOrderService'};            case 'saveGroupBinding':
                 {
                     const res = typeof saveGroupBindingService !== 'undefined' ? saveGroupBindingService(payload, user) : {error: '後端服務缺失: saveGroupBindingService'};
                     if (res && !res.error) {
@@ -295,9 +286,7 @@ function apiHandler(request) {
                     }
                     return res;
                 }
-            case 'updateOrderStatus': return typeof updateOrderStatusService !== 'undefined' ? updateOrderStatusService(payload, user) : {error: '後端服務缺失: updateOrderStatusService'};
-            case 'getBuildingSettings': return typeof getBuildingSettingsService !== 'undefined' ? getBuildingSettingsService(payload, user) : {error: '後端服務缺失: getBuildingSettingsService'};
-            case 'saveBuildingSettings':
+            case 'v2_updateOrderStatus': return typeof v2_updateOrderStatusService !== 'undefined' ? v2_updateOrderStatusService(payload, user) : {error: '後端服務缺失: v2_updateOrderStatusService'};            case 'saveBuildingSettings':
                 {
                     const res = typeof saveBuildingSettingsService !== 'undefined' ? saveBuildingSettingsService(payload, user) : {error: '後端服務缺失: saveBuildingSettingsService'};
                     if (res && !res.error) {
@@ -316,9 +305,7 @@ function apiHandler(request) {
 
                     // 2. 群組對照快取
                     let groupBindings = getCachedData('liff_group_bindings');
-                    if (!groupBindings) {
-                        groupBindings = typeof getGroupBindingsService !== 'undefined' ? getGroupBindingsService(payload, user) : {};
-                        setCachedData('liff_group_bindings', groupBindings, 21600); // 6 小時
+                    if (!groupBindings) {                        setCachedData('liff_group_bindings', groupBindings, 21600); // 6 小時
                     }
 
                     // 3. 大樓設定快取
@@ -361,8 +348,7 @@ function apiHandler(request) {
                     
                     return {
                         products: products,
-                        groupBindings: groupBindings,
-                        buildingSettings: buildingSettings
+                        groupBindings:                        buildingSettings: buildingSettings
                     };
                 }
             case 'getInventory': return typeof getInventoryService !== 'undefined' ? getInventoryService() : {error: '後端服務缺失: getInventoryService'}; 
@@ -1011,13 +997,7 @@ function warmup() {
       }
     }
     
-    // 2. 預熱群組對照快取
-    if (typeof getGroupBindingsService !== 'undefined') {
-      const groupBindings = getGroupBindingsService();
-      if (groupBindings) {
-        setCachedData('liff_group_bindings', groupBindings, 21600); // 6 小時
-      }
-    }
+    // 2. 預熱群組對照快取    }
     
     // 3. 預熱大樓設定快取
     if (typeof getBuildingSettingsService !== 'undefined') {
