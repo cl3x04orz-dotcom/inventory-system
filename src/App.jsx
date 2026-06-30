@@ -146,7 +146,10 @@ const MobileNavGroup = ({ label, icon: Icon, children }) => {
 
 function AppContent() {
     const [user, setUser] = useState(null); // { token, role, name, ... }
-    const [page, setPage] = useState('sales');
+    const [page, setPage] = useState(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('page') || 'sales';
+    });
     const [openDropdown, setOpenDropdown] = useState(null);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [isOffline, setIsOffline] = useState(false);
