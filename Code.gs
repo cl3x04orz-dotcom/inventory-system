@@ -347,8 +347,7 @@ function apiHandler(request) {
                     }
                     
                     return {
-                        products: products,
-                        groupBindings:                        buildingSettings: buildingSettings
+                        products: products
                     };
                 }
             case 'getInventory': return typeof getInventoryService !== 'undefined' ? getInventoryService() : {error: '後端服務缺失: getInventoryService'}; 
