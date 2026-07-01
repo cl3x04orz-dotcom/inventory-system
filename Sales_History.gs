@@ -41,6 +41,10 @@ function getSalesHistory(payload) {
   const qRep = (salesRep || "").trim().toLowerCase();
 
   const t1 = Date.now();
+  const salesMaxRows = salesSheet.getMaxRows();
+  const salesLastRow = salesSheet.getLastRow();
+  const salesLastCol = salesSheet.getLastColumn();
+
   const salesRows = salesSheet.getDataRange().getValues();
   const t2 = Date.now();
   const IDX_ID = 0;   
@@ -108,6 +112,10 @@ function getSalesHistory(payload) {
   }
   const t3 = Date.now();
 
+  const detailsMaxRows = detailsSheet.getMaxRows();
+  const detailsLastRow = detailsSheet.getLastRow();
+  const detailsLastCol = detailsSheet.getLastColumn();
+
   const detailRows = detailsSheet.getDataRange().getValues();
   const t4 = Date.now();
   const results = [];
@@ -168,7 +176,23 @@ function getSalesHistory(payload) {
       processSalesRows: t3 - t2,
       readDetailsSheet: t4 - t3,
       processDetails: t5 - t4,
-      sortResults: t6 - t5
+      sortResults: t6 - t5,
+      metrics: {
+        sales: {
+          lastRow: salesLastRow,
+          maxRows: salesMaxRows,
+          lastColumn: salesLastCol,
+          totalCellsRead: salesLastRow * salesLastCol,
+          processedRecords: salesRows.length - 1
+        },
+        details: {
+          lastRow: detailsLastRow,
+          maxRows: detailsMaxRows,
+          lastColumn: detailsLastCol,
+          totalCellsRead: detailsLastRow * detailsLastCol,
+          processedRecords: detailRows.length - 1
+        }
+      }
     }
   };
 }
