@@ -452,16 +452,42 @@ function saveDailyRecordService(payload, user) {
  * [Service] 取得員工類型 (輕量查詢，供銷售頁面決定是否顯示工時輸入欄)
  * 任何登入的員工都可以查詢自己的類型
  */
-function getEmpTypeService(payload, user) {
+function getEmpTypeService(payload, user, passedSs) {
     const targetUser = payload.targetUser || user.username;
-    const sheet = initPayrollSheet_('Payroll_Settings', ['Username', 'BaseSalary', 'AttendanceBonus', 'Insurance', 'OffDaysStandard', 'BonusTiersJson', 'EmpType', 'HourlyWage']);
+    
+    const cache = CacheService.getScriptCache();
+    const CACHE_KEY = 'EMP_TYPE_' + targetUser;
+    const cachedStr = cache.get(CACHE_KEY);
+    if (cachedStr) {
+        try {
+            return { empType: JSON.parse(cachedStr).empType, cached: true };
+        } catch (e) {}
+    }
+
+    // Dependency Injection
+    const ss = passedSs || SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName('Payroll_Settings');
+    if (!sheet) {
+        // initPayrollSheet_ fallback
+        sheet = ss.insertSheet('Payroll_Settings');
+        sheet.appendRow(['Username', 'BaseSalary', 'AttendanceBonus', 'Insurance', 'OffDaysStandard', 'BonusTiersJson', 'EmpType', 'HourlyWage']);
+    }
+    
     const data = sheet.getDataRange().getValues();
+    let resultType = 'FULL_TIME'; // 預設正職
     for (let i = 1; i < data.length; i++) {
         if (String(data[i][0]).trim() === String(targetUser).trim()) {
-            return { empType: String(data[i][6] || 'FULL_TIME') };
+            resultType = String(data[i][6] || 'FULL_TIME');
+            break;
         }
     }
-    return { empType: 'FULL_TIME' }; // 預設正職
+    
+    const finalResult = { empType: resultType };
+    try {
+        cache.put(CACHE_KEY, JSON.stringify(finalResult), 300); // 300 秒快取
+    } catch (e) {}
+    
+    return finalResult;
 }
 
 /**

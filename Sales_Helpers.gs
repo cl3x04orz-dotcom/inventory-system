@@ -360,3 +360,17 @@ function getCustomerCategoryMap_() {
   return map;
 }
 
+/**
+ * 失效庫存快取 (Write-Through 策略)
+ * 只要有進貨、退貨、結帳、盤點等會改變庫存的動作，就在最後呼叫此函式。
+ */
+function invalidateStockCache_() {
+  try {
+    const cache = CacheService.getScriptCache();
+    cache.remove('INVENTORY_STOCK_MAP');
+    console.log("Stock cache invalidated successfully.");
+  } catch (e) {
+    console.warn("Failed to invalidate stock cache:", e);
+  }
+}
+

@@ -3,8 +3,8 @@
  * [Service] 產品查詢與排序權重管理
  */
 
-function getProductsService() {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+function getProductsService(passedSs) {
+    var ss = passedSs || SpreadsheetApp.getActiveSpreadsheet();
     var productsSheet = ss.getSheetByName("Products");
     var inventorySheet = ss.getSheetByName("Inventory");
     
@@ -82,32 +82,52 @@ function getProductsService() {
     
     if (idxName === -1) idxName = 1; // Fallback
     
-    // 2. 從 Inventory 分頁彙總庫存
-    var stockMap = {}; // { productId: { stock: 0, originalStock: 0 } }
-    if (inventorySheet) {
-        var invData = inventorySheet.getDataRange().getValues();
-        if (invData.length > 1) {
-            var invHeaders = invData[0].map(h => String(h || '').trim().toLowerCase());
-            var invIdxProductId = invHeaders.findIndex(h => h.includes('productid') || h.includes('產品id'));
-            var invIdxQty = invHeaders.findIndex(h => h.includes('quantity') || h.includes('數量'));
-            var invIdxType = invHeaders.findIndex(h => h.includes('type') || h.includes('類型'));
-            
-            for (var i = 1; i < invData.length; i++) {
-                var invRow = invData[i];
-                var productId = invIdxProductId !== -1 ? String(invRow[invIdxProductId] || '').trim() : '';
-                var qty = invIdxQty !== -1 ? Number(invRow[invIdxQty]) || 0 : 0;
-                var type = invIdxType !== -1 ? String(invRow[invIdxType] || '').trim().toUpperCase() : '';
+    // 2. 從 Inventory 分頁彙總庫存 (加入快取機制)
+    var stockMap = null; // 初始化為 null
+    var cache = CacheService.getScriptCache();
+    var CACHE_KEY = 'INVENTORY_STOCK_MAP';
+    var cachedStockMapStr = cache.get(CACHE_KEY);
+    
+    if (cachedStockMapStr) {
+        try {
+            stockMap = JSON.parse(cachedStockMapStr);
+        } catch (e) {
+            stockMap = null;
+        }
+    }
+    
+    // 如果沒有快取，才執行耗時的 Inventory 掃描
+    if (!stockMap) {
+        stockMap = {};
+        if (inventorySheet) {
+            var invData = inventorySheet.getDataRange().getValues();
+            if (invData.length > 1) {
+                var invHeaders = invData[0].map(h => String(h || '').trim().toLowerCase());
+                var invIdxProductId = invHeaders.findIndex(h => h.includes('productid') || h.includes('產品id'));
+                var invIdxQty = invHeaders.findIndex(h => h.includes('quantity') || h.includes('數量'));
+                var invIdxType = invHeaders.findIndex(h => h.includes('type') || h.includes('類型'));
                 
-                if (!productId) continue;
-                if (!stockMap[productId]) stockMap[productId] = { stock: 0, originalStock: 0 };
-                
-                if (type === 'STOCK') {
-                    stockMap[productId].stock += qty;
-                } else if (type === 'ORIGINAL') {
-                    stockMap[productId].originalStock += qty;
+                for (var i = 1; i < invData.length; i++) {
+                    var invRow = invData[i];
+                    var productIdInv = invIdxProductId !== -1 ? String(invRow[invIdxProductId] || '').trim() : '';
+                    var qty = invIdxQty !== -1 ? Number(invRow[invIdxQty]) || 0 : 0;
+                    var type = invIdxType !== -1 ? String(invRow[invIdxType] || '').trim().toUpperCase() : '';
+                    
+                    if (!productIdInv) continue;
+                    if (!stockMap[productIdInv]) stockMap[productIdInv] = { stock: 0, originalStock: 0 };
+                    
+                    if (type === 'STOCK') {
+                        stockMap[productIdInv].stock += qty;
+                    } else if (type === 'ORIGINAL') {
+                        stockMap[productIdInv].originalStock += qty;
+                    }
                 }
             }
         }
+        // 將計算結果存入快取 (6小時，直到被結帳/進貨等動作清除)
+        try {
+            cache.put(CACHE_KEY, JSON.stringify(stockMap), 21600);
+        } catch (e) {}
     }
     
     // 3. 組合產品資料
@@ -143,8 +163,8 @@ function getProductsService() {
             name: nameCell,
             price: idxPrice !== -1 ? row[idxPrice] : 0,
             packSize: packSize,
-            stock: 0,
-            originalStock: 0,
+            stock: stockMap[productId] ? stockMap[productId].stock : 0,
+            originalStock: stockMap[productId] ? stockMap[productId].originalStock : 0,
             isActive: idxActive !== -1 ? (row[idxActive] === true || row[idxActive] === 'TRUE' || row[idxActive] === '是') : true,
             imageUrl: idxImage !== -1 ? String(row[idxImage] || '').trim() : '',
             expiryDate: expiryStr,
@@ -183,12 +203,6 @@ function getProductsService() {
             } catch (e) {
                 // Ignore parsing errors
             }
-        }
-        
-        // 從 Inventory 取得實際庫存
-        if (stockMap[productId]) {
-            p.stock = stockMap[productId].stock;
-            p.originalStock = stockMap[productId].originalStock;
         }
         
         // 排序權重

@@ -1,7 +1,7 @@
 /**
  * Serves the React App
  */
-const APP_VERSION = '1782897220551';
+const APP_VERSION = '1782900281549';
  // 版本號：A2:3/24
 
 // ── CacheService Helper 函數 ───────────────────────────────────────
@@ -128,6 +128,7 @@ function apiHandler(request) {
         'generatePdf': 'sales_entry', // Allow sales entry to generate PDF
         'getSmartPickSuggestion': 'sales_entry', // [New] AI Replenishment
         'getAllUniqueCustomers': 'sales_entry', // [New] AI Customer List
+        'initSalesPageData': 'sales_entry', // [New] Combined API for SalesPage
         
         // Purchase (進貨管理)
         'addPurchase': 'purchase_entry', 
@@ -247,6 +248,9 @@ function apiHandler(request) {
             case 'v1_saveMember': return typeof v1_saveMemberService !== 'undefined' ? v1_saveMemberService(payload) : {error: 'Service missing'};
             case 'v1_getOrders': return typeof v1_getOrdersService !== 'undefined' ? v1_getOrdersService(payload) : {error: 'Service missing'};
             case 'v1_reorder': return typeof v1_reorderService !== 'undefined' ? v1_reorderService(payload) : {error: 'Service missing'};
+            
+            // 銷售頁面整合 API (解決卡頓)
+            case 'initSalesPageData': return typeof initSalesPageDataService !== 'undefined' ? initSalesPageDataService(payload, user) : {error: 'Service missing'};
             
             // 庫存與異動
             case 'adjustInventory': return typeof adjustInventoryService !== 'undefined' ? adjustInventoryService(payload, user) : {error: 'Service missing'};
@@ -543,9 +547,19 @@ function login(payload) {
 /**
  * [Service] 獲取使用者列表 (已修正讀取方式)
  */
-function getUsersService() {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
-    if (!sheet) return [];
+function getUsersService(passedSs) {
+    const cache = CacheService.getScriptCache();
+    const CACHE_KEY = 'USERS_CACHE_LIST';
+    const cachedStr = cache.get(CACHE_KEY);
+    if (cachedStr) {
+        try {
+            return { list: JSON.parse(cachedStr), cached: true };
+        } catch (e) {}
+    }
+
+    var ss = passedSs || SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Users");
+    if (!sheet) return { list: [], cached: false };
   
     var data = sheet.getDataRange().getDisplayValues();
     var users = [];
@@ -577,7 +591,12 @@ function getUsersService() {
             permissions: perms
         });
     }
-    return users;
+
+    try {
+        cache.put(CACHE_KEY, JSON.stringify(users), 300);
+    } catch (e) {}
+
+    return { list: users, cached: false };
 }
 
 /**

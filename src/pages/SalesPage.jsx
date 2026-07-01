@@ -208,136 +208,122 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     </div>
 
 
-    const load = useCallback(async () => {
-        try {
-
-            const data = await callGAS(apiUrl, 'getProducts', {}, user.token);
-            console.log('Sales Page - Raw Products Data:', data);
-
-            if (Array.isArray(data)) {
-                const content = data.filter(p => (Number(p.stock) || 0) > 0 || (Number(p.originalStock) || 0) > 0);
-                const sortedProducts = sortProducts(content, 'name');
-
-                // 0. Store all sorted products for merge printing (including those with 0 stock)
-                const allSorted = sortProducts(data, 'name');
-                setAllAvailableProducts(allSorted);
-
-                // 1. Generate Base Rows
-                let finalRows = sortedProducts.map(p => {
-                    const localPriceKey = `last_price_${p.id}`;
-                    const localPrice = safeLocalStorage.getItem(localPriceKey);
-
-                    // 優先使用記憶單價，若無則保持空白讓使用者填寫
-                    let finalPrice = localPrice !== null ? Number(localPrice) : '';
-
-                    return {
-                        id: p.id,
-                        name: p.name,
-                        stock: Number(p.stock) || 0,
-                        originalStock: Number(p.originalStock) || 0,
-                        picked: 0,
-                        original: 0,
-                        returns: 0,
-                        sold: 0,
-                        price: finalPrice,
-                        subtotal: 0,
-                        sortWeight: p.sortWeight,
-                        fromSheet: p._fromSheet
-                    };
-                });
-
-                // 2. Check & Merge Cloned Data immediately
-                const clonedRaw = safeSessionStorage.getItem('clonedSale');
-                if (clonedRaw) {
-                    try {
-                        const cloned = JSON.parse(clonedRaw);
-                        console.log('Sales Page - Applying Cloned Data:', cloned);
-
-                        // Set Form State
-                        if (cloned.customer) setLocation(cloned.customer);
-                        if (cloned.salesRep) setTargetSalesRep(cloned.salesRep); // [New] 載入原始業務
-                        if (cloned.paymentMethod) setPaymentType(cloned.paymentMethod);
-                        if (cloned.reserve !== undefined) setReserve(Number(cloned.reserve));
-                        // Restoring Cash Counts
-                        if (cloned.cashCounts) {
-                            setCashCounts(prev => ({ ...prev, ...cloned.cashCounts }));
-                        }
-                        if (cloned.expenses) {
-                            setExpenses(prev => ({
-                                ...prev,
-                                ...cloned.expenses
-                            }));
-                        }
-                        if (cloned.originalDate) setOriginalDate(cloned.originalDate);
-                        if (cloned.originalSaleId) setOriginalSaleId(cloned.originalSaleId);
-                        if (cloned.workHours) setWorkHours(cloned.workHours);
-
-                        // Merge Rows
-                        finalRows = finalRows.map(row => {
-                            const match = cloned.salesData.find(d => String(d.productId) === String(row.id));
-                            if (match) {
-                                const updated = {
-                                    ...row,
-                                    picked: match.picked,
-                                    original: match.original,
-                                    returns: match.returns,
-                                    price: match.unitPrice
-                                };
-                                updated.sold = getSafeNum(updated.picked) + getSafeNum(updated.original) - getSafeNum(updated.returns);
-                                updated.subtotal = updated.sold * getSafeNum(updated.price);
-                                return updated;
-                            }
-                            return row;
-                        });
-
-                        // alert('已載入舊單資料 (包含支出與備用金)，請修改後儲存。'); // [Modified] Removed alert for smoother transition
-                    } catch (e) {
-                        console.error('Failed to parse cloned data', e);
-                    }
-                }
-
-                // 3. If correction, fetch available users for attribution override
-                if (clonedRaw) {
-                    try {
-                        const usersList = await callGAS(apiUrl, 'getUsers', {}, user.token);
-                        if (Array.isArray(usersList)) {
-                            // Filter for active users or just take all for dropdown
-                            setAvailableUsers(usersList.map(u => u.username));
-                        }
-                    } catch (e) {
-                        console.error('Failed to fetch users list', e);
-                    }
-                }
-
-                // 4. Single State Update
-                setRows(finalRows);
-
-            } else {
-                console.error('Sales Page - Data is not an array:', data);
-            }
-        } catch (error) {
-            console.error("Fetch products failed", error);
-            alert('載入產品失敗: ' + error.message);
-        }
-    }, [apiUrl, user.token]);
-
     useEffect(() => {
         const init = async () => {
-            if (user?.token) {
-                await load();
+            if (!user?.token) return;
+            try {
+                // Determine if we are in correction/clone mode
+                const clonedRaw = safeSessionStorage.getItem('clonedSale');
+                const isCorrectionMode = !!clonedRaw;
+                
+                const targetUser = targetSalesRep || user.username;
+                
+                // Fetch all data in ONE call
+                const res = await callGAS(apiUrl, 'initSalesPageData', {
+                    targetUser: targetUser,
+                    isCorrectionMode: isCorrectionMode
+                }, user.token);
+                
+                if (res && res.success && res.data) {
+                    if (res.benchmark) {
+                        console.log(`[SalesPage Init Benchmark] Total: ${res.benchmark.total}ms`, res.benchmark);
+                    }
+                    if (res.versions) {
+                        console.log(`[SalesPage Data Versions]`, res.versions);
+                    }
+                    
+                    const { products, systemCustomers, empType, usersList } = res.data;
+                    
+                    // 1. Process Products
+                    if (Array.isArray(products)) {
+                        const content = products.filter(p => (Number(p.stock) || 0) > 0 || (Number(p.originalStock) || 0) > 0);
+                        const sortedProducts = sortProducts(content, 'name');
+                        setAllAvailableProducts(sortProducts(products, 'name'));
+                        
+                        let finalRows = sortedProducts.map(p => {
+                            const localPriceKey = `last_price_${p.id}`;
+                            const localPrice = safeLocalStorage.getItem(localPriceKey);
+                            let finalPrice = localPrice !== null ? Number(localPrice) : '';
+                            return {
+                                id: p.id,
+                                name: p.name,
+                                stock: Number(p.stock) || 0,
+                                originalStock: Number(p.originalStock) || 0,
+                                picked: 0,
+                                original: 0,
+                                returns: 0,
+                                sold: 0,
+                                price: finalPrice,
+                                subtotal: 0,
+                                sortWeight: p.sortWeight,
+                                fromSheet: p._fromSheet
+                            };
+                        });
+                        
+                        // 2. Process Cloned Data
+                        if (clonedRaw) {
+                            try {
+                                const cloned = JSON.parse(clonedRaw);
+                                if (cloned.customer) setLocation(cloned.customer);
+                                if (cloned.salesRep) setTargetSalesRep(cloned.salesRep);
+                                if (cloned.paymentMethod) setPaymentType(cloned.paymentMethod);
+                                if (cloned.reserve !== undefined) setReserve(Number(cloned.reserve));
+                                if (cloned.cashCounts) setCashCounts(prev => ({ ...prev, ...cloned.cashCounts }));
+                                if (cloned.expenses) setExpenses(prev => ({ ...prev, ...cloned.expenses }));
+                                if (cloned.originalDate) setOriginalDate(cloned.originalDate);
+                                if (cloned.originalSaleId) setOriginalSaleId(cloned.originalSaleId);
+                                if (cloned.workHours) setWorkHours(cloned.workHours);
+                                
+                                finalRows = finalRows.map(row => {
+                                    const match = cloned.salesData.find(d => String(d.productId) === String(row.id));
+                                    if (match) {
+                                        const updated = {
+                                            ...row,
+                                            picked: match.picked,
+                                            original: match.original,
+                                            returns: match.returns,
+                                            price: match.unitPrice
+                                        };
+                                        updated.sold = getSafeNum(updated.picked) + getSafeNum(updated.original) - getSafeNum(updated.returns);
+                                        updated.subtotal = updated.sold * getSafeNum(updated.price);
+                                        return updated;
+                                    }
+                                    return row;
+                                });
+                            } catch (e) {
+                                console.error('Failed to parse cloned data', e);
+                            }
+                        }
+                        
+                        setRows(finalRows);
+                    }
+                    
+                    // 3. Process Customers
+                    if (Array.isArray(systemCustomers)) {
+                        setSystemCustomers(systemCustomers);
+                    }
+                    
+                    // 4. Process Emp Type
+                    if (empType) {
+                        setIsPartTime(empType === 'PART_TIME');
+                    }
+                    
+                    // 5. Process Users List
+                    if (isCorrectionMode && Array.isArray(usersList)) {
+                        setAvailableUsers(usersList);
+                    }
+                    
+                } else {
+                    console.error('Failed to init data:', res);
+                    alert('載入資料失敗: ' + (res?.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error("Init data failed", error);
+                alert('載入資料失敗: ' + error.message);
             }
         };
         init();
-
-        // [New] Preload system-wide unique customers for AI replenishment
-        const fetchSystemCustomers = async () => {
-            try {
-                const res = await callGAS(apiUrl, 'getAllUniqueCustomers', {}, user.token);
-                if (res && Array.isArray(res)) setSystemCustomers(res);
-            } catch (e) { console.error("Failed to fetch system customers", e); }
-        };
-        fetchSystemCustomers();
-    }, [apiUrl, user.token, load]);
+    }, [apiUrl, user?.token, targetSalesRep, user?.username]);
 
     // [New] Ensure targetSalesRep is initialized to the current user
     useEffect(() => {
@@ -345,22 +331,6 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             setTargetSalesRep(user.username);
         }
     }, [user, targetSalesRep]);
-
-    // [New] Dynamically update isPartTime based on the selected targetSalesRep
-    useEffect(() => {
-        const fetchEmpType = async () => {
-            const userToCheck = targetSalesRep || user?.username;
-            if (userToCheck && apiUrl && user?.token) {
-                try {
-                    const empTypeRes = await callGAS(apiUrl, 'getEmpType', { targetUser: userToCheck }, user.token);
-                    setIsPartTime(empTypeRes?.empType === 'PART_TIME');
-                } catch (e) {
-                    console.error('Failed to fetch emp type for', userToCheck, e);
-                }
-            }
-        };
-        fetchEmpType();
-    }, [targetSalesRep, user?.username, apiUrl, user?.token]);
 
     // Recalculate row
     const handleRowChange = (id, field, value) => {

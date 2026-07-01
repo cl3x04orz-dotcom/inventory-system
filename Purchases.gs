@@ -148,7 +148,8 @@ function addPurchaseService(data, user) {
         });
     }
 
-    SpreadsheetApp.flush(); // Force write
+    SpreadsheetApp.flush(); 
+    if (typeof invalidateStockCache_ !== 'undefined') invalidateStockCache_();
     return { success: true, count: items.length };
 
   } catch (e) {
@@ -287,6 +288,7 @@ function voidAndFetchPurchaseService(payload, user) {
     }
 
     SpreadsheetApp.flush();
+    if (typeof invalidateStockCache_ !== 'undefined') invalidateStockCache_();
 
     // 3. 回傳原始資料供克隆
     return {
@@ -530,6 +532,7 @@ function confirmPurchaseReceipt(payload, user) {
         }
         
         SpreadsheetApp.flush();
+        if (typeof invalidateStockCache_ !== 'undefined') invalidateStockCache_();
         return { success: true, actualQty: finalQty, actualPrice: finalPrice };
       }
     }

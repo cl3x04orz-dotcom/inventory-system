@@ -204,8 +204,19 @@ function getSmartPickSuggestionService(customer, dayOfWeek, weather, currentOrig
  * 取得系統中心所有不重複的客戶地點名稱 (供 AI 預測下拉選單使用)
  * [策略 3.5]：智慧排程 - 讀取 Customers 表中的星期勾選
  */
-function getAllUniqueCustomersService() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+function getAllUniqueCustomersService(passedSs) {
+  const cache = CacheService.getScriptCache();
+  const CACHE_KEY = 'CUSTOMERS_CACHE_LIST';
+  const cachedStr = cache.get(CACHE_KEY);
+  if (cachedStr) {
+    try {
+      return { list: JSON.parse(cachedStr), cached: true };
+    } catch (e) {
+      // Parse error, fallback
+    }
+  }
+
+  const ss = passedSs || SpreadsheetApp.getActiveSpreadsheet();
   let custSheet = ss.getSheetByName('Customers');
   const DAYS = ['日', '一', '二', '三', '四', '五', '六'];
   
@@ -287,8 +298,15 @@ function getAllUniqueCustomersService() {
       });
     }
   }
+  const finalResult = customerList.sort((a, b) => a.name.localeCompare(b.name, 'zh-TW'));
   
-  return customerList.sort((a, b) => a.name.localeCompare(b.name, 'zh-TW'));
+  try {
+    cache.put(CACHE_KEY, JSON.stringify(finalResult), 300); // 300 秒快取
+  } catch (e) {
+    console.warn("Customers Cache save failed:", e);
+  }
+
+  return { list: finalResult, cached: false };
 }
 
 /**

@@ -179,6 +179,12 @@ function saveSalesService(data, user) {
     }
 
     SpreadsheetApp.flush(); // 強制寫入
+    
+    // [New] 庫存被修改，失效庫存快取以保證即時性
+    if (typeof invalidateStockCache_ !== 'undefined') {
+        invalidateStockCache_();
+    }
+    
     return { success: true };
 
   } finally {
@@ -477,4 +483,79 @@ function ensureCustomerInList_(customer, saleDate) {
         custSheet.appendRow(newRow);
     }
     // 已存在客戶則不作任何動作，維持原本手動設定的排程
+}
+
+// ===========================================
+// 4. 前端 API 合併 (Init Sales Page Data)
+// ===========================================
+function initSalesPageDataService(payload, user) {
+  try {
+    const tStart = Date.now();
+    const benchmark = {};
+    const versions = {
+        products: tStart, // 未快取，即時版
+        customers: tStart,
+        users: tStart
+    };
+
+    const targetUser = payload?.targetUser || user?.username;
+    const isCorrectionMode = payload?.isCorrectionMode || false;
+    
+    // 單一 Spreadsheet 實例 (Dependency Injection)
+    const tSsStart = Date.now();
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    benchmark.initSpreadsheet = Date.now() - tSsStart;
+
+    // 1. 取得商品與庫存 (維持 100% 即時)
+    const tProducts = Date.now();
+    const products = typeof getProductsService !== 'undefined' ? getProductsService(ss) : [];
+    benchmark.getProducts = Date.now() - tProducts;
+
+    // 2. 取得客戶清單 (內部具有 300s 獨立快取)
+    const tCustomers = Date.now();
+    const systemCustomersRes = typeof getAllUniqueCustomersService !== 'undefined' ? getAllUniqueCustomersService(ss) : { list: [], cached: false };
+    const systemCustomers = systemCustomersRes.list || systemCustomersRes;
+    benchmark.getCustomers = Date.now() - tCustomers;
+    if (systemCustomersRes.cached) {
+      benchmark.getCustomers_cached = true;
+    }
+    
+    // 3. 取得員工類型與使用者清單
+    const tUsers = Date.now();
+    let empType = null;
+    if (targetUser && typeof getEmpTypeService !== 'undefined') {
+      const empRes = getEmpTypeService({targetUser: targetUser}, user, ss);
+      if (empRes && empRes.empType) {
+        empType = empRes.empType;
+      }
+    }
+    
+    let usersList = [];
+    if (isCorrectionMode && typeof getUsersService !== 'undefined') {
+      const usersRes = getUsersService(ss);
+      if (Array.isArray(usersRes.list || usersRes)) {
+        usersList = (usersRes.list || usersRes).map(u => u.username);
+      }
+    }
+    benchmark.getUsers = Date.now() - tUsers;
+    
+    const resultData = {
+      products: products,
+      systemCustomers: systemCustomers,
+      empType: empType,
+      usersList: usersList
+    };
+
+    benchmark.total = Date.now() - tStart;
+
+    return {
+      success: true,
+      data: resultData,
+      versions: versions,
+      benchmark: benchmark
+    };
+  } catch (error) {
+    console.error("initSalesPageDataService error:", error);
+    return { error: error.toString() };
+  }
 }

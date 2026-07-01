@@ -93,7 +93,9 @@ function updateSafetyStock(payload) {
   for (let i = 1; i < prodData.length; i++) {
     if (prodData[i][1] === productName) {
       prodSheet.getRange(i + 1, 6).setValue(level);
-      return { success: true };
+      SpreadsheetApp.flush();
+      if (typeof invalidateStockCache_ !== 'undefined') invalidateStockCache_();
+      return { success: true, message: `已成功校正庫存` };
     }
   }
   throw new Error('找不到該產品');
@@ -152,6 +154,8 @@ function adjustInventoryService(payload, user) {
     payload.note,
     productMap[productId] || ''
   ]);
+  
+  if (typeof invalidateStockCache_ !== 'undefined') invalidateStockCache_();
   return { success: true };
 }
 
@@ -491,3 +495,133 @@ function backfillAdjustmentProductNames() {
 
   return `補齊完成：已更新 ${updatedCount} 筆資料`;
 }
+
+/**
+ * 封存已耗盡的庫存批次 (Archive Depleted Inventory)
+ * 將 qty <= 0 的批次搬移到 Inventory_Archive，大幅縮小 Inventory 表格大小，提升讀取速度。
+ */
+function archiveDepletedInventoryService() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const invSheet = ss.getSheetByName('Inventory');
+  let archiveSheet = ss.getSheetByName('Inventory_Archive');
+  
+  if (!invSheet) return { success: false, message: '找不到 Inventory 表單' };
+  
+  const data = invSheet.getDataRange().getValues();
+  if (data.length <= 1) return { success: false, message: '無庫存資料' };
+  
+  if (!archiveSheet) {
+    archiveSheet = ss.insertSheet('Inventory_Archive');
+    archiveSheet.appendRow(data[0]); // 複製標題
+  }
+  
+  // 找出所有已耗盡 (qty <= 0) 的列
+  const headers = data[0].map(h => String(h || '').trim().toLowerCase());
+  const idxQty = headers.findIndex(h => h.includes('quantity') || h.includes('數量'));
+  
+  if (idxQty === -1) return { success: false, message: '找不到數量欄位' };
+  
+  const rowsToArchive = [];
+  const rowsToKeep = [data[0]]; // 保留標題
+  
+  for (let i = 1; i < data.length; i++) {
+    const qty = Number(data[i][idxQty]);
+    // 保留在庫存中的條件: 數量不為 0 (保留大於0的正庫存，以及小於0的異常/負數庫存)
+    if (!isNaN(qty) && qty === 0) {
+      rowsToArchive.push(data[i]);
+    } else {
+      rowsToKeep.push(data[i]);
+    }
+  }
+  
+  if (rowsToArchive.length === 0) {
+    return { success: true, message: '沒有需要封存的耗盡庫存' };
+  }
+  
+  // 寫入 Archive
+  const nextArchiveRow = archiveSheet.getLastRow() + 1;
+  archiveSheet.getRange(nextArchiveRow, 1, rowsToArchive.length, rowsToArchive[0].length).setValues(rowsToArchive);
+  
+  // 清空並覆寫原表 (保留未耗盡的)
+  invSheet.clearContents();
+  invSheet.getRange(1, 1, rowsToKeep.length, rowsToKeep[0].length).setValues(rowsToKeep);
+  
+  SpreadsheetApp.flush();
+  
+  // 失效快取
+  if (typeof invalidateStockCache_ !== 'undefined') {
+    invalidateStockCache_();
+  }
+  
+  const msg = `成功封存了 ${rowsToArchive.length} 筆耗盡庫存`;
+  console.log(msg);
+  return { success: true, message: msg };
+}
+
+/**
+ * 驗證封存邏輯前後庫存總數是否一致 (Dry Run Test)
+ */
+function verifyArchiveLogic() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const invSheet = ss.getSheetByName('Inventory');
+  if (!invSheet) return "找不到 Inventory 表單";
+  
+  const data = invSheet.getDataRange().getValues();
+  if (data.length <= 1) return "無庫存資料可測試";
+  
+  const headers = data[0].map(h => String(h || '').trim().toLowerCase());
+  const idxQty = headers.findIndex(h => h.includes('quantity') || h.includes('數量'));
+  const idxProductId = headers.findIndex(h => h.includes('productid') || h.includes('產品id'));
+  const idxType = headers.findIndex(h => h.includes('type') || h.includes('類型'));
+  
+  if (idxQty === -1 || idxProductId === -1) return "找不到對應的欄位標題";
+  
+  const stockBefore = {};
+  const stockAfter = {};
+  let archiveCount = 0;
+  
+  for (let i = 1; i < data.length; i++) {
+    const pid = String(data[i][idxProductId]).trim();
+    const qty = Number(data[i][idxQty]) || 0;
+    const type = String(data[i][idxType]).trim().toUpperCase();
+    
+    if (!pid || type !== 'STOCK') continue;
+    
+    // 計算封存前總和
+    if (!stockBefore[pid]) stockBefore[pid] = 0;
+    stockBefore[pid] += qty;
+    
+    // 模擬封存判斷
+    if (qty === 0) {
+      archiveCount++;
+    } else {
+      // 保留的正數或負數
+      if (!stockAfter[pid]) stockAfter[pid] = 0;
+      stockAfter[pid] += qty;
+    }
+  }
+  
+  // 比對結果
+  let isMatch = true;
+  const mismatchProducts = [];
+  
+  Object.keys(stockBefore).forEach(pid => {
+    const before = stockBefore[pid];
+    const after = stockAfter[pid] || 0;
+    if (before !== after) {
+      isMatch = false;
+      mismatchProducts.push(`${pid}: 封存前 ${before}, 封存後 ${after}`);
+    }
+  });
+  
+  if (isMatch) {
+    const msg = `✅ 驗證成功！共模擬封存 ${archiveCount} 筆為 0 的批次。所有商品的庫存總和在封存前後【完全一致】。`;
+    console.log(msg);
+    return msg;
+  } else {
+    const msg = `❌ 驗證失敗！出現庫存不一致：\n` + mismatchProducts.join('\n');
+    console.error(msg);
+    return msg;
+  }
+}
+
