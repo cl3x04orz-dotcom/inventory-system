@@ -202,6 +202,15 @@ function getRecentSalesToday(payload) {
   const IDX_METHOD = 8;
   const IDX_STATUS = 9;
   
+  // 建立 O(1) 的 SalesDetails HashMap
+  const detailsBySaleId = {};
+  for (let j = 1; j < detailsData.length; j++) {
+    const sId = String(detailsData[j][0]).trim();
+    if (!sId) continue;
+    if (!detailsBySaleId[sId]) detailsBySaleId[sId] = [];
+    detailsBySaleId[sId].push(detailsData[j]);
+  }
+  
   for (let i = 1; i < salesData.length; i++) {
     const row = salesData[i];
     const saleId = String(row[IDX_ID] || '').trim();
@@ -221,27 +230,26 @@ function getRecentSalesToday(payload) {
     let rowRep = salesRep2 || salesRep1;
     
     const salesDetails = [];
-    for (let j = 1; j < detailsData.length; j++) {
-      if (String(detailsData[j][0]) === saleId) {
-        const productId = String(detailsData[j][1]);
-        const picked = Number(detailsData[j][2] || 0);
-        const original = Number(detailsData[j][3] || 0);
-        const returns = Number(detailsData[j][4] || 0);
-        const sold = Number(detailsData[j][5] || 0);
-        const unitPrice = Number(detailsData[j][6] || 0);
-        
-        if (sold > 0 || picked > 0 || original > 0) {
-          const pEntry = productMap[productId];
-          salesDetails.push({
-            productId: productId,
-            productName: pEntry ? pEntry.name : productId,
-            picked: picked,
-            original: original,
-            returns: returns,
-            sold: sold,
-            unitPrice: unitPrice
-          });
-        }
+    const matchedDetails = detailsBySaleId[saleId] || [];
+    for (const dRow of matchedDetails) {
+      const productId = String(dRow[1]);
+      const picked = Number(dRow[2] || 0);
+      const original = Number(dRow[3] || 0);
+      const returns = Number(dRow[4] || 0);
+      const sold = Number(dRow[5] || 0);
+      const unitPrice = Number(dRow[6] || 0);
+      
+      if (sold > 0 || picked > 0 || original > 0) {
+        const pEntry = productMap[productId];
+        salesDetails.push({
+          productId: productId,
+          productName: pEntry ? pEntry.name : productId,
+          picked: picked,
+          original: original,
+          returns: returns,
+          sold: sold,
+          unitPrice: unitPrice
+        });
       }
     }
     
@@ -293,6 +301,15 @@ function getSalesByDateRange(payload) {
   const IDX_METHOD = 8;
   const IDX_STATUS = 9;
   const IDX_WORKHOURS = 14; 
+
+  // 建立 O(1) 的 SalesDetails HashMap
+  const detailsBySaleId = {};
+  for (let j = 1; j < detailsData.length; j++) {
+    const sId = String(detailsData[j][0]).trim();
+    if (!sId) continue;
+    if (!detailsBySaleId[sId]) detailsBySaleId[sId] = [];
+    detailsBySaleId[sId].push(detailsData[j]);
+  }
   
   for (let i = 1; i < salesData.length; i++) {
     const row = salesData[i];
@@ -314,27 +331,26 @@ function getSalesByDateRange(payload) {
     const rowRep = salesRep2 || salesRep1;
     
     const salesDetails = [];
-    for (let j = 1; j < detailsData.length; j++) {
-      if (String(detailsData[j][0]) === saleId) {
-        const productId = String(detailsData[j][1]);
-        const picked = Number(detailsData[j][2] || 0);
-        const original = Number(detailsData[j][3] || 0);
-        const returns = Number(detailsData[j][4] || 0);
-        const sold = Number(detailsData[j][5] || 0);
-        const unitPrice = Number(detailsData[j][6] || 0);
-        
-        if (sold > 0 || picked > 0 || original > 0) {
-          const pEntry = productMap[productId];
-          salesDetails.push({
-            productId: productId,
-            productName: pEntry ? pEntry.name : productId,
-            picked: picked,
-            original: original,
-            returns: returns,
-            sold: sold,
-            unitPrice: unitPrice
-          });
-        }
+    const matchedDetails = detailsBySaleId[saleId] || [];
+    for (const dRow of matchedDetails) {
+      const productId = String(dRow[1]);
+      const picked = Number(dRow[2] || 0);
+      const original = Number(dRow[3] || 0);
+      const returns = Number(dRow[4] || 0);
+      const sold = Number(dRow[5] || 0);
+      const unitPrice = Number(dRow[6] || 0);
+      
+      if (sold > 0 || picked > 0 || original > 0) {
+        const pEntry = productMap[productId];
+        salesDetails.push({
+          productId: productId,
+          productName: pEntry ? pEntry.name : productId,
+          picked: picked,
+          original: original,
+          returns: returns,
+          sold: sold,
+          unitPrice: unitPrice
+        });
       }
     }
     

@@ -373,4 +373,36 @@ function invalidateStockCache_() {
     console.warn("Failed to invalidate stock cache:", e);
   }
 }
+}
 
+/**
+ * 清理指定表單底部的幽靈空白列
+ * 可以透過前端呼叫或在後台手動執行
+ */
+function cleanGhostRowsService() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetsToClean = ['Sales', 'SalesDetails'];
+  let resultMsg = [];
+
+  sheetsToClean.forEach(sheetName => {
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return;
+
+    const maxRows = sheet.getMaxRows();
+    const lastRow = sheet.getLastRow();
+
+    if (maxRows > lastRow) {
+      const rowsToDelete = maxRows - lastRow;
+      // 刪除從 lastRow + 1 開始到最後一行的所有空白列
+      sheet.deleteRows(lastRow + 1, rowsToDelete);
+      resultMsg.push(`[${sheetName}] 成功刪除 ${rowsToDelete} 行幽靈列。`);
+    } else {
+      resultMsg.push(`[${sheetName}] 沒有多餘的幽靈列。`);
+    }
+  });
+
+  return { 
+    success: true, 
+    message: resultMsg.join('\n') 
+  };
+}
