@@ -35,12 +35,14 @@ function getSalesHistory(payload) {
 
   const start = parseLocalYMD_(startDate); start.setHours(0,0,0,0);
   const end = parseLocalYMD_(endDate); end.setHours(23,59,59,999);
+  const t0 = Date.now();
   
   const qCust = (customer || "").trim().toLowerCase();
   const qRep = (salesRep || "").trim().toLowerCase();
 
+  const t1 = Date.now();
   const salesRows = salesSheet.getDataRange().getValues();
-  
+  const t2 = Date.now();
   const IDX_ID = 0;   
   const IDX_DATE = 1; 
   const IDX_REP1 = 2; 
@@ -104,8 +106,10 @@ function getSalesHistory(payload) {
       weather: row[IDX_WEATHER] || "SUNNY"
     };
   }
+  const t3 = Date.now();
 
   const detailRows = detailsSheet.getDataRange().getValues();
+  const t4 = Date.now();
   const results = [];
   
   const D_IDX_SID = 0;
@@ -150,8 +154,23 @@ function getSalesHistory(payload) {
       });
     }
   }
+  const t5 = Date.now();
 
-  return results.sort((a, b) => new Date(b.date) - new Date(a.date));
+  const finalResults = results.sort((a, b) => new Date(b.date) - new Date(a.date));
+  const t6 = Date.now();
+  
+  return {
+    data: finalResults,
+    benchmark: {
+      total: t6 - t0,
+      init: t1 - t0,
+      readSalesSheet: t2 - t1,
+      processSalesRows: t3 - t2,
+      readDetailsSheet: t4 - t3,
+      processDetails: t5 - t4,
+      sortResults: t6 - t5
+    }
+  };
 }
 
 /**

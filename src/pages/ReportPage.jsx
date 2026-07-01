@@ -50,8 +50,14 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                 callGAS(apiUrl, 'getExpenditures', payload, user.token)
             ];
             const results = await Promise.all(promises);
-            setRawSales(Array.isArray(results[0]) ? results[0] : []);
-            setRawExpenses(Array.isArray(results[1]) ? results[1] : []);
+            
+            const salesRes = results[0];
+            if (salesRes && salesRes.benchmark) {
+                console.log('[Sales Report Benchmark]', salesRes.benchmark);
+            }
+            
+            setRawSales(Array.isArray(salesRes) ? salesRes : (salesRes.data || []));
+            setRawExpenses(Array.isArray(results[1]) ? results[1] : (results[1].data || []));
         } catch (error) {
             console.error(error);
             alert('查詢失敗: ' + error.message);
