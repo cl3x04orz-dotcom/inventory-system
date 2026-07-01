@@ -405,3 +405,80 @@ function cleanGhostRowsService() {
     message: resultMsg.join('\n') 
   };
 }
+
+/**
+ * 補齊 SalesDetails 的 Date 欄位 (一次性執行 Migration)
+ */
+function backfillSalesDetailsDate() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const salesSheet = ss.getSheetByName('Sales');
+  const detailsSheet = ss.getSheetByName('SalesDetails');
+  
+  if (!salesSheet || !detailsSheet) {
+    console.error("找不到 Sales 或 SalesDetails 分頁");
+    return;
+  }
+
+  // 1. 建立 SaleID -> Date 的 Map
+  const salesData = salesSheet.getDataRange().getValues();
+  const salesHeaders = salesData[0];
+  const saleIdIdx = salesHeaders.indexOf('SaleID') !== -1 ? salesHeaders.indexOf('SaleID') : 0;
+  const dateIdx = salesHeaders.indexOf('Date') !== -1 ? salesHeaders.indexOf('Date') : 1;
+  
+  const dateMap = {};
+  for (let i = 1; i < salesData.length; i++) {
+    const sId = String(salesData[i][saleIdIdx]).trim();
+    const d = salesData[i][dateIdx];
+    if (sId && d) {
+      dateMap[sId] = new Date(d);
+    }
+  }
+
+  // 2. 確定 SalesDetails 的 Header
+  const detailsData = detailsSheet.getDataRange().getValues();
+  const detailsHeaders = detailsData[0];
+  const detailsSaleIdIdx = detailsHeaders.indexOf('SaleID') !== -1 ? detailsHeaders.indexOf('SaleID') : 0;
+  
+  let targetDateColIdx = detailsHeaders.indexOf('Date');
+  if (targetDateColIdx === -1) {
+    // 找不到 Date 欄位，自動加在最後面
+    targetDateColIdx = detailsHeaders.length;
+    detailsSheet.getRange(1, targetDateColIdx + 1).setValue('Date');
+  }
+
+  // 3. 準備寫入資料
+  const updates = [];
+  let updatedCount = 0;
+  let missingCount = 0;
+  let errorCount = 0;
+
+  for (let i = 1; i < detailsData.length; i++) {
+    const sId = String(detailsData[i][detailsSaleIdIdx]).trim();
+    if (sId && dateMap[sId]) {
+      updates.push([dateMap[sId]]);
+      updatedCount++;
+    } else if (!sId) {
+       // 空白列
+       updates.push(['']);
+    } else {
+      // 找不到對應的 Date
+      updates.push(['']);
+      missingCount++;
+      console.warn(`Missing Date for SaleID: ${sId}`);
+    }
+  }
+
+  // 4. 批次寫回
+  try {
+    if (updates.length > 0) {
+      detailsSheet.getRange(2, targetDateColIdx + 1, updates.length, 1).setValues(updates);
+      SpreadsheetApp.flush();
+    }
+    const msg = `Migration completed.\nTotal Details: ${detailsData.length - 1}\nUpdated: ${updatedCount}\nMissing: ${missingCount}\nError: ${errorCount}`;
+    console.log(msg);
+    return msg;
+  } catch (e) {
+    console.error("Migration failed: " + e);
+    return "Error: " + e.toString();
+  }
+}

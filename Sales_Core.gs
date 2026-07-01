@@ -116,6 +116,11 @@ function saveSalesService(data, user) {
     const newInvLogRows = [];
     let isInventoryModified = false;
 
+    // 讀取 SalesDetails 的表頭，進行動態 Header Mapping
+    const detailsHeaders = detailsSheet.getRange(1, 1, 1, Math.max(1, detailsSheet.getLastColumn())).getValues()[0];
+    const detailsHeaderMap = {};
+    detailsHeaders.forEach((h, idx) => { if (h) detailsHeaderMap[String(h).trim()] = idx; });
+
     // 獲取產品資訊（包含成本）對照表
     const productInfoMap = typeof getProductInfoMap_ !== 'undefined' ? getProductInfoMap_() : {};
 
@@ -125,21 +130,36 @@ function saveSalesService(data, user) {
 
         const pInfo = productInfoMap[item.productId] || {};
         const pName = pInfo.name || item.productName || 'Unknown';
-        const unitCost = Number(pInfo.cost) || 0; // 獲得當下成本
+        const unitCost = Number(pInfo.cost) || 0; 
         
-        newDetailRows.push([
-            saleId, 
-            item.productId, 
-            item.picked, 
-            item.original, 
-            item.returns, 
-            item.sold, 
-            item.unitPrice, 
-            (item.sold * item.unitPrice), 
-            pName, 
-            (customer || ''),
-            unitCost // 第 11 欄 (K): 銷售當下成本
-        ]);
+        // 使用 Header Mapping 動態組裝列
+        let newRow = new Array(detailsHeaders.length).fill('');
+        const setCol = (name, val) => {
+            if (detailsHeaderMap[name] !== undefined) newRow[detailsHeaderMap[name]] = val;
+        };
+
+        setCol('SaleID', saleId);
+        setCol('ProductID', item.productId);
+        setCol('Picked', item.picked);
+        setCol('Original', item.original);
+        setCol('Return', item.returns);
+        setCol('Sold', item.sold);
+        setCol('UnitPrice', item.unitPrice);
+        setCol('Subtotal', item.sold * item.unitPrice);
+        setCol('ProductName', pName);
+        setCol('Customer', customer || '');
+        setCol('UnitCost', unitCost);
+        setCol('Date', today);
+
+        // 防呆：如果表頭全錯，退回陣列推入模式
+        if (detailsHeaderMap['SaleID'] === undefined) {
+             newRow = [
+                saleId, item.productId, item.picked, item.original, item.returns, item.sold, 
+                item.unitPrice, (item.sold * item.unitPrice), pName, (customer || ''), unitCost, today
+            ];
+        }
+        
+        newDetailRows.push(newRow);
         
         let consumedBatches = []; 
         if (item.picked > 0) {

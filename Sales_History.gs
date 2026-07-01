@@ -113,19 +113,80 @@ function getSalesHistory(payload) {
   const t3 = Date.now();
 
   const detailsMaxRows = detailsSheet.getMaxRows();
-  const detailsLastRow = detailsSheet.getLastRow();
-  const detailsLastCol = detailsSheet.getLastColumn();
+  const detailsLastRow = Math.max(1, detailsSheet.getLastRow());
+  const detailsLastCol = Math.max(1, detailsSheet.getLastColumn());
 
-  const detailRows = detailsSheet.getDataRange().getValues();
+  // 1. 動態 Header Mapping
+  const detailsHeaders = detailsSheet.getRange(1, 1, 1, detailsLastCol).getValues()[0];
+  const headerMap = {};
+  detailsHeaders.forEach((h, idx) => { if (h) headerMap[String(h).trim()] = idx; });
+  
+  const D_IDX_SID = headerMap['SaleID'] !== undefined ? headerMap['SaleID'] : 0;
+  const D_IDX_PID = headerMap['ProductID'] !== undefined ? headerMap['ProductID'] : 1;
+  const D_IDX_SOLD = headerMap['Sold'] !== undefined ? headerMap['Sold'] : 5;
+  const D_IDX_AMT = headerMap['Subtotal'] !== undefined ? headerMap['Subtotal'] : 7;
+  const D_IDX_DATE = headerMap['Date']; 
+
+  let detailRows = [];
+  let dateColValues = [];
+
+  if (D_IDX_DATE !== undefined && detailsLastRow > 1) {
+    // 第一階讀取：僅拉取 Date 欄
+    dateColValues = detailsSheet.getRange(2, D_IDX_DATE + 1, detailsLastRow - 1, 1).getValues();
+    
+    const getT = (idx) => {
+       const v = dateColValues[idx][0];
+       if (v && typeof v.getTime === 'function') return v.getTime();
+       if (v) { const d = new Date(v); if (!isNaN(d.getTime())) return d.getTime(); }
+       return null;
+    };
+    
+    const startMs = start.getTime();
+    const endMs = end.getTime();
+    
+    // Binary Search First >= startMs
+    let l = 0, r = dateColValues.length - 1;
+    let minIdx = -1;
+    while(l <= r) {
+      let m = Math.floor((l+r)/2);
+      let t = getT(m);
+      if (t === null) { l = m+1; continue; } 
+      if (t >= startMs) { minIdx = m; r = m - 1; }
+      else { l = m + 1; }
+    }
+    
+    // Binary Search Last <= endMs
+    l = minIdx !== -1 ? minIdx : 0;
+    r = dateColValues.length - 1;
+    let maxIdx = -1;
+    while(l <= r) {
+      let m = Math.floor((l+r)/2);
+      let t = getT(m);
+      if (t === null) { l = m+1; continue; }
+      if (t <= endMs) { maxIdx = m; l = m + 1; }
+      else { r = m - 1; }
+    }
+    
+    if (minIdx !== -1 && maxIdx !== -1 && minIdx <= maxIdx) {
+       // 放寬 300 筆緩衝，避免些微無序(例如晚補的單)被遺漏
+       minIdx = Math.max(0, minIdx - 300);
+       maxIdx = Math.min(dateColValues.length - 1, maxIdx + 300);
+       const startSheetRow = minIdx + 2;
+       const numRows = maxIdx - minIdx + 1;
+       detailRows = detailsSheet.getRange(startSheetRow, 1, numRows, detailsLastCol).getValues();
+    } else {
+       // Fallback
+       detailRows = detailsSheet.getRange(2, 1, detailsLastRow - 1, detailsLastCol).getValues();
+    }
+  } else {
+    // 尚未 Migration，退回全表
+    detailRows = detailsLastRow > 1 ? detailsSheet.getRange(2, 1, detailsLastRow - 1, detailsLastCol).getValues() : [];
+  }
+
   const t4 = Date.now();
   const results = [];
-  
-  const D_IDX_SID = 0;
-  const D_IDX_PID = 1;
-  const D_IDX_SOLD = 5;
-  const D_IDX_AMT = 7;
 
-  for (let i = 1; i < detailRows.length; i++) {
+  for (let i = 0; i < detailRows.length; i++) {
     const row = detailRows[i];
     const dSaleId = String(row[D_IDX_SID] || "").trim();
     
@@ -189,8 +250,8 @@ function getSalesHistory(payload) {
           lastRow: detailsLastRow,
           maxRows: detailsMaxRows,
           lastColumn: detailsLastCol,
-          totalCellsRead: detailsLastRow * detailsLastCol,
-          processedRecords: detailRows.length - 1
+          totalCellsRead: (detailRows.length || 0) * detailsLastCol,
+          processedRecords: detailRows.length || 0
         }
       }
     }
