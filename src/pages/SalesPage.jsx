@@ -218,6 +218,140 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 
                 const targetUser = targetSalesRep || user.username;
                 
+                // --- Helper: Apply Data to State (Smart Merge) ---
+                const applyDataToState = (data, isBackgroundSync = false) => {
+                    const { products, systemCustomers, empType, usersList } = data;
+                    
+                    // 1. Process Products
+                    if (Array.isArray(products)) {
+                        const content = products.filter(p => (Number(p.stock) || 0) > 0 || (Number(p.originalStock) || 0) > 0);
+                        const sortedProducts = sortProducts(content, 'name');
+                        setAllAvailableProducts(sortProducts(products, 'name'));
+                        
+                        setRows(prevRows => {
+                            // Helper to initialize a clean row
+                            const createInitRow = (p) => {
+                                const localPriceKey = `last_price_${p.id}`;
+                                const localPrice = safeLocalStorage.getItem(localPriceKey);
+                                let finalPrice = localPrice !== null ? Number(localPrice) : '';
+                                return {
+                                    id: p.id,
+                                    name: p.name,
+                                    stock: Number(p.stock) || 0,
+                                    originalStock: Number(p.originalStock) || 0,
+                                    picked: 0,
+                                    original: 0,
+                                    returns: 0,
+                                    sold: 0,
+                                    price: finalPrice,
+                                    subtotal: 0,
+                                    sortWeight: p.sortWeight,
+                                    fromSheet: p._fromSheet
+                                };
+                            };
+
+                            let newRows = [];
+                            
+                            // If user already has rows, perform SMART MERGE (Update stock only, keep inputs)
+                            if (prevRows.length > 0) {
+                                const existingMap = {};
+                                prevRows.forEach(r => existingMap[r.id] = r);
+                                
+                                newRows = sortedProducts.map(p => {
+                                    const existing = existingMap[p.id];
+                                    if (existing) {
+                                        // Keep user inputs (picked, original, returns, price, subtotal), update inventory (stock, name)
+                                        return {
+                                            ...existing,
+                                            name: p.name,
+                                            stock: Number(p.stock) || 0,
+                                            originalStock: Number(p.originalStock) || 0,
+                                            sortWeight: p.sortWeight,
+                                            fromSheet: p._fromSheet
+                                        };
+                                    } else {
+                                        return createInitRow(p);
+                                    }
+                                });
+                            } else {
+                                // First time initialization
+                                newRows = sortedProducts.map(p => createInitRow(p));
+                                
+                                // Process Cloned Data ONLY ONCE (when initializing fresh)
+                                if (clonedRaw) {
+                                    try {
+                                        const cloned = JSON.parse(clonedRaw);
+                                        // Set global states if not in background sync
+                                        if (!isBackgroundSync) {
+                                            if (cloned.customer) setLocation(cloned.customer);
+                                            if (cloned.salesRep) setTargetSalesRep(cloned.salesRep);
+                                            if (cloned.paymentMethod) setPaymentType(cloned.paymentMethod);
+                                            if (cloned.reserve !== undefined) setReserve(Number(cloned.reserve));
+                                            if (cloned.cashCounts) setCashCounts(prev => ({ ...prev, ...cloned.cashCounts }));
+                                            if (cloned.expenses) setExpenses(prev => ({ ...prev, ...cloned.expenses }));
+                                            if (cloned.originalDate) setOriginalDate(cloned.originalDate);
+                                            if (cloned.originalSaleId) setOriginalSaleId(cloned.originalSaleId);
+                                            if (cloned.workHours) setWorkHours(cloned.workHours);
+                                        }
+                                        
+                                        newRows = newRows.map(row => {
+                                            const match = cloned.salesData.find(d => String(d.productId) === String(row.id));
+                                            if (match) {
+                                                const updated = {
+                                                    ...row,
+                                                    picked: match.picked,
+                                                    original: match.original,
+                                                    returns: match.returns,
+                                                    price: match.unitPrice
+                                                };
+                                                updated.sold = getSafeNum(updated.picked) + getSafeNum(updated.original) - getSafeNum(updated.returns);
+                                                updated.subtotal = updated.sold * getSafeNum(updated.price);
+                                                return updated;
+                                            }
+                                            return row;
+                                        });
+                                    } catch (e) {
+                                        console.error('Failed to parse cloned data', e);
+                                    }
+                                }
+                            }
+                            return newRows;
+                        });
+                    }
+                    
+                    // 2. Process Customers
+                    if (Array.isArray(systemCustomers)) {
+                        setSystemCustomers(systemCustomers);
+                    }
+                    
+                    // 3. Process Emp Type
+                    if (empType && !isBackgroundSync) {
+                        setIsPartTime(empType === 'PART_TIME');
+                    }
+                    
+                    // 4. Process Users List
+                    if (isCorrectionMode && Array.isArray(usersList)) {
+                        setAvailableUsers(usersList);
+                    }
+                };
+                
+                // --- SWR: Phase 1 (Instant Load from LocalStorage) ---
+                const CACHE_KEY = 'SALES_PAGE_CACHE';
+                const cachedDataRaw = safeLocalStorage.getItem(CACHE_KEY);
+                let hasLoadedFromCache = false;
+                if (cachedDataRaw) {
+                    try {
+                        const cachedData = JSON.parse(cachedDataRaw);
+                        if (cachedData && cachedData.products) {
+                            applyDataToState(cachedData, false);
+                            hasLoadedFromCache = true;
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse sales page cache', e);
+                    }
+                }
+                
+                // --- SWR: Phase 2 (Background Sync with Google) ---
                 // Fetch all data in ONE call
                 const res = await callGAS(apiUrl, 'initSalesPageData', {
                     targetUser: targetUser,
@@ -228,94 +362,18 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     if (res.benchmark) {
                         console.log(`[SalesPage Init Benchmark] Total: ${res.benchmark.total}ms`, res.benchmark);
                     }
-                    if (res.versions) {
-                        console.log(`[SalesPage Data Versions]`, res.versions);
-                    }
                     
-                    const { products, systemCustomers, empType, usersList } = res.data;
+                    // Save to local cache for next time
+                    safeLocalStorage.setItem(CACHE_KEY, JSON.stringify(res.data));
                     
-                    // 1. Process Products
-                    if (Array.isArray(products)) {
-                        const content = products.filter(p => (Number(p.stock) || 0) > 0 || (Number(p.originalStock) || 0) > 0);
-                        const sortedProducts = sortProducts(content, 'name');
-                        setAllAvailableProducts(sortProducts(products, 'name'));
-                        
-                        let finalRows = sortedProducts.map(p => {
-                            const localPriceKey = `last_price_${p.id}`;
-                            const localPrice = safeLocalStorage.getItem(localPriceKey);
-                            let finalPrice = localPrice !== null ? Number(localPrice) : '';
-                            return {
-                                id: p.id,
-                                name: p.name,
-                                stock: Number(p.stock) || 0,
-                                originalStock: Number(p.originalStock) || 0,
-                                picked: 0,
-                                original: 0,
-                                returns: 0,
-                                sold: 0,
-                                price: finalPrice,
-                                subtotal: 0,
-                                sortWeight: p.sortWeight,
-                                fromSheet: p._fromSheet
-                            };
-                        });
-                        
-                        // 2. Process Cloned Data
-                        if (clonedRaw) {
-                            try {
-                                const cloned = JSON.parse(clonedRaw);
-                                if (cloned.customer) setLocation(cloned.customer);
-                                if (cloned.salesRep) setTargetSalesRep(cloned.salesRep);
-                                if (cloned.paymentMethod) setPaymentType(cloned.paymentMethod);
-                                if (cloned.reserve !== undefined) setReserve(Number(cloned.reserve));
-                                if (cloned.cashCounts) setCashCounts(prev => ({ ...prev, ...cloned.cashCounts }));
-                                if (cloned.expenses) setExpenses(prev => ({ ...prev, ...cloned.expenses }));
-                                if (cloned.originalDate) setOriginalDate(cloned.originalDate);
-                                if (cloned.originalSaleId) setOriginalSaleId(cloned.originalSaleId);
-                                if (cloned.workHours) setWorkHours(cloned.workHours);
-                                
-                                finalRows = finalRows.map(row => {
-                                    const match = cloned.salesData.find(d => String(d.productId) === String(row.id));
-                                    if (match) {
-                                        const updated = {
-                                            ...row,
-                                            picked: match.picked,
-                                            original: match.original,
-                                            returns: match.returns,
-                                            price: match.unitPrice
-                                        };
-                                        updated.sold = getSafeNum(updated.picked) + getSafeNum(updated.original) - getSafeNum(updated.returns);
-                                        updated.subtotal = updated.sold * getSafeNum(updated.price);
-                                        return updated;
-                                    }
-                                    return row;
-                                });
-                            } catch (e) {
-                                console.error('Failed to parse cloned data', e);
-                            }
-                        }
-                        
-                        setRows(finalRows);
-                    }
-                    
-                    // 3. Process Customers
-                    if (Array.isArray(systemCustomers)) {
-                        setSystemCustomers(systemCustomers);
-                    }
-                    
-                    // 4. Process Emp Type
-                    if (empType) {
-                        setIsPartTime(empType === 'PART_TIME');
-                    }
-                    
-                    // 5. Process Users List
-                    if (isCorrectionMode && Array.isArray(usersList)) {
-                        setAvailableUsers(usersList);
-                    }
+                    // Apply to state (as background sync)
+                    applyDataToState(res.data, hasLoadedFromCache);
                     
                 } else {
                     console.error('Failed to init data:', res);
-                    alert('載入資料失敗: ' + (res?.error || 'Unknown error'));
+                    if (!hasLoadedFromCache) {
+                        alert('載入資料失敗: ' + (res?.error || 'Unknown error'));
+                    }
                 }
             } catch (error) {
                 console.error("Init data failed", error);
