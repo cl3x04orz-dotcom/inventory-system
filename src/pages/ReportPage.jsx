@@ -53,7 +53,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
             
             const salesRes = results[0];
             if (salesRes && salesRes.benchmark) {
-                console.log('[Sales Report Benchmark]', salesRes.benchmark);
+                console.log('[Sales Report Benchmark]', JSON.stringify(salesRes.benchmark, null, 2));
             }
             
             setRawSales(Array.isArray(salesRes) ? salesRes : (salesRes.data || []));
