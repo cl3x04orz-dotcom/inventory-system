@@ -373,7 +373,6 @@ function invalidateStockCache_() {
     console.warn("Failed to invalidate stock cache:", e);
   }
 }
-}
 
 /**
  * 清理指定表單底部的幽靈空白列
