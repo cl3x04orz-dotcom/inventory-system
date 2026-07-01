@@ -342,9 +342,14 @@ function saveStocktake(payload) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Stocktakes') || ss.insertSheet('Stocktakes');
   const today = new Date();
-  items.forEach(item => {
-    sheet.appendRow([Utilities.getUuid(), today, item.productId, item.productName, item.bookQty, item.physicalQty, item.diff, item.reason, item.accountability, operator]);
-  });
+  if (items && items.length > 0) {
+    const newRows = items.map(item => [
+      Utilities.getUuid(), today, item.productId, item.productName, 
+      item.bookQty, item.physicalQty, item.diff, item.reason, 
+      item.accountability, operator
+    ]);
+    sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
+  }
   return { success: true };
 }
 
@@ -478,15 +483,22 @@ function backfillAdjustmentProductNames() {
   }
 
   let updatedCount = 0;
+  const updates = [];
   for (let i = 1; i < data.length; i++) {
     const pId = String(data[i][2]).trim(); // 產品ID 在第 3 欄 (index 2)
     const existingName = data[i][7] || ""; // 產品名稱 在第 8 欄 (index 7)
     
     if (pId && !existingName) {
       const name = productMap[pId] || "Unknown";
-      adjSheet.getRange(i + 1, 8).setValue(name);
+      updates.push([name]);
       updatedCount++;
+    } else {
+      updates.push([existingName]);
     }
+  }
+
+  if (updates.length > 0) {
+    adjSheet.getRange(2, 8, updates.length, 1).setValues(updates);
   }
 
   return `補齊完成：已更新 ${updatedCount} 筆資料`;

@@ -1,53 +1,45 @@
-# Inventory System (庫存管理系統)
+# 米立微 Milk Zero Waste - 線上點單與後台管理系統 🍼
 
-一個基於 React (Vite) 前端與 Google Apps Script (GAS) 後端的庫存管理系統。
+本專案為米立微牛奶倉庫（實體店面、兵仔市載貨、大樓團購配送）的核心營運後台。架構採用 **Google Apps Script (GAS) + Git 版本控制 + Google 試算表（Spreadsheet as a Database）** 進行全套自動化營運管理。
 
-## 技術棧
-- 前端：React 19 (Vite)
-- 後端：Google Apps Script
-- 資料庫：Google Sheets (Google 試算表)
-- UI 庫：Lucide React, Tailwind CSS
+目前代碼量已正式突破 **10,000 行**。為了維持前台 LINE LIFF 點單的極速回應，並防止後台大批量對帳、營運統計任務造成系統延遲，所有參與本專案開發的夥伴必須嚴格遵守以下開發軍規。
 
-## 環境變數設定
+---
 
-本專案使用 Vite 開發，環境變數需以 `VITE_` 開頭。請參考 `.env.example` 建立 `.env` 檔案。
+## 🛑 開發三大核心鐵律（效能規範）
 
-```env
-VITE_GAS_API_URL=你的_GAS_API_網址
-```
+### 1. 嚴禁在迴圈（Loop）內部進行試算表 I/O 操作 ❌
+這是導致系統超時（Timeout）與卡頓的隱形元兇。
+* **錯誤示範**：在 `for` / `while` / `forEach` 迴圈內重複呼叫 `getValue()`、`setValue()`、`appendRow()`。
+* **正確做法**：一律在迴圈外使用 `getValues()` 將目標區間一次性讀取至 JavaScript 記憶體中，利用二維陣列進行處理與運算，最後再使用 `setValues()` 一次性批次寫回試算表。
 
-## 本機開發
+### 2. 前後台代碼架構分流（微服務化） ⚡
+* **前台 Web App (LINE LIFF API)**：必須保持絕對輕量（Lightweight）。只負責接收點單、寫入歷史紀錄與基本的會員校驗，回應時間必須壓在 **1 秒之內**，嚴禁在此執行重量級的帳目統計。
+* **後台排程任務 (Triggers)**：營業額結算、過期品先進先出庫存檢查、歷史帳目對帳等重量級運算，一律拆分至獨立模組，並透過定時排程執行，避免阻塞前台點單。
 
-1. 複製儲存庫
-2. 執行 `npm install`
-3. 建立 `.env` 並填入 `VITE_GAS_API_URL`
-4. 執行 `npm run dev`
+### 3. 資料庫輕量化管理 📦
+必須維持表單數據的輕量化，確保 GAS 能一秒渲染至前台。
+* **資料封存機制**：單張試算表儲存格總數有 Google 上限（1000 萬格），開發核心功能時需考量「歷史資料定期歸檔備份」邏輯，確保當前工作工作表維持在數千列以內。
 
-## 自動化部署 (GitHub Actions)
+---
 
-本專案已設定 GitHub Actions 自動部署至 GitHub Pages。
+## 🛠️ Git 工作流與分支保護規範 (Workflow)
 
-### 1. 取得 Google Apps Script 網址
-1. 開啟您的 GAS 專案（例如 `Code.gs` 或 `Payroll.gs` 所在的編輯畫面）。
-2. 在右上角選擇 **部署 (Deploy)** -> **管理部署 (Manage deployments)**。
-3. 找到狀態為「已啟用」的 Web App 部署。
-4. 點擊 **網址 (URL)** 下方的複製按鈕。
+為確保生產環境（Production）的絕對穩定，本專案強制執行以下 Git 規範：
 
-### 2. 在 GitHub 設定 Secret
-為了安全起見，API 網址不應直接寫在工作流檔案中。請依照以下步驟設定：
-1. **開啟您的 GitHub 儲存庫頁面** (例如 `https://github.com/cl3x04orz-dotcom/inventory-system`)。
-2. 點擊頂端標籤列最右側的 **Settings (設定)**。
-3. 在左側側邊欄中，向下捲動找到 **Security (安全性)** 區塊。
-4. 點選 **Secrets and variables** -> **Actions**。
-5. 點擊右側綠色的 **New repository secret** 按鈕。
-6. 在 **Name** 欄位輸入：`VITE_GAS_API_URL`
-7. 在 **Secret** 欄位貼上您剛才複製的 **Google Apps Script 網址**。
-8. 點擊 **Add secret** 完成設定。
+1. **禁止直推主分支**：嚴禁直接 `git push` 至 `main` 或 `master` 分支。
+2. **分支命名規範**：
+   * 功能開發：`feature/功能名稱`（例如：`feature/liff-key-fix`）
+   * Bug 修復：`bugfix/問題描述`
+3. **Pull Request (PR) 審查制**：
+   所有新代碼上線前必須提交 PR，且必須在說明中主動核對以下自我檢查表（Checklist）：
+   - [ ] 程式碼中是否已 100% 排除「迴圈內讀寫試算表」的情形？
+   - [ ] 此次改動是否會影響到 `LiffOrderPage.jsx` 的渲染效能？
+   - [ ] 是否有針對高併發（多人同時點單）進行 `LockService` 讀寫衝突防護？
 
-### 3. 觸發部署
-每當您執行 `git push` 將程式碼推送到 `main` 分支時，GitHub Actions 就會自動帶入此 Secret 進行 Build 並部署。
+---
 
-### 4. 開啟 GitHub Pages (首次設定)
-1. 進入 **Settings** -> **Pages**。
-2. Build and deployment -> Source 選擇 **Deploy from a branch**。
-3. Branch 選擇 `gh-pages` 且目錄為 `/(root)`。
+## 📅 專案維護與聯絡
+* **專案擁有者**：成哥 (米立微營運團隊)
+
+> **開發叮嚀**：我們用最低的成本架構出了最穩健的商業模式，每一行代碼的優化都直接影響到店面與大樓住戶的第一線體驗。代碼可以繼續寫，但效率必須死守！感謝大家的打拼！

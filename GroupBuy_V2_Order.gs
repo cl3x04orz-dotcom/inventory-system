@@ -177,27 +177,38 @@ function savePendingOrderService(payload, user) {
     orderSheet.appendRow(row);
 
     // 寫入明細
-    items.forEach(item => {
-        const subtotal = Number(item.unitPrice) * Number(item.qty);
+    if (items && items.length > 0) {
         const detailHeaders = detailSheet.getRange(1, 1, 1, detailSheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
         const remarkIdx = detailHeaders.findIndex(h => h === 'Remark' || h === '備註' || h === '商品備註');
         
-        const row = [
-            orderId,
-            item.productId || '',
-            item.productName || '',
-            Number(item.unitPrice) || 0,
-            Number(item.qty) || 0,
-            subtotal
-        ];
-        if (remarkIdx >= 0) {
-            while (row.length < remarkIdx) row.push('');
-            row[remarkIdx] = item.remark || '';
-        } else {
-            row.push(item.remark || '');
+        const newDetailRows = [];
+        items.forEach(item => {
+            const subtotal = Number(item.unitPrice) * Number(item.qty);
+            const row = [
+                orderId,
+                item.productId || '',
+                item.productName || '',
+                Number(item.unitPrice) || 0,
+                Number(item.qty) || 0,
+                subtotal
+            ];
+            if (remarkIdx >= 0) {
+                while (row.length < remarkIdx) row.push('');
+                row[remarkIdx] = item.remark || '';
+            } else {
+                row.push(item.remark || '');
+            }
+            newDetailRows.push(row);
+        });
+        
+        if (newDetailRows.length > 0) {
+            const maxCols = Math.max(...newDetailRows.map(r => r.length), detailHeaders.length);
+            newDetailRows.forEach(r => {
+                while (r.length < maxCols) r.push('');
+            });
+            detailSheet.getRange(detailSheet.getLastRow() + 1, 1, newDetailRows.length, maxCols).setValues(newDetailRows);
         }
-        detailSheet.appendRow(row);
-    });
+    }
 
     SpreadsheetApp.flush();
     return { success: true, orderId };
