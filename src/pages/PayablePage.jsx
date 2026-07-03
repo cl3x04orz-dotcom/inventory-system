@@ -44,7 +44,6 @@ export default function PayablePage({ user, apiUrl }) {
 
     const fetchData = React.useCallback(async () => {
         setLoading(true);
-        setSelectedItemUuids(new Set()); // 清空選取
         try {
             const payload = {};
             if (startDate) payload.startDate = startDate;
@@ -54,6 +53,19 @@ export default function PayablePage({ user, apiUrl }) {
             if (Array.isArray(data)) {
                 const sorted = data.sort((a, b) => new Date(b.date) - new Date(a.date));
                 setRecords(sorted);
+
+                // [優化] 僅保留在新資料中依然存在的未付款細項 UUID，避免背景刷新 (如 Heartbeat) 時清空使用者的勾選狀態
+                const activeUuids = new Set(
+                    data.filter(r => r.status !== 'PAID')
+                        .flatMap(r => (r.items || []).map(item => item.uuid).filter(Boolean))
+                );
+                setSelectedItemUuids(prev => {
+                    const next = new Set();
+                    prev.forEach(id => {
+                        if (activeUuids.has(id)) next.add(id);
+                    });
+                    return next;
+                });
             }
         } catch (error) {
             console.error('Failed to fetch payables:', error);
