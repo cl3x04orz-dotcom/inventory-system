@@ -59,12 +59,19 @@ export default function PayrollPage({ user, apiUrl }) {
         editNote: useRef(null)
     };
 
-    // Load User List (Only for BOSS)
     useEffect(() => {
         const isAdmin = user.role === 'BOSS';
         if (isAdmin) {
             callGAS(apiUrl, 'getUsers', {}, user.token)
-                .then(users => setUserList(users))
+                .then(res => {
+                    if (res && Array.isArray(res.list)) {
+                        setUserList(res.list);
+                    } else if (Array.isArray(res)) {
+                        setUserList(res);
+                    } else {
+                        console.warn('Backend returned non-array structure for users:', res);
+                    }
+                })
                 .catch(err => console.error(err));
         }
     }, [user.role, user.token, apiUrl]);
