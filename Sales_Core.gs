@@ -528,7 +528,7 @@ function initSalesPageDataService(payload, user) {
 
     // 1. 取得商品與庫存 (維持 100% 即時)
     const tProducts = Date.now();
-    const products = typeof getProductsService !== 'undefined' ? getProductsService(ss) : [];
+    const products = typeof getProductsService !== 'undefined' ? getProductsService(ss, isCorrectionMode) : [];
     benchmark.getProducts = Date.now() - tProducts;
 
     // 2. 取得客戶清單 (內部具有 300s 獨立快取)

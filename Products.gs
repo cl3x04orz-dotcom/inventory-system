@@ -3,7 +3,7 @@
  * [Service] 產品查詢與排序權重管理
  */
 
-function getProductsService(passedSs) {
+function getProductsService(passedSs, bypassCache) {
     var ss = passedSs || SpreadsheetApp.getActiveSpreadsheet();
     var productsSheet = ss.getSheetByName("Products");
     var inventorySheet = ss.getSheetByName("Inventory");
@@ -88,7 +88,7 @@ function getProductsService(passedSs) {
     var CACHE_KEY = 'INVENTORY_STOCK_MAP';
     var cachedStockMapStr = cache.get(CACHE_KEY);
     
-    if (cachedStockMapStr) {
+    if (cachedStockMapStr && !bypassCache) {
         try {
             stockMap = JSON.parse(cachedStockMapStr);
         } catch (e) {
