@@ -215,6 +215,9 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 // Determine if we are in correction/clone mode
                 const clonedRaw = safeSessionStorage.getItem('clonedSale');
                 const isCorrectionMode = !!clonedRaw;
+                if (isCorrectionMode) {
+                    setIsSubmitting(true);
+                }
                 
                 const targetUser = targetSalesRep || user.username;
                 
@@ -339,7 +342,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 const CACHE_KEY = 'SALES_PAGE_CACHE';
                 const cachedDataRaw = safeLocalStorage.getItem(CACHE_KEY);
                 let hasLoadedFromCache = false;
-                if (cachedDataRaw) {
+                if (cachedDataRaw && !isCorrectionMode) {
                     try {
                         const cachedData = JSON.parse(cachedDataRaw);
                         if (cachedData && cachedData.products) {
@@ -378,6 +381,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             } catch (error) {
                 console.error("Init data failed", error);
                 alert('載入資料失敗: ' + error.message);
+            } finally {
+                setIsSubmitting(false);
             }
         };
         init();
