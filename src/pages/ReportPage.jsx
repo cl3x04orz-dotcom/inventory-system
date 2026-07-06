@@ -778,13 +778,13 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                 </div>
                             </div>
                             {isSummaryExpanded && (
-                                <div className="overflow-x-auto border-t border-[var(--border-primary)] max-h-60">
+                                <div className="overflow-auto border-t border-[var(--border-primary)] max-h-60 relative">
                                     <table className="w-full text-left">
-                                        <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs uppercase font-bold border-b border-[var(--border-primary)]">
-                                            <tr>
-                                                <th className="p-4">商品名稱</th>
-                                                <th className="p-4 text-right">銷售數量</th>
-                                                <th className="p-4 text-right">銷售金額</th>
+                                        <thead className="text-[var(--text-secondary)] text-xs uppercase font-bold">
+                                            <tr className="sticky top-0 z-10 bg-[var(--bg-tertiary)] shadow-[0_1px_0_0_var(--border-primary)]">
+                                                <th className="p-4 bg-[var(--bg-tertiary)] sticky top-0">商品名稱</th>
+                                                <th className="p-4 text-right bg-[var(--bg-tertiary)] sticky top-0">銷售數量</th>
+                                                <th className="p-4 text-right bg-[var(--bg-tertiary)] sticky top-0">銷售金額</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-[var(--border-primary)] bg-[var(--bg-secondary)]">
@@ -888,15 +888,15 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                         )}
                                     </div>
                                     {isPivotExpanded && (
-                                        <div className="overflow-x-auto border-t border-[var(--border-primary)]">
+                                        <div className="overflow-auto border-t border-[var(--border-primary)] max-h-[450px] relative">
                                             <table className="w-full text-left text-sm whitespace-nowrap">
-                                                <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs uppercase font-bold border-b border-[var(--border-primary)]">
-                                                    <tr>
-                                                        <th className="p-4 w-48">商品名稱</th>
+                                                <thead className="text-[var(--text-secondary)] text-xs uppercase font-bold">
+                                                    <tr className="sticky top-0 z-10 bg-[var(--bg-tertiary)] shadow-[0_1px_0_0_var(--border-primary)]">
+                                                        <th className="p-4 w-48 bg-[var(--bg-tertiary)] sticky top-0">商品名稱</th>
                                                         {reps.map(rep => (
-                                                            <th key={rep} className="p-4 text-center">{rep}</th>
+                                                            <th key={rep} className="p-4 text-center bg-[var(--bg-tertiary)] sticky top-0">{rep}</th>
                                                         ))}
-                                                        <th className="p-4 text-right text-blue-600 font-extrabold">總計</th>
+                                                        <th className="p-4 text-right text-blue-600 font-extrabold bg-[var(--bg-tertiary)] sticky top-0">總計</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-[var(--border-primary)] bg-[var(--bg-secondary)]">
