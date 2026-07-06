@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Package, ClipboardList, Eye, Edit, Trash2, CheckCircle, RefreshCw, X, User, Phone, MapPin, FileText, Plus, Minus, Save, Calendar, Check, Search } from 'lucide-react';
+import { Package, ClipboardList, Eye, Edit, Trash2, CheckCircle, RefreshCw, X, User, Phone, MapPin, FileText, Plus, Minus, Save, Calendar, Check, Search, Copy } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
 export default function PendingOrdersPage({ user, apiUrl }) {
@@ -21,6 +21,12 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
     // 搜尋與篩選
     const [searchTerm, setSearchTerm] = useState('');
+
+    // 批次與大樓功能狀態
+    const [selectedOrderIds, setSelectedOrderIds] = useState([]);
+    const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+    const [batchMessage, setBatchMessage] = useState('');
+    const [buildings, setBuildings] = useState([]);
 
     const fetchOrders = useCallback(async () => {
         setLoading(true);
@@ -58,14 +64,28 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             console.error('Failed to fetch group bindings:', error);
         }
     }, [apiUrl, user.token]);
+
+    const fetchBuildings = useCallback(async () => {
+        try {
+            const data = await callGAS(apiUrl, 'getBuildingSettings', {}, user.token);
+            if (Array.isArray(data)) {
+                const names = data.map(b => b.building).filter(Boolean);
+                // 去重
+                setBuildings(Array.from(new Set(names)));
+            }
+        } catch (error) {
+            console.error('Failed to fetch buildings settings:', error);
+        }
+    }, [apiUrl, user.token]);
  
      useEffect(() => {
          if (user?.token) {
              fetchOrders();
              fetchProducts();
              fetchGroupBindings();
+             fetchBuildings();
          }
-     }, [user.token, activeTab, fetchOrders, fetchProducts, fetchGroupBindings]);
+     }, [user.token, activeTab, fetchOrders, fetchProducts, fetchGroupBindings, fetchBuildings]);
 
     const handleConfirmOrder = async (orderId) => {
         if (!window.confirm(`確定要將訂單 ${orderId} 確認出貨嗎？\n此動作會正式扣減商品庫存，並寫入銷售紀錄！`)) {
@@ -231,7 +251,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 customerPhone: editingOrder.customerPhone,
                 deliveryAddress: editingOrder.deliveryAddress,
                 note: editingOrder.note,
-                items: editingOrder.items
+                items: editingOrder.items,
+                paymentMethod: editingOrder.paymentMethod,
+                transferLastFive: editingOrder.transferLastFive,
+                paymentStatus: editingOrder.paymentStatus
             }, user.token);
 
             if (res && res.error) {
@@ -269,6 +292,170 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             String(order.sourceGroup || '').toLowerCase().includes(search)
         );
     });
+
+    // 排序：同大樓排在一起，大樓相同則依時間新到舊排序
+    const sortedFilteredOrders = React.useMemo(() => {
+        return [...filteredOrders].sort((a, b) => {
+            const getBuildingName = (order) => {
+                const boundName = groupBindings[order.sourceGroup];
+                if (boundName) return boundName;
+                const addr = String(order.deliveryAddress || '').trim();
+                const matched = Object.values(groupBindings).find(bName => addr.startsWith(bName));
+                return matched || '一般散客';
+            };
+            const bA = getBuildingName(a);
+            const bB = getBuildingName(b);
+            const comp = bA.localeCompare(bB, 'zh-Hant');
+            if (comp !== 0) return comp;
+            // 相同大樓則依時間新到舊
+            return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        });
+    }, [filteredOrders, groupBindings]);
+
+    // 數據加總統計 (Summary Panel)
+    const summaryStats = React.useMemo(() => {
+        let totalAmount = 0;
+        let totalQty = 0;
+        sortedFilteredOrders.forEach(o => {
+            totalAmount += (Number(o.totalAmount) || 0);
+            o.items?.forEach(i => {
+                totalQty += (Number(i.qty) || 0);
+            });
+        });
+        return {
+            ordersCount: sortedFilteredOrders.length,
+            totalQty,
+            totalAmount
+        };
+    }, [sortedFilteredOrders]);
+
+    // 一鍵複製小工具
+    const handleCopyText = (text, typeLabel) => {
+        if (!text) return;
+        navigator.clipboard.writeText(text)
+            .then(() => {
+                alert(`${typeLabel}已複製：${text}`);
+            })
+            .catch(err => {
+                console.error('Copy failed:', err);
+            });
+    };
+
+    // 一鍵標記已付款快捷功能
+    const handleQuickConfirmPayment = async (order) => {
+        if (!window.confirm(`確定要將訂單 ${order.orderId} 標記為【已付款】嗎？`)) {
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const res = await callGAS(apiUrl, 'updatePendingOrder', {
+                orderId: order.orderId,
+                paymentStatus: '已付款'
+            }, user.token);
+
+            if (res && res.error) {
+                throw new Error(res.error);
+            }
+
+            alert('已成功將訂單標記為已付款！');
+            fetchOrders();
+        } catch (error) {
+            alert('更新付款狀態失敗: ' + error.message);
+            setLoading(false);
+        }
+    };
+
+    // 批次確認付款/收款邏輯
+    const handleBatchConfirmPayment = async () => {
+        if (selectedOrderIds.length === 0) return;
+        if (!window.confirm(`確定要將這 ${selectedOrderIds.length} 筆選取的訂單全部標記為【已付款】嗎？`)) {
+            return;
+        }
+
+        setIsBatchProcessing(true);
+        setLoading(true);
+        
+        let successCount = 0;
+        let failCount = 0;
+
+        for (let i = 0; i < selectedOrderIds.length; i++) {
+            const orderId = selectedOrderIds[i];
+            setBatchMessage(`正在更新第 ${i + 1} / ${selectedOrderIds.length} 筆訂單的付款狀態...`);
+            try {
+                const res = await callGAS(apiUrl, 'updatePendingOrder', { 
+                    orderId, 
+                    paymentStatus: '已付款' 
+                }, user.token);
+                if (res && res.error) {
+                    failCount++;
+                } else {
+                    successCount++;
+                }
+            } catch (err) {
+                failCount++;
+            }
+        }
+
+        alert(`批次確認收款執行完畢！\n成功：${successCount} 筆\n失敗：${failCount} 筆`);
+        setSelectedOrderIds([]);
+        setIsBatchProcessing(false);
+        setBatchMessage('');
+        fetchOrders();
+    };
+
+    // 批次確認出貨邏輯
+    const handleBatchConfirm = async () => {
+        if (selectedOrderIds.length === 0) return;
+        if (!window.confirm(`確定要將這 ${selectedOrderIds.length} 筆選取的訂單全部【確認出貨】嗎？\n此操作會扣減庫存並寫入銷售紀錄！`)) {
+            return;
+        }
+
+        setIsBatchProcessing(true);
+        setLoading(true);
+        
+        let successCount = 0;
+        let failCount = 0;
+
+        for (let i = 0; i < selectedOrderIds.length; i++) {
+            const orderId = selectedOrderIds[i];
+            setBatchMessage(`正在出貨第 ${i + 1} / ${selectedOrderIds.length} 筆訂單...`);
+            try {
+                const res = await callGAS(apiUrl, 'confirmPendingOrder', { orderId }, user.token);
+                if (res && res.error) {
+                    failCount++;
+                } else {
+                    successCount++;
+                }
+            } catch (err) {
+                failCount++;
+            }
+        }
+
+        alert(`批次出貨執行完畢！\n成功：${successCount} 筆\n失敗：${failCount} 筆`);
+        setSelectedOrderIds([]);
+        setIsBatchProcessing(false);
+        setBatchMessage('');
+        fetchOrders();
+    };
+
+    const handleToggleSelectAll = () => {
+        if (selectedOrderIds.length === sortedFilteredOrders.length) {
+            setSelectedOrderIds([]);
+        } else {
+            setSelectedOrderIds(sortedFilteredOrders.map(o => o.orderId));
+        }
+    };
+
+    const handleToggleSelectOrder = (orderId) => {
+        setSelectedOrderIds(prev => {
+            if (prev.includes(orderId)) {
+                return prev.filter(id => id !== orderId);
+            } else {
+                return [...prev, orderId];
+            }
+        });
+    };
 
     const formatDate = (isoString) => {
         if (!isoString) return '-';
@@ -450,7 +637,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shadow-sm gap-4">
                 <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
                     <ClipboardList className="text-blue-600" />
-                    團購訂單審核與出貨
+                    訂單審核
                 </h2>
 
                 {/* 篩選與搜尋 */}
@@ -462,7 +649,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         onChange={(e) => setSelectedBuilding(e.target.value)}
                     >
                         <option value="全部">全部社區大樓</option>
-                        {Object.values(groupBindings).map(bname => (
+                        {buildings.map(bname => (
                             <option key={bname} value={bname}>{bname}</option>
                         ))}
                     </select>
@@ -483,44 +670,68 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 </div>
             </div>
 
-            {/* 未命名大樓新群組警告區 */}
-            {unnamedGroups.length > 0 && (
-                <div className="bg-amber-500/10 backdrop-blur-md border border-amber-500/30 rounded-xl p-4 flex flex-col gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
-                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-extrabold text-sm">
-                        <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+            {/* 批次處理中遮罩 */}
+            {isBatchProcessing && (
+                <div className="fixed inset-0 bg-white/30 backdrop-blur-md z-50 flex flex-col items-center justify-center animate-in fade-in duration-300">
+                    <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4 shadow-lg"></div>
+                    <p className="text-xl font-bold text-blue-900">{batchMessage}</p>
+                </div>
+            )}
+
+            {/* 頂部數據加總面板 */}
+            {sortedFilteredOrders.length > 0 && (
+                <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl p-3.5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                        <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">訂單總筆數</span>
+                        <span className="text-xl font-extrabold text-[var(--text-primary)] mt-1">{summaryStats.ordersCount} <span className="text-xs font-medium text-[var(--text-tertiary)]">筆</span></span>
+                    </div>
+                    <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl p-3.5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                        <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">待出貨數量</span>
+                        <span className="text-xl font-extrabold text-blue-600 mt-1">{summaryStats.totalQty} <span className="text-xs font-medium text-[var(--text-tertiary)]">瓶/件</span></span>
+                    </div>
+                    <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl p-3.5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                        <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">待出貨總金額</span>
+                        <span className="text-xl font-extrabold text-emerald-600 mt-1">${summaryStats.totalAmount.toLocaleString()}</span>
+                    </div>
+                </div>
+            )}
+
+            {/* 批次操作列 (限待確認 tab 下) */}
+            {activeTab === 'PENDING' && sortedFilteredOrders.length > 0 && (
+                <div className="bg-slate-50 dark:bg-slate-900/10 border border-[var(--border-primary)] rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-inner">
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            checked={selectedOrderIds.length === sortedFilteredOrders.length && sortedFilteredOrders.length > 0}
+                            onChange={handleToggleSelectAll}
+                            className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                            id="selectAllCheckbox"
+                        />
+                        <label htmlFor="selectAllCheckbox" className="text-sm font-bold text-[var(--text-secondary)] cursor-pointer select-none">
+                            全選本頁面待審核訂單
+                        </label>
+                        <span className="text-xs text-[var(--text-tertiary)] ml-1">
+                            (已選取 {selectedOrderIds.length} 筆)
                         </span>
-                        🔔 偵測到有未命名的全新大樓群組下單！請在此為群組綁定真實大樓名稱，綁定完成後該群組下單將自動帶入並鎖定此名稱。
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                        {unnamedGroups.map(gid => (
-                            <div key={gid} className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-sm hover:border-amber-500/20 transition-colors">
-                                <div className="flex flex-col gap-0.5">
-                                    <span className="text-[10px] text-[var(--text-secondary)] font-bold">群組代碼 (LINE ID)</span>
-                                    <span className="font-mono text-xs font-black text-[var(--text-primary)]">{gid}</span>
-                                </div>
-                                <div className="flex gap-2 items-center flex-1 sm:justify-end">
-                                    <input
-                                        type="text"
-                                        placeholder="例如：遠雄富源大樓"
-                                        className="input-field py-1.5 px-3 text-xs bg-[var(--bg-primary)] border-[var(--border-primary)] rounded-lg font-bold text-[var(--text-primary)] focus:outline-none w-full sm:w-48"
-                                        value={newGroupNames[gid] || ''}
-                                        onChange={(e) => setNewGroupNames(prev => ({ ...prev, [gid]: e.target.value }))}
-                                        disabled={isBinding}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => handleBindGroup(gid)}
-                                        className="py-1.5 px-3 text-xs font-bold rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 transition-transform text-white shadow-sm disabled:opacity-55 flex-shrink-0"
-                                        disabled={isBinding || !newGroupNames[gid]?.trim()}
-                                    >
-                                        一鍵綁定
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                    {selectedOrderIds.length > 0 && (
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={handleBatchConfirmPayment}
+                                className="py-1.5 px-4 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-transform text-white shadow-sm flex items-center gap-1"
+                            >
+                                <CheckCircle size={14} /> 批次確認收款 ({selectedOrderIds.length})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleBatchConfirm}
+                                className="btn-primary py-1.5 px-4 text-xs font-bold bg-blue-600 hover:bg-blue-700 border-none shadow-sm active:scale-95 transition-transform flex items-center gap-1"
+                            >
+                                <CheckCircle size={14} /> 批次確認出貨 ({selectedOrderIds.length})
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -590,11 +801,16 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                 {/* Order Header */}
                                 <div>
                                     <div className="flex justify-between items-start mb-3 pb-2 border-b border-[var(--border-primary)]">
-                                        <div>
+                                        <div className="flex items-center gap-2">
+                                            {activeTab === 'PENDING' && (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedOrderIds.includes(order.orderId)}
+                                                    onChange={() => handleToggleSelectOrder(order.orderId)}
+                                                    className="w-4.5 h-4.5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                                                />
+                                            )}
                                             <span className="font-mono font-bold text-base text-[var(--text-primary)]">{order.orderId}</span>
-                                            <div className="text-[10px] text-[var(--text-tertiary)] font-semibold mt-0.5 flex items-center gap-1">
-                                                <Calendar size={12} /> {formatDate(order.createdAt)}
-                                            </div>
                                         </div>
                                         <div>
                                             <span className={`inline-block text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider ${order.status === 'PENDING'
@@ -625,14 +841,71 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                 </span>
                                             )}
                                         </div>
+                                        
+                                        {/* 付款方式與狀態標籤 */}
+                                        {order.paymentMethod && (
+                                            <div className="flex flex-wrap items-center gap-1.5 py-0.5">
+                                                <span className={`inline-block text-[10px] px-2 py-0.5 rounded font-black border uppercase tracking-wider ${
+                                                    order.paymentMethod === '轉帳' 
+                                                        ? 'bg-amber-50 text-amber-600 border-amber-200' 
+                                                        : order.paymentMethod === 'LINE Pay'
+                                                        ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                                        : 'bg-slate-50 text-slate-600 border-slate-200'
+                                                }`}>
+                                                    💳 {order.paymentMethod}
+                                                </span>
+                                                {order.transferLastFive && (
+                                                    <span className="text-[10px] text-slate-500 font-mono bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                                        末五碼：{order.transferLastFive}
+                                                    </span>
+                                                )}
+                                                {order.paymentStatus && (
+                                                    <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded font-black ${
+                                                        order.paymentStatus === '已付款' || order.paymentStatus === '已入帳'
+                                                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                                                            : 'bg-rose-50 text-rose-600 border border-rose-200'
+                                                    }`}>
+                                                        {order.paymentStatus}
+                                                    </span>
+                                                )}
+                                                {/* 快捷收款按鈕 */}
+                                                {order.status === 'PENDING' && order.paymentStatus !== '已付款' && order.paymentStatus !== '已入帳' && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleQuickConfirmPayment(order)}
+                                                        className="text-[10px] px-2 py-0.5 font-bold rounded bg-emerald-500 hover:bg-emerald-600 active:scale-95 transition-transform text-white shadow-sm flex items-center gap-0.5 ml-1"
+                                                        title="一鍵標記為已付款"
+                                                    >
+                                                        <Check size={10} /> 確認收款
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+
                                         <div className="flex items-center gap-2 text-[var(--text-secondary)]">
                                             <Phone size={16} className="text-[var(--text-tertiary)]" />
                                             <span>{order.customerPhone}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleCopyText(order.customerPhone, '電話')}
+                                                className="p-1 hover:bg-[var(--bg-hover)] rounded text-[var(--text-tertiary)] hover:text-blue-500 transition-colors"
+                                                title="複製電話"
+                                            >
+                                                <Copy size={12} />
+                                            </button>
                                         </div>
                                         {order.deliveryAddress && (
                                             <div className="flex items-center gap-2 text-[var(--text-secondary)]">
                                                 <MapPin size={16} className="text-[var(--text-tertiary)] animate-pulse" />
-                                                <span>{order.deliveryAddress}</span>
+                                                <span className="break-all">{order.deliveryAddress}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleCopyText(order.deliveryAddress, '地址')}
+                                                    className="p-1 hover:bg-[var(--bg-hover)] rounded text-[var(--text-tertiary)] hover:text-blue-500 transition-colors"
+                                                    title="複製地址"
+                                                >
+                                                    <Copy size={12} />
+                                                </button>
                                             </div>
                                         )}
                                         {order.note && (
@@ -773,6 +1046,47 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                     value={editingOrder.note}
                                     onChange={(e) => handleEditFieldChange('note', e.target.value)}
                                 />
+                            </div>
+
+                            {/* 付款資訊調整 */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-[var(--border-primary)] pt-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-[var(--text-secondary)]">付款方式</label>
+                                    <select
+                                        className="input-field w-full p-2 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)]"
+                                        value={editingOrder.paymentMethod || ''}
+                                        onChange={(e) => handleEditFieldChange('paymentMethod', e.target.value)}
+                                    >
+                                        <option value="現金">現金</option>
+                                        <option value="轉帳">轉帳</option>
+                                        <option value="LINE Pay">LINE Pay</option>
+                                        <option value="">未指定</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-[var(--text-secondary)]">轉帳後五碼</label>
+                                    <input
+                                        type="text"
+                                        className="input-field w-full p-2 text-sm"
+                                        value={editingOrder.transferLastFive || ''}
+                                        placeholder="對帳後五碼"
+                                        onChange={(e) => handleEditFieldChange('transferLastFive', e.target.value)}
+                                        disabled={editingOrder.paymentMethod !== '轉帳'}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-[var(--text-secondary)]">對帳狀態</label>
+                                    <select
+                                        className="input-field w-full p-2 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)]"
+                                        value={editingOrder.paymentStatus || ''}
+                                        onChange={(e) => handleEditFieldChange('paymentStatus', e.target.value)}
+                                    >
+                                        <option value="未對帳">待對帳 / 未對帳</option>
+                                        <option value="待確認">待確認</option>
+                                        <option value="已付款">已付款 / 已入帳</option>
+                                        <option value="貨到付款">貨到付款</option>
+                                    </select>
+                                </div>
                             </div>
 
                             {/* 商品細明修改 */}

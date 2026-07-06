@@ -83,7 +83,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
             <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shadow-sm gap-4">
                 <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
                     <Package className="text-blue-600" />
-                    商品上架與屬性管理
+                    商品屬性
                 </h2>
 
                 <div className="flex gap-2 w-full md:w-auto">

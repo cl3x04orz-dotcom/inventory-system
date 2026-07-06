@@ -258,7 +258,7 @@ function getPendingOrdersService(payload, user) {
 function updatePendingOrderService(payload, user) {
     if (user.role !== 'BOSS') throw new Error('權限不足');
 
-    const { orderId, customerName, customerPhone, deliveryAddress, note, items } = payload;
+    const { orderId, customerName, customerPhone, deliveryAddress, note, items, paymentMethod, transferLastFive, paymentStatus } = payload;
     if (!orderId) throw new Error('缺少 orderId');
 
     const { orderSheet, detailSheet } = initGroupBuySheets_();
@@ -275,31 +275,39 @@ function updatePendingOrderService(payload, user) {
     if (foundOrderRow === -1) throw new Error('找不到訂單：' + orderId);
 
     const now = new Date();
-    const totalAmount = (items || []).reduce((sum, item) => sum + (Number(item.unitPrice) * Number(item.qty)), 0);
 
     // 動態更新主單欄位
     const headers = orderSheet.getRange(1, 1, 1, orderSheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
     const setVal = (name, val) => {
-        const idx = headers.indexOf(name);
+        const idx = headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
         if (idx >= 0) {
             orderSheet.getRange(foundOrderRow, idx + 1).setValue(val);
         }
     };
     
-    const oNameIdx = headers.indexOf('CustomerName');
-    const oPhoneIdx = headers.indexOf('CustomerPhone');
-    const oAddrIdx = headers.indexOf('DeliveryAddress');
-    const oNoteIdx = headers.indexOf('Note');
+    const findIdx = (name) => headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
+    const oNameIdx = findIdx('CustomerName');
+    const oPhoneIdx = findIdx('CustomerPhone');
+    const oAddrIdx = findIdx('DeliveryAddress');
+    const oNoteIdx = findIdx('Note');
 
-    setVal('CustomerName', customerName || (oNameIdx >= 0 ? orderData[foundOrderRow-1][oNameIdx] : ''));
-    setVal('CustomerPhone', customerPhone || (oPhoneIdx >= 0 ? orderData[foundOrderRow-1][oPhoneIdx] : ''));
-    setVal('DeliveryAddress', deliveryAddress !== undefined ? deliveryAddress : (oAddrIdx >= 0 ? orderData[foundOrderRow-1][oAddrIdx] : ''));
-    setVal('Note', note !== undefined ? note : (oNoteIdx >= 0 ? orderData[foundOrderRow-1][oNoteIdx] : ''));
-    setVal('TotalAmount', totalAmount);
+    if (customerName !== undefined) setVal('CustomerName', customerName);
+    if (customerPhone !== undefined) setVal('CustomerPhone', customerPhone);
+    if (deliveryAddress !== undefined) setVal('DeliveryAddress', deliveryAddress);
+    if (note !== undefined) setVal('Note', note);
+
+    if (items !== undefined && Array.isArray(items)) {
+        const totalAmount = items.reduce((sum, item) => sum + (Number(item.unitPrice) * Number(item.qty)), 0);
+        setVal('TotalAmount', totalAmount);
+    }
     setVal('UpdatedAt', now);
 
+    if (paymentMethod !== undefined) setVal('PaymentMethod', paymentMethod);
+    if (transferLastFive !== undefined) setVal('TransferLastFive', transferLastFive);
+    if (paymentStatus !== undefined) setVal('PaymentStatus', paymentStatus);
+
     // 清除舊明細並重寫
-    if (items && items.length > 0) {
+    if (items !== undefined && Array.isArray(items) && items.length > 0) {
         const detailData = detailSheet.getDataRange().getValues();
         const rowsToDelete = [];
         for (let i = detailData.length - 1; i >= 1; i--) {

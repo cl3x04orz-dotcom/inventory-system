@@ -234,44 +234,107 @@ export default function LiffOrderPage({ user, apiUrl }) {
     }
   };
 
+  const isTimeInWeeklyWindow = (nowDate, openDay, openTimeStr, closeDay, closeTimeStr) => {
+    if (openDay === undefined || openDay === '' || !openTimeStr || closeDay === undefined || closeDay === '' || !closeTimeStr) {
+      return false;
+    }
+    const [openH, openM] = openTimeStr.split(':').map(Number);
+    const [closeH, closeM] = closeTimeStr.split(':').map(Number);
+    const getWeekMinute = (day, hour, min) => day * 1440 + hour * 60 + min;
+    const openMin = getWeekMinute(Number(openDay), openH, openM);
+    const closeMin = getWeekMinute(Number(closeDay), closeH, closeM);
+    const curDay = nowDate.getDay();
+    const curMin = getWeekMinute(curDay, nowDate.getHours(), nowDate.getMinutes());
+
+    if (openMin < closeMin) {
+      return curMin >= openMin && curMin <= closeMin;
+    } else if (openMin > closeMin) {
+      return curMin >= openMin || curMin <= closeMin;
+    }
+    return false;
+  };
+
   const getGroupBuyStatus = () => {
     const currentBuildingName = (selectedBuilding && selectedBuilding !== "其它") ? selectedBuilding : "一般散客";
     const setting = buildingSettings.find(s => s.building === currentBuildingName);
     if (!setting) return { status: 'open', message: '' };
 
-    const { start_time, end_time } = setting;
-    if (!start_time && !end_time) return { status: 'open', message: '' };
-
+    const { start_time, end_time, is_auto, auto_open_day, auto_open_time, auto_close_day, auto_close_time } = setting;
     const now = new Date();
     const nowTime = now.getTime();
+    const dayNames = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
 
-    if (start_time) {
+    // 1. 先檢測自動開關團
+    let isAutoOpen = false;
+    if (is_auto) {
+      isAutoOpen = isTimeInWeeklyWindow(now, auto_open_day, auto_open_time, auto_close_day, auto_close_time);
+    }
+
+    // 2. 檢測手動加開開關團
+    let isManualOpen = false;
+    let isManualUpcoming = false;
+    let isManualEnded = false;
+
+    if (start_time && end_time) {
       const start = new Date(start_time.replace(/\//g, '-'));
-      if (!isNaN(start.getTime()) && nowTime < start.getTime()) {
-        return {
-          status: 'upcoming',
-          message: `⚠️ 本期團購尚未開始！開團時間為：${start_time}，敬請期待。`,
-          startTime: start_time
-        };
-      }
-    }
-
-    if (end_time) {
       const end = new Date(end_time.replace(/\//g, '-'));
-      if (!isNaN(end.getTime()) && nowTime > end.getTime()) {
-        return {
-          status: 'ended',
-          message: `🛑 本期團購已截止下單！謝謝大家的支持。`,
-          endTime: end_time
-        };
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        if (nowTime >= start.getTime() && nowTime <= end.getTime()) {
+          isManualOpen = true;
+        } else if (nowTime < start.getTime()) {
+          isManualUpcoming = true;
+        } else if (nowTime > end.getTime()) {
+          isManualEnded = true;
+        }
       }
     }
 
-    return {
-      status: 'open',
-      message: end_time ? `⏰ 本期團購將於 ${end_time} 準時結單，請把握時間！` : '',
-      endTime: end_time
-    };
+    // 3. 彙整狀態輸出
+    if (isAutoOpen) {
+      const autoEndStr = `${dayNames[auto_close_day]} ${auto_close_time}`;
+      return {
+        status: 'open',
+        message: `⏰ 本期自動團購將於每週 ${autoEndStr} 準時結單，請把握時間！`,
+        endTime: autoEndStr
+      };
+    }
+
+    if (isManualOpen) {
+      return {
+        status: 'open',
+        message: `⏰ 手動加開團購將於 ${end_time} 準時結單，請把握時間！`,
+        endTime: end_time
+      };
+    }
+
+    if (isManualUpcoming) {
+      return {
+        status: 'upcoming',
+        message: `⚠️ 本期加開團購尚未開始！開團時間為：${start_time}，敬請期待。`,
+        startTime: start_time
+      };
+    }
+
+    if (is_auto) {
+      // 雖然啟用自動但目前時間未到
+      const autoStartStr = `${dayNames[auto_open_day]} ${auto_open_time}`;
+      const autoEndStr = `${dayNames[auto_close_day]} ${auto_close_time}`;
+      return {
+        status: 'ended',
+        message: `🛑 目前非開團時段。每週自動開團時間：${autoStartStr} 至 ${autoEndStr}。`
+      };
+    }
+
+    if (isManualEnded) {
+      return {
+        status: 'ended',
+        message: `🛑 本期團購已截止下單！謝謝大家的支持。`,
+        endTime: end_time
+      };
+    }
+
+    // 若都沒設，預設為開放
+    return { status: 'open', message: '' };
   };
 
   const gbStatus = getGroupBuyStatus();
@@ -565,56 +628,47 @@ export default function LiffOrderPage({ user, apiUrl }) {
   };
 
   // ── 滾動監聽 (Scroll Spy) ──────────────────────────────────────────
-  useEffect(() => {
-    if (loading || products.length === 0 || !listRef.current) return;
+  const handleScroll = useCallback((e) => {
+    if (isManualScrollRef.current) return;
 
-    const scrollContainer = listRef.current;
+    const container = e.currentTarget;
+    const containerScrollTop = container.scrollTop;
 
-    const observerOptions = {
-      root: scrollContainer,
-      rootMargin: "-10% 0px -75% 0px", // 只偵測容器頂部下方一小段的區塊
-      threshold: 0,
-    };
+    const groupElements = Object.entries(sectionRefs.current)
+      .map(([cat, el]) => ({ cat, el }))
+      .filter((g) => g.el != null);
 
-    const handleIntersection = (entries) => {
-      if (isManualScrollRef.current) return;
+    if (groupElements.length === 0) return;
 
-      const visibleEntry = entries.find((entry) => entry.isIntersecting);
-      if (visibleEntry) {
-        const cat = visibleEntry.target.getAttribute("data-category");
-        if (cat) {
-          setActiveCategory(cat);
-          if (tabBarRef.current) {
-            const btn = tabBarRef.current.querySelector(
-              `[data-cat="${CSS.escape(cat)}"]`,
-            );
-            if (btn) {
-              const bar = tabBarRef.current;
-              bar.scrollTo({
-                left:
-                  btn.offsetLeft - bar.offsetWidth / 2 + btn.offsetWidth / 2,
-                behavior: "smooth",
-              });
-            }
-          }
+    // 當前滾動位置 (加一點偏移量 offset 做精準選中)
+    const currentScrollTop = containerScrollTop + 15;
+
+    let targetCat = groupElements[0].cat;
+    for (let i = 0; i < groupElements.length; i++) {
+      const g = groupElements[i];
+      if (g.el.offsetTop <= currentScrollTop) {
+        targetCat = g.cat;
+      } else {
+        break;
+      }
+    }
+
+    if (targetCat && targetCat !== activeCategory) {
+      setActiveCategory(targetCat);
+      if (tabBarRef.current) {
+        const btn = tabBarRef.current.querySelector(
+          `[data-cat="${CSS.escape(targetCat)}"]`,
+        );
+        if (btn) {
+          const bar = tabBarRef.current;
+          bar.scrollTo({
+            left: btn.offsetLeft - bar.offsetWidth / 2 + btn.offsetWidth / 2,
+            behavior: "smooth",
+          });
         }
       }
-    };
-
-    const observer = new IntersectionObserver(
-      handleIntersection,
-      observerOptions,
-    );
-    Object.values(sectionRefs.current).forEach((el) => {
-      if (el) observer.observe(el);
-    });
-
-    return () => {
-      observer.disconnect();
-      if (manualScrollTimeoutRef.current)
-        clearTimeout(manualScrollTimeoutRef.current);
-    };
-  }, [products, loading]);
+    }
+  }, [activeCategory]);
 
   // ── 購物車 ───────────────────────────────────────────────────
   const handleUpdateQty = (pid, delta) => {
@@ -1956,6 +2010,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
           {/* 商品列表 */}
           <div
             ref={listRef}
+            onScroll={handleScroll}
             className="flex-1 overflow-y-auto pb-28 relative overscroll-contain"
           >
             {products.length === 0 ? (

@@ -15,6 +15,13 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
     const [endDate, setEndDate] = useState('');
     const [endTime, setEndTime] = useState('');
     
+    // 自動開關團狀態
+    const [isAuto, setIsAuto] = useState(false);
+    const [autoOpenDay, setAutoOpenDay] = useState('');
+    const [autoOpenTime, setAutoOpenTime] = useState('');
+    const [autoCloseDay, setAutoCloseDay] = useState('');
+    const [autoCloseTime, setAutoCloseTime] = useState('');
+    
     const [isSaving, setIsSaving] = useState(false);
     const [copied, setCopied] = useState(false);
 
@@ -76,11 +83,24 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
             const end = parseDateTime(found.end_time);
             setEndDate(end.date);
             setEndTime(end.time);
+
+            // 自動設定
+            setIsAuto(!!found.is_auto);
+            setAutoOpenDay(found.auto_open_day !== undefined && found.auto_open_day !== '' ? String(found.auto_open_day) : '');
+            setAutoOpenTime(found.auto_open_time || '');
+            setAutoCloseDay(found.auto_close_day !== undefined && found.auto_close_day !== '' ? String(found.auto_close_day) : '');
+            setAutoCloseTime(found.auto_close_time || '');
         } else {
             setStartDate('');
             setStartTime('');
             setEndDate('');
             setEndTime('');
+
+            setIsAuto(false);
+            setAutoOpenDay('');
+            setAutoOpenTime('');
+            setAutoCloseDay('');
+            setAutoCloseTime('');
         }
     };
 
@@ -94,6 +114,11 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
             setStartTime('');
             setEndDate('');
             setEndTime('');
+            setIsAuto(false);
+            setAutoOpenDay('');
+            setAutoOpenTime('');
+            setAutoCloseDay('');
+            setAutoCloseTime('');
         } else {
             setIsAddingNew(false);
             updateFormFields(val);
@@ -122,7 +147,12 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
             const res = await callGAS(apiUrl, 'saveBuildingSettings', {
                 building: targetBuilding,
                 start_time: sDateTime,
-                end_time: eDateTime
+                end_time: eDateTime,
+                is_auto: isAuto,
+                auto_open_day: autoOpenDay !== '' ? Number(autoOpenDay) : '',
+                auto_open_time: autoOpenTime,
+                auto_close_day: autoCloseDay !== '' ? Number(autoCloseDay) : '',
+                auto_close_time: autoCloseTime
             }, user.token);
 
             if (res && res.error) {
@@ -185,7 +215,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
             <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shadow-sm gap-4">
                 <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
                     <Link className="text-blue-600" />
-                    開團時段與網址生成面板
+                    開團管理
                 </h2>
                 <button onClick={fetchSettings} className="btn-secondary px-3 py-1.5 rounded-lg text-xs font-bold" disabled={loading}>
                     {loading ? '載入中...' : '重新整理'}
@@ -198,25 +228,28 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                     <span>載入大樓時段設定中...</span>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1 overflow-y-auto pb-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 flex-1 overflow-y-auto pb-6">
                     {/* Left: Building Selection Card */}
-                    <div className="md:col-span-1 bg-[var(--bg-secondary)] p-5 rounded-xl border border-[var(--border-primary)] shadow-sm flex flex-col gap-4">
-                        <h3 className="font-bold text-lg text-[var(--text-primary)] pb-2 border-b border-[var(--border-primary)]">
-                            第一步：選擇大樓 / 社區
+                    <div className="md:col-span-1 bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
+                        <h3 className="font-extrabold text-base text-[var(--text-primary)] pb-2.5 border-b border-[var(--border-primary)] flex items-center gap-1.5">
+                            <span className="flex items-center justify-center bg-blue-500 text-white rounded-full w-5 h-5 text-xs font-black">1</span>
+                            選擇大樓 / 社區
                         </h3>
                         
-                        <div className="space-y-3">
-                            <label className="text-xs font-bold text-[var(--text-secondary)]">選擇現有大樓</label>
-                            <select
-                                className="w-full bg-[var(--bg-secondary)] p-2.5 rounded-xl border border-[var(--border-primary)] text-sm font-bold text-[var(--text-primary)] focus:outline-none"
-                                value={selectedBuilding}
-                                onChange={handleBuildingChange}
-                            >
-                                {settings.map(s => (
-                                    <option key={s.building} value={s.building}>{s.building}</option>
-                                ))}
-                                <option value="__new__">+ 新增大樓 / 社區</option>
-                            </select>
+                        <div className="space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-[var(--text-secondary)]">選擇現有大樓</label>
+                                <select
+                                    className="w-full bg-[var(--bg-secondary)] p-2.5 rounded-xl border border-[var(--border-primary)] text-sm font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 transition-colors"
+                                    value={selectedBuilding}
+                                    onChange={handleBuildingChange}
+                                >
+                                    {settings.map(s => (
+                                        <option key={s.building} value={s.building}>{s.building}</option>
+                                    ))}
+                                    <option value="__new__">➕ 新增大樓 / 社區</option>
+                                </select>
+                            </div>
 
                             {isAddingNew && (
                                 <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
@@ -224,7 +257,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                     <input
                                         type="text"
                                         className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm"
-                                        placeholder="例如：遠雄大樓"
+                                        placeholder="例如：遠雄富源大樓"
                                         value={newBuildingName}
                                         onChange={(e) => setNewBuildingName(e.target.value)}
                                     />
@@ -233,99 +266,191 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                         </div>
                     </div>
 
-                    {/* Middle: Set Times Card */}
-                    <div className="md:col-span-2 bg-[var(--bg-secondary)] p-5 rounded-xl border border-[var(--border-primary)] shadow-sm flex flex-col gap-5">
-                        <h3 className="font-bold text-lg text-[var(--text-primary)] pb-2 border-b border-[var(--border-primary)]">
-                            第二步：設定開結單時段
-                        </h3>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {/* Start Time */}
-                            <div className="space-y-3 p-4 bg-[var(--bg-tertiary)] rounded-2xl border border-[var(--border-primary)]">
-                                <label className="text-sm font-extrabold text-[var(--text-primary)] flex items-center gap-1.5">
-                                    <Calendar className="text-amber-500" size={16} />
-                                    開團時間 (Start Time)
+                    {/* Right: Settings Container */}
+                    <div className="md:col-span-2 flex flex-col gap-5">
+                        
+                        {/* Auto Settings Card */}
+                        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
+                            <div className="flex justify-between items-center pb-2.5 border-b border-[var(--border-primary)]">
+                                <h3 className="font-extrabold text-base text-[var(--text-primary)] flex items-center gap-1.5">
+                                    <span className="flex items-center justify-center bg-blue-500 text-white rounded-full w-5 h-5 text-xs font-black">2</span>
+                                    每週定期自動開關團設定
+                                </h3>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        className="sr-only peer"
+                                        checked={isAuto}
+                                        onChange={(e) => setIsAuto(e.target.checked)}
+                                    />
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                                 </label>
-                                <div className="space-y-2">
-                                    <input
-                                        type="date"
-                                        className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm font-bold"
-                                        value={startDate}
-                                        onChange={(e) => setStartDate(e.target.value)}
-                                    />
-                                    <input
-                                        type="time"
-                                        className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm font-bold"
-                                        value={startTime}
-                                        onChange={(e) => setStartTime(e.target.value)}
-                                    />
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => { setStartDate(''); setStartTime(''); }}
-                                    className="text-xs text-red-500 font-bold hover:underline"
-                                >
-                                    清除開團時間
-                                </button>
                             </div>
 
-                            {/* End Time */}
-                            <div className="space-y-3 p-4 bg-[var(--bg-tertiary)] rounded-2xl border border-[var(--border-primary)]">
-                                <label className="text-sm font-extrabold text-[var(--text-primary)] flex items-center gap-1.5">
-                                    <Clock className="text-rose-500" size={16} />
-                                    結單時間 (End Time)
-                                </label>
-                                <div className="space-y-2">
-                                    <input
-                                        type="date"
-                                        className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm font-bold"
-                                        value={endDate}
-                                        onChange={(e) => setEndDate(e.target.value)}
-                                    />
-                                    <input
-                                        type="time"
-                                        className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm font-bold"
-                                        value={endTime}
-                                        onChange={(e) => setEndTime(e.target.value)}
-                                    />
+                            {isAuto ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in duration-200">
+                                    {/* Auto Open Time */}
+                                    <div className="space-y-3 p-4 bg-emerald-50/10 dark:bg-emerald-950/10 rounded-2xl border border-emerald-500/20">
+                                        <label className="text-sm font-extrabold text-emerald-600 flex items-center gap-1.5">
+                                            <Clock size={16} />
+                                            自動開團時間 (每週)
+                                        </label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <select
+                                                className="input-field p-2 text-xs bg-[var(--bg-secondary)] border-[var(--border-primary)]"
+                                                value={autoOpenDay}
+                                                onChange={(e) => setAutoOpenDay(e.target.value)}
+                                            >
+                                                <option value="">選擇星期</option>
+                                                <option value="1">星期一</option>
+                                                <option value="2">星期二</option>
+                                                <option value="3">星期三</option>
+                                                <option value="4">星期四</option>
+                                                <option value="5">星期五</option>
+                                                <option value="6">星期六</option>
+                                                <option value="0">星期日</option>
+                                            </select>
+                                            <input
+                                                type="time"
+                                                className="input-field p-2 text-xs bg-[var(--bg-secondary)] border-[var(--border-primary)]"
+                                                value={autoOpenTime}
+                                                onChange={(e) => setAutoOpenTime(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Auto Close Time */}
+                                    <div className="space-y-3 p-4 bg-rose-50/10 dark:bg-rose-950/10 rounded-2xl border border-rose-500/20">
+                                        <label className="text-sm font-extrabold text-rose-600 flex items-center gap-1.5">
+                                            <Clock size={16} />
+                                            自動結單時間 (每週)
+                                        </label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <select
+                                                className="input-field p-2 text-xs bg-[var(--bg-secondary)] border-[var(--border-primary)]"
+                                                value={autoCloseDay}
+                                                onChange={(e) => setAutoCloseDay(e.target.value)}
+                                            >
+                                                <option value="">選擇星期</option>
+                                                <option value="1">星期一</option>
+                                                <option value="2">星期二</option>
+                                                <option value="3">星期三</option>
+                                                <option value="4">星期四</option>
+                                                <option value="5">星期五</option>
+                                                <option value="6">星期六</option>
+                                                <option value="0">星期日</option>
+                                            </select>
+                                            <input
+                                                type="time"
+                                                className="input-field p-2 text-xs bg-[var(--bg-secondary)] border-[var(--border-primary)]"
+                                                value={autoCloseTime}
+                                                onChange={(e) => setAutoCloseTime(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => { setEndDate(''); setEndTime(''); }}
-                                    className="text-xs text-red-500 font-bold hover:underline"
-                                >
-                                    清除結單時間
-                                </button>
-                            </div>
+                            ) : (
+                                <p className="text-xs text-[var(--text-tertiary)] italic">
+                                    💡 啟用後，大樓每週將在指定星期與時間「自動開關團」，不需每次手動設定。
+                                </p>
+                            )}
                         </div>
 
-                        <div className="flex justify-end border-t border-[var(--border-primary)]/50 pt-4">
-                            <button
-                                onClick={handleSave}
-                                disabled={isSaving}
-                                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 shadow-md shadow-blue-500/20 active:scale-95 transition-all"
-                            >
-                                <Save size={16} />
-                                {isSaving ? '儲存中...' : '儲存大樓設定'}
-                            </button>
+                        {/* Manual Settings Card */}
+                        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
+                            <h3 className="font-extrabold text-base text-[var(--text-primary)] pb-2.5 border-b border-[var(--border-primary)] flex items-center gap-1.5">
+                                <span className="flex items-center justify-center bg-blue-500 text-white rounded-full w-5 h-5 text-xs font-black">3</span>
+                                手動臨時加開時段設定
+                            </h3>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {/* Start Time */}
+                                <div className="space-y-3 p-4 bg-[var(--bg-tertiary)] rounded-2xl border border-[var(--border-primary)] flex flex-col justify-between">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-extrabold text-[var(--text-primary)] flex items-center gap-1.5">
+                                            <Calendar className="text-amber-500" size={14} />
+                                            加開：開始時間
+                                        </label>
+                                        <input
+                                            type="date"
+                                            className="input-field w-full p-2 text-xs rounded-lg border bg-[var(--bg-secondary)] font-bold"
+                                            value={startDate}
+                                            onChange={(e) => setStartDate(e.target.value)}
+                                        />
+                                        <input
+                                            type="time"
+                                            className="input-field w-full p-2 text-xs rounded-lg border bg-[var(--bg-secondary)] font-bold"
+                                            value={startTime}
+                                            onChange={(e) => setStartTime(e.target.value)}
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setStartDate(''); setStartTime(''); }}
+                                        className="text-[10px] text-red-500 font-bold hover:underline self-start mt-2"
+                                    >
+                                        清除開始時間
+                                    </button>
+                                </div>
+
+                                {/* End Time */}
+                                <div className="space-y-3 p-4 bg-[var(--bg-tertiary)] rounded-2xl border border-[var(--border-primary)] flex flex-col justify-between">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-extrabold text-[var(--text-primary)] flex items-center gap-1.5">
+                                            <Clock className="text-rose-500" size={14} />
+                                            加開：結束時間
+                                        </label>
+                                        <input
+                                            type="date"
+                                            className="input-field w-full p-2 text-xs rounded-lg border bg-[var(--bg-secondary)] font-bold"
+                                            value={endDate}
+                                            onChange={(e) => setEndDate(e.target.value)}
+                                        />
+                                        <input
+                                            type="time"
+                                            className="input-field w-full p-2 text-xs rounded-lg border bg-[var(--bg-secondary)] font-bold"
+                                            value={endTime}
+                                            onChange={(e) => setEndTime(e.target.value)}
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setEndDate(''); setEndTime(''); }}
+                                        className="text-[10px] text-red-500 font-bold hover:underline self-start mt-2"
+                                    >
+                                        清除結束時間
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end border-t border-[var(--border-primary)]/50 pt-3">
+                                <button
+                                    onClick={handleSave}
+                                    disabled={isSaving}
+                                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-500/20 active:scale-95 transition-all"
+                                >
+                                    <Save size={14} />
+                                    {isSaving ? '儲存中...' : '儲存大樓設定'}
+                                </button>
+                            </div>
                         </div>
 
                         {/* URL Generation display */}
                         {activeUrl && (
                             <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-2xl space-y-2.5 animate-in fade-in duration-200">
                                 <h4 className="font-extrabold text-sm text-blue-700 dark:text-blue-400">
-                                    第三步：獲取專屬開團網址
+                                    🔗 獲取大樓專屬下單網址
                                 </h4>
                                 <div className="flex flex-col sm:flex-row gap-2">
                                     <input
                                         type="text"
                                         readOnly
-                                        className="input-field flex-1 p-2.5 rounded-xl border border-blue-200 dark:border-blue-800 bg-[var(--bg-secondary)] text-xs text-[var(--text-primary)] font-mono font-bold"
+                                        className="input-field flex-1 p-2 bg-[var(--bg-secondary)] rounded-lg border border-blue-200 dark:border-blue-800 text-xs text-[var(--text-primary)] font-mono font-bold"
                                         value={activeUrl}
                                     />
                                     <button
                                         onClick={handleCopy}
-                                        className="btn-primary sm:w-28 py-2.5 rounded-xl font-bold flex items-center justify-center gap-1 shadow-sm text-xs"
+                                        className="btn-primary sm:w-28 py-2 rounded-lg font-bold flex items-center justify-center gap-1 shadow-sm text-xs"
                                         style={{ backgroundColor: copied ? '#10B981' : undefined }}
                                     >
                                         {copied ? <Check size={14} /> : <Copy size={14} />}
@@ -333,10 +458,11 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                     </button>
                                 </div>
                                 <p className="text-[10px] text-slate-400 font-medium">
-                                    ※ 轉貼此網址至 LINE 群組，住戶點選將自動鎖定該大樓，並依據您所設定的時段進行下單防呆。
+                                    ※ 複製此網址丟給該大樓社區住戶即可下單。系統會自動鎖定該大樓，並依據您所設定的每週自動或手動加開時段進行下單驗證。
                                 </p>
                             </div>
                         )}
+
                     </div>
                 </div>
             )}
