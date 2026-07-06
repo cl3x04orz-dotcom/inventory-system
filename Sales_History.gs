@@ -126,6 +126,8 @@ function getSalesHistory(payload) {
   const D_IDX_SOLD = headerMap['Sold'] !== undefined ? headerMap['Sold'] : 5;
   const D_IDX_AMT = headerMap['Subtotal'] !== undefined ? headerMap['Subtotal'] : 7;
   const D_IDX_DATE = headerMap['Date']; 
+  const D_IDX_PICKED = headerMap['Picked'] !== undefined ? headerMap['Picked'] : 2;
+  const D_IDX_ORIGINAL = headerMap['Original'] !== undefined ? headerMap['Original'] : 3; 
 
   let detailRows = [];
   let dateColValues = [];
@@ -193,7 +195,9 @@ function getSalesHistory(payload) {
     if (dSaleId && matchedSales[dSaleId]) {
       const info = matchedSales[dSaleId];
       const soldQty = Number(row[D_IDX_SOLD] || 0);
-      if (soldQty <= 0) continue;
+      const pickedQty = D_IDX_PICKED !== -1 ? Number(row[D_IDX_PICKED] || 0) : 0;
+      const originalQty = D_IDX_ORIGINAL !== -1 ? Number(row[D_IDX_ORIGINAL] || 0) : 0;
+      if (soldQty <= 0 && pickedQty <= 0 && originalQty <= 0) continue;
 
       const pId = String(row[D_IDX_PID] || "").trim();
       const pEntry = productMap[pId];
@@ -213,6 +217,8 @@ function getSalesHistory(payload) {
         salesRep: info.salesRep,
         productName: pName,
         soldQty: soldQty,
+        pickedQty: pickedQty,
+        originalQty: originalQty,
         totalAmount: Number(row[D_IDX_AMT] || 0),
         paymentMethod: displayMethod,
         saleId: dSaleId,

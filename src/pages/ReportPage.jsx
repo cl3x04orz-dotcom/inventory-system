@@ -37,6 +37,9 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     const [expandedGroups, setExpandedGroups] = useState({}); // [New] Track expanded transactions
     const [activeQuickDate, setActiveQuickDate] = useState('TODAY'); // 預設選中今天
     const [category, setCategory] = useState('全部'); // [New] 類別過濾 (市場 / 批發)
+    const [pivotMetric, setPivotMetric] = useState('picked'); // 預設為追加領貨 (picked)
+    const [isPivotExpanded, setIsPivotExpanded] = useState(false); // 預設折疊
+    const [isSummaryExpanded, setIsSummaryExpanded] = useState(false); // 預設折疊
 
     // 1. Fetch Data from Server (Only on Date Change)
     const fetchData = useCallback(async () => {
@@ -762,39 +765,182 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                 {reportData && (
                     <div className="space-y-6">
                         {/* 1. Summary Table */}
-                        <div className="rounded-xl border border-[var(--border-primary)] overflow-hidden">
-                            <div className="px-4 py-3 bg-[var(--bg-tertiary)] border-b border-[var(--border-primary)]">
-                                <h3 className="font-bold text-[var(--text-primary)] flex items-center gap-2">
-                                    <Package size={16} className="text-blue-600" /> 商品銷售統計
-                                </h3>
+                        <div className="rounded-xl border border-[var(--border-primary)] overflow-hidden bg-[var(--bg-secondary)] shadow-sm">
+                            <div 
+                                onClick={() => setIsSummaryExpanded(!isSummaryExpanded)}
+                                className="px-4 py-3 bg-[var(--bg-tertiary)] flex justify-between items-center cursor-pointer hover:bg-[var(--bg-hover)] transition-colors select-none"
+                            >
+                                <div className="flex items-center gap-2">
+                                    {isSummaryExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                                    <h3 className="font-bold text-[var(--text-primary)] flex items-center gap-2">
+                                        <Package size={16} className="text-blue-600 animate-pulse" /> 商品銷售統計
+                                    </h3>
+                                </div>
                             </div>
-                            <div className="overflow-x-auto max-h-60">
-                                <table className="w-full text-left">
-                                    <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs uppercase font-bold border-b border-[var(--border-primary)]">
-                                        <tr>
-                                            <th className="p-4">商品名稱</th>
-                                            <th className="p-4 text-right">銷售數量</th>
-                                            <th className="p-4 text-right">銷售金額</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-[var(--border-primary)] bg-[var(--bg-secondary)]">
-                                        {summaryList.length > 0 ? (
-                                            summaryList.map((item, idx) => (
-                                                <tr key={idx} className="hover:bg-[var(--bg-hover)] transition-colors">
-                                                    <td className="p-4 text-[var(--text-primary)]">{item.name}</td>
-                                                    <td className="p-4 text-right text-[var(--text-tertiary)]">{item.qty}</td>
-                                                    <td className="p-4 text-right text-emerald-600">${item.amount.toLocaleString()}</td>
-                                                </tr>
-                                            ))
-                                        ) : (
+                            {isSummaryExpanded && (
+                                <div className="overflow-x-auto border-t border-[var(--border-primary)] max-h-60">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs uppercase font-bold border-b border-[var(--border-primary)]">
                                             <tr>
-                                                <td colSpan="3" className="p-8 text-center text-[var(--text-secondary)]">查無資料</td>
+                                                <th className="p-4">商品名稱</th>
+                                                <th className="p-4 text-right">銷售數量</th>
+                                                <th className="p-4 text-right">銷售金額</th>
                                             </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
+                                        </thead>
+                                        <tbody className="divide-y divide-[var(--border-primary)] bg-[var(--bg-secondary)]">
+                                            {summaryList.length > 0 ? (
+                                                summaryList.map((item, idx) => (
+                                                    <tr key={idx} className="hover:bg-[var(--bg-hover)] transition-colors">
+                                                        <td className="p-4 text-[var(--text-primary)] font-bold">{item.name}</td>
+                                                        <td className="p-4 text-right font-mono font-bold text-blue-600 text-lg">{item.qty}</td>
+                                                        <td className="p-4 text-right font-mono font-bold text-emerald-600 text-lg">${item.amount.toLocaleString()}</td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan="3" className="p-8 text-center text-[var(--text-secondary)]">查無資料</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </div>
+
+                        {/* 1.5 業務代表領銷交叉表 (Pivot Table) */}
+                        {(() => {
+                            // A. 抓出所有不重複的商品名稱 (排除運費)
+                            const prods = Array.from(new Set(reportData.map(item => item.productName).filter(Boolean)))
+                                .filter(p => !['運費', '系統運費', 'SHIPPING_FEE'].includes(p))
+                                .sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+                            
+                            // B. 抓出所有不重複的業務代表
+                            const reps = Array.from(new Set(reportData.map(item => item.salesRep).filter(Boolean)))
+                                .sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+
+                            if (prods.length === 0) return null;
+
+                            // C. 初始化二維矩陣
+                            const matrix = {};
+                            prods.forEach(prod => {
+                                matrix[prod] = {};
+                                reps.forEach(rep => {
+                                    matrix[prod][rep] = { original: 0, picked: 0, sold: 0 };
+                                });
+                            });
+
+                            // D. 統計數據
+                            reportData.forEach(item => {
+                                if (item.isCollectionReportMode) return;
+                                const prod = item.productName;
+                                const rep = item.salesRep;
+                                if (matrix[prod] && matrix[prod][rep]) {
+                                    matrix[prod][rep].original += (Number(item.originalQty) || 0);
+                                    matrix[prod][rep].picked += (Number(item.pickedQty) || 0);
+                                    matrix[prod][rep].sold += (Number(item.soldQty) || 0);
+                                }
+                            });
+
+                            const getProductTotal = (prod, metric) => {
+                                return reps.reduce((sum, rep) => sum + (matrix[prod]?.[rep]?.[metric] || 0), 0);
+                            };
+
+                            const getRepTotal = (rep, metric) => {
+                                return prods.reduce((sum, prod) => sum + (matrix[prod]?.[rep]?.[metric] || 0), 0);
+                            };
+
+                            const getGrandTotal = (metric) => {
+                                return prods.reduce((sum, prod) => sum + getProductTotal(prod, metric), 0);
+                            };
+
+                            return (
+                                <div className="rounded-xl border border-[var(--border-primary)] overflow-hidden bg-[var(--bg-secondary)] shadow-sm">
+                                    <div 
+                                        onClick={() => setIsPivotExpanded(!isPivotExpanded)}
+                                        className="px-4 py-3 bg-[var(--bg-tertiary)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors select-none"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            {isPivotExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                                            <h3 className="font-bold text-[var(--text-primary)] flex items-center gap-2">
+                                                <TrendingUp size={16} className="text-blue-600 animate-pulse" /> 出貨對照表
+                                            </h3>
+                                        </div>
+                                        {isPivotExpanded && (
+                                            <div className="flex bg-[var(--bg-primary)] p-0.5 rounded-lg border border-[var(--border-primary)] text-xs font-bold shadow-inner shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                {[
+                                                    { value: 'original', label: '原在車上 (Original)' },
+                                                    { value: 'picked', label: '追加領貨 (Picked)' },
+                                                    { value: 'sold', label: '實售數量 (Sold)' }
+                                                ].map(item => (
+                                                    <button
+                                                        key={item.value}
+                                                        type="button"
+                                                        onClick={() => setPivotMetric(item.value)}
+                                                        className={`px-3 py-1.5 rounded-md transition-all duration-200 ${pivotMetric === item.value 
+                                                            ? 'bg-blue-600 text-white shadow-sm font-black' 
+                                                            : 'text-slate-500 hover:text-slate-900'
+                                                        }`}
+                                                    >
+                                                        {item.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {isPivotExpanded && (
+                                        <div className="overflow-x-auto border-t border-[var(--border-primary)]">
+                                            <table className="w-full text-left text-sm whitespace-nowrap">
+                                                <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs uppercase font-bold border-b border-[var(--border-primary)]">
+                                                    <tr>
+                                                        <th className="p-4 w-48">商品名稱</th>
+                                                        {reps.map(rep => (
+                                                            <th key={rep} className="p-4 text-center">{rep}</th>
+                                                        ))}
+                                                        <th className="p-4 text-right text-blue-600 font-extrabold">總計</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-[var(--border-primary)] bg-[var(--bg-secondary)]">
+                                                    {prods.map(prod => {
+                                                        const rTotal = getProductTotal(prod, pivotMetric);
+                                                        return (
+                                                            <tr key={prod} className="hover:bg-[var(--bg-hover)] transition-colors">
+                                                                <td className="p-4 font-bold text-[var(--text-primary)]">{prod}</td>
+                                                                {reps.map(rep => {
+                                                                    const val = matrix[prod]?.[rep]?.[pivotMetric] || 0;
+                                                                    return (
+                                                                        <td key={rep} className="p-4 text-center font-mono font-bold text-[var(--text-secondary)]">
+                                                                            {val > 0 ? val.toLocaleString() : <span className="opacity-30">-</span>}
+                                                                        </td>
+                                                                    );
+                                                                })}
+                                                                <td className="p-4 text-right font-mono font-black text-blue-600 text-base">
+                                                                    {rTotal > 0 ? rTotal.toLocaleString() : '-'}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                    {/* 總計列 */}
+                                                    <tr className="bg-[var(--bg-tertiary)] font-black text-[var(--text-primary)] border-t border-[var(--border-primary)] shadow-sm">
+                                                        <td className="p-4">📊 總計</td>
+                                                        {reps.map(rep => {
+                                                            const repTotal = getRepTotal(rep, pivotMetric);
+                                                            return (
+                                                                <td key={rep} className="p-4 text-center font-mono text-[var(--text-primary)] text-base">
+                                                                    {repTotal > 0 ? repTotal.toLocaleString() : '-'}
+                                                                </td>
+                                                            );
+                                                        })}
+                                                        <td className="p-4 text-right font-mono text-blue-700 text-lg">
+                                                            {getGrandTotal(pivotMetric) > 0 ? getGrandTotal(pivotMetric).toLocaleString() : '-'}
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
 
                         {/* 2. Detailed Lists with Tabs */}
                         <div className="rounded-xl border border-[var(--border-primary)] overflow-hidden flex flex-col h-[600px]">
