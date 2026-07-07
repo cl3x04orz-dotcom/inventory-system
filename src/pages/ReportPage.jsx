@@ -1064,7 +1064,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                         <div className="rounded-xl border border-[var(--border-primary)] overflow-hidden flex flex-col h-[600px]">
                             <div className="px-4 py-3 bg-[var(--bg-tertiary)] border-b border-[var(--border-primary)] flex gap-4">
                                 <div className="font-bold flex items-center gap-2 pb-2 border-b-2 text-blue-600 border-blue-600">
-                                    <TrendingUp size={16} /> 銷售明細 ({reportData.length})
+                                    <TrendingUp size={16} /> 銷售明細 ({sortedGroups.length})
                                 </div>
                             </div>
 
