@@ -831,6 +831,7 @@ function getExpendituresService(payload, user) {
 
     const allItems = rows.map(row => {
         let obj = {
+            saleId: row[0] || '',
             stall: row[colMap['stall']] || 0,
             cleaning: row[colMap['cleaning']] || 0,
             electricity: row[colMap['electricity']] || 0,

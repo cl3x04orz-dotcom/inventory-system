@@ -29,6 +29,11 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     const [productTerm, setProductTerm] = useState('');
     const [rawSales, setRawSales] = useState([]);
     const [rawExpenses, setRawExpenses] = useState([]);
+    const [rawPurchases, setRawPurchases] = useState([]);
+    const [purchaseData, setPurchaseData] = useState([]);
+    const [rawInventory, setRawInventory] = useState([]);
+    const [rawAdjustments, setRawAdjustments] = useState([]);
+    const [adjustmentData, setAdjustmentData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [reportData, setReportData] = useState([]);
     const [expenseData, setExpenseData] = useState([]);
@@ -46,11 +51,24 @@ export default function ReportPage({ user, apiUrl, setPage }) {
         if (!startDate || !endDate) return;
         setLoading(true);
 
+        // 輔助函數：容錯處理，若 API 報錯（例如 Forbidden 權限不足），則返回預設值，避免整個 Promise.all 崩潰
+        const safeCall = async (promise, defaultValue = []) => {
+            try {
+                return await promise;
+            } catch (e) {
+                console.warn('報表安全容錯：API 呼叫失敗或權限不足，已自動忽略。錯誤：', e);
+                return defaultValue;
+            }
+        };
+
         try {
             const payload = { startDate, endDate, category };
             const promises = [
-                callGAS(apiUrl, 'getSalesHistory', payload, user.token),
-                callGAS(apiUrl, 'getExpenditures', payload, user.token)
+                safeCall(callGAS(apiUrl, 'getSalesHistory', payload, user.token)),
+                safeCall(callGAS(apiUrl, 'getExpenditures', payload, user.token)),
+                safeCall(callGAS(apiUrl, 'getPurchaseHistory', { startDate, endDate }, user.token)),
+                safeCall(callGAS(apiUrl, 'getInventory', {}, user.token)),
+                safeCall(callGAS(apiUrl, 'getAdjustmentHistory', { startDate, endDate }, user.token))
             ];
             const results = await Promise.all(promises);
             
@@ -61,6 +79,9 @@ export default function ReportPage({ user, apiUrl, setPage }) {
             
             setRawSales(Array.isArray(salesRes) ? salesRes : (salesRes.data || []));
             setRawExpenses(Array.isArray(results[1]) ? results[1] : (results[1].data || []));
+            setRawPurchases(Array.isArray(results[2]) ? results[2] : (results[2]?.data || []));
+            setRawInventory(Array.isArray(results[3]) ? results[3] : (results[3]?.data || []));
+            setRawAdjustments(Array.isArray(results[4]) ? results[4] : (results[4]?.data || []));
         } catch (error) {
             console.error(error);
             alert('查詢失敗: ' + error.message);
@@ -108,7 +129,17 @@ export default function ReportPage({ user, apiUrl, setPage }) {
         }
         setExpenseData(filteredExpenses);
 
-    }, [rawSales, rawExpenses, location, salesRep, productTerm]);
+        // Filter Purchases
+        let filteredPurchases = rawPurchases.filter(item => item != null && item.status !== 'VOID');
+        if (prodTerm) filteredPurchases = filteredPurchases.filter(item => String(item.productName || '').toLowerCase().includes(prodTerm));
+        setPurchaseData(filteredPurchases);
+
+        // Filter Adjustments (報銷)
+        let filteredAdjustments = rawAdjustments.filter(item => item != null);
+        if (prodTerm) filteredAdjustments = filteredAdjustments.filter(item => String(item.productName || '').toLowerCase().includes(prodTerm));
+        setAdjustmentData(filteredAdjustments);
+
+    }, [rawSales, rawExpenses, rawPurchases, rawAdjustments, location, salesRep, productTerm]);
 
     // Trigger Fetching
     React.useEffect(() => {
@@ -271,10 +302,13 @@ export default function ReportPage({ user, apiUrl, setPage }) {
             hour: '2-digit', minute: '2-digit', hour12: false
         });
         // Unique key for grouping: Transaction ID + Collection Note (to separate regular sale vs collection)
-        const key = `${dateStr}_${item.location}_${item.salesRep}`;
+        const key = item.saleId 
+            ? `${item.saleId}_${item.isCollectionReportMode ? 'col' : 'sale'}`
+            : `manual_${dateStr}_${item.location}_${item.salesRep}`;
         if (!acc[key]) {
             acc[key] = {
                 key,
+                dateObj: d,
                 dateDisplay: dateStr,
                 location: item.location,
                 salesRep: item.salesRep,
@@ -328,10 +362,13 @@ export default function ReportPage({ user, apiUrl, setPage }) {
             year: 'numeric', month: '2-digit', day: '2-digit',
             hour: '2-digit', minute: '2-digit', hour12: false
         });
-        const key = `${dateStr}_${item.normCustomer || '-'}_${item.normSalesRep}`;
+        const key = item.saleId 
+            ? `${item.saleId}_sale` 
+            : `manual_${dateStr}_${item.normCustomer || '-'}_${item.normSalesRep}`;
         if (!groupedSales[key]) {
             groupedSales[key] = {
                 key,
+                dateObj: d,
                 dateDisplay: dateStr,
                 location: item.normCustomer || '-',
                 salesRep: item.normSalesRep,
@@ -403,7 +440,11 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     });
 
     // Use database Column L (rawFinalTotal) as balance (Settlement)
-    const sortedGroups = Object.values(groupedSales).sort((a, b) => b.key.localeCompare(a.key)); // Newest first
+    const sortedGroups = Object.values(groupedSales).sort((a, b) => {
+        const timeA = a.dateObj && !isNaN(a.dateObj.getTime()) ? a.dateObj.getTime() : 0;
+        const timeB = b.dateObj && !isNaN(b.dateObj.getTime()) ? b.dateObj.getTime() : 0;
+        return timeB - timeA;
+    }); // Newest first
     sortedGroups.forEach(g => {
         let val = Number(g.rawFinalTotal) || 0;
 
@@ -809,10 +850,26 @@ export default function ReportPage({ user, apiUrl, setPage }) {
 
                         {/* 1.5 業務代表領銷交叉表 (Pivot Table) */}
                         {(() => {
-                            // A. 抓出所有不重複的商品名稱 (排除運費)
-                            const prods = Array.from(new Set(reportData.map(item => item.productName).filter(Boolean)))
+                            // 建立商品排序權重對照表
+                            const productWeightMap = {};
+                            rawInventory.forEach(item => {
+                                if (item.productName && item.sortWeight !== undefined) {
+                                    productWeightMap[item.productName] = Number(item.sortWeight);
+                                }
+                            });
+
+                            // A. 抓出所有不重複的商品名稱 (排除運費，包含有銷售、有進貨與有報銷調整的商品)
+                            const prodsInSales = reportData.map(item => item.productName).filter(Boolean);
+                            const prodsInPurchases = purchaseData.map(item => item.productName).filter(Boolean);
+                            const prodsInAdjustments = adjustmentData.map(item => item.productName).filter(Boolean);
+                            const prods = Array.from(new Set([...prodsInSales, ...prodsInPurchases, ...prodsInAdjustments]))
                                 .filter(p => !['運費', '系統運費', 'SHIPPING_FEE'].includes(p))
-                                .sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+                                .sort((a, b) => {
+                                    const wA = productWeightMap[a] !== undefined ? productWeightMap[a] : 999999;
+                                    const wB = productWeightMap[b] !== undefined ? productWeightMap[b] : 999999;
+                                    if (wA !== wB) return wA - wB;
+                                    return a.localeCompare(b, 'zh-Hant');
+                                });
                             
                             // B. 抓出所有不重複的業務代表
                             const reps = Array.from(new Set(reportData.map(item => item.salesRep).filter(Boolean)))
@@ -841,6 +898,31 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                 }
                             });
 
+                            // E. 統計各商品實時庫存、進貨總量與報銷總量
+                            const inventoryMap = {};
+                            rawInventory.forEach(item => {
+                                const pName = item.productName;
+                                if (pName && (item.type === 'STOCK' || item.type === 'VOID_REFUND')) {
+                                    inventoryMap[pName] = (inventoryMap[pName] || 0) + (Number(item.quantity) || 0);
+                                }
+                            });
+
+                            const purchaseMap = {};
+                            purchaseData.forEach(item => {
+                                const pName = item.productName;
+                                if (pName) {
+                                    purchaseMap[pName] = (purchaseMap[pName] || 0) + (Number(item.quantity) || 0);
+                                }
+                            });
+
+                            const adjustmentMap = {};
+                            adjustmentData.forEach(item => {
+                                const pName = item.productName;
+                                if (pName) {
+                                    adjustmentMap[pName] = (adjustmentMap[pName] || 0) + (Number(item.quantity) || 0);
+                                }
+                            });
+
                             const getProductTotal = (prod, metric) => {
                                 return reps.reduce((sum, rep) => sum + (matrix[prod]?.[rep]?.[metric] || 0), 0);
                             };
@@ -852,6 +934,10 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                             const getGrandTotal = (metric) => {
                                 return prods.reduce((sum, prod) => sum + getProductTotal(prod, metric), 0);
                             };
+
+                            const totalInventory = prods.reduce((sum, p) => sum + (inventoryMap[p] || 0), 0);
+                            const totalPurchased = prods.reduce((sum, p) => sum + (purchaseMap[p] || 0), 0);
+                            const totalAdjusted = prods.reduce((sum, p) => sum + (adjustmentMap[p] || 0), 0);
 
                             return (
                                 <div className="rounded-xl border border-[var(--border-primary)] overflow-hidden bg-[var(--bg-secondary)] shadow-sm">
@@ -893,18 +979,32 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                 <thead className="text-[var(--text-secondary)] text-xs uppercase font-bold">
                                                     <tr className="sticky top-0 z-10 bg-[var(--bg-tertiary)] shadow-[0_1px_0_0_var(--border-primary)]">
                                                         <th className="p-4 w-48 bg-[var(--bg-tertiary)] sticky top-0">商品名稱</th>
+                                                        <th className="p-4 text-center bg-gray-50 dark:bg-gray-800 text-slate-700 dark:text-slate-300 font-extrabold sticky top-0">期初庫存</th>
+                                                        <th className="p-4 text-center bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 font-extrabold sticky top-0">進貨 (+)</th>
                                                         {reps.map(rep => (
                                                             <th key={rep} className="p-4 text-center bg-[var(--bg-tertiary)] sticky top-0">{rep}</th>
                                                         ))}
-                                                        <th className="p-4 text-right text-blue-600 font-extrabold bg-[var(--bg-tertiary)] sticky top-0">總計</th>
+                                                        <th className="p-4 text-center bg-rose-50/50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 font-extrabold sticky top-0">出貨合計 (-)</th>
+                                                        <th className="p-4 text-center bg-amber-50/40 dark:bg-amber-950/10 text-amber-700 dark:text-amber-400 font-extrabold sticky top-0">報銷 (-)</th>
+                                                        <th className="p-4 text-center bg-blue-50/50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 font-black sticky top-0">現有庫存 (=)</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-[var(--border-primary)] bg-[var(--bg-secondary)]">
                                                     {prods.map(prod => {
                                                         const rTotal = getProductTotal(prod, pivotMetric);
+                                                        const invQty = inventoryMap[prod] || 0;
+                                                        const purQty = purchaseMap[prod] || 0;
+                                                        const adjQty = adjustmentMap[prod] || 0;
+                                                        const startingQty = invQty - purQty + rTotal + adjQty;
                                                         return (
                                                             <tr key={prod} className="hover:bg-[var(--bg-hover)] transition-colors">
                                                                 <td className="p-4 font-bold text-[var(--text-primary)]">{prod}</td>
+                                                                <td className="p-4 text-center font-mono font-bold bg-gray-50/30 dark:bg-gray-800/10 text-slate-600">
+                                                                    {startingQty > 0 ? startingQty.toLocaleString() : startingQty < 0 ? <span className="text-red-500 font-bold">{startingQty.toLocaleString()}</span> : <span className="opacity-30">-</span>}
+                                                                </td>
+                                                                <td className="p-4 text-center font-mono font-bold bg-emerald-50/20 dark:bg-emerald-950/5 text-emerald-600">
+                                                                    {purQty > 0 ? `+ ${purQty.toLocaleString()}` : <span className="opacity-30">-</span>}
+                                                                </td>
                                                                 {reps.map(rep => {
                                                                     const val = matrix[prod]?.[rep]?.[pivotMetric] || 0;
                                                                     return (
@@ -913,8 +1013,14 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                                         </td>
                                                                     );
                                                                 })}
-                                                                <td className="p-4 text-right font-mono font-black text-blue-600 text-base">
-                                                                    {rTotal > 0 ? rTotal.toLocaleString() : '-'}
+                                                                <td className="p-4 text-center font-mono font-bold bg-rose-50/20 dark:bg-rose-950/5 text-rose-600">
+                                                                    {rTotal > 0 ? `- ${rTotal.toLocaleString()}` : <span className="opacity-30">-</span>}
+                                                                </td>
+                                                                <td className="p-4 text-center font-mono font-bold bg-amber-50/20 dark:bg-amber-950/5 text-amber-600">
+                                                                    {adjQty > 0 ? `- ${adjQty.toLocaleString()}` : <span className="opacity-30">-</span>}
+                                                                </td>
+                                                                <td className="p-4 text-center font-mono font-black bg-blue-50/25 dark:bg-blue-950/10 text-blue-600 text-base">
+                                                                    = {invQty.toLocaleString()}
                                                                 </td>
                                                             </tr>
                                                         );
@@ -922,6 +1028,12 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                     {/* 總計列 */}
                                                     <tr className="bg-[var(--bg-tertiary)] font-black text-[var(--text-primary)] border-t border-[var(--border-primary)] shadow-sm">
                                                         <td className="p-4">📊 總計</td>
+                                                        <td className="p-4 text-center font-mono bg-gray-50/30 dark:bg-gray-800/10 text-slate-700 text-base">
+                                                            {(totalInventory - totalPurchased + getGrandTotal(pivotMetric) + totalAdjusted).toLocaleString()}
+                                                        </td>
+                                                        <td className="p-4 text-center font-mono bg-emerald-50/20 dark:bg-emerald-950/5 text-emerald-700 text-base">
+                                                            {totalPurchased > 0 ? `+ ${totalPurchased.toLocaleString()}` : '-'}
+                                                        </td>
                                                         {reps.map(rep => {
                                                             const repTotal = getRepTotal(rep, pivotMetric);
                                                             return (
@@ -930,8 +1042,14 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                                 </td>
                                                             );
                                                         })}
-                                                        <td className="p-4 text-right font-mono text-blue-700 text-lg">
-                                                            {getGrandTotal(pivotMetric) > 0 ? getGrandTotal(pivotMetric).toLocaleString() : '-'}
+                                                        <td className="p-4 text-center font-mono bg-rose-50/20 dark:bg-rose-950/5 text-rose-700 text-base">
+                                                            {getGrandTotal(pivotMetric) > 0 ? `- ${getGrandTotal(pivotMetric).toLocaleString()}` : '-'}
+                                                        </td>
+                                                        <td className="p-4 text-center font-mono bg-amber-50/20 dark:bg-amber-950/5 text-amber-700 text-base">
+                                                            {totalAdjusted > 0 ? `- ${totalAdjusted.toLocaleString()}` : '-'}
+                                                        </td>
+                                                        <td className="p-4 text-center font-mono bg-blue-50/25 dark:bg-blue-950/10 text-blue-700 text-lg">
+                                                            = {totalInventory.toLocaleString()}
                                                         </td>
                                                     </tr>
                                                 </tbody>

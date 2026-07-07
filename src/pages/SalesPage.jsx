@@ -527,17 +527,73 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 const productIds = rows.map(r => r.id);
                 const res = await callGAS(apiUrl, 'updateProductSortOrder', { productIds }, user.token);
                 if (res.success) {
+                    // 同步更新 rows 與 allAvailableProducts 中的 sortWeight
+                    const weightMap = {};
+                    rows.forEach((r, idx) => {
+                        const newWeight = (idx + 1) * 10;
+                        r.sortWeight = newWeight;
+                        weightMap[r.id] = newWeight;
+                    });
+                    setAllAvailableProducts(prev => 
+                        prev.map(p => weightMap[p.id] !== undefined ? { ...p, sortWeight: weightMap[p.id] } : p)
+                    );
                     alert('順序已儲存！');
                 }
             } catch (error) {
                 console.error('Failed to sync sort order:', error);
                 alert('排序儲存失敗：' + error.message);
             } finally {
+                // 還原 rows：只保留有庫存的，或者已經有輸入領銷退資料的商品
+                setRows(prev => {
+                    const filtered = prev.filter(r => 
+                        (Number(r.stock) || 0) > 0 || 
+                        (Number(r.originalStock) || 0) > 0 ||
+                        Number(r.picked) > 0 ||
+                        Number(r.original) > 0 ||
+                        Number(r.returns) > 0 ||
+                        Number(r.sold) > 0
+                    );
+                    return sortProducts(filtered, 'name');
+                });
                 setIsSubmitting(false);
                 setIsSorting(false);
             }
         } else {
             // Entering sorting mode
+            // 將 allAvailableProducts 中的所有商品，補進 rows 裡面以顯示完整清單進行排序
+            setRows(prevRows => {
+                const existingMap = {};
+                prevRows.forEach(r => existingMap[r.id] = r);
+
+                const merged = allAvailableProducts.map(p => {
+                    const existing = existingMap[p.id];
+                    if (existing) {
+                        return existing;
+                    } else {
+                        // 建立一個預設為 0 庫存的乾淨列
+                        const localPriceKey = `last_price_${p.id}`;
+                        const localPrice = safeLocalStorage.getItem(localPriceKey);
+                        let finalPrice = localPrice !== null ? Number(localPrice) : '';
+                        return {
+                            id: p.id,
+                            name: p.name,
+                            stock: Number(p.stock) || 0,
+                            originalStock: Number(p.originalStock) || 0,
+                            picked: 0,
+                            original: 0,
+                            returns: 0,
+                            sold: 0,
+                            price: finalPrice,
+                            subtotal: 0,
+                            sortWeight: p.sortWeight,
+                            fromSheet: p._fromSheet
+                        };
+                    }
+                });
+                
+                // 再次用 sortProducts 排序以確保進入 sorting 狀態時一開始順序正確
+                return sortProducts(merged, 'name');
+            });
             setIsSorting(true);
         }
     };
