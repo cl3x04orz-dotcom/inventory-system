@@ -96,7 +96,7 @@ function getSalesHistory(payload) {
 
     if (!isSaleInBatch && !isCollectionInBatch) continue;
 
-    matchedSales[sId] = {
+    matchedSales[sId.toLowerCase()] = {
       date: sDate,
       customer: rowCust,
       salesRep: rowRep,
@@ -130,16 +130,17 @@ function getSalesHistory(payload) {
   const D_IDX_ORIGINAL = headerMap['Original'] !== undefined ? headerMap['Original'] : 3; 
 
   let detailRows = [];
+  let minIdx = -1;
+  let maxIdx = -1;
+  let saleIdColValues = [];
 
   if (detailsLastRow > 1) {
     // 第一階讀取：僅拉取 SaleID 欄（僅一欄，極快！）
-    const saleIdColValues = detailsSheet.getRange(2, D_IDX_SID + 1, detailsLastRow - 1, 1).getValues();
+    saleIdColValues = detailsSheet.getRange(2, D_IDX_SID + 1, detailsLastRow - 1, 1).getValues();
     
     // 找出所有 matchedSales 的 SaleID 在 detailsSheet 中的最小和最大索引
-    let minIdx = -1;
-    let maxIdx = -1;
     for (let i = 0; i < saleIdColValues.length; i++) {
-      const sId = String(saleIdColValues[i][0]).trim();
+      const sId = String(saleIdColValues[i][0]).trim().toLowerCase();
       if (sId && matchedSales[sId]) {
         if (minIdx === -1) minIdx = i;
         maxIdx = i;
@@ -159,7 +160,7 @@ function getSalesHistory(payload) {
 
   for (let i = 0; i < detailRows.length; i++) {
     const row = detailRows[i];
-    const dSaleId = String(row[D_IDX_SID] || "").trim();
+    const dSaleId = String(row[D_IDX_SID] || "").trim().toLowerCase();
     
     if (dSaleId && matchedSales[dSaleId]) {
       const info = matchedSales[dSaleId];
@@ -213,6 +214,14 @@ function getSalesHistory(payload) {
       readDetailsSheet: t4 - t3,
       processDetails: t5 - t4,
       sortResults: t6 - t5,
+      debug: {
+        matchedSalesCount: Object.keys(matchedSales).length,
+        sampleMatchedKeys: Object.keys(matchedSales).slice(0, 3),
+        sampleDetailsKeys: saleIdColValues.slice(0, 3).map(r => String(r[0]).trim().toLowerCase()),
+        minIdx: minIdx,
+        maxIdx: maxIdx,
+        detailRowsLength: detailRows.length
+      },
       metrics: {
         sales: {
           lastRow: salesLastRow,
