@@ -53,15 +53,22 @@ function getInventoryService() {
         }
     }
     
-    const result = inventory.map(row => ({
-        batchId: row[0],
-        productId: row[1],
-        productName: productMap[row[1]] || 'Unknown',
-        quantity: row[2],
-        expiry: row[3],
-        type: row[5],
-        sortWeight: sortWeightMap[row[1]] || 999999
-    }));
+    const result = [];
+    for (let i = 0; i < inventory.length; i++) {
+        const row = inventory[i];
+        const qty = Number(row[2]) || 0;
+        if (qty === 0) continue; // 排除已扣空（耗盡）的歷史庫存批次，大幅減肥回傳資料
+        
+        result.push({
+            batchId: row[0],
+            productId: row[1],
+            productName: productMap[row[1]] || 'Unknown',
+            quantity: qty,
+            expiry: row[3],
+            type: row[5],
+            sortWeight: sortWeightMap[row[1]] || 999999
+        });
+    }
     
     // 按照排序權重排序
     result.sort((a, b) => (a.sortWeight - b.sortWeight) || a.productName.localeCompare(b.productName, 'zh-TW'));
@@ -164,8 +171,40 @@ function getAdjustmentHistory(filter) {
   const adjSheet = ss.getSheetByName('Adjustments');
   const uSheet = ss.getSheetByName('Users');
   if (!adjSheet) return [];
+
+  const lastRow = Math.max(1, adjSheet.getLastRow());
+  const lastCol = Math.max(1, adjSheet.getLastColumn());
   
-  const adjRows = adjSheet.getDataRange().getValues().slice(1);
+  let adjRows = [];
+  if (lastRow > 1) {
+    // 讀取日期欄（減少資料量）
+    const dateColValues = adjSheet.getRange(2, 2, lastRow - 1, 1).getValues();
+    const start = new Date(filter.startDate); start.setHours(0, 0, 0, 0);
+    const end = new Date(filter.endDate); end.setHours(23, 59, 59, 999);
+    const startMs = start.getTime();
+    const endMs = end.getTime();
+    
+    let minIdx = -1;
+    let maxIdx = -1;
+    for (let i = 0; i < dateColValues.length; i++) {
+      const v = dateColValues[i][0];
+      let t = null;
+      if (v && typeof v.getTime === 'function') t = v.getTime();
+      else if (v) { const d = new Date(v); if (!isNaN(d.getTime())) t = d.getTime(); }
+      
+      if (t !== null && t >= startMs && t <= endMs) {
+        if (minIdx === -1) minIdx = i;
+        maxIdx = i;
+      }
+    }
+    
+    if (minIdx !== -1 && maxIdx !== -1) {
+      const startRow = minIdx + 2;
+      const numRows = maxIdx - minIdx + 1;
+      adjRows = adjSheet.getRange(startRow, 1, numRows, lastCol).getValues();
+    }
+  }
+
   const productMap = typeof getProductMap !== 'undefined' ? getProductMap() : {};
   const uData = uSheet ? uSheet.getDataRange().getValues().slice(1) : [];
   const userMap = {};

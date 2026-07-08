@@ -163,7 +163,45 @@ function getPurchaseHistory(filter) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const purSheet = ss.getSheetByName('Purchases');
   const uSheet = ss.getSheetByName('Users');
-  const purData = purSheet.getDataRange().getValues().slice(1);
+  if (!purSheet) return [];
+
+  const lastRow = Math.max(1, purSheet.getLastRow());
+  const lastCol = Math.max(1, purSheet.getLastColumn());
+  
+  let purData = [];
+  if (lastRow > 1) {
+    // 讀取日期欄與狀態欄（減少資料量）
+    const metaValues = purSheet.getRange(2, 1, lastRow - 1, 10).getValues();
+    const start = new Date(filter.startDate); start.setHours(0, 0, 0, 0);
+    const end = new Date(filter.endDate); end.setHours(23, 59, 59, 999);
+    const startMs = start.getTime();
+    const endMs = end.getTime();
+    
+    let minIdx = -1;
+    let maxIdx = -1;
+    for (let i = 0; i < metaValues.length; i++) {
+      const v = metaValues[i][1]; // Date
+      const status = String(metaValues[i][9] || '').toUpperCase();
+      const isOrdered = (status === 'ORDERED');
+      
+      let t = null;
+      if (v && typeof v.getTime === 'function') t = v.getTime();
+      else if (v) { const d = new Date(v); if (!isNaN(d.getTime())) t = d.getTime(); }
+      
+      const dateMatch = isOrdered || (t !== null && t >= startMs && t <= endMs);
+      if (dateMatch) {
+        if (minIdx === -1) minIdx = i;
+        maxIdx = i;
+      }
+    }
+    
+    if (minIdx !== -1 && maxIdx !== -1) {
+      const startRow = minIdx + 2;
+      const numRows = maxIdx - minIdx + 1;
+      purData = purSheet.getRange(startRow, 1, numRows, lastCol).getValues();
+    }
+  }
+
   const productMap = typeof getProductMap !== 'undefined' ? getProductMap() : {};
   const userMap = {};
   if (uSheet) uSheet.getDataRange().getValues().slice(1).forEach(r => { if (r[0]) userMap[r[0]] = r[1]; });
