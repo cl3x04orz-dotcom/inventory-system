@@ -130,59 +130,28 @@ function getSalesHistory(payload) {
   const D_IDX_ORIGINAL = headerMap['Original'] !== undefined ? headerMap['Original'] : 3; 
 
   let detailRows = [];
-  let dateColValues = [];
 
-  if (D_IDX_DATE !== undefined && detailsLastRow > 1) {
-    // 第一階讀取：僅拉取 Date 欄
-    dateColValues = detailsSheet.getRange(2, D_IDX_DATE + 1, detailsLastRow - 1, 1).getValues();
+  if (detailsLastRow > 1) {
+    // 第一階讀取：僅拉取 SaleID 欄（僅一欄，極快！）
+    const saleIdColValues = detailsSheet.getRange(2, D_IDX_SID + 1, detailsLastRow - 1, 1).getValues();
     
-    const getT = (idx) => {
-       const v = dateColValues[idx][0];
-       if (v && typeof v.getTime === 'function') return v.getTime();
-       if (v) { const d = new Date(v); if (!isNaN(d.getTime())) return d.getTime(); }
-       return null;
-    };
-    
-    const startMs = start.getTime();
-    const endMs = end.getTime();
-    
-    // Binary Search First >= startMs
-    let l = 0, r = dateColValues.length - 1;
+    // 找出所有 matchedSales 的 SaleID 在 detailsSheet 中的最小和最大索引
     let minIdx = -1;
-    while(l <= r) {
-      let m = Math.floor((l+r)/2);
-      let t = getT(m);
-      if (t === null) { l = m+1; continue; } 
-      if (t >= startMs) { minIdx = m; r = m - 1; }
-      else { l = m + 1; }
-    }
-    
-    // Binary Search Last <= endMs
-    l = minIdx !== -1 ? minIdx : 0;
-    r = dateColValues.length - 1;
     let maxIdx = -1;
-    while(l <= r) {
-      let m = Math.floor((l+r)/2);
-      let t = getT(m);
-      if (t === null) { l = m+1; continue; }
-      if (t <= endMs) { maxIdx = m; l = m + 1; }
-      else { r = m - 1; }
+    for (let i = 0; i < saleIdColValues.length; i++) {
+      const sId = String(saleIdColValues[i][0]).trim();
+      if (sId && matchedSales[sId]) {
+        if (minIdx === -1) minIdx = i;
+        maxIdx = i;
+      }
     }
     
-    if (minIdx !== -1 && maxIdx !== -1 && minIdx <= maxIdx) {
-       // 放寬 300 筆緩衝，避免些微無序(例如晚補的單)被遺漏
-       minIdx = Math.max(0, minIdx - 300);
-       maxIdx = Math.min(dateColValues.length - 1, maxIdx + 300);
+    if (minIdx !== -1 && maxIdx !== -1) {
+       // 讀取最小到最大索引之間的區間（一次性區間讀取，極快！）
        const startSheetRow = minIdx + 2;
        const numRows = maxIdx - minIdx + 1;
        detailRows = detailsSheet.getRange(startSheetRow, 1, numRows, detailsLastCol).getValues();
-    } else {
-       // Fallback
-       detailRows = detailsSheet.getRange(2, 1, detailsLastRow - 1, detailsLastCol).getValues();
     }
-  } else {
-    // 尚未 Migration，退回全表
-    detailRows = detailsLastRow > 1 ? detailsSheet.getRange(2, 1, detailsLastRow - 1, detailsLastCol).getValues() : [];
   }
 
   const t4 = Date.now();
