@@ -202,7 +202,7 @@ function AppContent() {
     const { logActivity, logLogin, logLogout, logPageView } = useActivityLogger({
         user,
         apiUrl: GAS_API_URL,
-        enabled: !!user
+        enabled: false // 完全停用日誌記錄，減少背景請求與避免伺服器塞車時卡頓
     });
 
     // Initialize SessionManager

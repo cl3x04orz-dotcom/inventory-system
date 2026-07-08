@@ -81,8 +81,7 @@ const useActivityLogger = ({ user, apiUrl, enabled = true }) => {
             await callGAS(apiUrl, 'logActivity', { logs: logsToSend }, user.token);
         } catch (error) {
             console.error('Failed to log activity:', error);
-            // 失敗時放回佇列
-            logQueue.current = [...logsToSend, ...logQueue.current];
+            // 💡 移除失敗放回佇列的邏輯，避免背景無限重試導致 Self-DDOS 卡死
         }
     };
 
