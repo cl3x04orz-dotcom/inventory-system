@@ -391,6 +391,31 @@ function apiHandler(request) {
             // Sales & Analytics
             case 'saveSales': return typeof saveSalesService !== 'undefined' ? saveSalesService(payload, user) : {error: 'Service missing'}; 
             case 'getSalesHistory': return typeof getSalesHistory !== 'undefined' ? getSalesHistory(payload) : {error: 'Service missing'}; 
+            case 'getReportDataBatch':
+                {
+                    const safeCall = (fn, arg1, arg2) => {
+                        try {
+                            return fn(arg1, arg2);
+                        } catch (e) {
+                            console.warn('Batch API safeCall error:', e);
+                            return [];
+                        }
+                    };
+
+                    const salesRes = typeof getSalesHistory !== 'undefined' ? safeCall(getSalesHistory, payload) : { data: [] };
+                    const expendituresRes = safeCall(getExpendituresService, payload, user);
+                    const purchaseRes = typeof getPurchaseHistory !== 'undefined' ? safeCall(getPurchaseHistory, payload) : [];
+                    const inventoryRes = payload.fetchInventory ? (typeof getInventoryService !== 'undefined' ? safeCall(getInventoryService) : []) : null;
+                    const adjustmentRes = typeof getAdjustmentHistory !== 'undefined' ? safeCall(getAdjustmentHistory, payload) : [];
+                    
+                    return {
+                        sales: salesRes,
+                        expenditures: expendituresRes,
+                        purchases: purchaseRes,
+                        inventory: inventoryRes,
+                        adjustments: adjustmentRes
+                    };
+                }
             case 'getRecentSalesToday': return typeof getRecentSalesToday !== 'undefined' ? getRecentSalesToday(payload) : {error: 'Service missing'};
             case 'getSalesByDateRange': return typeof getSalesByDateRange !== 'undefined' ? getSalesByDateRange(payload) : {error: 'Service missing'};
             case 'getSaleToClone': return typeof getSaleToCloneService !== 'undefined' ? getSaleToCloneService(payload) : {error: 'Service missing'};

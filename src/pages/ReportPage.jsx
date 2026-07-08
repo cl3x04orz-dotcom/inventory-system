@@ -47,48 +47,37 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     const [isSummaryExpanded, setIsSummaryExpanded] = useState(false); // 預設折疊
 
     // 1. Fetch Data from Server (Only on Date Change)
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (forceFetch = false) => {
         if (!startDate || !endDate) return;
         setLoading(true);
 
-        // 輔助函數：容錯處理，若 API 報錯（例如 Forbidden 權限不足），則返回預設值，避免整個 Promise.all 崩潰
-        const safeCall = async (promise, defaultValue = []) => {
-            try {
-                return await promise;
-            } catch (e) {
-                console.warn('報表安全容錯：API 呼叫失敗或權限不足，已自動忽略。錯誤：', e);
-                return defaultValue;
-            }
-        };
-
         try {
-            const payload = { startDate, endDate, category };
-            const promises = [
-                safeCall(callGAS(apiUrl, 'getSalesHistory', payload, user.token)),
-                safeCall(callGAS(apiUrl, 'getExpenditures', payload, user.token)),
-                safeCall(callGAS(apiUrl, 'getPurchaseHistory', { startDate, endDate }, user.token)),
-                safeCall(callGAS(apiUrl, 'getInventory', {}, user.token)),
-                safeCall(callGAS(apiUrl, 'getAdjustmentHistory', { startDate, endDate }, user.token))
-            ];
-            const results = await Promise.all(promises);
+            const payload = {
+                startDate,
+                endDate,
+                category,
+                fetchInventory: forceFetch || rawInventory.length === 0
+            };
+            const res = await callGAS(apiUrl, 'getReportDataBatch', payload, user.token);
             
-            const salesRes = results[0];
-            if (salesRes && salesRes.benchmark) {
-                console.log('[Sales Report Benchmark]', JSON.stringify(salesRes.benchmark, null, 2));
+            if (res.sales && res.sales.benchmark) {
+                console.log('[Sales Report Benchmark]', JSON.stringify(res.sales.benchmark, null, 2));
             }
             
-            setRawSales(Array.isArray(salesRes) ? salesRes : (salesRes.data || []));
-            setRawExpenses(Array.isArray(results[1]) ? results[1] : (results[1].data || []));
-            setRawPurchases(Array.isArray(results[2]) ? results[2] : (results[2]?.data || []));
-            setRawInventory(Array.isArray(results[3]) ? results[3] : (results[3]?.data || []));
-            setRawAdjustments(Array.isArray(results[4]) ? results[4] : (results[4]?.data || []));
+            setRawSales(Array.isArray(res.sales) ? res.sales : (res.sales?.data || []));
+            setRawExpenses(Array.isArray(res.expenditures) ? res.expenditures : (res.expenditures?.data || []));
+            setRawPurchases(Array.isArray(res.purchases) ? res.purchases : (res.purchases?.data || []));
+            if (res.inventory !== null) {
+                setRawInventory(Array.isArray(res.inventory) ? res.inventory : (res.inventory?.data || []));
+            }
+            setRawAdjustments(Array.isArray(res.adjustments) ? res.adjustments : (res.adjustments?.data || []));
         } catch (error) {
             console.error(error);
             alert('查詢失敗: ' + error.message);
         } finally {
             setLoading(false);
         }
-    }, [startDate, endDate, category, user.token, apiUrl]);
+    }, [startDate, endDate, category, user.token, apiUrl, rawInventory.length]);
 
     // 2. Perform Local Filtering (Instant Response)
     React.useEffect(() => {
@@ -141,10 +130,45 @@ export default function ReportPage({ user, apiUrl, setPage }) {
 
     }, [rawSales, rawExpenses, rawPurchases, rawAdjustments, location, salesRep, productTerm]);
 
-    // Trigger Fetching
+    // Trigger Fetching (with 300ms debounce to prevent multiple requests when changing dates rapidly)
     React.useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+        let active = true;
+        
+        const timer = setTimeout(async () => {
+            if (!startDate || !endDate) return;
+            setLoading(true);
+            try {
+                const payload = { 
+                    startDate, 
+                    endDate, 
+                    category,
+                    fetchInventory: rawInventory.length === 0
+                };
+                const res = await callGAS(apiUrl, 'getReportDataBatch', payload, user.token);
+                
+                if (!active) return;
+                
+                setRawSales(Array.isArray(res.sales) ? res.sales : (res.sales?.data || []));
+                setRawExpenses(Array.isArray(res.expenditures) ? res.expenditures : (res.expenditures?.data || []));
+                setRawPurchases(Array.isArray(res.purchases) ? res.purchases : (res.purchases?.data || []));
+                if (res.inventory !== null) {
+                    setRawInventory(Array.isArray(res.inventory) ? res.inventory : (res.inventory?.data || []));
+                }
+                setRawAdjustments(Array.isArray(res.adjustments) ? res.adjustments : (res.adjustments?.data || []));
+            } catch (error) {
+                if (!active) return;
+                console.error(error);
+                alert('查詢失敗: ' + error.message);
+            } finally {
+                if (active) setLoading(false);
+            }
+        }, 300);
+
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [startDate, endDate, category, user.token, apiUrl]);
 
     const handleCorrection = async (saleId) => {
         if (!window.confirm('確定要「作廢並修正」此筆紀錄嗎？\n系統將會：\n1. 作廢舊單並回補庫存\n2. 自動跳轉到錄入頁面填入舊資料\n3. 讓您修改後重新存檔')) return;
