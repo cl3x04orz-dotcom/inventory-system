@@ -386,7 +386,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             }
         };
         init();
-    }, [apiUrl, user?.token, targetSalesRep, user?.username]);
+    }, [apiUrl, user?.token, user?.username]);
 
     // [New] Ensure targetSalesRep is initialized to the current user
     useEffect(() => {
