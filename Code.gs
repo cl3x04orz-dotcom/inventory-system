@@ -122,6 +122,7 @@ function apiHandler(request) {
         // Sales (銷售管理)
         'saveSales': 'sales_entry', 
         'getSalesHistory': 'sales_report',
+        'getReportDataBatch': 'sales_report',
         'getRecentSalesToday': 'sales_entry', // Today's records for merge printing
         'getSalesByDateRange': 'sales_entry', // Date range records for merge printing
         'getTemplatesList': 'sales_entry', // Allow sales entry to list templates
@@ -404,9 +405,9 @@ function apiHandler(request) {
 
                     const salesRes = typeof getSalesHistory !== 'undefined' ? safeCall(getSalesHistory, payload) : { data: [] };
                     const expendituresRes = safeCall(getExpendituresService, payload, user);
-                    const purchaseRes = typeof getPurchaseHistory !== 'undefined' ? safeCall(getPurchaseHistory, payload) : [];
-                    const inventoryRes = payload.fetchInventory ? (typeof getInventoryService !== 'undefined' ? safeCall(getInventoryService) : []) : null;
-                    const adjustmentRes = typeof getAdjustmentHistory !== 'undefined' ? safeCall(getAdjustmentHistory, payload) : [];
+                    const purchaseRes = payload.fetchPivotData && typeof getPurchaseHistory !== 'undefined' ? safeCall(getPurchaseHistory, payload) : [];
+                    const inventoryRes = payload.fetchPivotData && typeof getInventoryService !== 'undefined' ? safeCall(getInventoryService) : null;
+                    const adjustmentRes = payload.fetchPivotData && typeof getAdjustmentHistory !== 'undefined' ? safeCall(getAdjustmentHistory, payload) : [];
                     
                     return {
                         sales: salesRes,

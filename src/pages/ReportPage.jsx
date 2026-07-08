@@ -45,6 +45,8 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     const [pivotMetric, setPivotMetric] = useState('picked'); // 預設為追加領貨 (picked)
     const [isPivotExpanded, setIsPivotExpanded] = useState(false); // 預設折疊
     const [isSummaryExpanded, setIsSummaryExpanded] = useState(false); // 預設折疊
+    const [hasLoadedPivot, setHasLoadedPivot] = useState(false); // [New] 是否已載入對照表資料
+    const [loadingPivot, setLoadingPivot] = useState(false); // [New] 是否正在載入對照表資料
 
     // 1. Fetch Data from Server (Only on Date Change)
     const fetchData = useCallback(async (forceFetch = false) => {
@@ -56,7 +58,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                 startDate,
                 endDate,
                 category,
-                fetchInventory: forceFetch || rawInventory.length === 0
+                fetchPivotData: forceFetch || hasLoadedPivot
             };
             const res = await callGAS(apiUrl, 'getReportDataBatch', payload, user.token);
             
@@ -66,18 +68,48 @@ export default function ReportPage({ user, apiUrl, setPage }) {
             
             setRawSales(Array.isArray(res.sales) ? res.sales : (res.sales?.data || []));
             setRawExpenses(Array.isArray(res.expenditures) ? res.expenditures : (res.expenditures?.data || []));
-            setRawPurchases(Array.isArray(res.purchases) ? res.purchases : (res.purchases?.data || []));
-            if (res.inventory !== null) {
-                setRawInventory(Array.isArray(res.inventory) ? res.inventory : (res.inventory?.data || []));
+            if (payload.fetchPivotData) {
+                setRawPurchases(Array.isArray(res.purchases) ? res.purchases : (res.purchases?.data || []));
+                if (res.inventory !== null) {
+                    setRawInventory(Array.isArray(res.inventory) ? res.inventory : (res.inventory?.data || []));
+                }
+                setRawAdjustments(Array.isArray(res.adjustments) ? res.adjustments : (res.adjustments?.data || []));
+                setHasLoadedPivot(true);
             }
-            setRawAdjustments(Array.isArray(res.adjustments) ? res.adjustments : (res.adjustments?.data || []));
         } catch (error) {
             console.error(error);
             alert('查詢失敗: ' + error.message);
         } finally {
             setLoading(false);
         }
-    }, [startDate, endDate, category, user.token, apiUrl, rawInventory.length]);
+    }, [startDate, endDate, category, user.token, apiUrl, hasLoadedPivot]);
+
+    // [New] 懶載入出貨對照表與庫存數據
+    const loadPivotData = useCallback(async () => {
+        if (loadingPivot || hasLoadedPivot || !startDate || !endDate) return;
+        setLoadingPivot(true);
+        try {
+            const payload = {
+                startDate,
+                endDate,
+                category,
+                fetchPivotData: true
+            };
+            const res = await callGAS(apiUrl, 'getReportDataBatch', payload, user.token);
+            
+            setRawPurchases(Array.isArray(res.purchases) ? res.purchases : (res.purchases?.data || []));
+            if (res.inventory !== null) {
+                setRawInventory(Array.isArray(res.inventory) ? res.inventory : (res.inventory?.data || []));
+            }
+            setRawAdjustments(Array.isArray(res.adjustments) ? res.adjustments : (res.adjustments?.data || []));
+            setHasLoadedPivot(true);
+        } catch (error) {
+            console.error('載入對照表失敗:', error);
+            alert('載入對照表失敗: ' + error.message);
+        } finally {
+            setLoadingPivot(false);
+        }
+    }, [startDate, endDate, category, apiUrl, user.token, loadingPivot, hasLoadedPivot]);
 
     // 2. Perform Local Filtering (Instant Response)
     React.useEffect(() => {
@@ -134,6 +166,11 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     React.useEffect(() => {
         let active = true;
         
+        // 切換日期時重設對照表載入狀態
+        setHasLoadedPivot(false);
+        setRawPurchases([]);
+        setRawAdjustments([]);
+
         const timer = setTimeout(async () => {
             if (!startDate || !endDate) return;
             setLoading(true);
@@ -142,7 +179,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                     startDate, 
                     endDate, 
                     category,
-                    fetchInventory: rawInventory.length === 0
+                    fetchPivotData: false // 預設初始與切換日期時不讀取龐大的對照表/庫存數據
                 };
                 const res = await callGAS(apiUrl, 'getReportDataBatch', payload, user.token);
                 
@@ -150,11 +187,6 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                 
                 setRawSales(Array.isArray(res.sales) ? res.sales : (res.sales?.data || []));
                 setRawExpenses(Array.isArray(res.expenditures) ? res.expenditures : (res.expenditures?.data || []));
-                setRawPurchases(Array.isArray(res.purchases) ? res.purchases : (res.purchases?.data || []));
-                if (res.inventory !== null) {
-                    setRawInventory(Array.isArray(res.inventory) ? res.inventory : (res.inventory?.data || []));
-                }
-                setRawAdjustments(Array.isArray(res.adjustments) ? res.adjustments : (res.adjustments?.data || []));
             } catch (error) {
                 if (!active) return;
                 console.error(error);
@@ -874,6 +906,38 @@ export default function ReportPage({ user, apiUrl, setPage }) {
 
                         {/* 1.5 業務代表領銷交叉表 (Pivot Table) */}
                         {(() => {
+                            if (!hasLoadedPivot && !loadingPivot) {
+                                return (
+                                    <div className="rounded-xl border border-[var(--border-primary)] overflow-hidden bg-[var(--bg-secondary)] shadow-sm">
+                                        <div 
+                                            onClick={() => {
+                                                setIsPivotExpanded(true);
+                                                loadPivotData();
+                                            }}
+                                            className="px-4 py-3 bg-[var(--bg-tertiary)] flex justify-between items-center cursor-pointer hover:bg-[var(--bg-hover)] transition-colors select-none"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <ChevronRight size={18} />
+                                                <h3 className="font-bold text-[var(--text-primary)] flex items-center gap-2">
+                                                    <TrendingUp size={16} className="text-blue-600" /> 出貨對照表 (點擊載入庫存與對照表數據)
+                                                </h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            }
+
+                            if (loadingPivot) {
+                                return (
+                                    <div className="rounded-xl border border-[var(--border-primary)] overflow-hidden bg-[var(--bg-secondary)] shadow-sm">
+                                        <div className="px-4 py-6 bg-[var(--bg-tertiary)] flex flex-col items-center justify-center gap-3 select-none">
+                                            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                            <span className="font-bold text-sm text-[var(--text-secondary)]">正在載入庫存與進出貨對照數據，請稍候...</span>
+                                        </div>
+                                    </div>
+                                );
+                            }
+
                             // 建立商品排序權重對照表
                             const productWeightMap = {};
                             rawInventory.forEach(item => {
