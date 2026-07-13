@@ -1,7 +1,7 @@
 /**
  * Serves the React App
  */
-const APP_VERSION = '1783938360767';
+const APP_VERSION = '1783939316048';
  // 版本號：A2:3/24
 
 // ── CacheService Helper 函數 ───────────────────────────────────────
