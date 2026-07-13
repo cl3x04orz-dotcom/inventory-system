@@ -521,6 +521,32 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         setRows(items);
     };
 
+    const handleMoveRow = (idx, direction) => {
+        setRows(prev => {
+            const next = Array.from(prev);
+            if (direction === 'up') {
+                if (idx === 0) return prev;
+                const temp = next[idx];
+                next[idx] = next[idx - 1];
+                next[idx - 1] = temp;
+            } else if (direction === 'down') {
+                if (idx === next.length - 1) return prev;
+                const temp = next[idx];
+                next[idx] = next[idx + 1];
+                next[idx + 1] = temp;
+            } else if (direction === 'top') {
+                if (idx === 0) return prev;
+                const [target] = next.splice(idx, 1);
+                next.unshift(target);
+            } else if (direction === 'bottom') {
+                if (idx === next.length - 1) return prev;
+                const [target] = next.splice(idx, 1);
+                next.push(target);
+            }
+            return next;
+        });
+    };
+
     const toggleSorting = async () => {
         if (isSorting) {
             // Ending sorting mode -> Perform sync
@@ -1509,113 +1535,18 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                         className="md:hidden space-y-4"
                                     >
                                         {rows.map((row, idx) => (
-                                            <Draggable key={`${row.id}-${idx}`} draggableId={String(row.id)} index={idx} isDragDisabled={!isSorting}>
-                                                {(provided, snapshot) => (
-                                                    <div
-                                                        ref={provided.innerRef}
-                                                        {...provided.draggableProps}
-                                                        className={`bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)] ${snapshot.isDragging ? 'shadow-2xl z-50 ring-2 ring-indigo-500' : ''}`}
-                                                    >
-                                                        {/* Header: Name & Stock */}
-                                                        <div className="flex justify-between items-start mb-2">
-                                                            <div className="flex items-center gap-2">
-                                                                {isSorting && (
-                                                                    <div {...provided.dragHandleProps} className="text-[var(--text-tertiary)] cursor-grab active:cursor-grabbing">
-                                                                        <GripVertical size={20} />
-                                                                    </div>
-                                                                )}
-                                                                <div className="font-extrabold text-[var(--text-primary)] text-xl leading-tight whitespace-nowrap">{row.name}</div>
-                                                            </div>
-                                                             <div className="text-[10px] font-mono bg-transparent px-2 py-0.5 rounded-lg border border-slate-200/40 whitespace-nowrap">
-                                                                 <span className="text-blue-500 font-bold">{row.stock}</span>
-                                                                 <span className="text-slate-300 dark:text-slate-600 mx-1">/</span>
-                                                                 <span className="text-orange-500 font-bold">{row.originalStock || 0}</span>
-                                                             </div>
-                                                         </div>
-                                                        <div className="bg-gray-50 rounded-lg p-2 mb-3 border border-gray-100">
-
-                                                            <div className="grid grid-cols-4 gap-2">
-                                                                <div className="flex flex-col gap-1 min-h-[56px]">
-                                                                    <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">領貨</label>
-                                                                    <input
-                                                                        id={`input-m-${idx}-picked`}
-                                                                        type="text"
-                                                                        inputMode="decimal"
-                                                                        autoComplete="off"
-                                                                        className="input-field text-center p-2 text-base font-bold bg-white"
-                                                                        value={row.picked || ''}
-                                                                        onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
-                                                                        onBlur={(e) => handleBlur(row.id, 'picked', e.target.value)}
-                                                                        onFocus={() => setActiveInput({ id: `input-m-${idx}-picked`, type: 'row', rowId: row.id, field: 'picked' })}
-                                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'picked', 'input-m-')}
-                                                                        disabled={isSorting}
-                                                                    />
-                                                                </div>
-                                                                <div className="flex flex-col gap-1 min-h-[56px]">
-                                                                    <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">原貨</label>
-                                                                    <input
-                                                                        id={`input-m-${idx}-original`}
-                                                                        type="text"
-                                                                        inputMode="decimal"
-                                                                        autoComplete="off"
-                                                                        className="input-field text-center p-2 text-base font-bold bg-white"
-                                                                        value={row.original || ''}
-                                                                        onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
-                                                                        onBlur={(e) => handleBlur(row.id, 'original', e.target.value)}
-                                                                        onFocus={() => setActiveInput({ id: `input-m-${idx}-original`, type: 'row', rowId: row.id, field: 'original' })}
-                                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'original', 'input-m-')}
-                                                                        disabled={isSorting}
-                                                                    />
-                                                                </div>
-                                                                <div className="flex flex-col gap-1 min-h-[56px]">
-                                                                    <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">退貨</label>
-                                                                    <input
-                                                                        id={`input-m-${idx}-returns`}
-                                                                        type="text"
-                                                                        inputMode="decimal"
-                                                                        autoComplete="off"
-                                                                        className="input-field text-center p-2 text-base font-bold text-red-600 bg-white"
-                                                                        value={row.returns || ''}
-                                                                        onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
-                                                                        onBlur={(e) => handleBlur(row.id, 'returns', e.target.value)}
-                                                                        onFocus={() => setActiveInput({ id: `input-m-${idx}-returns`, type: 'row', rowId: row.id, field: 'returns' })}
-                                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'returns', 'input-m-')}
-                                                                        disabled={isSorting}
-                                                                    />
-                                                                </div>
-                                                                <div className="flex flex-col gap-1 min-h-[56px]">
-                                                                    <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">單價</label>
-                                                                    <input
-                                                                        id={`input-m-${idx}-price`}
-                                                                        type="text"
-                                                                        inputMode="decimal"
-                                                                        autoComplete="off"
-                                                                        className="input-field text-center p-2 text-base font-bold bg-white"
-                                                                        value={row.price}
-                                                                        onChange={(e) => handleRowChange(row.id, 'price', e.target.value)}
-                                                                        onBlur={(e) => handleBlur(row.id, 'price', e.target.value)}
-                                                                        onFocus={() => setActiveInput({ id: `input-m-${idx}-price`, type: 'row', rowId: row.id, field: 'price' })}
-                                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'price', 'input-m-')}
-                                                                        disabled={isSorting}
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Summary Footer */}
-                                                        <div className="flex justify-between items-center pt-2 border-t border-[var(--border-primary)]">
-                                                            <div className="text-xs text-[var(--text-secondary)] font-bold">
-                                                                售出: <span className={`font-mono font-black tabular-nums text-base ml-1 ${getSafeNum(row.sold) > 0 ? 'text-blue-600' : 'text-slate-300'}`}>{row.sold}</span>
-                                                            </div>
-                                                            <div className="text-xs text-[var(--text-secondary)] font-bold">
-                                                                小計: <span className={`font-mono font-black tabular-nums text-base ml-1 ${getSafeNum(row.subtotal) > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
-                                                                    ${getSafeNum(row.subtotal).toLocaleString()}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </Draggable>
+                                            <SalesMobileRow
+                                                key={`${row.id}-${idx}`}
+                                                row={row}
+                                                idx={idx}
+                                                isSorting={isSorting}
+                                                handleMoveRow={handleMoveRow}
+                                                handleRowChange={handleRowChange}
+                                                handleBlur={handleBlur}
+                                                setActiveInput={setActiveInput}
+                                                handleKeyDown={handleKeyDown}
+                                                rowsLength={rows.length}
+                                            />
                                         ))}
                                         {provided.placeholder}
                                     </div>
@@ -1645,98 +1576,20 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                             className="divide-y divide-[var(--border-primary)]"
                                         >
                                             {rows.map((row, idx) => (
-                                                <Draggable key={`${row.id}-${idx}`} draggableId={String(row.id)} index={idx} isDragDisabled={!isSorting}>
-                                                    {(provided, snapshot) => (
-                                                        <tr
-                                                            ref={provided.innerRef}
-                                                            {...provided.draggableProps}
-                                                            className={`transition-colors ${snapshot.isDragging ? 'bg-[var(--bg-tertiary)] shadow-xl z-50' : ''
-                                                                } ${inputMode === 'mouse' ? 'hover:bg-[var(--bg-hover)]' : ''
-                                                                } ${inputMode === 'keyboard' && activeInput?.rowId === row.id ? 'bg-[var(--bg-hover)]' : ''
-                                                                }`}
-                                                        >
-                                                            <td className="p-4">
-                                                                {isSorting && (
-                                                                    <div {...provided.dragHandleProps} className="text-[var(--text-tertiary)] cursor-grab active:cursor-grabbing">
-                                                                        <GripVertical size={16} />
-                                                                    </div>
-                                                                )}
-                                                            </td>
-                                                            <td className="p-4 text-[var(--text-primary)] font-extrabold text-xl whitespace-nowrap">{row.name}</td>
-                                                            <td className="p-4 text-center font-mono tracking-tighter tabular-nums text-sm text-[var(--text-secondary)]">
-                                                                <span className="text-blue-500">{row.stock}</span>
-                                                                <span className="text-[var(--text-tertiary)] mx-1">/</span>
-                                                                <span className="text-orange-500">{row.originalStock || 0}</span>
-                                                            </td>
-                                                            <td className="p-4">
-                                                                <input
-                                                                    id={`input-${idx}-picked`}
-                                                                    type="text"
-                                                                    autoComplete="off"
-                                                                    className="input-field text-center p-1 font-mono"
-                                                                    value={row.picked || ''}
-                                                                    onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
-                                                                    onBlur={(e) => handleBlur(row.id, 'picked', e.target.value)}
-                                                                    onFocus={() => setActiveInput({ id: `input-${idx}-picked`, type: 'row', rowId: row.id, field: 'picked' })}
-                                                                    onKeyDown={(e) => handleKeyDown(e, idx, 'picked')}
-                                                                    disabled={isSorting}
-                                                                />
-                                                            </td>
-                                                            <td className="p-4">
-                                                                <input
-                                                                    id={`input-${idx}-original`}
-                                                                    type="text"
-                                                                    autoComplete="off"
-                                                                    className="input-field text-center p-1 font-mono"
-                                                                    value={row.original || ''}
-                                                                    onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
-                                                                    onBlur={(e) => handleBlur(row.id, 'original', e.target.value)}
-                                                                    onFocus={() => setActiveInput({ id: `input-${idx}-original`, type: 'row', rowId: row.id, field: 'original' })}
-                                                                    onKeyDown={(e) => handleKeyDown(e, idx, 'original')}
-                                                                    disabled={isSorting}
-                                                                />
-                                                            </td>
-                                                            <td className="p-4">
-                                                                <input
-                                                                    id={`input-${idx}-returns`}
-                                                                    type="text"
-                                                                    autoComplete="off"
-                                                                    className="input-field text-center p-1 text-red-600 font-mono"
-                                                                    value={row.returns || ''}
-                                                                    onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
-                                                                    onBlur={(e) => handleBlur(row.id, 'returns', e.target.value)}
-                                                                    onFocus={() => setActiveInput({ id: `input-${idx}-returns`, type: 'row', rowId: row.id, field: 'returns' })}
-                                                                    onKeyDown={(e) => handleKeyDown(e, idx, 'returns')}
-                                                                    disabled={isSorting}
-                                                                />
-                                                            </td>
-                                                            <td className="p-4 text-center">
-                                                                <span className={`font-mono font-black tabular-nums text-lg ${getSafeNum(row.sold) > 0 ? 'text-blue-600' : 'text-slate-300'}`}>
-                                                                    {row.sold}
-                                                                </span>
-                                                            </td>
-                                                            <td className="p-4">
-                                                                <input
-                                                                    id={`input-${idx}-price`}
-                                                                    type="text"
-                                                                    autoComplete="off"
-                                                                    className="input-field text-center p-1 w-20 font-mono"
-                                                                    value={row.price}
-                                                                    onChange={(e) => handleRowChange(row.id, 'price', e.target.value)}
-                                                                    onBlur={(e) => handleBlur(row.id, 'price', e.target.value)}
-                                                                    onFocus={() => setActiveInput({ id: `input-${idx}-price`, type: 'row', rowId: row.id, field: 'price' })}
-                                                                    onKeyDown={(e) => handleKeyDown(e, idx, 'price')}
-                                                                    disabled={isSorting}
-                                                                />
-                                                            </td>
-                                                            <td className="p-4 text-right">
-                                                                <span className={`font-mono font-black tabular-nums text-lg ${getSafeNum(row.subtotal) > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
-                                                                    ${getSafeNum(row.subtotal).toLocaleString()}
-                                                                </span>
-                                                            </td>
-                                                        </tr>
-                                                    )}
-                                                </Draggable>
+                                                <SalesDesktopRow
+                                                    key={`${row.id}-${idx}`}
+                                                    row={row}
+                                                    idx={idx}
+                                                    isSorting={isSorting}
+                                                    inputMode={inputMode}
+                                                    activeInput={activeInput}
+                                                    handleMoveRow={handleMoveRow}
+                                                    handleRowChange={handleRowChange}
+                                                    handleBlur={handleBlur}
+                                                    setActiveInput={setActiveInput}
+                                                    handleKeyDown={handleKeyDown}
+                                                    rowsLength={rows.length}
+                                                />
                                             ))}
                                             {provided.placeholder}
                                         </tbody>
@@ -2129,7 +1982,7 @@ const SalesMobileRow = React.memo(({
                                         type="button"
                                         onClick={() => handleMoveRow(idx, 'up')}
                                         disabled={idx === 0}
-                                        className="p-1 text-blue-500 disabled:text-gray-300 rounded"
+                                        className="p-1 text-blue-500 disabled:text-gray-300 rounded hover:bg-blue-50"
                                     >
                                         <ChevronUp size={16} strokeWidth={2.5} />
                                     </button>
@@ -2137,7 +1990,7 @@ const SalesMobileRow = React.memo(({
                                         type="button"
                                         onClick={() => handleMoveRow(idx, 'down')}
                                         disabled={idx === rowsLength - 1}
-                                        className="p-1 text-blue-500 disabled:text-gray-300 rounded"
+                                        className="p-1 text-blue-500 disabled:text-gray-300 rounded hover:bg-blue-50"
                                     >
                                         <ChevronDown size={16} strokeWidth={2.5} />
                                     </button>
@@ -2145,9 +1998,17 @@ const SalesMobileRow = React.memo(({
                                         type="button"
                                         onClick={() => handleMoveRow(idx, 'top')}
                                         disabled={idx === 0}
-                                        className="px-1 text-indigo-600 disabled:text-gray-300 text-[10px] font-black rounded"
+                                        className="px-1 text-indigo-600 disabled:text-gray-300 text-[10px] font-black rounded hover:bg-indigo-50"
                                     >
                                         置頂
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleMoveRow(idx, 'bottom')}
+                                        disabled={idx === rowsLength - 1}
+                                        className="px-1 text-indigo-600 disabled:text-gray-300 text-[10px] font-black rounded hover:bg-indigo-50"
+                                    >
+                                        置底
                                     </button>
                                 </div>
                             )}
