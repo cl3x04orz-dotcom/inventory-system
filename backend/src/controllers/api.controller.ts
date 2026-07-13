@@ -127,6 +127,8 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       return BillService.getReceivables(payload);
     case 'markAsPaid':
       return BillService.markAsPaid(payload);
+    case 'markAsUnpaid':
+      return BillService.markAsUnpaid(payload);
     case 'getPayables':
       return BillService.getPayables(payload);
     case 'markPayableAsPaid':

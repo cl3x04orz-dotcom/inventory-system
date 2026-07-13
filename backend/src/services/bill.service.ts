@@ -13,11 +13,18 @@ const formatLocalYMD = (date: Date) => {
 export const BillService = {
   // 1. 查詢應收帳款
   async getReceivables(payload: any) {
-    const { startDate, endDate } = payload;
+    const { startDate, endDate, status } = payload;
     const where: any = {
-      paymentMethod: 'CREDIT',
-      status: 'UNPAID'
+      paymentMethod: 'CREDIT'
     };
+
+    if (status === 'PAID') {
+      where.status = 'PAID';
+    } else if (status === 'ALL') {
+      where.status = { in: ['PAID', 'UNPAID'] };
+    } else {
+      where.status = 'UNPAID';
+    }
 
     if (startDate || endDate) {
       where.date = {};
@@ -171,6 +178,25 @@ export const BillService = {
     const res = await prisma.purchase.updateMany({
       where: { purchaseId: { in: targetUuids } },
       data: { status: 'PAID' }
+    });
+
+    return { success: true, updated: res.count };
+  },
+
+  // 5. 標記應收帳款為未結清 (還原)
+  async markAsUnpaid(payload: any) {
+    const { targetUuids } = payload;
+    if (!targetUuids || targetUuids.length === 0) {
+      throw new Error('未提供有效 SaleID');
+    }
+
+    const res = await prisma.sales.updateMany({
+      where: { saleId: { in: targetUuids } },
+      data: {
+        status: 'UNPAID',
+        paymentDate: null,
+        actualPaymentMethod: null
+      }
     });
 
     return { success: true, updated: res.count };

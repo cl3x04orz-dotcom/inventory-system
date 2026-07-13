@@ -6,6 +6,7 @@ import { getLocalDateString, getFirstDayOfMonthString } from '../utils/constants
 export default function ReceivablePage({ user, apiUrl }) {
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [statusFilter, setStatusFilter] = useState('UNPAID'); // 'UNPAID' | 'PAID' | 'ALL'
 
     const [startDate, setStartDate] = useState(getFirstDayOfMonthString());
     const [endDate, setEndDate] = useState(getLocalDateString());
@@ -48,7 +49,7 @@ export default function ReceivablePage({ user, apiUrl }) {
         setLoading(true);
         setSelectedItemUuids(new Set()); // 清空選取
         try {
-            const payload = {};
+            const payload = { status: statusFilter };
             if (startDate) payload.startDate = startDate;
             if (endDate) payload.endDate = endDate;
 
@@ -62,9 +63,25 @@ export default function ReceivablePage({ user, apiUrl }) {
         } finally {
             setLoading(false);
         }
-    }, [apiUrl, user.token, startDate, endDate]);
+    }, [apiUrl, user.token, startDate, endDate, statusFilter]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
+
+    const handleCancelPayment = async (record) => {
+        if (!window.confirm(`確定要取消該筆單據的收款狀態（還原為未收款）嗎？`)) return;
+        setLoading(true);
+        try {
+            const targetUuids = Array.isArray(record.uuids) ? record.uuids : [record.saleId];
+            await callGAS(apiUrl, 'markAsUnpaid', { targetUuids }, user.token);
+            alert('已成功取消收款（已還原為未收款）！');
+            fetchData();
+        } catch (error) {
+            console.error('Failed to cancel payment:', error);
+            alert('操作失敗: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleConfirmPayment = async (paymentMethod) => {
         const { type, record } = modalData;
@@ -227,18 +244,42 @@ export default function ReceivablePage({ user, apiUrl }) {
                             批次確認收款 ({selectedItemUuids.size})
                         </button>
                     )}
-                    {selectedAmount > 0 && (
-                        <div className="glass-panel px-3 py-2 border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-500/10 shrink-0 flex flex-col items-end animate-in fade-in zoom-in-95 duration-200">
-                            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider">已選取金額</p>
-                            <p className="text-lg md:text-xl font-black text-emerald-600 dark:text-emerald-400">
-                                ${selectedAmount.toLocaleString()}
-                            </p>
-                        </div>
-                    )}
-                    <div className="glass-panel px-3 py-2 border-[var(--border-primary)] bg-[var(--bg-secondary)] shrink-0 flex flex-col items-end">
-                        <p className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider">總應收金額</p>
-                        <p className="text-lg md:text-xl font-bold text-emerald-500">${totalAmount.toLocaleString()}</p>
+                </div>
+            </div>
+
+            {/* 狀態切換 Tabs */}
+            <div className="flex border-b border-[var(--border-primary)]">
+                {[
+                    { label: '未收款', value: 'UNPAID' },
+                    { label: '已收款', value: 'PAID' },
+                    { label: '全部', value: 'ALL' }
+                ].map(tab => (
+                    <button
+                        key={tab.value}
+                        onClick={() => setStatusFilter(tab.value)}
+                        className={`px-4 py-2 text-sm font-black border-b-2 -mb-px transition-all duration-200 ${
+                            statusFilter === tab.value
+                                ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+
+            <div className="flex items-center gap-3 justify-end">
+                {selectedAmount > 0 && (
+                    <div className="glass-panel px-3 py-2 border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-500/10 shrink-0 flex flex-col items-end animate-in fade-in zoom-in-95 duration-200">
+                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider">已選取金額</p>
+                        <p className="text-lg md:text-xl font-black text-emerald-600 dark:text-emerald-400">
+                            ${selectedAmount.toLocaleString()}
+                        </p>
                     </div>
+                )}
+                <div className="glass-panel px-3 py-2 border-[var(--border-primary)] bg-[var(--bg-secondary)] shrink-0 flex flex-col items-end">
+                    <p className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider">總應收金額</p>
+                    <p className="text-lg md:text-xl font-bold text-emerald-500">${totalAmount.toLocaleString()}</p>
                 </div>
             </div>
 
@@ -352,9 +393,13 @@ export default function ReceivablePage({ user, apiUrl }) {
                                             </span>
                                         </td>
                                         <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
-                                            {r.status !== 'PAID' && (
+                                            {r.status !== 'PAID' ? (
                                                 <button onClick={() => handleMarkAsPaid(r)} className="btn-primary text-xs py-1 px-3">
                                                     確認收款
+                                                </button>
+                                            ) : (
+                                                <button onClick={() => handleCancelPayment(r)} className="px-2 py-1 text-xs text-rose-600 border border-rose-200 bg-rose-50/50 rounded hover:bg-rose-100 transition-colors">
+                                                    取消收款
                                                 </button>
                                             )}
                                         </td>
@@ -393,12 +438,21 @@ export default function ReceivablePage({ user, apiUrl }) {
                                                                             <td className="py-3 px-4 text-right text-[var(--text-secondary)] font-mono">${(Number(item.price) || Number(item.unitPrice) || 0).toLocaleString()}</td>
                                                                             <td className="py-3 px-4 text-center text-[var(--text-secondary)] font-mono">{item.qty || item.soldQty || 1}</td>
                                                                             <td className="py-3 px-4 text-center">
-                                                                                <button
-                                                                                    onClick={() => handleMarkAsPaid(r)}
-                                                                                    className="px-2 py-1 text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-200 rounded hover:bg-emerald-100 transition-colors"
-                                                                                >
-                                                                                    確認收款
-                                                                                </button>
+                                                                                {r.status !== 'PAID' ? (
+                                                                                    <button
+                                                                                        onClick={() => handleMarkAsPaid(r)}
+                                                                                        className="px-2 py-1 text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-200 rounded hover:bg-emerald-100 transition-colors"
+                                                                                    >
+                                                                                        確認收款
+                                                                                    </button>
+                                                                                ) : (
+                                                                                    <button
+                                                                                        onClick={() => handleCancelPayment(r)}
+                                                                                        className="px-2 py-1 text-[10px] bg-rose-50 text-rose-600 border border-rose-200 rounded hover:bg-rose-100 transition-colors"
+                                                                                    >
+                                                                                        取消收款
+                                                                                    </button>
+                                                                                )}
                                                                             </td>
                                                                         </tr>
                                                                     );
@@ -481,9 +535,13 @@ export default function ReceivablePage({ user, apiUrl }) {
                                     {expandedRows.has(i) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                     明細
                                 </button>
-                                {r.status !== 'PAID' && (
+                                {r.status !== 'PAID' ? (
                                     <button onClick={(e) => { e.stopPropagation(); handleMarkAsPaid(r); }} className="btn-primary text-xs py-1.5 px-4">
                                         確認收款
+                                    </button>
+                                ) : (
+                                    <button onClick={(e) => { e.stopPropagation(); handleCancelPayment(r); }} className="px-3 py-1.5 text-xs text-rose-600 border border-rose-200 bg-rose-50/50 rounded hover:bg-rose-100 transition-colors">
+                                        取消收款
                                     </button>
                                 )}
                             </div>
@@ -508,15 +566,27 @@ export default function ReceivablePage({ user, apiUrl }) {
                                                     <div className="text-[var(--text-primary)] font-extrabold text-lg whitespace-nowrap">{item.productName || item.name}</div>
                                                     <div className="text-[var(--text-tertiary)] text-[10px] font-mono">${(Number(item.price) || 0).toLocaleString()} x {item.qty || 1}</div>
                                                 </div>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleMarkAsPaid(r);
-                                                    }}
-                                                    className="px-2 py-1 text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-200 rounded"
-                                                >
-                                                    確認細項
-                                                </button>
+                                                {r.status !== 'PAID' ? (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleMarkAsPaid(r);
+                                                        }}
+                                                        className="px-2 py-1 text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-200 rounded"
+                                                    >
+                                                        確認細項
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleCancelPayment(r);
+                                                        }}
+                                                        className="px-2 py-1 text-[10px] bg-rose-50 text-rose-600 border border-rose-200 rounded animate-none"
+                                                    >
+                                                        取消細項
+                                                    </button>
+                                                )}
                                             </div>
                                         );
                                     })}
