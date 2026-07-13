@@ -124,6 +124,12 @@ async function main() {
   console.log(`[Seed] 已導入 ${users.length} 位使用者`);
 
   // 2. Products
+  console.log('[Seed] 備份既有商品排序權重...');
+  const existingDbProducts = await prisma.product.findMany({
+    select: { productId: true, sortWeight: true }
+  });
+  const existingSortWeights = new Map(existingDbProducts.map(p => [p.productId, p.sortWeight]));
+
   console.log('[Seed] 導入 Products...');
   const productsRows = getSheetData('Products');
   const products = productsRows.map(row => {
@@ -131,6 +137,7 @@ async function main() {
     const productName = String(row.name ?? row.ProductName ?? row.productName ?? '').trim();
     const price = parseDecimal(row['Price/單價'] ?? row.defaultPrice ?? row.DefaultPrice);
     const singlePrice = parseDecimal(row.single_price ?? row.singlePrice ?? price);
+    const savedWeight = existingSortWeights.get(productId);
     
     return {
       productId,
@@ -139,7 +146,7 @@ async function main() {
       defaultPrice: price,
       reserve: parseDecimal(row['最新成本/備用'] ?? row.reserve ?? row.Reserve),
       safetyStock: parseInteger(row['安全庫存'] ?? row.safetyStock ?? row.SafetyStock),
-      sortWeight: parseInteger(row['排序權重'] ?? row.sortWeight ?? row.SortWeight),
+      sortWeight: savedWeight !== undefined ? savedWeight : parseInteger(row['排序權重'] ?? row.sortWeight ?? row.SortWeight ?? 0),
       isActive: parseBoolean(row['是否上架'] ?? row.isActive ?? true),
       imageUrl: String(row['圖片網址'] || row.imageUrl || '').trim() || null,
       expiryDate: row['有效日期'] ? String(row['有效日期']).trim() : null,
@@ -207,7 +214,9 @@ async function main() {
     operator: String(row.Operator || row.operator || row.OperatorID || '').trim() || 'System',
     paymentMethod: String(row['Payment Method'] || row.paymentMethod || row.PaymentMethod || '').trim() || null,
     status: String(row.Status || row.status || 'COMPLETED').trim().toUpperCase(),
-    workHours: parseDecimal(row.WorkHours || row.workHours || row['工時'] || 0)
+    workHours: parseDecimal(row.WorkHours || row.workHours || row['工時'] || 0),
+    paymentDate: parseExcelDate(row.PaymentDate || row.paymentDate),
+    actualPaymentMethod: String(row.ActualPaymentMethod || row.actualPaymentMethod || '').trim() || null
   })).filter(s => s.saleId);
 
   await prisma.sales.createMany({ data: sales });
