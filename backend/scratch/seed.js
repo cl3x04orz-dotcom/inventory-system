@@ -142,7 +142,7 @@ async function main() {
     return {
       productId,
       productName,
-      category: String(row['Category/分類'] ?? row['分類'] ?? row.category ?? '').trim() || null,
+      category: String(row['分類'] ?? row['Category/分類'] ?? row.category ?? '').trim() || null,
       defaultPrice: price,
       reserve: parseDecimal(row['最新成本/備用'] ?? row.reserve ?? row.Reserve),
       safetyStock: parseInteger(row['安全庫存'] ?? row.safetyStock ?? row.SafetyStock),
