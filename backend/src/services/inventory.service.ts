@@ -27,7 +27,7 @@ export const InventoryService = {
     const result = invList.map((item: any) => ({
       batchId: item.batchId,
       productId: item.productId,
-      productName: item.productName || item.product.productName || 'Unknown',
+      productName: item.product.productName || item.productName || 'Unknown',
       quantity: item.quantity,
       expiry: formatLocalDay(item.expiryDate),
       type: item.type,
@@ -157,7 +157,7 @@ export const InventoryService = {
     const totals: Record<string, { name: string; qty: number }> = {};
     invList.forEach((item: any) => {
       const pId = item.productId;
-      const name = item.productName || item.product.productName || pId;
+      const name = item.product.productName || item.productName || pId;
       if (!totals[pId]) {
         totals[pId] = { name, qty: 0 };
       }
@@ -250,7 +250,7 @@ export const InventoryService = {
 
     invList.forEach((item: any) => {
       const pId = item.productId;
-      const pName = item.productName || item.product.productName || pId;
+      const pName = item.product.productName || item.productName || pId;
       const qty = item.quantity;
       const type = item.type.toUpperCase();
       const price = Number(item.cost) || Number(item.product.defaultPrice) || 0;
