@@ -2200,9 +2200,8 @@ const SalesDesktopRow = React.memo(({
                         <input
                             id={`input-${idx}-picked`}
                             type="text"
-                            inputMode="decimal"
                             autoComplete="off"
-                            className="input-field text-center w-full font-bold p-1 bg-transparent"
+                            className="input-field text-center p-1 font-mono"
                             value={row.picked || ''}
                             onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
                             onBlur={(e) => handleBlur(row.id, 'picked', e.target.value)}
@@ -2215,9 +2214,8 @@ const SalesDesktopRow = React.memo(({
                         <input
                             id={`input-${idx}-original`}
                             type="text"
-                            inputMode="decimal"
                             autoComplete="off"
-                            className="input-field text-center w-full font-bold p-1 bg-transparent"
+                            className="input-field text-center p-1 font-mono"
                             value={row.original || ''}
                             onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
                             onBlur={(e) => handleBlur(row.id, 'original', e.target.value)}
@@ -2230,9 +2228,8 @@ const SalesDesktopRow = React.memo(({
                         <input
                             id={`input-${idx}-returns`}
                             type="text"
-                            inputMode="decimal"
                             autoComplete="off"
-                            className="input-field text-center w-full font-bold p-1 bg-transparent text-red-600"
+                            className="input-field text-center p-1 text-red-600 font-mono"
                             value={row.returns || ''}
                             onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
                             onBlur={(e) => handleBlur(row.id, 'returns', e.target.value)}
@@ -2241,14 +2238,17 @@ const SalesDesktopRow = React.memo(({
                             disabled={isSorting}
                         />
                     </td>
-                    <td className="p-4 text-center font-mono tracking-tighter tabular-nums text-[1.1rem] text-[var(--text-primary)] font-extrabold">{row.sold}</td>
+                    <td className="p-4 text-center">
+                        <span className={`font-mono font-black tabular-nums text-lg ${(Number(row.sold) || 0) > 0 ? 'text-blue-600' : 'text-slate-300'}`}>
+                            {row.sold}
+                        </span>
+                    </td>
                     <td className="p-4">
                         <input
                             id={`input-${idx}-price`}
                             type="text"
-                            inputMode="decimal"
                             autoComplete="off"
-                            className="input-field text-center w-full font-bold p-1 bg-transparent"
+                            className="input-field text-center p-1 w-20 font-mono"
                             value={row.price}
                             onChange={(e) => handleRowChange(row.id, 'price', e.target.value)}
                             onBlur={(e) => handleBlur(row.id, 'price', e.target.value)}
@@ -2257,8 +2257,10 @@ const SalesDesktopRow = React.memo(({
                             disabled={isSorting}
                         />
                     </td>
-                    <td className="p-4 text-right font-mono tracking-tighter tabular-nums text-lg font-black text-[var(--text-primary)]">
-                        ${(Number(row.subtotal) || 0).toLocaleString()}
+                    <td className="p-4 text-right">
+                        <span className={`font-mono font-black tabular-nums text-lg ${(Number(row.subtotal) || 0) > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
+                            ${(Number(row.subtotal) || 0).toLocaleString()}
+                        </span>
                     </td>
                 </tr>
             )}
