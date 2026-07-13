@@ -1,3 +1,4 @@
+# Trigger deploy: 2026-07-13
 name: Deploy to GitHub Pages
 
 on:
