@@ -257,7 +257,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     // 定義非現金付款方式判斷
     const isNonCashMethod = (method) => {
         const m = String(method || '').trim().toUpperCase();
-        return ['CREDIT', 'TRANSFER', '賒帳', '賒銷', '匯款'].includes(m);
+        return ['CREDIT', 'TRANSFER', 'WALLET', '賒帳', '賒銷', '匯款', '奶包金', '奶包金扣抵'].includes(m);
     };
 
     const getPaymentMethodsBadges = (group) => {
@@ -274,6 +274,9 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                     }
                     if (['LINEPAY', 'LINE PAY'].includes(m)) {
                         return <span key={m} className="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/30">LINE PAY</span>;
+                    }
+                    if (['WALLET', '奶包金', '奶包金扣抵'].includes(m)) {
+                        return <span key={m} className="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-100 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30">奶包金</span>;
                     }
                     return <span key={m} className="px-1.5 py-0.5 rounded text-[10px] font-black bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">現金</span>;
                 })}

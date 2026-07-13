@@ -166,9 +166,10 @@ export const GroupBuyService = {
         salesRep: user.username,
         operator: user.username,
         customer: (order.customerName || '') + (order.deliveryAddress ? ' ' + order.deliveryAddress : ''),
-        paymentMethod: order.paymentMethod === '轉帳' ? 'TRANSFER' : 'CASH',
+        paymentMethod: order.paymentMethod === '轉帳' ? 'TRANSFER' : 
+                       (order.paymentMethod === '奶包金扣抵' || order.paymentMethod === '奶包金') ? 'WALLET' : 'CASH',
         status: 'PAID',
-        totalCash: order.totalAmount,
+        totalCash: (order.paymentMethod === '轉帳' || order.paymentMethod === '奶包金扣抵' || order.paymentMethod === '奶包金') ? 0 : order.totalAmount,
         finalTotal: order.totalAmount,
         details: {
           create: (order.details as any[]).map((d: any) => ({
