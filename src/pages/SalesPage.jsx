@@ -2178,6 +2178,15 @@ const SalesDesktopRow = React.memo(({
                                 >
                                     置頂
                                 </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleMoveRow(idx, 'bottom')}
+                                    disabled={idx === rowsLength - 1}
+                                    className="px-1.5 py-0.5 text-indigo-600 disabled:text-gray-300 hover:bg-indigo-50 text-[10px] font-black rounded"
+                                    title="直接置底"
+                                >
+                                    置底
+                                </button>
                             </div>
                         )}
                     </td>
