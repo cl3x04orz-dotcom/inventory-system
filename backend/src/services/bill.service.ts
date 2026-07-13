@@ -63,6 +63,7 @@ export const BillService = {
         customer: sale.customer || '',
         salesRep: sale.salesRep || '未知',
         amount: Number(sale.finalTotal),
+        status: sale.status,
         items
       };
     });
