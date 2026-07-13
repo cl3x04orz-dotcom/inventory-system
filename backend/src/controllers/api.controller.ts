@@ -43,7 +43,7 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
     case 'voidAndFetchSale':
       return SalesService.voidAndFetchSale(payload, user);
     case 'getSalesHistory':
-      return SalesService.getSalesHistory(payload);
+      return SalesService.getSalesHistory(payload, user);
     case 'getReportDataBatch':
       return SalesService.getReportDataBatch(payload, user);
     case 'initSalesPageData':

@@ -351,7 +351,7 @@ export const SalesService = {
   },
 
   // 獲取歷史紀錄 (終極優化：原生 Raw SQL 關聯查詢，全資料一鍵秒開)
-  async getSalesHistory(payload: any) {
+  async getSalesHistory(payload: any, user: any = null) {
     const { startDate, endDate } = payload;
     
     let query = `
@@ -404,6 +404,13 @@ export const SalesService = {
     } else if (end) {
       query += ` AND (s.date <= $${paramIdx} OR s."paymentDate" <= $${paramIdx})`;
       params.push(end);
+      paramIdx += 1;
+    }
+
+    const isAdmin = user && (user.role === 'BOSS' || user.role === 'ADMIN');
+    if (!isAdmin && user && user.username) {
+      query += ` AND LOWER(s."salesRep") = $${paramIdx}`;
+      params.push(user.username.trim().toLowerCase());
       paramIdx += 1;
     }
 
@@ -735,7 +742,7 @@ export const SalesService = {
     const { startDate, endDate, fetchPivotData } = payload;
     const historyPayload = { startDate, endDate };
 
-    const sales = await this.getSalesHistory(historyPayload);
+    const sales = await this.getSalesHistory(historyPayload, user);
 
     // Get expenditures
     const expWhere: any = {};
