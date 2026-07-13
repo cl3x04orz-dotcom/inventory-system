@@ -79,6 +79,28 @@ async function main() {
     return xlsx.utils.sheet_to_json(sheet, { defval: "" });
   }
 
+  console.log('[Seed] 清空舊資料（按外鍵相依性順序）...');
+  await prisma.salesDetail.deleteMany();
+  await prisma.expenditure.deleteMany();
+  await prisma.inventory.deleteMany();
+  await prisma.purchase.deleteMany();
+  await prisma.groupBuyCampaign.deleteMany();
+  await prisma.groupBuyOrderStatusHistory.deleteMany();
+  await prisma.groupBuyNotification.deleteMany();
+  await prisma.dailyRecord.deleteMany();
+  await prisma.employeeProfile.deleteMany();
+  await prisma.payrollSetting.deleteMany();
+  await prisma.activityLog.deleteMany();
+  await prisma.groupBuyAuditLog.deleteMany();
+
+  await prisma.sales.deleteMany();
+  await prisma.product.deleteMany();
+  await prisma.user.deleteMany();
+  await prisma.groupBuyCommunity.deleteMany();
+  await prisma.groupBuySystemSetting.deleteMany();
+  await prisma.vendor.deleteMany();
+  console.log('[Seed] 清空完成，開始匯入新資料...');
+
   // 1. Users
   console.log('[Seed] 導入 Users...');
   const usersRows = getSheetData('Users');
@@ -92,7 +114,6 @@ async function main() {
     permissions: parseJson(row.Permissions || row.permissions, [])
   })).filter(u => u.username && u.passwordHash);
 
-  await prisma.user.deleteMany();
   for (const u of users) {
     await prisma.user.upsert({
       where: { username: u.username },
@@ -130,7 +151,6 @@ async function main() {
     };
   }).filter(p => p.productId && p.productName);
 
-  await prisma.product.deleteMany();
   await prisma.product.createMany({ data: products });
   console.log(`[Seed] 已導入 ${products.length} 個商品`);
 
@@ -150,7 +170,6 @@ async function main() {
     productName: String(row.ProductName || row.productName || '').trim() || null
   })).filter(inv => inv.productId && validProductIds.has(inv.productId));
 
-  await prisma.inventory.deleteMany();
   await prisma.inventory.createMany({ data: inventories });
   console.log(`[Seed] 已導入 ${inventories.length} 筆庫存紀錄`);
 
@@ -171,7 +190,6 @@ async function main() {
     operator: String(row.Operator || row.operator || '').trim() || 'System'
   })).filter(p => p.purchaseId && p.productId);
 
-  await prisma.purchase.deleteMany();
   await prisma.purchase.createMany({ data: purchases });
   console.log(`[Seed] 已導入 ${purchases.length} 筆進貨紀錄`);
 
@@ -192,7 +210,6 @@ async function main() {
     workHours: parseDecimal(row.WorkHours || row.workHours || row['工時'] || 0)
   })).filter(s => s.saleId);
 
-  await prisma.sales.deleteMany();
   await prisma.sales.createMany({ data: sales });
   console.log(`[Seed] 已導入 ${sales.length} 筆銷售訂單`);
 
@@ -212,7 +229,6 @@ async function main() {
     subtotal: parseDecimal(row.Subtotal || row.subtotal)
   })).filter(sd => sd.saleId && sd.productId && validSaleIds.has(sd.saleId) && validProductIds.has(sd.productId));
 
-  await prisma.salesDetail.deleteMany();
   await prisma.salesDetail.createMany({ data: salesDetails });
   console.log(`[Seed] 已導入 ${salesDetails.length} 筆銷售明細`);
 
@@ -243,7 +259,6 @@ async function main() {
     paymentDate: parseExcelDate(row.paymentDate || row.PaymentDate || row['付款日期'])
   })).filter(exp => exp.saleId);
 
-  await prisma.expenditure.deleteMany();
   await prisma.expenditure.createMany({ data: expenditures });
   console.log(`[Seed] 已導入 ${expenditures.length} 筆支出/薪資記錄`);
 
@@ -262,7 +277,6 @@ async function main() {
     commissionRate: parseDecimal(row.CommissionRate || row.commissionRate)
   })).filter(p => p.username);
 
-  await prisma.payrollSetting.deleteMany();
   await prisma.payrollSetting.createMany({ data: payrollSettings });
   console.log(`[Seed] 已導入 ${payrollSettings.length} 筆員工薪資設定`);
 
@@ -278,7 +292,6 @@ async function main() {
     timestamp: parseExcelDate(row.Timestamp || row.timestamp) || new Date()
   })).filter(dr => dr.username);
 
-  await prisma.dailyRecord.deleteMany();
   await prisma.dailyRecord.createMany({ data: dailyRecords });
   console.log(`[Seed] 已導入 ${dailyRecords.length} 筆每日出勤與扣款紀錄`);
 
@@ -294,7 +307,6 @@ async function main() {
     note: row.Note || row.note ? String(row.Note || row.note).trim() : null
   })).filter(ep => ep.username);
 
-  await prisma.employeeProfile.deleteMany();
   await prisma.employeeProfile.createMany({ data: employeeProfiles });
   console.log(`[Seed] 已導入 ${employeeProfiles.length} 筆員工基本資料`);
 
@@ -328,7 +340,6 @@ async function main() {
     deletedAt: parseExcelDate(row.DeletedAt || row.deletedAt)
   })).filter(c => c.communityId && c.communityCode);
 
-  await prisma.groupBuyCommunity.deleteMany();
   await prisma.groupBuyCommunity.createMany({ data: gbCommunities });
   console.log(`[Seed] 已導入 ${gbCommunities.length} 個團購社區`);
 
@@ -360,7 +371,6 @@ async function main() {
     updatedAt: parseExcelDate(row.UpdatedAt || row.updatedAt) || new Date()
   })).filter(cam => cam.campaignId && cam.communityId);
 
-  await prisma.groupBuyCampaign.deleteMany();
   await prisma.groupBuyCampaign.createMany({ data: gbCampaigns });
   console.log(`[Seed] 已導入 ${gbCampaigns.length} 個團購活動`);
 
@@ -380,7 +390,6 @@ async function main() {
     createdAt: parseExcelDate(row.CreatedAt || row.createdAt) || new Date()
   }));
 
-  await prisma.groupBuyAuditLog.deleteMany();
   await prisma.groupBuyAuditLog.createMany({ data: gbAuditLogs });
   console.log(`[Seed] 已導入 ${gbAuditLogs.length} 筆團購稽核日誌`);
 
@@ -395,7 +404,6 @@ async function main() {
     createdAt: parseExcelDate(row.CreatedAt || row.createdAt) || new Date()
   })).filter(h => h.orderId && h.status);
 
-  await prisma.groupBuyOrderStatusHistory.deleteMany();
   await prisma.groupBuyOrderStatusHistory.createMany({ data: gbStatusHistories });
   console.log(`[Seed] 已導入 ${gbStatusHistories.length} 筆團購訂單歷程`);
 
@@ -414,7 +422,6 @@ async function main() {
     createdAt: parseExcelDate(row.CreatedAt || row.createdAt) || new Date()
   })).filter(n => n.orderId && n.type);
 
-  await prisma.groupBuyNotification.deleteMany();
   await prisma.groupBuyNotification.createMany({ data: gbNotifications });
   console.log(`[Seed] 已導入 ${gbNotifications.length} 筆團購通知紀錄`);
 
@@ -426,7 +433,6 @@ async function main() {
     settingValue: String(row.SettingValue || row.settingValue || '').trim()
   })).filter(s => s.settingKey);
 
-  await prisma.groupBuySystemSetting.deleteMany();
   await prisma.groupBuySystemSetting.createMany({ data: gbSystemSettings });
   console.log(`[Seed] 已導入 ${gbSystemSettings.length} 筆團購系統設定`);
 
@@ -449,7 +455,6 @@ async function main() {
     };
   }).filter(v => v.vendorName);
 
-  await prisma.vendor.deleteMany();
   await prisma.vendor.createMany({ data: vendors });
   console.log(`[Seed] 已導入 ${vendors.length} 家廠商設定`);
 
@@ -475,7 +480,6 @@ async function main() {
     })).filter(l => l.username && l.actionType);
   }
 
-  await prisma.activityLog.deleteMany();
   if (activityLogs.length > 0) {
     await prisma.activityLog.createMany({ data: activityLogs });
   }
