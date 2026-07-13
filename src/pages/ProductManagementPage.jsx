@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Package, Search, RefreshCw, Save, Image, Edit2 } from 'lucide-react';
+import { Package, Search, RefreshCw, Save, Image, Edit2, ChevronDown, ChevronUp, Check, AlertCircle } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
 export default function ProductManagementPage({ user, apiUrl }) {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
-    const [savingId, setSavingId] = useState(null);
     const [tempFlavorChoices, setTempFlavorChoices] = useState({}); // { [productId]: string }
+    const [expandedIds, setExpandedIds] = useState(new Set()); // 展開的商品 ID
+    const [savingStatus, setSavingStatus] = useState({}); // { [productId]: 'saving' | 'saved' | 'error' }
+    const [lastError, setLastError] = useState({}); // { [productId]: string }
 
     const fetchProducts = useCallback(async () => {
         setLoading(true);
@@ -40,35 +42,92 @@ export default function ProductManagementPage({ user, apiUrl }) {
         setProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: value, _dirty: true } : p));
     };
 
-    const handleSave = async (product) => {
-        setSavingId(product.id);
+    // 展開與折疊
+    const toggleExpand = (id) => {
+        setExpandedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    };
+
+    // 自動背景存檔，不彈出 Alert 影響體驗
+    const handleSaveProduct = async (id, updatedProductFields = {}) => {
+        const currentProduct = products.find(p => p.id === id);
+        if (!currentProduct) return;
+
+        // 立即套用修改至本地 state，並標記儲存中
+        const mergedProduct = { ...currentProduct, ...updatedProductFields };
+        setSavingStatus(prev => ({ ...prev, [id]: 'saving' }));
+        setLastError(prev => {
+            const next = { ...prev };
+            delete next[id];
+            return next;
+        });
+
         try {
-            // 從暫存字串中解析口味陣列（相容中英文逗號）
-            const rawStr = tempFlavorChoices[product.id] || '';
+            // 從暫存字串中解析口味陣列
+            const rawStr = tempFlavorChoices[id] || '';
             const parsedFlavors = rawStr.split(/[,，]/).map(s => s.trim()).filter(Boolean);
 
+            // 解析發貨階梯
+            let parsedSteps = [];
+            if (typeof mergedProduct.dispatchSteps === 'string') {
+                parsedSteps = mergedProduct.dispatchSteps.split(/[,，]/).map(s => Number(s.trim())).filter(n => !isNaN(n));
+            } else if (Array.isArray(mergedProduct.dispatchSteps)) {
+                parsedSteps = mergedProduct.dispatchSteps.map(Number);
+            }
+
             const res = await callGAS(apiUrl, 'updateProductDetails', {
-                productId: product.id,
-                isActive: product.isActive,
-                imageUrl: product.imageUrl,
-                expiryDate: product.expiryDate,
-                has_flavor_attributes: product.has_flavor_attributes,
+                productId: mergedProduct.id,
+                isActive: mergedProduct.isActive,
+                imageUrl: mergedProduct.imageUrl,
+                expiryDate: mergedProduct.expiryDate,
+                has_flavor_attributes: mergedProduct.has_flavor_attributes,
                 flavor_choices: parsedFlavors,
-                single_price: product.single_price,
-                has_volume_pricing: product.has_volume_pricing,
-                volume_pricing_settings: product.volume_pricing_settings
+                single_price: mergedProduct.single_price,
+                has_volume_pricing: mergedProduct.has_volume_pricing,
+                volume_pricing_settings: mergedProduct.volume_pricing_settings,
+                
+                packSize: Number(mergedProduct.packSize || 1),
+                dispatchSteps: parsedSteps,
+                roundThreshold: Number(mergedProduct.roundThreshold !== undefined ? mergedProduct.roundThreshold : 99),
+                autoSuppress: Boolean(mergedProduct.autoSuppress),
+                maxSuggestion: Number(mergedProduct.maxSuggestion || 0)
             }, user.token);
             
             if (res && res.error) {
                 throw new Error(res.error);
             }
             
-            setProducts(prev => prev.map(p => p.id === product.id ? { ...p, flavor_choices: parsedFlavors, _dirty: false } : p));
-            alert(`${product.name} 儲存成功`);
+            // 儲存成功，清除 _dirty
+            setProducts(prev => prev.map(p => p.id === id ? { 
+                ...p, 
+                ...updatedProductFields,
+                flavor_choices: parsedFlavors, 
+                dispatchSteps: parsedSteps,
+                _dirty: false 
+            } : p));
+            
+            setSavingStatus(prev => ({ ...prev, [id]: 'saved' }));
+            
+            // 2.5 秒後淡出「已儲存」字眼
+            setTimeout(() => {
+                setSavingStatus(prev => {
+                    const next = { ...prev };
+                    if (next[id] === 'saved') delete next[id];
+                    return next;
+                });
+            }, 2500);
+            
         } catch (error) {
-            alert('儲存失敗: ' + error.message);
-        } finally {
-            setSavingId(null);
+            console.error('Auto save error:', error);
+            setSavingStatus(prev => ({ ...prev, [id]: 'error' }));
+            setLastError(prev => ({ ...prev, [id]: error.message }));
         }
     };
 
@@ -116,171 +175,340 @@ export default function ProductManagementPage({ user, apiUrl }) {
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {filtered.map(product => (
-                            <div key={product.id} className="flex flex-col gap-4 p-5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] hover:border-blue-500/20 transition-all shadow-sm">
-                                {/* Top row: Image & General info */}
-                                <div className="flex flex-col md:flex-row md:items-center gap-4">
-                                    {/* 圖片預覽 */}
-                                    <div className="w-16 h-16 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] overflow-hidden flex items-center justify-center flex-shrink-0 relative group">
-                                        {product.imageUrl ? (
-                                            <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; }} />
-                                        ) : (
-                                            <Image size={24} className="text-[var(--text-tertiary)]" />
-                                        )}
-                                    </div>
-
-                                    {/* 商品資訊 */}
-                                    <div className="flex-1 min-w-[150px]">
-                                        <div className="font-bold text-lg text-[var(--text-primary)]">{product.name}</div>
-                                        <div className="text-xs text-[var(--text-tertiary)] font-mono mt-0.5">ID: {product.id}</div>
-                                        <div className="text-sm text-blue-600 font-bold mt-1">庫存單價: ${product.price}</div>
-                                    </div>
-
-                                    {/* 上架狀態 & 有效日期 */}
-                                    <div className="flex items-center gap-4 flex-shrink-0">
-                                        <div className="flex flex-col gap-1">
-                                            <span className="text-[10px] uppercase font-bold text-[var(--text-tertiary)]">有效日期</span>
-                                            <input
-                                                type="date"
-                                                className="input-field text-xs p-1.5 w-32"
-                                                value={product.expiryDate || ''}
-                                                onChange={(e) => handleFieldChange(product.id, 'expiryDate', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="flex flex-col gap-1 items-center">
-                                            <span className="text-[10px] uppercase font-bold text-[var(--text-tertiary)]">上架</span>
-                                            <label className="relative inline-flex items-center cursor-pointer mt-1">
-                                                <input
-                                                    type="checkbox"
-                                                    className="sr-only peer"
-                                                    checked={!!product.isActive}
-                                                    onChange={(e) => handleFieldChange(product.id, 'isActive', e.target.checked)}
-                                                />
-                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Middle row: Extended attributes grid */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t border-[var(--border-primary)]/50 text-xs">
-                                    {/* Image URL input */}
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-[10px] uppercase font-bold text-[var(--text-tertiary)]">圖片網址</span>
-                                        <input
-                                            type="text"
-                                            className="input-field text-xs p-2"
-                                            placeholder="圖片網址 https://..."
-                                            value={product.imageUrl || ''}
-                                            onChange={(e) => handleFieldChange(product.id, 'imageUrl', e.target.value)}
-                                        />
-                                    </div>
-
-                                    {/* Flavor Attributes settings */}
-                                    <div className="flex flex-col gap-1">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-[10px] uppercase font-bold text-[var(--text-tertiary)]">多規格口味</span>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    className="sr-only peer"
-                                                    checked={!!product.has_flavor_attributes}
-                                                    onChange={(e) => handleFieldChange(product.id, 'has_flavor_attributes', e.target.checked)}
-                                                />
-                                                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                                            </label>
-                                        </div>
-                                        <input
-                                            type="text"
-                                            className="input-field text-xs p-2"
-                                            placeholder="口味選項，以逗號分隔，例：麥芽, 蘋果"
-                                            disabled={!product.has_flavor_attributes}
-                                            value={tempFlavorChoices[product.id] || ''}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                setTempFlavorChoices(prev => ({ ...prev, [product.id]: val }));
-                                                handleFieldChange(product.id, '_dirty', true);
-                                            }}
-                                        />
-                                    </div>
-
-                                    {/* Volume Pricing settings */}
-                                    <div className="flex flex-col gap-1 border-t sm:border-t-0 sm:border-l border-[var(--border-primary)]/50 sm:pl-3">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-[10px] uppercase font-bold text-[var(--text-tertiary)]">啟用階梯組合價</span>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    className="sr-only peer"
-                                                    checked={!!product.has_volume_pricing}
-                                                    onChange={(e) => handleFieldChange(product.id, 'has_volume_pricing', e.target.checked)}
-                                                />
-                                                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                                            </label>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <div className="flex-1">
-                                                <input
-                                                    type="number"
-                                                    className="input-field text-xs p-2"
-                                                    placeholder="單件原價"
-                                                    value={product.single_price || ''}
-                                                    onChange={(e) => handleFieldChange(product.id, 'single_price', e.target.value !== '' ? Number(e.target.value) : '')}
-                                                />
-                                            </div>
-                                            <div className="flex-1 flex gap-1 items-center font-mono">
-                                                <input
-                                                    type="number"
-                                                    className="input-field text-xs p-2 w-12 text-center"
-                                                    placeholder="件數"
-                                                    disabled={!product.has_volume_pricing}
-                                                    value={product.volume_pricing_settings?.target_quantity || ''}
-                                                    onChange={(e) => {
-                                                        const settings = {
-                                                            ...(product.volume_pricing_settings || {}),
-                                                            target_quantity: e.target.value !== '' ? Number(e.target.value) : 0
-                                                        };
-                                                        handleFieldChange(product.id, 'volume_pricing_settings', settings);
-                                                    }}
-                                                />
-                                                <span className="text-[10px] text-[var(--text-tertiary)]">件</span>
-                                                <input
-                                                    type="number"
-                                                    className="input-field text-xs p-2 flex-1"
-                                                    placeholder="組合價"
-                                                    disabled={!product.has_volume_pricing}
-                                                    value={product.volume_pricing_settings?.package_price || ''}
-                                                    onChange={(e) => {
-                                                        const settings = {
-                                                            ...(product.volume_pricing_settings || {}),
-                                                            package_price: e.target.value !== '' ? Number(e.target.value) : 0
-                                                        };
-                                                        handleFieldChange(product.id, 'volume_pricing_settings', settings);
-                                                    }}
-                                                />
-                                                <span className="text-[10px] text-[var(--text-tertiary)]">元</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Action row (Save button) */}
-                                <div className="flex justify-end pt-3 border-t border-[var(--border-primary)]/30">
-                                    <button
-                                        disabled={savingId === product.id || !product._dirty}
-                                        onClick={() => handleSave(product)}
-                                        className={`px-5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                                            product._dirty 
-                                                ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md active:scale-95' 
-                                                : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
-                                        }`}
+                        {filtered.map(product => {
+                            const isDirty = !!product._dirty;
+                            const isExpanded = expandedIds.has(product.id);
+                            const status = savingStatus[product.id];
+                            
+                            return (
+                                <div key={product.id} className={`flex flex-col rounded-2xl border transition-all duration-300 bg-[var(--bg-secondary)] shadow-sm ${
+                                    isExpanded 
+                                        ? 'border-[var(--border-primary)] shadow-md' 
+                                        : 'border-[var(--border-primary)] hover:border-[var(--border-primary)]/80 hover:shadow-md'
+                                }`}>
+                                    {/* 1. 商品標頭：主圖與基本資訊（點擊切換展開/折疊） */}
+                                    <div 
+                                        onClick={() => toggleExpand(product.id)}
+                                        className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 cursor-pointer hover:bg-[var(--bg-tertiary)]/20 transition-all rounded-t-2xl"
                                     >
-                                        <Save size={14} />
-                                        {savingId === product.id ? '儲存中...' : '儲存變更'}
-                                    </button>
+                                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                                            {/* 商品大圖 */}
+                                            <div className="w-16 h-16 rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] overflow-hidden flex items-center justify-center flex-shrink-0 shadow-inner">
+                                                {product.imageUrl ? (
+                                                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; }} />
+                                                ) : (
+                                                    <Image size={24} className="text-[var(--text-tertiary)]" />
+                                                )}
+                                            </div>
+                                            {/* 名稱與ID */}
+                                            <div className="min-w-0 flex-1">
+                                                <div className="font-extrabold text-base md:text-lg text-[var(--text-primary)] truncate">{product.name}</div>
+                                                <div className="text-xs text-[var(--text-tertiary)] font-mono mt-0.5 flex items-center gap-1.5">
+                                                    <span className="bg-[var(--bg-tertiary)] px-1.5 py-0.2 rounded border border-[var(--border-primary)] text-[10px]">ID</span> 
+                                                    <span className="truncate max-w-[120px] md:max-w-none">{product.id}</span>
+                                                </div>
+                                                <div className="text-xs font-bold text-blue-600 mt-1">
+                                                    庫存單價：<span className="font-mono text-sm">${product.price}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 右側操控區 (有效日期, 上架, 儲存狀態, 箭頭) */}
+                                        <div className="flex items-center gap-4 flex-shrink-0 self-end md:self-auto">
+                                            {/* 有效日期 */}
+                                            <div className="flex flex-col gap-0.5" onClick={(e) => e.stopPropagation()}>
+                                                <span className="text-[9px] uppercase font-bold text-[var(--text-secondary)]">有效日期</span>
+                                                <input
+                                                    type="date"
+                                                    className="input-field text-xs px-2 py-1 w-32 font-semibold"
+                                                    value={product.expiryDate || ''}
+                                                    onChange={(e) => {
+                                                        handleFieldChange(product.id, 'expiryDate', e.target.value);
+                                                        handleSaveProduct(product.id, { expiryDate: e.target.value });
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="h-6 w-[1px] bg-[var(--border-primary)]" />
+                                            {/* 上架 */}
+                                            <div className="flex flex-col gap-0.5 items-center" onClick={(e) => e.stopPropagation()}>
+                                                <span className="text-[9px] uppercase font-bold text-[var(--text-secondary)]">上架</span>
+                                                <label className="relative inline-flex items-center cursor-pointer mt-0.5">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="sr-only peer"
+                                                        checked={!!product.isActive}
+                                                        onChange={(e) => {
+                                                            handleFieldChange(product.id, 'isActive', e.target.checked);
+                                                            handleSaveProduct(product.id, { isActive: e.target.checked });
+                                                        }}
+                                                    />
+                                                    <div className="w-9 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                                                </label>
+                                            </div>
+                                            <div className="h-6 w-[1px] bg-[var(--border-primary)]" />
+                                            
+                                            {/* 自動儲存狀態 */}
+                                            <div className="min-w-[65px] flex justify-end">
+                                                {status === 'saving' && (
+                                                    <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-bold text-[10px] bg-blue-500/10 px-2 py-0.5 rounded-full">
+                                                        <RefreshCw size={10} className="animate-spin" /> 儲存中
+                                                    </span>
+                                                )}
+                                                {status === 'saved' && (
+                                                    <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded-full animate-fade-in">
+                                                        <Check size={10} /> 已儲存
+                                                    </span>
+                                                )}
+                                                {status === 'error' && (
+                                                    <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400 font-bold text-[10px] bg-rose-500/10 px-2 py-0.5 rounded-full" title={lastError[product.id]}>
+                                                        <AlertCircle size={10} /> 失敗
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* 展開 Chevron */}
+                                            <div className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors pl-1">
+                                                {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 展開的詳細欄位 */}
+                                    {isExpanded && (
+                                        <div className="p-5 border-t border-[var(--border-primary)]/40 flex flex-col gap-6 animate-slide-down">
+                                            {/* 2. 第一大組：行銷與多規格配置 */}
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
+                                                {/* 圖片網址 */}
+                                                <div className="flex flex-col gap-2 bg-[var(--bg-tertiary)]/30 p-3.5 rounded-xl border border-[var(--border-primary)]/40">
+                                                    <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">圖片網址</span>
+                                                    <input
+                                                        type="text"
+                                                        className="input-field text-xs p-2.5"
+                                                        placeholder="輸入圖片網址 https://..."
+                                                        value={product.imageUrl || ''}
+                                                        onChange={(e) => handleFieldChange(product.id, 'imageUrl', e.target.value)}
+                                                        onBlur={(e) => handleSaveProduct(product.id, { imageUrl: e.target.value })}
+                                                    />
+                                                </div>
+
+                                                {/* 多規格口味 */}
+                                                <div className={`flex flex-col gap-2 p-3.5 rounded-xl border transition-colors ${
+                                                    product.has_flavor_attributes 
+                                                        ? 'bg-blue-500/5 border-blue-500/20' 
+                                                        : 'bg-[var(--bg-tertiary)]/30 border-[var(--border-primary)]/40'
+                                                }`}>
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">多規格口味選項</span>
+                                                        <label className="relative inline-flex items-center cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="sr-only peer"
+                                                                checked={!!product.has_flavor_attributes}
+                                                                onChange={(e) => {
+                                                                    handleFieldChange(product.id, 'has_flavor_attributes', e.target.checked);
+                                                                    handleSaveProduct(product.id, { has_flavor_attributes: e.target.checked });
+                                                                }}
+                                                            />
+                                                            <div className="w-9 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                                                        </label>
+                                                    </div>
+                                                    <input
+                                                        type="text"
+                                                        className="input-field text-xs p-2.5"
+                                                        placeholder="口味選項，以逗號分隔，例：原味, 巧克力"
+                                                        disabled={!product.has_flavor_attributes}
+                                                        value={tempFlavorChoices[product.id] || ''}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            setTempFlavorChoices(prev => ({ ...prev, [product.id]: val }));
+                                                            handleFieldChange(product.id, '_dirty', true);
+                                                        }}
+                                                        onBlur={() => handleSaveProduct(product.id)}
+                                                    />
+                                                </div>
+
+                                                {/* 階梯組合價 */}
+                                                <div className={`flex flex-col gap-2 p-3.5 rounded-xl border transition-colors ${
+                                                    product.has_volume_pricing 
+                                                        ? 'bg-blue-500/5 border-blue-500/20' 
+                                                        : 'bg-[var(--bg-tertiary)]/30 border-[var(--border-primary)]/40'
+                                                }`}>
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">階梯組合價設定</span>
+                                                        <label className="relative inline-flex items-center cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="sr-only peer"
+                                                                checked={!!product.has_volume_pricing}
+                                                                onChange={(e) => {
+                                                                    handleFieldChange(product.id, 'has_volume_pricing', e.target.checked);
+                                                                    handleSaveProduct(product.id, { has_volume_pricing: e.target.checked });
+                                                                }}
+                                                            />
+                                                            <div className="w-9 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                                                        </label>
+                                                    </div>
+                                                    <div className="flex gap-2 items-center">
+                                                        <div className="flex-1 min-w-[70px]">
+                                                            <div className="relative">
+                                                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-bold font-mono">$</span>
+                                                                <input
+                                                                    type="number"
+                                                                    className="input-field text-xs pl-6 p-2"
+                                                                    placeholder="原價"
+                                                                    value={product.single_price || ''}
+                                                                    onChange={(e) => handleFieldChange(product.id, 'single_price', e.target.value !== '' ? Number(e.target.value) : '')}
+                                                                    onBlur={(e) => handleSaveProduct(product.id, { single_price: e.target.value !== '' ? Number(e.target.value) : '' })}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className={`flex-[1.5] flex gap-1.5 items-center ${product.has_volume_pricing ? '' : 'opacity-40 select-none pointer-events-none'}`}>
+                                                            <span className="text-[10px] text-[var(--text-tertiary)]">滿</span>
+                                                            <input
+                                                                type="number"
+                                                                className="input-field text-xs p-2 w-14 text-center font-bold"
+                                                                placeholder="件"
+                                                                disabled={!product.has_volume_pricing}
+                                                                value={product.volume_pricing_settings?.target_quantity || ''}
+                                                                onChange={(e) => {
+                                                                    const settings = {
+                                                                        ...(product.volume_pricing_settings || {}),
+                                                                        target_quantity: e.target.value !== '' ? Number(e.target.value) : 0
+                                                                    };
+                                                                    handleFieldChange(product.id, 'volume_pricing_settings', settings);
+                                                                }}
+                                                                onBlur={(e) => {
+                                                                    const settings = {
+                                                                        ...(product.volume_pricing_settings || {}),
+                                                                        target_quantity: e.target.value !== '' ? Number(e.target.value) : 0
+                                                                    };
+                                                                    handleSaveProduct(product.id, { volume_pricing_settings: settings });
+                                                                }}
+                                                            />
+                                                            <span className="text-[10px] text-[var(--text-tertiary)]">件</span>
+                                                            <div className="relative flex-1">
+                                                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-bold font-mono">$</span>
+                                                                <input
+                                                                    type="number"
+                                                                    className="input-field text-xs pl-6 p-2 font-bold text-blue-600 dark:text-blue-400"
+                                                                    placeholder="組合價"
+                                                                    disabled={!product.has_volume_pricing}
+                                                                    value={product.volume_pricing_settings?.package_price || ''}
+                                                                    onChange={(e) => {
+                                                                        const settings = {
+                                                                            ...(product.volume_pricing_settings || {}),
+                                                                            package_price: e.target.value !== '' ? Number(e.target.value) : 0
+                                                                        };
+                                                                        handleFieldChange(product.id, 'volume_pricing_settings', settings);
+                                                                    }}
+                                                                    onBlur={(e) => {
+                                                                        const settings = {
+                                                                            ...(product.volume_pricing_settings || {}),
+                                                                            package_price: e.target.value !== '' ? Number(e.target.value) : 0
+                                                                        };
+                                                                        handleSaveProduct(product.id, { volume_pricing_settings: settings });
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* 3. 第二大組：🤖 AI 自動領貨參數設定 */}
+                                            <div className="bg-[var(--bg-primary)] rounded-2xl p-5 border border-[var(--border-primary)] text-xs flex flex-col gap-4 shadow-inner">
+                                                <div className="flex items-center gap-1.5 pb-2 border-b border-[var(--border-primary)]">
+                                                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                                                    <span className="text-xs uppercase font-extrabold text-blue-600 dark:text-blue-400 tracking-wider">🤖 AI 領貨補貨進階配置參數</span>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                    {/* AI 包裝與發貨階梯 */}
+                                                    <div className="flex flex-col gap-2">
+                                                        <span className="text-[10px] font-bold text-[var(--text-primary)]">📦 發貨包裝與階梯</span>
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-[9px] text-[var(--text-secondary)] font-medium">整箱包裝數 (一箱)</span>
+                                                                <input
+                                                                    type="number"
+                                                                    className="input-field text-xs p-2"
+                                                                    placeholder="例：24"
+                                                                    value={product.packSize || 1}
+                                                                    onChange={(e) => handleFieldChange(product.id, 'packSize', e.target.value !== '' ? Number(e.target.value) : 1)}
+                                                                    onBlur={(e) => handleSaveProduct(product.id, { packSize: e.target.value !== '' ? Number(e.target.value) : 1 })}
+                                                                />
+                                                            </div>
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-[9px] text-[var(--text-secondary)] font-medium">發貨階梯 (逗號分隔)</span>
+                                                                <input
+                                                                    type="text"
+                                                                    className="input-field text-xs p-2 font-mono"
+                                                                    placeholder="例：24, 48, 72"
+                                                                    value={Array.isArray(product.dispatchSteps) ? product.dispatchSteps.join(', ') : product.dispatchSteps || ''}
+                                                                    onChange={(e) => handleFieldChange(product.id, 'dispatchSteps', e.target.value)}
+                                                                    onBlur={(e) => handleSaveProduct(product.id, { dispatchSteps: e.target.value })}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* 進位門檻與上限 */}
+                                                    <div className="flex flex-col gap-2">
+                                                        <span className="text-[10px] font-bold text-[var(--text-primary)]">⚖️ 進位門檻與數量上限</span>
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-[9px] text-[var(--text-secondary)] font-medium">門檻 (尾數多於此即進箱)</span>
+                                                                <input
+                                                                    type="number"
+                                                                    className="input-field text-xs p-2 text-center"
+                                                                    placeholder="例：5"
+                                                                    value={product.roundThreshold !== undefined ? product.roundThreshold : 99}
+                                                                    onChange={(e) => handleFieldChange(product.id, 'roundThreshold', e.target.value !== '' ? Number(e.target.value) : 99)}
+                                                                    onBlur={(e) => handleSaveProduct(product.id, { roundThreshold: e.target.value !== '' ? Number(e.target.value) : 99 })}
+                                                                />
+                                                            </div>
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-[9px] text-[var(--text-secondary)] font-medium">最大建議量 (0為無限制)</span>
+                                                                <input
+                                                                    type="number"
+                                                                    className="input-field text-xs p-2 text-center"
+                                                                    placeholder="無"
+                                                                    value={product.maxSuggestion || 0}
+                                                                    onChange={(e) => handleFieldChange(product.id, 'maxSuggestion', e.target.value !== '' ? Number(e.target.value) : 0)}
+                                                                    onBlur={(e) => handleSaveProduct(product.id, { maxSuggestion: e.target.value !== '' ? Number(e.target.value) : 0 })}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* 智慧領貨抑制 */}
+                                                    <div className="flex flex-col gap-2 md:pl-4 md:border-l border-[var(--border-primary)]/50">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-[10px] font-bold text-[var(--text-primary)]">🧠 智慧散貨抑制</span>
+                                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="sr-only peer"
+                                                                    checked={!!product.autoSuppress}
+                                                                    onChange={(e) => {
+                                                                        handleFieldChange(product.id, 'autoSuppress', e.target.checked);
+                                                                        handleSaveProduct(product.id, { autoSuppress: e.target.checked });
+                                                                    }}
+                                                                />
+                                                                <div className="w-9 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                                                            </label>
+                                                        </div>
+                                                        <p className="text-[10px] text-[var(--text-secondary)] font-medium leading-relaxed mt-1">
+                                                            啟用後，若預估需求過低，且車上剩餘量已過半箱，AI 會自動將領貨量歸零，避免出車只為領取極少量的散貨。
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

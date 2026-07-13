@@ -12,10 +12,14 @@ export default function HistoryImportModal({
     endDate,
     onDateChange,
     onSearch,
-    isLoading
+    isLoading,
+    defaultCustomer = '' // [New] 預設帶入的客戶名稱
 }) {
+    const [filterText, setFilterText] = React.useState('');
+
     React.useEffect(() => {
         if (show) {
+            setFilterText(defaultCustomer || '');
             // Lock body scroll
             document.body.style.overflow = 'hidden';
         } else {
@@ -25,12 +29,18 @@ export default function HistoryImportModal({
         return () => {
             document.body.style.overflow = '';
         };
-    }, [show]);
+    }, [show, defaultCustomer]);
 
     if (!show) return null;
 
+    // Filter records by customer name locally
+    const filteredRecords = records.filter(record => {
+        if (!filterText.trim()) return true;
+        return (record.customer || '').toLowerCase().includes(filterText.toLowerCase().trim());
+    });
+
     // Group records by date
-    const groupedRecords = records.reduce((groups, record) => {
+    const groupedRecords = filteredRecords.reduce((groups, record) => {
         const dateParams = new Date(record.date);
         const dateKey = dateParams.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
         if (!groups[dateKey]) groups[dateKey] = [];
@@ -92,6 +102,25 @@ export default function HistoryImportModal({
                             >
                                 查詢
                             </button>
+                        </div>
+
+                        {/* Customer Filter Input */}
+                        <div className="relative mt-2">
+                            <input
+                                type="text"
+                                placeholder="🔍 輸入關鍵字篩選地點/客戶..."
+                                value={filterText}
+                                onChange={(e) => setFilterText(e.target.value)}
+                                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold text-gray-700 outline-none focus:border-emerald-500 focus:bg-white transition-all shadow-inner"
+                            />
+                            {filterText && (
+                                <button
+                                    onClick={() => setFilterText('')}
+                                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-[10px] sm:text-xs font-black"
+                                >
+                                    ✕ 清除
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

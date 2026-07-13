@@ -1,8 +1,9 @@
 import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PlusCircle } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import { evaluateFormula } from '../utils/mathUtils';
+import PurchaseConfigModal from '../components/PurchaseConfigModal';
 
 const getSafeNum = (v) => {
     if (typeof v === 'string' && v.trim().startsWith('=')) return 0;
@@ -21,24 +22,26 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
     const [newProductsToSetup, setNewProductsToSetup] = useState([]); // [新增] 待設定的新產品
     const [setupData, setSetupData] = useState({}); // [新增] 新產品的設定值
     const [loading, setLoading] = useState(false);
+    const [showConfigModal, setShowConfigModal] = useState(false); // [New] 管理廠商與商品後台開關
+
+    const loadSuggestions = useCallback(async () => {
+        try {
+            const data = await callGAS(apiUrl, 'getPurchaseSuggestions', {}, user.token);
+            if (data.vendors) setSuggestions(data);
+            
+            // [新增] 抓取完整的產品主檔清單
+            const products = await callGAS(apiUrl, 'getProducts', { activeOnly: true }, user.token);
+            if (Array.isArray(products)) {
+                setAllProductNames(products.map(p => p.name));
+            }
+        } catch (e) {
+            console.error("Failed to fetch suggestions", e);
+        }
+    }, [apiUrl, user.token]);
 
     useEffect(() => {
-        const fetchSuggestions = async () => {
-            try {
-                const data = await callGAS(apiUrl, 'getPurchaseSuggestions', {}, user.token);
-                if (data.vendors) setSuggestions(data);
-                
-                // [新增] 抓取完整的產品主檔清單
-                const products = await callGAS(apiUrl, 'getProducts', {}, user.token);
-                if (Array.isArray(products)) {
-                    setAllProductNames(products.map(p => p.name));
-                }
-            } catch (e) {
-                console.error("Failed to fetch suggestions", e);
-            }
-        };
-        if (user?.token) fetchSuggestions();
-    }, [user.token, apiUrl]);
+        if (user?.token) loadSuggestions();
+    }, [user.token, loadSuggestions]);
 
     // [New] Handle Correction/Clone from safeSessionStorage
     useEffect(() => {
@@ -84,29 +87,23 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
         }));
     }, [suggestions.vendorDefaults, items.map(i => i.vendor).join(',')]);
 
-    const handleSaveDefault = async (item) => {
-        if (!item.vendor) return;
 
-        try {
-            await callGAS(apiUrl, 'saveVendorDefault', { vendor: item.vendor, method: item.paymentMethod }, user.token);
-            alert(`已將「${item.vendor}」的預設支付方式設為「${item.paymentMethod === 'CASH' ? '現金' : '賒帳'}」`);
-            setSuggestions(prev => ({
-                ...prev,
-                vendorDefaults: { ...prev.vendorDefaults, [item.vendor]: item.paymentMethod }
-            }));
-        } catch (e) {
-            alert("保存失敗: " + e.message);
-        }
-    };
 
     // Helper to get product list for a specific vendor
     const getProductSuggestions = (currentVendor) => {
+        const activeSet = new Set(allProductNames);
         if (currentVendor && suggestions.vendorProductMap[currentVendor]) {
-            return suggestions.vendorProductMap[currentVendor];
+            return suggestions.vendorProductMap[currentVendor].filter(pName => activeSet.has(pName));
         }
-        // If no vendor selected (or not found), show all unique products
+        // If no vendor selected (or not found), show all unique active products
         const allProducts = new Set();
-        Object.values(suggestions.vendorProductMap || {}).forEach(list => list.forEach(p => allProducts.add(p)));
+        Object.values(suggestions.vendorProductMap || {}).forEach(list => 
+            list.forEach(p => {
+                if (activeSet.has(p)) {
+                    allProducts.add(p);
+                }
+            })
+        );
         return Array.from(allProducts);
     };
 
@@ -402,6 +399,13 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                     <h2 className="text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
                         進貨作業
                     </h2>
+                    <button
+                        type="button"
+                        onClick={() => setShowConfigModal(true)}
+                        className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black rounded-xl text-xs transition-all shadow-md shadow-emerald-100 dark:shadow-none"
+                    >
+                        ⚙️ 管理廠商與商品
+                    </button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -429,17 +433,6 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                             </div>
                                             <span className="md:hidden text-sm font-bold text-[var(--text-secondary)]">商品資料</span>
                                         </div>
-
-                                        {/* Mobile Save Default */}
-                                        {item.vendor && (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleSaveDefault(item)}
-                                                className="md:hidden text-[10px] px-2 py-1 rounded-md bg-slate-100 text-slate-500 border border-slate-200"
-                                            >
-                                                📌 設為預設
-                                            </button>
-                                        )}
                                     </div>
 
                                     {/* MOBILE VIEW (Horizontal Layout) */}
@@ -511,26 +504,7 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                             />
                                         </div>
 
-                                        {/* Mobile Payment Toggle */}
-                                        <div className="flex items-center gap-3">
-                                            <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">支付方式:</label>
-                                            <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 flex-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleItemChange(item.id, 'paymentMethod', 'CASH')}
-                                                    className={`flex-1 py-1 text-[10px] font-bold rounded-md transition-all ${item.paymentMethod === 'CASH' ? 'bg-emerald-500 text-white' : 'text-slate-400'}`}
-                                                >
-                                                    現金
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleItemChange(item.id, 'paymentMethod', 'CREDIT')}
-                                                    className={`flex-1 py-1 text-[10px] font-bold rounded-md transition-all ${item.paymentMethod === 'CREDIT' ? 'bg-purple-600 text-white' : 'text-slate-400'}`}
-                                                >
-                                                    賒帳
-                                                </button>
-                                            </div>
-                                        </div>
+
 
                                         {/* Expiry */}
                                         <div className="flex items-center gap-3">
@@ -583,8 +557,8 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                     {/* DESKTOP VIEW (Original Grid Layout) */}
                                     <div className="hidden md:grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
 
-                                        {/* Vendor (2 cols) */}
-                                        <div className="col-span-12 md:col-span-2">
+                                        {/* Vendor (3 cols) */}
+                                        <div className="col-span-12 md:col-span-3">
                                             <label className="text-[10px] font-bold text-[var(--text-secondary)] mb-1 uppercase">
                                                 廠商
                                             </label>
@@ -601,8 +575,8 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                             />
                                         </div>
 
-                                        {/* Product (2 cols) */}
-                                        <div className="col-span-12 md:col-span-2">
+                                        {/* Product (3 cols) */}
+                                        <div className="col-span-12 md:col-span-3">
                                             <label className="text-[10px] font-bold text-[var(--text-secondary)] mb-1 uppercase">
                                                 產品名稱
                                             </label>
@@ -693,39 +667,7 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                                             </div>
                                         </div>
 
-                                        {/* Payment (3 cols) */}
-                                        <div className="col-span-12 md:col-span-3">
-                                            <div className="flex items-center justify-between mb-1">
-                                                <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">
-                                                    支付方式
-                                                </label>
-                                                {item.vendor && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleSaveDefault(item)}
-                                                        className="text-[9px] text-emerald-600 hover:text-emerald-700 font-bold transition-colors flex items-center gap-0.5"
-                                                    >
-                                                        📌 設為預設
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <div className="flex bg-[var(--bg-primary)] p-0.5 rounded-lg border border-[var(--border-primary)] shadow-sm h-8">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleItemChange(item.id, 'paymentMethod', 'CASH')}
-                                                    className={`flex-1 py-0.5 text-[10px] font-bold rounded-md transition-all ${item.paymentMethod === 'CASH' ? 'bg-emerald-500 text-white' : 'text-[var(--text-tertiary)] hover:bg-slate-50'}`}
-                                                >
-                                                    現金
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleItemChange(item.id, 'paymentMethod', 'CREDIT')}
-                                                    className={`flex-1 py-0.5 text-[10px] font-bold rounded-md transition-all ${item.paymentMethod === 'CREDIT' ? 'bg-purple-600 text-white' : 'text-[var(--text-tertiary)] hover:bg-slate-50'}`}
-                                                >
-                                                    賒帳
-                                                </button>
-                                            </div>
-                                        </div>
+
 
                                         {/* Action (Delete) */}
                                         <div className="col-span-12 md:col-span-1 flex items-end justify-center">
@@ -908,6 +850,19 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                         </div>
                     </div>
                 </div>
+            )}
+            
+            {showConfigModal && (
+                <PurchaseConfigModal
+                    isOpen={showConfigModal}
+                    onClose={() => {
+                        setShowConfigModal(false);
+                        loadSuggestions();
+                    }}
+                    apiUrl={apiUrl}
+                    token={user.token}
+                    vendorProductMap={suggestions.vendorProductMap}
+                />
             )}
         </div>
     );

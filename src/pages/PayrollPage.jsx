@@ -443,7 +443,7 @@ export default function PayrollPage({ user, apiUrl }) {
 
                 {/* Info (Seniority etc) - Keep compact */}
                 <div className="flex flex-wrap justify-center gap-2 px-1 text-[10px]">
-                    <span className="bg-[var(--bg-secondary)] text-[var(--accent-blue)] px-2 py-0.5 rounded border border-[var(--border-primary)]">到職: {profileData.profile.joinedDate || '-'}</span>
+                    <span className="bg-[var(--bg-secondary)] text-[var(--accent-blue)] px-2 py-0.5 rounded border border-[var(--border-primary)]">到職: {profileData.joinedDateFormatted || profileData.profile.joinedDate || '-'}</span>
                     <span className="bg-[var(--bg-secondary)] text-indigo-500 px-2 py-0.5 rounded border border-[var(--border-primary)]">年資: {profileData.seniorityText}</span>
                 {data?.config?.empType !== 'PART_TIME' && (
                     <span className="bg-[var(--bg-secondary)] text-emerald-500 px-2 py-0.5 rounded border border-[var(--border-primary)]">剩餘特休: {(profileData.estimatedLeaveDays - (data?.totalSpecialLeaveUsed || 0))}天</span>
@@ -494,7 +494,7 @@ export default function PayrollPage({ user, apiUrl }) {
             {/* Desktop Info */}
             <div className="hidden md:flex flex-wrap gap-4 px-2">
                 <div className="flex items-center gap-2 bg-[var(--bg-secondary)] text-[var(--accent-blue)] px-3 py-1.5 rounded-full text-sm font-medium border border-[var(--border-primary)]">
-                    <Calendar size={14} /> 到職日: {profileData.profile.joinedDate || '未設定'}
+                    <Calendar size={14} /> 到職日: {profileData.joinedDateFormatted || profileData.profile.joinedDate || '未設定'}
                 </div>
                 <div className="flex items-center gap-2 bg-[var(--bg-secondary)] text-indigo-500 px-3 py-1.5 rounded-full text-sm font-medium border border-[var(--border-primary)]">
                     <User size={14} /> 年資: {profileData.seniorityText}

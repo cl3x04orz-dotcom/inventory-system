@@ -27,6 +27,7 @@ import LiffOrderPage from './pages/LiffOrderPage';
 import PendingOrdersPage from './pages/PendingOrdersPage';
 import ProductManagementPage from './pages/ProductManagementPage';
 import GroupBuySettingsPage from './pages/GroupBuySettingsPage';
+import MemberManagementPage from './pages/MemberManagementPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './contexts/ThemeContext';
 import ThemeToggle from './components/ThemeToggle';
@@ -438,6 +439,8 @@ function AppContent() {
                 return perms.includes('sales_pending') || user.role === 'BOSS';
             case 'groupBuySettings':
                 return perms.includes('sales_pending') || user.role === 'BOSS';
+            case 'memberManagement':
+                return perms.includes('sales_pending') || user.role === 'BOSS';
             case 'products':
                 return perms.includes('products') || user.role === 'BOSS';
             case 'sales':
@@ -630,6 +633,7 @@ function AppContent() {
                                             {checkPermission('pendingOrders') && <NavItem label="訂單審核" icon={ClipboardList} onClick={() => handlePageChange('pendingOrders')} active={page === 'pendingOrders'} />}
                                             {checkPermission('groupBuySettings') && <NavItem label="開團管理" icon={Link} onClick={() => handlePageChange('groupBuySettings')} active={page === 'groupBuySettings'} />}
                                             {checkPermission('products') && <NavItem label="商品屬性" icon={Edit2} onClick={() => handlePageChange('products')} active={page === 'products'} />}
+                                            {checkPermission('memberManagement') && <NavItem label="會員管理" icon={Wallet} onClick={() => handlePageChange('memberManagement')} active={page === 'memberManagement'} />}
                                         </MobileNavGroup>
                                     )}
                                     {(user.role === 'BOSS' || checkPermission('purchase') || checkPermission('purchaseHistory')) && (
@@ -710,11 +714,12 @@ function AppContent() {
                                      icon={Users}
                                      openDropdown={openDropdown}
                                      setOpenDropdown={setOpenDropdown}
-                                     active={['pendingOrders', 'groupBuySettings', 'products'].includes(page)}
+                                     active={['pendingOrders', 'groupBuySettings', 'products', 'memberManagement'].includes(page)}
                                  >
                                      {checkPermission('pendingOrders') && <NavItem label="訂單審核" icon={ClipboardList} onClick={() => handlePageChange('pendingOrders')} active={page === 'pendingOrders'} />}
                                      {checkPermission('groupBuySettings') && <NavItem label="開團管理" icon={Link} onClick={() => handlePageChange('groupBuySettings')} active={page === 'groupBuySettings'} />}
                                      {checkPermission('products') && <NavItem label="商品屬性" icon={Edit2} onClick={() => handlePageChange('products')} active={page === 'products'} />}
+                                     {checkPermission('memberManagement') && <NavItem label="會員管理" icon={Wallet} onClick={() => handlePageChange('memberManagement')} active={page === 'memberManagement'} />}
                                  </NavDropdown>
                             )}
                         </div>
@@ -861,7 +866,11 @@ function AppContent() {
 
                 {checkPermission(page) ? (
                     <>
-                        {page === 'sales' && <SalesPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'sales' && (
+                            <ErrorBoundary>
+                                <SalesPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />
+                            </ErrorBoundary>
+                        )}
                         {page === 'inventory' && <InventoryPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'purchase' && <PurchasePage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'report' && (
@@ -891,6 +900,7 @@ function AppContent() {
                         {page === 'pendingOrders' && <PendingOrdersPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'groupBuySettings' && <GroupBuySettingsPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'products' && <ProductManagementPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'memberManagement' && <MemberManagementPage user={user} apiUrl={GAS_API_URL} />}
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full text-slate-400">

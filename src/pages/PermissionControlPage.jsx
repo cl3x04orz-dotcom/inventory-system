@@ -117,8 +117,9 @@ export default function PermissionControlPage({ user, apiUrl }) {
         setLoading(true);
         try {
             const data = await callGAS(apiUrl, 'getUsers', {}, user.token);
-            if (Array.isArray(data)) {
-                const parsedData = data.map(u => {
+            const rawList = Array.isArray(data) ? data : (Array.isArray(data?.list) ? data.list : []);
+            if (rawList.length > 0 || data) {
+                const parsedData = rawList.map(u => {
                     let perms = u.permissions;
                     if (typeof perms === 'string') {
                         try {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   ShoppingCart,
   Plus,
@@ -19,6 +19,7 @@ import {
   History,
   RotateCcw,
   Home,
+  Wallet,
 } from "lucide-react";
 import { callGAS, memberApi } from "../utils/api";
 import logoImg from "../assets/logo.png";
@@ -56,6 +57,7 @@ const formatTaiwanPhone = (phone) => {
 
 // 全域鎖：防止 React 嚴格模式或重複 Render 觸發多次 LIFF 初始化與登入轉址
 let isLiffInitStarted = false;
+let isLiffInitialized = false;
 
 export default function LiffOrderPage({ user, apiUrl }) {
   // ── 鎖定 body / html 避免 iOS 橡皮筋 & 網址列跳動 ──────────────
@@ -98,12 +100,23 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [note, setNote] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("現金");
   const [transferLastFive, setTransferLastFive] = useState("");
+  const [useWallet, setUseWallet] = useState(false);
 
   // ── 送出 state ───────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderId, setOrderId] = useState("");
   const [orderTime, setOrderTime] = useState("");
   const [copied, setCopied] = useState(false);
+
+  const handleCopy = (text) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(err => {
+      console.error("Failed to copy:", err);
+    });
+  };
 
   // ── 大樓群組綁定與管理員 State ──────────────────────────────
   const [groupBindings, setGroupBindings] = useState({});
@@ -130,7 +143,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
     if (step === "success") return null;
     return (
       <div className="flex-shrink-0 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] flex justify-around items-center h-[60px] pb-safe z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
-        <button onClick={() => setStep("shop")} className={`flex flex-col items-center justify-center flex-1 h-full ${step === 'shop' ? 'text-blue-600 dark:text-blue-400' : 'text-[var(--text-tertiary)]'}`}>
+        <button onClick={() => setStep("shop")} className={`flex flex-col items-center justify-center flex-1 h-full ${step === 'shop' ? 'text-blue-600' : 'text-[var(--text-tertiary)]'}`}>
           <Home size={22} />
           <span className="text-[10px] mt-1 font-bold">首頁</span>
         </button>
@@ -139,8 +152,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 alert('購物車是空的');
                 return;
             }
-            setStep("form");
-        }} className={`flex flex-col items-center justify-center flex-1 h-full relative ${step === 'form' || step === 'confirm' ? 'text-blue-600 dark:text-blue-400' : 'text-[var(--text-tertiary)]'}`}>
+            handleProceedToForm();
+        }} className={`flex flex-col items-center justify-center flex-1 h-full relative ${step === 'form' || step === 'confirm' ? 'text-blue-600' : 'text-[var(--text-tertiary)]'}`}>
           <div className="relative">
             <ShoppingCart size={22} />
             {Object.keys(cart).length > 0 && (
@@ -160,11 +173,11 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 }).catch(err => setIsMemberLoading(false));
             }
             setStep("orders");
-        }} className={`flex flex-col items-center justify-center flex-1 h-full ${step === 'orders' ? 'text-blue-600 dark:text-blue-400' : 'text-[var(--text-tertiary)]'}`}>
+        }} className={`flex flex-col items-center justify-center flex-1 h-full ${step === 'orders' ? 'text-blue-600' : 'text-[var(--text-tertiary)]'}`}>
           <FileText size={22} />
           <span className="text-[10px] mt-1 font-bold">訂單</span>
         </button>
-        <button onClick={() => setStep("member")} className={`flex flex-col items-center justify-center flex-1 h-full ${step === 'member' ? 'text-blue-600 dark:text-blue-400' : 'text-[var(--text-tertiary)]'}`}>
+        <button onClick={() => setStep("member")} className={`flex flex-col items-center justify-center flex-1 h-full ${step === 'member' ? 'text-blue-600' : 'text-[var(--text-tertiary)]'}`}>
           <User size={22} />
           <span className="text-[10px] mt-1 font-bold">會員</span>
         </button>
@@ -178,19 +191,33 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [nextOpenTime, setNextOpenTime] = useState(null);
 
   // ── 載入商品與初始化資料（單次 API，後端已過濾） ─────────────────────────────────────────
-  const loadAllData = async () => {
+  const loadAllData = async (overrideBuilding = '') => {
     setLoading(true);
     try {
       const params = new URLSearchParams(window.location.search);
-      const cParam = params.get("c") || "";
-      const urlGrp = params.get("grp") || "";
+
+      // 解析 liff.state（LIFF 外部瀏覽器時，原始 query 藏在 liff.state 裡）
+      let liffStateParams = null;
+      const liffState = params.get('liff.state');
+      if (liffState) {
+        try {
+          const stateStr = liffState.startsWith('?') ? liffState.slice(1) : liffState;
+          liffStateParams = new URLSearchParams(stateStr);
+        } catch (e) {}
+      }
+      const getP = (key) => liffStateParams?.get(key) || params.get(key) || '';
+
+      const cParam = getP("c");
+      const urlGrp = getP("grp");
+      const buildingParam = (typeof overrideBuilding === 'string' ? overrideBuilding : '') || getP("building");
 
       const initData = await callGAS(
         apiUrl,
         "v2_getLiffInitData",
         {
           c: cParam,
-          grp: urlGrp
+          grp: urlGrp,
+          building: buildingParam
         },
         user?.token
       );
@@ -340,6 +367,17 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const gbStatus = getGroupBuyStatus();
 
   const initLiffAndFetchInfo = async () => {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const isInClient = window.liff && window.liff.isInClient();
+
+    if (isLocalhost && !isInClient) {
+      console.warn("[Localhost Test] Skip LIFF SDK initialization entirely to avoid URL redirects.");
+      setLineUserId("test-guest-id");
+      setCustomerName("本地測試訪客");
+      setCustomerPhone("0912345678");
+      return true;
+    }
+
     if (!window.liff) {
       console.warn("LINE LIFF SDK is not loaded.");
       return true; // Standalone browser test fallback
@@ -348,6 +386,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
       const params = new URLSearchParams(window.location.search);
       const liffId = import.meta.env.VITE_LIFF_ID || params.get("liffId") || "2010308873-ur2zL2cc";
       await window.liff.init({ liffId });
+      isLiffInitialized = true;
 
       // ★ 關鍵：在 login redirect 之前先抓 context，存入 sessionStorage
       // 因為 login redirect 後會跳到外部瀏覽器，getContext() 就失效了
@@ -480,8 +519,27 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
       // 先解析 URL 參數，讓 loadAllData 能帶正確的 building/grp
       const params = new URLSearchParams(window.location.search);
-      const buildingParam = params.get("building") || "";
-      const urlGrp = params.get("grp") || "";
+
+      // ★ LIFF 特殊行為：在外部瀏覽器開啟時，原始 query 會被放進 liff.state
+      // 例如：?page=liffOrder&liff.state=?building=清景麟
+      // 需要先解析 liff.state，再 fallback 到頂層 params
+      let liffStateParams = null;
+      const liffState = params.get('liff.state');
+      if (liffState) {
+        try {
+          // liff.state 值可能是 ?building=xxx 或 building=xxx
+          const stateStr = liffState.startsWith('?') ? liffState.slice(1) : liffState;
+          liffStateParams = new URLSearchParams(stateStr);
+        } catch (e) {
+          console.warn('Failed to parse liff.state:', e);
+        }
+      }
+
+      const getParam = (key) =>
+        (liffStateParams?.get(key)) || params.get(key) || '';
+
+      const buildingParam = getParam("building");
+      const urlGrp = getParam("grp");
       if (buildingParam) {
         setUrlBuilding(buildingParam);
         setSelectedBuilding(buildingParam);
@@ -503,7 +561,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
           console.error("LIFF init error in background:", err);
         });
 
-      const p2 = loadAllData()
+      const p2 = loadAllData(buildingParam)
         .catch((err) => {
           loadError = err;
         });
@@ -818,6 +876,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
           qty,
           remark,
           subtotal,
+          imageUrl: p?.imageUrl ?? "",
         };
       }),
     [cart, products, flavorSelections],
@@ -853,7 +912,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
         setCustomerName(saved.name);
       } else {
         // 如果沒有儲存的名字，嘗試抓取 LINE 暱稱作為預填
-        if (window.liff && window.liff.isLoggedIn()) {
+        if (isLiffInitialized && window.liff && window.liff.isLoggedIn()) {
           try {
             const profile = await window.liff.getProfile();
             if (profile.displayName) setCustomerName(profile.displayName);
@@ -928,7 +987,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
         }
       }
     } catch (_) { }
-    setStep("form");
+    setStep("confirm");
   };
 
   // ── 送出訂單 ─────────────────────────────────────────────────
@@ -949,16 +1008,18 @@ export default function LiffOrderPage({ user, apiUrl }) {
       );
 
       let lineDisplayName = "";
-      let lineUserId = "";
-      if (window.liff && window.liff.isLoggedIn()) {
+      let finalLineUserId = lineUserId || "";
+      if (isLiffInitialized && window.liff && window.liff.isLoggedIn()) {
         try {
           const profile = await window.liff.getProfile();
           lineDisplayName = profile.displayName || "";
-          lineUserId = profile.userId || "";
+          finalLineUserId = profile.userId || "";
         } catch (e) {
           console.warn("Failed to get LIFF profile for submitting order:", e);
         }
       }
+
+      const maxDeduction = Math.min(memberProfile?.WalletBalance || 0, cartTotal);
 
       const res = await callGAS(
         apiUrl,
@@ -974,7 +1035,9 @@ export default function LiffOrderPage({ user, apiUrl }) {
           paymentMethod,
           transferLastFive,
           lineDisplayName,
-          lineUserId,
+          lineUserId: finalLineUserId,
+          useWalletDeduction: useWallet,
+          walletDeductionAmount: maxDeduction,
           items: cartItems.map((i) => ({
             productId: i.id,
             productName: i.name,
@@ -988,9 +1051,16 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
       if (res?.error) throw new Error(res.error);
 
+      if (useWallet && memberProfile) {
+        setMemberProfile(prev => prev ? {
+          ...prev,
+          WalletBalance: Math.max(0, Number(prev.WalletBalance) - maxDeduction)
+        } : null);
+      }
+
       setOrderId(res.orderId || "");
       setOrderTime(new Date().toLocaleString("zh-TW", { hour12: false }));
-      setSuccessOrderTotal(cartTotal);
+      setSuccessOrderTotal(useWallet ? Math.max(0, cartTotal - maxDeduction) : cartTotal);
 
       // 判斷是否為大樓群組客，以及是否為白天時段 (08:00 - 22:00)
       const isGroupCustomer = (!!urlBuilding && urlBuilding !== "一般散客") || (!!sourceGroup && sourceGroup !== "一般散客" && groupBindings[sourceGroup] && groupBindings[sourceGroup] !== "一般散客");
@@ -1020,7 +1090,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
       }
 
       // LINE 喊單發送 (僅限群組客且在白天)
-      if (shouldSendLiffMsg && window.liff && window.liff.isInClient()) {
+      if (shouldSendLiffMsg && isLiffInitialized && window.liff && window.liff.isInClient()) {
         try {
           const itemsText = cartItems
             .map(
@@ -1099,7 +1169,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
           {/* 夜間靜音提示 */}
           {isNightOrder && (
-            <div className="bg-slate-50 dark:bg-slate-900/15 border border-slate-200 dark:border-slate-700/30 rounded-xl p-4 text-sm text-slate-800 dark:text-slate-300">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-800">
               <p className="font-bold mb-1">貼心提示</p>
               <p>訂單已成功送出！因夜深了，系統將不打擾群組鄰居，明早會為您排單出貨。</p>
             </div>
@@ -1107,14 +1177,14 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
           {/* 付款說明 */}
           {paymentMethod === "現金" && (
-            <div className="bg-amber-50 dark:bg-amber-900/15 border border-amber-200 dark:border-amber-700/30 rounded-xl p-4 text-sm text-amber-800 dark:text-amber-300">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
               <p className="font-bold mb-1">現金注意事項</p>
               <p>採現金支付，請自備零錢，現場不找零。</p>
             </div>
           )}
           {paymentMethod === "轉帳" && (
-            <div className="bg-blue-50 dark:bg-blue-900/15 border border-blue-200 dark:border-blue-700/30 rounded-xl p-4 space-y-3">
-              <p className="font-bold text-sm text-blue-800 dark:text-blue-300">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+              <p className="font-bold text-sm text-blue-800">
                 請轉帳至以下帳戶
               </p>
               <div className="space-y-1.5 text-sm">
@@ -1130,7 +1200,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     </span>
                     <button
                       onClick={() => handleCopy(BANK_INFO.account)}
-                      className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-lg font-semibold"
+                      className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-lg font-semibold"
                     >
                       {copied ? "已複製！" : "複製"}
                     </button>
@@ -1221,13 +1291,13 @@ export default function LiffOrderPage({ user, apiUrl }) {
           style={{ touchAction: "none" }}
         >
           <button
-            onClick={() => setStep("form")}
+            onClick={() => setStep("shop")}
             className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           >
             <ChevronLeft size={20} />
           </button>
           <h2 className="text-lg font-bold text-[var(--text-primary)]">
-            確認訂單明細
+            確認購物清單
           </h2>
         </div>
 
@@ -1240,24 +1310,42 @@ export default function LiffOrderPage({ user, apiUrl }) {
             {cartItems.map((item) => (
               <div
                 key={item.id}
-                className="flex justify-between items-center px-4 py-2.5 border-b border-[var(--border-primary)] last:border-0 text-sm"
+                className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border-primary)] last:border-0 text-sm"
               >
-                <div>
-                  <span className="font-semibold text-[var(--text-primary)]">
-                    {item.name}
-                  </span>
-                  <span className="text-[var(--text-secondary)] ml-2">
-                    × {item.qty}
-                  </span>
+                {/* 圖片展示 */}
+                <div className="w-12 h-12 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-primary)] overflow-hidden shrink-0 flex items-center justify-center">
+                  {item.imageUrl ? (
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Package size={20} className="text-[var(--text-tertiary)]" />
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start">
+                    <span className="font-semibold text-[var(--text-primary)] truncate">
+                      {item.name}
+                    </span>
+                    <span className="font-mono font-bold text-[var(--text-primary)] ml-2 shrink-0">
+                      ${item.subtotal}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center mt-1 text-xs text-[var(--text-secondary)]">
+                    <span>單價 ${item.price}</span>
+                    <span className="font-bold bg-[var(--bg-tertiary)] px-2 py-0.5 rounded border border-[var(--border-primary)]">
+                      × {item.qty}
+                    </span>
+                  </div>
                   {item.remark && (
-                    <div className="text-xs text-blue-600 dark:text-blue-400 font-medium mt-0.5">
+                    <div className="text-xs text-blue-600 font-medium mt-1">
                       {item.remark}
                     </div>
                   )}
                 </div>
-                <span className="font-mono font-bold text-[var(--text-primary)]">
-                  ${item.subtotal}
-                </span>
               </div>
             ))}
             <div className="flex justify-between items-center px-4 py-3 bg-[var(--bg-tertiary)]">
@@ -1268,84 +1356,6 @@ export default function LiffOrderPage({ user, apiUrl }) {
             </div>
           </div>
 
-          {/* 收件資訊 */}
-          <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-[var(--border-primary)] text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
-              收件資訊
-            </div>
-            {[
-              { label: "收件人", value: customerName },
-              { label: "電話", value: customerPhone },
-            ].map(({ label, value }) => (
-              <div
-                key={label}
-                className="flex gap-3 px-4 py-2.5 border-b border-[var(--border-primary)] last:border-0 text-sm"
-              >
-                <span className="text-[var(--text-secondary)] w-14 shrink-0">
-                  {label}
-                </span>
-                <span className="text-[var(--text-primary)] font-medium">
-                  {value}
-                </span>
-              </div>
-            ))}
-
-            {/* 地址欄位獨立渲染，支援一般用戶的換行顯示與過濾大樓字眼 */}
-            <div className="flex gap-3 px-4 py-2.5 border-b border-[var(--border-primary)] text-sm">
-              <span className="text-[var(--text-secondary)] w-14 shrink-0">地址</span>
-              <span className="text-[var(--text-primary)] font-medium flex flex-col">
-                {isGeneralUser ? (
-                  <>
-                    <span>{detailAddress.trim() || "（未填）"}</span>
-                    {companyName.trim() && (
-                      <span className="text-xs text-[var(--text-secondary)] font-normal mt-0.5">
-                        {companyName.trim()}
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <span>{getFullAddress() || "（未填）"}</span>
-                )}
-              </span>
-            </div>
-
-            <div className="flex gap-3 px-4 py-2.5 text-sm">
-              <span className="text-[var(--text-secondary)] w-14 shrink-0">備註</span>
-              <span className="text-[var(--text-primary)] font-medium">
-                {note || "（無）"}
-              </span>
-            </div>
-          </div>
-
-          {/* 付款方式 */}
-          <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-[var(--border-primary)] text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
-              付款方式
-            </div>
-            <div className="px-4 py-3 space-y-1 text-sm">
-              <div className="font-semibold text-[var(--text-primary)]">
-                {paymentMethod}
-              </div>
-              {paymentMethod === "轉帳" && transferLastFive && (
-                <div className="text-[var(--text-secondary)]">
-                  帳戶後 5 碼：
-                  <span className="font-mono font-bold text-[var(--text-primary)]">
-                    {transferLastFive}
-                  </span>
-                </div>
-              )}
-              {paymentMethod === "現金" && (
-                <div className="text-xs text-amber-600">
-                  請自備零錢，現場不找零
-                </div>
-              )}
-              {paymentMethod === "LINE Pay" && (
-                <div className="text-xs text-emerald-600 font-medium">
-                  ※ 送出訂單後，請於下一頁點擊按鈕進行個人轉帳付款。
-                </div>
-              )}
-            </div>
-          </div>
         </div>
 
         <div 
@@ -1353,24 +1363,16 @@ export default function LiffOrderPage({ user, apiUrl }) {
           style={{ touchAction: "none" }}
         >
           <button
-            onClick={() => setStep("form")}
+            onClick={() => setStep("shop")}
             className="btn-secondary py-3 rounded-xl font-bold"
-            disabled={isSubmitting}
           >
-            回去修改
+            返回修改商品
           </button>
           <button
-            onClick={handleSubmitOrder}
+            onClick={() => setStep("form")}
             className="btn-primary py-3 rounded-xl font-bold flex items-center justify-center gap-1 shadow-md shadow-blue-500/20"
-            disabled={isSubmitting}
           >
-            {isSubmitting ? (
-              <>
-                <RefreshCw className="animate-spin" size={16} /> 送出中...
-              </>
-            ) : (
-              "確定送出"
-            )}
+            前往填寫資料 <ArrowRight size={16} />
           </button>
         </div>
       </div>
@@ -1387,6 +1389,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
     const safeOther = String(otherBuildingText || "");
     const safeTransfer = String(transferLastFive || "");
 
+    // 奶包金抵扣計算
+    const hasWallet = memberProfile?.WalletBalance > 0;
+    const maxDeduction = hasWallet ? Math.min(Number(memberProfile.WalletBalance), cartTotal) : 0;
+    const payAmount = useWallet ? Math.max(0, cartTotal - maxDeduction) : cartTotal;
+    const isFullyCovered = useWallet && payAmount === 0;
+
     const isPhoneValid = /^09\d{8}$/.test(safePhone.trim());
     const isBuildingValid =
       selectedBuilding &&
@@ -1396,25 +1404,33 @@ export default function LiffOrderPage({ user, apiUrl }) {
       isPhoneValid &&
       isBuildingValid &&
       safeAddress.trim() &&
-      (paymentMethod !== "轉帳" || safeTransfer.trim().length === 5);
+      (isFullyCovered || paymentMethod !== "轉帳" || safeTransfer.trim().length === 5);
 
-    const paymentOptions = [
-      {
-        value: "現金",
-        Icon: Banknote,
-        label: "現金",
-      },
-      {
-        value: "轉帳",
-        Icon: CreditCard,
-        label: "銀行轉帳",
-      },
-      {
-        value: "LINE Pay",
-        Icon: Smartphone,
-        label: "LINE Pay",
-      },
-    ];
+    const paymentOptions = isFullyCovered
+      ? [
+          {
+            value: "奶包金扣抵",
+            Icon: Wallet,
+            label: "奶包金全額扣抵",
+          }
+        ]
+      : [
+          {
+            value: "現金",
+            Icon: Banknote,
+            label: "現金",
+          },
+          {
+            value: "轉帳",
+            Icon: CreditCard,
+            label: "銀行轉帳",
+          },
+          {
+            value: "LINE Pay",
+            Icon: Smartphone,
+            label: "LINE Pay",
+          },
+        ];
 
     return (
       <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
@@ -1424,7 +1440,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
           style={{ touchAction: "none" }}
         >
           <button
-            onClick={() => setStep("shop")}
+            onClick={() => setStep("confirm")}
             className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           >
             <ChevronLeft size={20} />
@@ -1564,6 +1580,58 @@ export default function LiffOrderPage({ user, apiUrl }) {
             </div>
           </div>
 
+          {/* 奶包金抵扣小卡 */}
+          {hasWallet && (
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 space-y-3 shadow-sm">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                    <Wallet size={16} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-amber-800 flex items-center gap-1.5">
+                      錢包折抵 
+                      <span className="text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded-full">
+                        餘額 ${Number(memberProfile.WalletBalance)}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-amber-700/70">
+                      本筆消費最多可折抵 ${maxDeduction} 元
+                    </p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useWallet}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUseWallet(checked);
+                      if (checked && cartTotal - maxDeduction === 0) {
+                        setPaymentMethod("奶包金扣抵");
+                      } else if (paymentMethod === "奶包金扣抵") {
+                        setPaymentMethod("現金");
+                      }
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                </label>
+              </div>
+
+              {useWallet && (
+                <div className="border-t border-amber-200/50 pt-2.5 grid grid-cols-2 gap-y-1 text-xs">
+                  <div className="text-amber-700">商品總計：</div>
+                  <div className="text-right font-mono font-bold text-slate-700">${cartTotal}</div>
+                  <div className="text-amber-700">奶包金折抵：</div>
+                  <div className="text-right font-mono font-bold text-red-600">-${maxDeduction}</div>
+                  <div className="text-amber-800 font-bold border-t border-dashed border-amber-200/60 pt-1.5">賸餘應付：</div>
+                  <div className="text-right font-mono font-black text-blue-600 text-sm border-t border-dashed border-amber-200/60 pt-1.5">${payAmount}</div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* 付款方式 */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
@@ -1576,7 +1644,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                   <div
                     key={value}
                     className={`flex flex-col rounded-xl border transition-all overflow-hidden ${active
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/15"
+                        ? "border-blue-500 bg-blue-50"
                         : "border-[var(--border-primary)] bg-[var(--bg-secondary)] hover:border-blue-300"
                       }`}
                   >
@@ -1610,21 +1678,21 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
                     {/* 抽屜伸縮內容 */}
                     {active && (
-                      <div className="px-4 pb-3.5 border-t border-blue-100 dark:border-blue-900/30 pt-3 bg-white/40 dark:bg-black/10">
+                      <div className="px-4 pb-3.5 border-t border-blue-100 pt-3 bg-white/40">
                         {value === "現金" && (
-                          <div className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+                          <div className="text-xs text-amber-700 font-medium">
                             ※ 採現金支付，請自備零錢，現場不找零。
                           </div>
                         )}
                         {value === "轉帳" && (
                           <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-blue-800 dark:text-blue-300">
+                            <label className="text-xs font-bold text-blue-800">
                               您的帳戶後 5 碼 <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="tel"
                               maxLength={5}
-                              className="input-field w-full p-3 rounded-xl border border-blue-300 dark:border-blue-600 bg-white dark:bg-blue-900/20 text-center font-mono tracking-[0.5em] text-lg focus:bg-white focus:outline-none"
+                              className="input-field w-full p-3 rounded-xl border border-blue-300 bg-white text-center font-mono tracking-[0.5em] text-lg focus:bg-white focus:outline-none"
                               placeholder="_ _ _ _ _"
                               value={transferLastFive}
                               onChange={(e) =>
@@ -1636,7 +1704,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                           </div>
                         )}
                         {value === "LINE Pay" && (
-                          <div className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">
+                          <div className="text-xs text-emerald-700 font-medium">
                             ※ 送出訂單後，下一頁將引導您手動點擊進行付款。
                           </div>
                         )}
@@ -1656,17 +1724,26 @@ export default function LiffOrderPage({ user, apiUrl }) {
         >
           <button
             onClick={() => {
-              if (canProceed) {
+              if (canProceed && !isSubmitting) {
                 syncMemberToCloud();
-                setStep("confirm");
+                handleSubmitOrder();
               }
             }}
-            className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${canProceed
+            disabled={!canProceed || isSubmitting}
+            className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${canProceed && !isSubmitting
                 ? "btn-primary shadow-md shadow-blue-500/20"
                 : "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed"
               }`}
           >
-            下一步：確認訂單明細 <ArrowRight size={16} />
+            {isSubmitting ? (
+              <>
+                <RefreshCw className="animate-spin" size={16} /> 送出中...
+              </>
+            ) : (
+              <>
+                確認送出訂單 <CheckCircle size={16} />
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -1704,24 +1781,24 @@ export default function LiffOrderPage({ user, apiUrl }) {
             </div>
 
             {/* 配送日小卡 */}
-            <div className="mt-1 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30 rounded-xl p-4 flex justify-between items-center">
+            <div className="mt-1 bg-blue-50/80 border border-blue-200 rounded-xl p-4 flex justify-between items-center shadow-sm">
               <div>
-                <div className="text-xs text-blue-600 dark:text-blue-400 font-bold mb-1">今天配送日</div>
-                <div className="text-lg font-bold text-[var(--text-primary)]">6/28</div>
-                <div className="text-xs text-[var(--text-secondary)]">下午15:00~17:00</div>
+                <div className="text-xs text-blue-700 font-bold mb-1">今天配送日</div>
+                <div className="text-lg font-black text-blue-900">6/28</div>
+                <div className="text-xs text-blue-800/80">下午15:00~17:00</div>
               </div>
-              <Package size={32} className="text-blue-200 dark:text-blue-800" />
+              <Package size={32} className="text-blue-500/80" />
             </div>
 
             {/* 奶包金 & 會員卡 */}
             <div className="flex gap-3 mt-1">
-              <div className="flex-1 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-100 dark:border-amber-800/30 rounded-xl p-4">
-                <div className="text-xs text-amber-700 dark:text-amber-500 font-bold flex items-center gap-1 mb-1"><Banknote size={14}/> 奶包金餘額</div>
-                <div className="text-2xl font-black text-amber-600 dark:text-amber-400">${memberProfile?.WalletBalance || 0}</div>
+              <div className="flex-1 bg-amber-50/80 border border-amber-200 rounded-xl p-4 shadow-sm">
+                <div className="text-xs text-amber-800 font-bold flex items-center gap-1 mb-1"><Banknote size={14}/> 奶包金餘額</div>
+                <div className="text-2xl font-black text-amber-700 font-mono">${memberProfile?.WalletBalance || 0}</div>
               </div>
-              <div className="flex-1 bg-gradient-to-br from-gray-50 to-slate-50 dark:from-gray-800 dark:to-slate-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col justify-between">
-                <div className="text-xs text-gray-500 dark:text-gray-400 font-bold flex items-center gap-1"><CheckCircle size={14}/> 會員等級</div>
-                <div className="text-base font-bold text-[var(--text-primary)] mt-1">{
+              <div className="flex-1 bg-slate-50/80 border border-slate-200 rounded-xl p-4 flex flex-col justify-between shadow-sm">
+                <div className="text-xs text-slate-700 font-bold flex items-center gap-1"><CheckCircle size={14}/> 會員等級</div>
+                <div className="text-base font-black text-slate-800 mt-1">{
                   !memberProfile?.MemberLevel || memberProfile.MemberLevel.trim().toUpperCase() === 'GENERAL' ? '一般會員' : 
                   memberProfile.MemberLevel.trim().toUpperCase() === 'VIP' ? 'VIP 會員' : 
                   memberProfile.MemberLevel.trim().toUpperCase() === 'VVIP' ? 'VVIP 會員' : 
@@ -1732,8 +1809,17 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
             {/* 快捷操作按鈕 */}
             <div className="flex gap-3 mt-1">
-              <button onClick={() => setStep("shop")} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
-                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400"><RotateCcw size={20}/></div>
+              <button onClick={() => {
+                  if (lineUserId) {
+                      setIsMemberLoading(true);
+                      memberApi.getOrders(apiUrl, { userId: lineUserId }).then(res => {
+                          if (res && res.success) setOrders(res.orders || []);
+                          setIsMemberLoading(false);
+                      }).catch(err => setIsMemberLoading(false));
+                  }
+                  setStep("orders");
+                }} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center"><RotateCcw size={20}/></div>
                 <span className="text-xs font-bold text-[var(--text-primary)]">再訂一次</span>
               </button>
               <button onClick={() => {
@@ -1746,12 +1832,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
                   }
                   setStep("orders");
                 }} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
-                <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400"><History size={20}/></div>
+                <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center"><History size={20}/></div>
                 <span className="text-xs font-bold text-[var(--text-primary)]">查看訂單</span>
               </button>
               <button className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-tr from-transparent to-rose-500/10 pointer-events-none"></div>
-                <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-900/50 flex items-center justify-center text-rose-600 dark:text-rose-400"><Package size={20}/></div>
+                <div className="w-10 h-10 rounded-full bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center"><Package size={20}/></div>
                 <span className="text-xs font-bold text-[var(--text-primary)]">最新優惠</span>
               </button>
             </div>
@@ -1817,7 +1903,51 @@ export default function LiffOrderPage({ user, apiUrl }) {
                         try {
                           const res = await memberApi.reorder(apiUrl, { orderId: o.OrderId });
                           if (res && res.success) {
-                            setCart(res.cart || {});
+                            const newCart = {};
+                            const newFlavorSelections = {};
+                            
+                            // 雙重保險：優先使用 res.items 重組購物車與口味選擇，防止後端 cart 缺漏或大小寫對不上
+                            if (Array.isArray(res.items) && res.items.length > 0) {
+                              res.items.forEach(item => {
+                                const pid = item.ProductId || item.productId;
+                                if (!pid) return;
+                                
+                                const qty = Number(item.Qty || item.qty || 1);
+                                newCart[pid] = (newCart[pid] || 0) + qty;
+                                
+                                // 解析 Remark 內的口味備註，例如 "【口味備註：原味x2, 巧克力x1】"
+                                const remarkStr = item.Remark || item.remark || '';
+                                if (remarkStr) {
+                                  const cleanRemark = remarkStr.replace(/【口味備註：(.*?)】/, '$1');
+                                  const parts = cleanRemark.split(/[,，\s+]/);
+                                  const flavorMap = {};
+                                  
+                                  parts.forEach(part => {
+                                    // 匹配 "規格x數量" (如 "原味x2", "(巧克力)x1")
+                                    const match = part.trim().match(/^\(?([^\s*x:：)]+)\)?\s*[*xX:：]\s*(\d+)$/);
+                                    if (match) {
+                                      const flavor = match[1];
+                                      const fQty = Number(match[2]);
+                                      if (flavor && fQty > 0) {
+                                        flavorMap[flavor] = (flavorMap[flavor] || 0) + fQty;
+                                      }
+                                    }
+                                  });
+                                  
+                                  if (Object.keys(flavorMap).length > 0) {
+                                    newFlavorSelections[pid] = {
+                                      ...(newFlavorSelections[pid] || {}),
+                                      ...flavorMap
+                                    };
+                                  }
+                                }
+                              });
+                            }
+                            
+                            const finalCart = Object.keys(newCart).length > 0 ? newCart : (res.cart || {});
+                            setCart(finalCart);
+                            setFlavorSelections(newFlavorSelections);
+
                             if (res.delivery) {
                               setSelectedBuilding(res.delivery.community || "");
                               setDetailAddress(res.delivery.floorRoom || "");
@@ -1879,23 +2009,23 @@ export default function LiffOrderPage({ user, apiUrl }) {
             </div>
 
             {/* 配送日小卡 */}
-            <div className="mt-1 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30 rounded-xl p-4 flex justify-between items-center">
+            <div className="mt-1 bg-blue-50 border border-blue-100 rounded-xl p-4 flex justify-between items-center">
               <div>
-                <div className="text-xs text-blue-600 dark:text-blue-400 font-bold mb-1">今天配送日</div>
+                <div className="text-xs text-blue-600 font-bold mb-1">今天配送日</div>
                 <div className="text-lg font-bold text-[var(--text-primary)]">6/28</div>
                 <div className="text-xs text-[var(--text-secondary)]">下午15:00~17:00</div>
               </div>
-              <Package size={32} className="text-blue-200 dark:text-blue-800" />
+              <Package size={32} className="text-blue-200" />
             </div>
 
             {/* 奶包金 & 會員卡 */}
             <div className="flex gap-3 mt-1">
-              <div className="flex-1 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-100 dark:border-amber-800/30 rounded-xl p-4">
-                <div className="text-xs text-amber-700 dark:text-amber-500 font-bold flex items-center gap-1 mb-1"><Banknote size={14}/> 奶包金餘額</div>
-                <div className="text-2xl font-black text-amber-600 dark:text-amber-400">${memberProfile?.WalletBalance || 0}</div>
+              <div className="flex-1 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 rounded-xl p-4">
+                <div className="text-xs text-amber-700 font-bold flex items-center gap-1 mb-1"><Banknote size={14}/> 奶包金餘額</div>
+                <div className="text-2xl font-black text-amber-600">${memberProfile?.WalletBalance || 0}</div>
               </div>
-              <div className="flex-1 bg-gradient-to-br from-gray-50 to-slate-50 dark:from-gray-800 dark:to-slate-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col justify-between">
-                <div className="text-xs text-gray-500 dark:text-gray-400 font-bold flex items-center gap-1"><CheckCircle size={14}/> 會員等級</div>
+              <div className="flex-1 bg-gradient-to-br from-gray-50 to-slate-50 border border-gray-200 rounded-xl p-4 flex flex-col justify-between">
+                <div className="text-xs text-gray-500 font-bold flex items-center gap-1"><CheckCircle size={14}/> 會員等級</div>
                 <div className="text-base font-bold text-[var(--text-primary)] mt-1">{
                   !memberProfile?.MemberLevel || memberProfile.MemberLevel.trim().toUpperCase() === 'GENERAL' ? '一般會員' : 
                   memberProfile.MemberLevel.trim().toUpperCase() === 'VIP' ? 'VIP 會員' : 
@@ -1908,16 +2038,16 @@ export default function LiffOrderPage({ user, apiUrl }) {
             {/* 快捷操作按鈕 */}
             <div className="flex gap-3 mt-1">
               <button onClick={() => setStep("shop")} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
-                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400"><RotateCcw size={20}/></div>
+                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600"><RotateCcw size={20}/></div>
                 <span className="text-xs font-bold text-[var(--text-primary)]">再訂一次</span>
               </button>
               <button onClick={() => setStep("orders")} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
-                <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400"><History size={20}/></div>
+                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600"><History size={20}/></div>
                 <span className="text-xs font-bold text-[var(--text-primary)]">查看訂單</span>
               </button>
               <button className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-tr from-transparent to-rose-500/10 pointer-events-none"></div>
-                <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-900/50 flex items-center justify-center text-rose-600 dark:text-rose-400"><Package size={20}/></div>
+                <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-600"><Package size={20}/></div>
                 <span className="text-xs font-bold text-[var(--text-primary)]">最新優惠</span>
               </button>
             </div>
@@ -1941,14 +2071,14 @@ export default function LiffOrderPage({ user, apiUrl }) {
           <div className="flex-1 flex justify-start items-center gap-3">
             <MilkZeroWasteLogo />
             {sourceGroup && (
-              <span className="text-xs bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 font-bold px-2 py-0.5 rounded-lg border border-blue-100 dark:border-blue-900/30">
+              <span className="text-xs bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-lg border border-blue-100">
                 {groupBindings[sourceGroup] || sourceGroup}
               </span>
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
-              onClick={loadAllData}
+              onClick={() => loadAllData()}
               className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             >
               <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
@@ -2038,7 +2168,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                       return (
                         <div
                           key={product.id}
-                          className={`flex bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden shadow-[0_3px_10px_rgba(0,0,0,0.04)] dark:shadow-[0_3px_10px_rgba(0,0,0,0.2)] transition-all duration-150 ${animatingProductId === product.id ? "scale-95" : "scale-100"}`}
+                          className={`flex bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden shadow-[0_3px_10px_rgba(0,0,0,0.04)],0,0,0.2)] transition-all duration-150 ${animatingProductId === product.id ? "scale-95" : "scale-100"}`}
                         >
                           <div
                             className="w-[100px] flex-shrink-0 bg-[var(--bg-tertiary)]"
@@ -2078,7 +2208,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                                 {product.name}
                               </h3>
                               {product.expiryDate && (
-                                <span className="inline-block text-[10px] text-orange-600 bg-orange-50 dark:bg-orange-950/10 px-1.5 py-0.5 rounded mt-1">
+                                <span className="inline-block text-[10px] text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded mt-1">
                                   有效: {product.expiryDate}
                                 </span>
                               )}
@@ -2139,7 +2269,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                               </div>
                               {qty > 0 && product.has_flavor_attributes && (
                                 <div
-                                  className="text-[10px] text-blue-600 dark:text-blue-400 font-medium mt-1.5 select-none cursor-pointer"
+                                  className="text-[10px] text-blue-600 font-medium mt-1.5 select-none cursor-pointer"
                                   onClick={() =>
                                     handleProductAction(product, true)
                                   }
@@ -2169,7 +2299,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
               style={{ touchAction: "none" }}
             >
               <div className="flex items-center gap-3">
-                <div className="relative bg-blue-100 dark:bg-blue-900/30 text-blue-600 p-2.5 rounded-full">
+                <div className="relative bg-blue-100 text-blue-600 p-2.5 rounded-full">
                   <ShoppingCart size={20} />
                   <span className="absolute -top-1 -right-1.5 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold border-2 border-white">
                     {totalQty}
@@ -2179,7 +2309,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                   <div className="text-[10px] text-[var(--text-secondary)] font-semibold">
                     已選 {totalQty} 件
                   </div>
-                  <div className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono">
+                  <div className="text-2xl font-black text-blue-600 font-mono">
                     ${cartTotal}
                   </div>
                 </div>

@@ -1,0 +1,381 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  userId       String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String
+  role         String   @default("EMPLOYEE")
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now())
+  permissions  Json     @default("[]")
+}
+
+model Product {
+  productId             String        @id
+  productName           String
+  category              String?
+  defaultPrice          Decimal       @default(0)
+  reserve               Decimal       @default(0)
+  safetyStock           Int           @default(0)
+  sortWeight            Int           @default(0)
+  isActive              Boolean       @default(true)
+  imageUrl              String?
+  expiryDate            String?
+  hasFlavorAttributes   Boolean       @default(false)
+  flavorChoices         Json          @default("[]")
+  singlePrice           Decimal       @default(0)
+  hasVolumePricing      Boolean       @default(false)
+  volumePricingSettings Json?
+  packSize              Int           @default(1)
+  dispatchSteps         Json          @default("[]") // e.g. [28, 42, 70]
+  roundThreshold        Int           @default(99)
+  autoSuppress          Boolean       @default(false)
+  maxSuggestion         Int           @default(0)
+  inventories           Inventory[]
+  salesDetails          SalesDetail[]
+}
+
+model Customer {
+  customerName String  @id
+  isAiEnabled  Boolean @default(true)
+  schedule     Json    @default("[]")
+  category     String  @default("市場")
+}
+
+model Inventory {
+  batchId     String    @id @default(uuid())
+  productId   String
+  quantity    Int
+  expiryDate  DateTime?
+  entryDate   DateTime  @default(now())
+  type        String
+  cost        Decimal   @default(0)
+  productName String?
+  product     Product   @relation(fields: [productId], references: [productId])
+}
+
+model Purchase {
+  purchaseId    String    @id
+  date          DateTime
+  vendor        String?
+  productId     String
+  quantity      Int
+  unitPrice     Decimal
+  expiryDate    DateTime?
+  buyer         String?
+  paymentMethod String?
+  status        String    @default("ORDERED")
+  operator      String
+  productName   String?
+
+  @@index([date])
+}
+
+model Sales {
+  saleId        String        @id
+  date          DateTime
+  salesRep      String
+  totalCash     Decimal       @default(0)
+  reserve       Decimal       @default(0)
+  finalTotal    Decimal       @default(0)
+  customer      String?
+  operator      String
+  paymentMethod String?
+  status        String        @default("COMPLETED")
+  workHours     Decimal       @default(0)
+  paymentDate   DateTime?
+  actualPaymentMethod String?
+  details       SalesDetail[]
+
+  @@index([date])
+}
+
+model SalesDetail {
+  id        String  @id @default(uuid())
+  saleId    String
+  productId String
+  picked    Int     @default(0)
+  original  Int     @default(0)
+  returnQty Int     @default(0)
+  sold      Int     @default(0)
+  unitPrice Decimal
+  subtotal  Decimal
+  product   Product @relation(fields: [productId], references: [productId])
+  sale      Sales   @relation(fields: [saleId], references: [saleId], onDelete: Cascade)
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+model Expenditure {
+  saleId             String    @id
+  stall              Decimal   @default(0)
+  cleaning           Decimal   @default(0)
+  electricity        Decimal   @default(0)
+  gas                Decimal   @default(0)
+  parking            Decimal   @default(0)
+  goods              Decimal   @default(0)
+  bags               Decimal   @default(0)
+  others             Decimal   @default(0)
+  linePay            Decimal   @default(0)
+  serviceFee         Decimal   @default(0)
+  totalDeductions    Decimal   @default(0)
+  customer           String?
+  salesRep           String?
+  timestamp          DateTime  @default(now())
+  vehicleMaintenance Decimal   @default(0)
+  salary             Decimal   @default(0)
+  reserve            Decimal   @default(0)
+  note               String?
+  paymentMethod      String?
+  paymentDate        DateTime?
+
+  @@index([timestamp])
+}
+
+model PayrollSetting {
+  username        String  @id
+  baseSalary      Decimal @default(0)
+  attendanceBonus Decimal @default(0)
+  insurance       Decimal @default(0)
+  offDaysStandard Int     @default(8)
+  bonusTiersJson  Json    @default("[]")
+  empType         String  @default("FULL_TIME")
+  hourlyWage      Decimal @default(0)
+  commissionRate  Decimal @default(0)
+}
+
+model DailyRecord {
+  id        String   @id @default(uuid())
+  date      DateTime
+  username  String
+  type      String
+  value     Decimal  @default(0)
+  note      String?
+  timestamp DateTime @default(now())
+}
+
+model EmployeeProfile {
+  username   String  @id
+  joinedDate String?
+  birthday   String?
+  identityId String?
+  contact    String?
+  note       String?
+}
+
+model GroupBuyCommunity {
+  communityId           String    @id
+  communityCode         String    @unique
+  communityName         String
+  communityType         String?
+  orderingMode          String?
+  serviceArea           String?
+  isDefault             Boolean   @default(false)
+  icon                  String?
+  contactPerson         String?
+  contactPhone          String?
+  openMessage           String?
+  closeMessage          String?
+  defaultDeliveryTime   String?
+  defaultFreeShipping   Boolean   @default(false)
+  defaultPaymentMethods Json      @default("[]")
+  defaultRoute          String?
+  deliveryInstruction   String?
+  status                String    @default("ACTIVE")
+  notes                 String?
+  createdBy             String?
+  updatedBy             String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
+}
+
+model GroupBuyOrder {
+  orderId            String               @id
+  status             String               @default("PENDING")
+  customerLineId     String?
+  customerName       String?
+  customerPhone      String?
+  deliveryAddress    String?
+  sourceGroup        String?
+  note               String?
+  totalAmount        Decimal              @default(0)
+  paymentMethod      String?
+  transferLastFive   String?
+  paymentStatus      String?
+  lineDisplayName    String?
+  source             String?              @default("NORMAL")
+  confirmedAt        DateTime?
+  confirmedBy        String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  details            GroupBuyOrderDetail[]
+}
+
+model GroupBuyOrderDetail {
+  id          String        @id @default(uuid())
+  orderId     String
+  productId   String?
+  productName String?
+  unitPrice   Decimal       @default(0)
+  qty         Int           @default(0)
+  subtotal    Decimal       @default(0)
+  remark      String?
+  order       GroupBuyOrder @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+}
+
+model GroupBuyCampaign {
+  campaignId         String    @id
+  communityId        String
+  campaignName       String
+  campaignType       String?
+  campaignStatus     String    @default("DRAFT")
+  version            Int       @default(1)
+  allowReorder       Boolean   @default(true)
+  themeColor         String?
+  displayOrder       Int       @default(0)
+  priority           Int       @default(0)
+  publishedAt        DateTime?
+  startTime          DateTime?
+  endTime            DateTime?
+  deliveryDate       DateTime?
+  deliveryStartTime  String?
+  deliveryEndTime    String?
+  systemAnnouncement String?
+  groupAnnouncement  String?
+  createdBy          String?
+  updatedBy          String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model GroupBuyAuditLog {
+  logId     String   @id @default(uuid())
+  module    String
+  action    String
+  targetId  String?
+  fieldName String?
+  oldValue  String?
+  newValue  String?
+  operator  String
+  ipAddress String?
+  device    String?
+  createdAt DateTime @default(now())
+}
+
+model GroupBuyOrderStatusHistory {
+  historyId String   @id @default(uuid())
+  orderId   String
+  status    String
+  remark    String?
+  operator  String
+  createdAt DateTime @default(now())
+}
+
+model GroupBuyNotification {
+  notificationId String   @id @default(uuid())
+  orderId        String
+  memberId       String?
+  type           String
+  line           Boolean  @default(false)
+  email          Boolean  @default(false)
+  push           Boolean  @default(false)
+  content        String
+  status         String   @default("PENDING")
+  createdAt      DateTime @default(now())
+}
+
+model GroupBuySystemSetting {
+  settingKey   String @id
+  settingValue String
+}
+
+model Vendor {
+  vendorName    String  @id
+  paymentMethod String  @default("CASH")
+  lineGroupId   String?
+  orderDays     String?
+  deliveryDays  String?
+  isActive      Boolean @default(true)
+  sortWeight    Int     @default(0)
+}
+
+model ActivityLog {
+  id               String   @id @default(uuid())
+  timestamp        DateTime @default(now())
+  username         String
+  actionType       String
+  page             String?
+  details          String?
+  userAgent        String?
+  screenResolution String?
+  ipAddress        String?
+}
+
+model Stocktake {
+  id             String   @id @default(uuid())
+  date           DateTime @default(now())
+  productId      String
+  productName    String
+  bookQty        Int
+  physicalQty    Int
+  diff           Int
+  reason         String?
+  accountability String?
+  operator       String
+}
+
+model InventoryAdjustment {
+  id          String   @id @default(uuid())
+  date        DateTime @default(now())
+  productId   String
+  productName String
+  type        String
+  quantity    Int
+  operator    String
+  note        String?
+}
+
+model BuildingSetting {
+  building   String   @id
+  startTime  String?
+  endTime    String?
+  updatedAt  DateTime @updatedAt
+}
+
+model GroupBinding {
+  groupId    String   @id
+  groupName  String
+  updatedAt  DateTime @updatedAt
+}
+
+model Member {
+  memberId      String              @id // LINE userId
+  displayName   String?
+  pictureUrl    String?
+  receiverName  String?
+  phone         String?
+  walletBalance Decimal             @default(0)
+  memberLevel   String              @default("General")
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  transactions  WalletTransaction[]
+}
+
+model WalletTransaction {
+  transactionId String   @id @default(uuid())
+  memberId      String
+  amount        Decimal
+  type          String   // e.g. "ORDER_PAY", "DEPOSIT"
+  description   String?
+  createdAt     DateTime @default(now())
+  member        Member   @relation(fields: [memberId], references: [memberId], onDelete: Cascade)
+}

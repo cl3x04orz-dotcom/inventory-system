@@ -27,8 +27,9 @@ export const callGAS = async (apiUrl, action, payload, token = null) => {
 
         const data = await response.json();
         
-        // 檢查 Token 是否過期
-        if (data.error && (data.error === 'TokenExpired' || data.error.includes('Unauthorized'))) {
+        // 檢查 Token 是否過期 (精確比對，避免 Forbidden 被誤判)
+        const isTokenExpired = data.error === 'TokenExpired' || data.error === 'Unauthorized' || data.error === 'Unauthorized: No valid token provided';
+        if (data.error && isTokenExpired) {
             // 如果當前動作不是 renewToken，則嘗試自動續約並重試
             if (action !== 'renewToken' && token) {
                 console.warn(`[API] Token 過期，嘗試自動續約: ${action}`);

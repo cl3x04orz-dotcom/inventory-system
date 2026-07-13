@@ -1,6 +1,7 @@
 import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 import React, { useState, useEffect, useCallback } from 'react';
-import { Save, RefreshCw, Calculator, DollarSign, GripVertical, ListOrdered, Printer } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Save, RefreshCw, Calculator, DollarSign, GripVertical, ListOrdered, Printer, ChevronUp, ChevronDown, FileText } from 'lucide-react';
 
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { callGAS } from '../utils/api';
@@ -8,6 +9,7 @@ import { sortProducts } from '../utils/constants';
 import { evaluateFormula } from '../utils/mathUtils';
 import MergePrintModal from '../components/MergePrintModal';
 import HistoryImportModal from '../components/HistoryImportModal';
+import PrintTemplate from './PrintTemplate';
 
 const getSafeNum = (v) => {
     if (typeof v === 'string' && v.trim().startsWith('=')) return 0;
@@ -560,6 +562,21 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             }
         } else {
             // Entering sorting mode
+            // [Performance Optimization] Prefetch all last_price values into memory in a single loop
+            // to avoid blocking the JS event loop with 199 consecutive disk reads inside setState.
+            const localPrices = {};
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('last_price_')) {
+                        const pId = key.substring('last_price_'.length);
+                        localPrices[pId] = localStorage.getItem(key);
+                    }
+                }
+            } catch (err) {
+                console.warn('Failed to prefetch local prices:', err);
+            }
+
             // 將 allAvailableProducts 中的所有商品，補進 rows 裡面以顯示完整清單進行排序
             setRows(prevRows => {
                 const existingMap = {};
@@ -571,9 +588,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                         return existing;
                     } else {
                         // 建立一個預設為 0 庫存的乾淨列
-                        const localPriceKey = `last_price_${p.id}`;
-                        const localPrice = safeLocalStorage.getItem(localPriceKey);
-                        let finalPrice = localPrice !== null ? Number(localPrice) : '';
+                        const localPrice = localPrices[p.id];
+                        let finalPrice = (localPrice !== undefined && localPrice !== null) ? Number(localPrice) : '';
                         return {
                             id: p.id,
                             name: p.name,
@@ -2074,3 +2090,325 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
         </>
     );
 }
+
+// ==========================================
+// [Performance Optimization] Memoized Rows
+// ==========================================
+const SalesMobileRow = React.memo(({
+    row,
+    idx,
+    isSorting,
+    handleMoveRow,
+    handleRowChange,
+    handleBlur,
+    setActiveInput,
+    handleKeyDown,
+    rowsLength
+}) => {
+    const getSafeNum = (v) => {
+        const n = Number(v);
+        return isNaN(n) ? 0 : n;
+    };
+    return (
+        <Draggable draggableId={String(row.id)} index={idx} isDragDisabled={!isSorting}>
+            {(provided, snapshot) => (
+                <div
+                    ref={provided.innerRef}
+                    {...provided.draggableProps}
+                    className={`bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)] ${snapshot.isDragging ? 'shadow-2xl z-50 ring-2 ring-indigo-500' : ''}`}
+                >
+                    {/* Header: Name & Stock */}
+                    <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-2">
+                            {isSorting && (
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <div {...provided.dragHandleProps} className="text-[var(--text-tertiary)] cursor-grab active:cursor-grabbing p-1">
+                                        <GripVertical size={20} />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleMoveRow(idx, 'up')}
+                                        disabled={idx === 0}
+                                        className="p-1 text-blue-500 disabled:text-gray-300 rounded"
+                                    >
+                                        <ChevronUp size={16} strokeWidth={2.5} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleMoveRow(idx, 'down')}
+                                        disabled={idx === rowsLength - 1}
+                                        className="p-1 text-blue-500 disabled:text-gray-300 rounded"
+                                    >
+                                        <ChevronDown size={16} strokeWidth={2.5} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleMoveRow(idx, 'top')}
+                                        disabled={idx === 0}
+                                        className="px-1 text-indigo-600 disabled:text-gray-300 text-[10px] font-black rounded"
+                                    >
+                                        置頂
+                                    </button>
+                                </div>
+                            )}
+                            <div className="font-extrabold text-[var(--text-primary)] text-xl leading-tight whitespace-nowrap">{row.name}</div>
+                        </div>
+                        <div className="text-[10px] font-mono bg-transparent px-2 py-0.5 rounded-lg border border-slate-200/40 whitespace-nowrap">
+                            <span className="text-blue-500 font-bold">{row.stock}</span>
+                            <span className="text-slate-300 dark:text-slate-600 mx-1">/</span>
+                            <span className="text-orange-500 font-bold">{row.originalStock || 0}</span>
+                        </div>
+                    </div>
+                    
+                    <div className="bg-gray-50 rounded-lg p-2 mb-3 border border-gray-100">
+                        <div className="grid grid-cols-4 gap-2">
+                            <div className="flex flex-col gap-1 min-h-[56px]">
+                                <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">領貨</label>
+                                <input
+                                    id={`input-m-${idx}-picked`}
+                                    type="text"
+                                    inputMode="decimal"
+                                    autoComplete="off"
+                                    className="input-field text-center p-2 text-base font-bold bg-white"
+                                    value={row.picked || ''}
+                                    onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
+                                    onBlur={(e) => handleBlur(row.id, 'picked', e.target.value)}
+                                    onFocus={() => setActiveInput({ id: `input-m-${idx}-picked`, type: 'row', rowId: row.id, field: 'picked' })}
+                                    onKeyDown={(e) => handleKeyDown(e, idx, 'picked', 'input-m-')}
+                                    disabled={isSorting}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1 min-h-[56px]">
+                                <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">原貨</label>
+                                <input
+                                    id={`input-m-${idx}-original`}
+                                    type="text"
+                                    inputMode="decimal"
+                                    autoComplete="off"
+                                    className="input-field text-center p-2 text-base font-bold bg-white"
+                                    value={row.original || ''}
+                                    onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
+                                    onBlur={(e) => handleBlur(row.id, 'original', e.target.value)}
+                                    onFocus={() => setActiveInput({ id: `input-m-${idx}-original`, type: 'row', rowId: row.id, field: 'original' })}
+                                    onKeyDown={(e) => handleKeyDown(e, idx, 'original', 'input-m-')}
+                                    disabled={isSorting}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1 min-h-[56px]">
+                                <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">退貨</label>
+                                <input
+                                    id={`input-m-${idx}-returns`}
+                                    type="text"
+                                    inputMode="decimal"
+                                    autoComplete="off"
+                                    className="input-field text-center p-2 text-base font-bold text-red-600 bg-white"
+                                    value={row.returns || ''}
+                                    onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
+                                    onBlur={(e) => handleBlur(row.id, 'returns', e.target.value)}
+                                    onFocus={() => setActiveInput({ id: `input-m-${idx}-returns`, type: 'row', rowId: row.id, field: 'returns' })}
+                                    onKeyDown={(e) => handleKeyDown(e, idx, 'returns', 'input-m-')}
+                                    disabled={isSorting}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1 min-h-[56px]">
+                                <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">單價</label>
+                                <input
+                                    id={`input-m-${idx}-price`}
+                                    type="text"
+                                    inputMode="decimal"
+                                    autoComplete="off"
+                                    className="input-field text-center p-2 text-base font-bold bg-white"
+                                    value={row.price}
+                                    onChange={(e) => handleRowChange(row.id, 'price', e.target.value)}
+                                    onBlur={(e) => handleBlur(row.id, 'price', e.target.value)}
+                                    onFocus={() => setActiveInput({ id: `input-m-${idx}-price`, type: 'row', rowId: row.id, field: 'price' })}
+                                    onKeyDown={(e) => handleKeyDown(e, idx, 'price', 'input-m-')}
+                                    disabled={isSorting}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Summary Footer */}
+                    <div className="flex justify-between items-center pt-2 border-t border-[var(--border-primary)]">
+                        <div className="text-xs text-[var(--text-secondary)] font-bold">
+                            售出: <span className={`font-mono font-black tabular-nums text-base ml-1 ${getSafeNum(row.sold) > 0 ? 'text-blue-600' : 'text-slate-300'}`}>{row.sold}</span>
+                        </div>
+                        <div className="text-xs text-[var(--text-secondary)] font-bold">
+                            小計: <span className={`font-mono font-black tabular-nums text-base ml-1 ${getSafeNum(row.subtotal) > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
+                                ${getSafeNum(row.subtotal).toLocaleString()}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </Draggable>
+    );
+}, (prev, next) => {
+    return (
+        prev.row.picked === next.row.picked &&
+        prev.row.original === next.row.original &&
+        prev.row.returns === next.row.returns &&
+        prev.row.sold === next.row.sold &&
+        prev.row.price === next.row.price &&
+        prev.row.subtotal === next.row.subtotal &&
+        prev.row.sortWeight === next.row.sortWeight &&
+        prev.isSorting === next.isSorting &&
+        prev.idx === next.idx &&
+        prev.rowsLength === next.rowsLength
+    );
+});
+
+const SalesDesktopRow = React.memo(({
+    row,
+    idx,
+    isSorting,
+    inputMode,
+    activeInput,
+    handleMoveRow,
+    handleRowChange,
+    handleBlur,
+    setActiveInput,
+    handleKeyDown,
+    rowsLength
+}) => {
+    const prevActive = activeInput?.rowId === row.id;
+    return (
+        <Draggable draggableId={String(row.id)} index={idx} isDragDisabled={!isSorting}>
+            {(provided, snapshot) => (
+                <tr
+                    ref={provided.innerRef}
+                    {...provided.draggableProps}
+                    className={`transition-colors ${snapshot.isDragging ? 'bg-[var(--bg-tertiary)] shadow-xl z-50' : ''
+                        } ${inputMode === 'mouse' ? 'hover:bg-[var(--bg-hover)]' : ''
+                        } ${inputMode === 'keyboard' && prevActive ? 'bg-[var(--bg-hover)]' : ''
+                        }`}
+                >
+                    <td className="p-4">
+                        {isSorting && (
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                <div {...provided.dragHandleProps} className="text-[var(--text-tertiary)] cursor-grab active:cursor-grabbing p-1">
+                                    <GripVertical size={16} />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => handleMoveRow(idx, 'up')}
+                                    disabled={idx === 0}
+                                    className="p-1 text-blue-500 disabled:text-gray-300 rounded hover:bg-blue-50"
+                                    title="向上移動"
+                                >
+                                    <ChevronUp size={16} strokeWidth={2.5} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleMoveRow(idx, 'down')}
+                                    disabled={idx === rowsLength - 1}
+                                    className="p-1 text-blue-500 disabled:text-gray-300 rounded hover:bg-blue-50"
+                                    title="向下移動"
+                                >
+                                    <ChevronDown size={16} strokeWidth={2.5} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleMoveRow(idx, 'top')}
+                                    disabled={idx === 0}
+                                    className="px-1.5 py-0.5 text-indigo-600 disabled:text-gray-300 hover:bg-indigo-50 text-[10px] font-black rounded"
+                                    title="直接置頂"
+                                >
+                                    置頂
+                                </button>
+                            </div>
+                        )}
+                    </td>
+                    <td className="p-4 text-[var(--text-primary)] font-extrabold text-xl whitespace-nowrap">{row.name}</td>
+                    <td className="p-4 text-center font-mono tracking-tighter tabular-nums text-sm text-[var(--text-secondary)]">
+                        <span className="text-blue-500">{row.stock}</span>
+                        <span className="text-[var(--text-tertiary)] mx-1">/</span>
+                        <span className="text-orange-500">{row.originalStock || 0}</span>
+                    </td>
+                    <td className="p-4">
+                        <input
+                            id={`input-${idx}-picked`}
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            className="input-field text-center w-full font-bold p-1 bg-transparent"
+                            value={row.picked || ''}
+                            onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
+                            onBlur={(e) => handleBlur(row.id, 'picked', e.target.value)}
+                            onFocus={() => setActiveInput({ id: `input-${idx}-picked`, type: 'row', rowId: row.id, field: 'picked' })}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'picked')}
+                            disabled={isSorting}
+                        />
+                    </td>
+                    <td className="p-4">
+                        <input
+                            id={`input-${idx}-original`}
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            className="input-field text-center w-full font-bold p-1 bg-transparent"
+                            value={row.original || ''}
+                            onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
+                            onBlur={(e) => handleBlur(row.id, 'original', e.target.value)}
+                            onFocus={() => setActiveInput({ id: `input-${idx}-original`, type: 'row', rowId: row.id, field: 'original' })}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'original')}
+                            disabled={isSorting}
+                        />
+                    </td>
+                    <td className="p-4">
+                        <input
+                            id={`input-${idx}-returns`}
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            className="input-field text-center w-full font-bold p-1 bg-transparent text-red-600"
+                            value={row.returns || ''}
+                            onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
+                            onBlur={(e) => handleBlur(row.id, 'returns', e.target.value)}
+                            onFocus={() => setActiveInput({ id: `input-${idx}-returns`, type: 'row', rowId: row.id, field: 'returns' })}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'returns')}
+                            disabled={isSorting}
+                        />
+                    </td>
+                    <td className="p-4 text-center font-mono tracking-tighter tabular-nums text-[1.1rem] text-[var(--text-primary)] font-extrabold">{row.sold}</td>
+                    <td className="p-4">
+                        <input
+                            id={`input-${idx}-price`}
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            className="input-field text-center w-full font-bold p-1 bg-transparent"
+                            value={row.price}
+                            onChange={(e) => handleRowChange(row.id, 'price', e.target.value)}
+                            onBlur={(e) => handleBlur(row.id, 'price', e.target.value)}
+                            onFocus={() => setActiveInput({ id: `input-${idx}-price`, type: 'row', rowId: row.id, field: 'price' })}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'price')}
+                            disabled={isSorting}
+                        />
+                    </td>
+                    <td className="p-4 text-right font-mono tracking-tighter tabular-nums text-lg font-black text-[var(--text-primary)]">
+                        ${(Number(row.subtotal) || 0).toLocaleString()}
+                    </td>
+                </tr>
+            )}
+        </Draggable>
+    );
+}, (prev, next) => {
+    const prevActive = prev.activeInput?.rowId === prev.row.id;
+    const nextActive = next.activeInput?.rowId === next.row.id;
+    return (
+        prev.row.picked === next.row.picked &&
+        prev.row.original === next.row.original &&
+        prev.row.returns === next.row.returns &&
+        prev.row.sold === next.row.sold &&
+        prev.row.price === next.row.price &&
+        prev.row.subtotal === next.row.subtotal &&
+        prev.row.sortWeight === next.row.sortWeight &&
+        prev.isSorting === next.isSorting &&
+        prev.idx === next.idx &&
+        prev.rowsLength === next.rowsLength &&
+        prev.inputMode === next.inputMode &&
+        prevActive === nextActive
+    );
+});

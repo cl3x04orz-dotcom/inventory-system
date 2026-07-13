@@ -37,7 +37,11 @@ export default function ExpenditureManagementPage({ user, apiUrl }) {
         const fetchUsers = async () => {
             try {
                 const data = await callGAS(apiUrl, 'getUsers', {}, user.token);
-                if (Array.isArray(data)) setUsers(data);
+                if (Array.isArray(data)) {
+                    setUsers(data);
+                } else if (data && Array.isArray(data.list)) {
+                    setUsers(data.list);
+                }
             } catch (e) { console.error('Fetch users failed', e); }
         };
         fetchUsers();

@@ -47,6 +47,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     const [isSummaryExpanded, setIsSummaryExpanded] = useState(false); // 預設折疊
     const [hasLoadedPivot, setHasLoadedPivot] = useState(false); // [New] 是否已載入對照表資料
     const [loadingPivot, setLoadingPivot] = useState(false); // [New] 是否正在載入對照表資料
+    const [visibleCount, setVisibleCount] = useState(50); // [New] 限制單次渲染筆數，避免 DOM 節點過多造成瀏覽器卡死
 
     // 1. Fetch Data from Server (Only on Date Change)
     const fetchData = useCallback(async (forceFetch = false) => {
@@ -170,6 +171,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
         setHasLoadedPivot(false);
         setRawPurchases([]);
         setRawAdjustments([]);
+        setVisibleCount(50); // [New] 切換日期時重設限制筆數
 
         const timer = setTimeout(async () => {
             if (!startDate || !endDate) return;
@@ -256,6 +258,27 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     const isNonCashMethod = (method) => {
         const m = String(method || '').trim().toUpperCase();
         return ['CREDIT', 'TRANSFER', '賒帳', '賒銷', '匯款'].includes(m);
+    };
+
+    const getPaymentMethodsBadges = (group) => {
+        if (!group.items || group.items.length === 0) return null;
+        const methods = [...new Set(group.items.map(item => String(item.paymentMethod || 'CASH').trim().toUpperCase()))];
+        return (
+            <div className="flex gap-1 mt-1 flex-wrap">
+                {methods.map(m => {
+                    if (['CREDIT', '賒帳', '賒銷'].includes(m)) {
+                        return <span key={m} className="px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-100 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/30">賒帳</span>;
+                    }
+                    if (['TRANSFER', '匯款'].includes(m)) {
+                        return <span key={m} className="px-1.5 py-0.5 rounded text-[10px] font-black bg-blue-100 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/30">匯款</span>;
+                    }
+                    if (['LINEPAY', 'LINE PAY'].includes(m)) {
+                        return <span key={m} className="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/30">LINE PAY</span>;
+                    }
+                    return <span key={m} className="px-1.5 py-0.5 rounded text-[10px] font-black bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">現金</span>;
+                })}
+            </div>
+        );
     };
 
     // [Fix] 計算「今日原始銷售中的非現金部分」
@@ -1159,7 +1182,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                             <div className="overflow-auto flex-1">
                                 {/* Mobile Card View (SALES) - Grouped */}
                                 <div className="md:hidden divide-y divide-[var(--border-primary)]">
-                                    {sortedGroups.map((group) => {
+                                    {sortedGroups.slice(0, visibleCount).map((group) => {
                                         const isExpanded = expandedGroups[group.key];
                                         return (
                                             <div key={group.key} className={`bg-[var(--bg-secondary)] transition-colors ${isExpanded ? 'bg-blue-50/20' : ''}`}>
@@ -1196,6 +1219,9 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                                 {group.collectionNote && (
                                                                     <div className="text-[10px] text-amber-600 font-bold w-full mt-0.5">{group.collectionNote}</div>
                                                                 )}
+                                                                <div className="w-full mt-1">
+                                                                    {getPaymentMethodsBadges(group)}
+                                                                </div>
                                                             </div>
                                                         </div>
 
@@ -1304,7 +1330,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-[var(--border-primary)] bg-[var(--bg-secondary)]">
-                                        {sortedGroups.map((group) => {
+                                        {sortedGroups.slice(0, visibleCount).map((group) => {
                                             const isExpanded = expandedGroups[group.key];
                                             return (
                                                 <React.Fragment key={group.key}>
@@ -1328,6 +1354,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                             {group.collectionNote && (
                                                                 <div className="text-[11px] text-amber-600 font-medium mt-0.5">{group.collectionNote}</div>
                                                             )}
+                                                            {getPaymentMethodsBadges(group)}
                                                         </td>
                                                         <td className="p-3 text-[var(--text-secondary)] text-sm">
                                                             <div className="flex items-center gap-1.5 whitespace-nowrap">
@@ -1394,6 +1421,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                                             <thead>
                                                                                 <tr className="text-[var(--text-tertiary)] font-bold uppercase tracking-wider text-xs border-b border-[var(--border-primary)]/30">
                                                                                     <th className="px-4 py-3 text-left">品項</th>
+                                                                                    <th className="px-4 py-3 text-left w-24">付款方式</th>
                                                                                     <th className="px-4 py-3 text-right">數量</th>
                                                                                     <th className="px-4 py-3 text-right">單價</th>
                                                                                     <th className="px-4 py-3 text-right">小計</th>
@@ -1403,6 +1431,17 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                                                 {group.items.map((it, i) => (
                                                                                     <tr key={i} className="hover:bg-white/70 transition-colors">
                                                                                         <td className="px-4 py-3 text-[var(--text-primary)] font-bold text-base">{it.productName}</td>
+                                                                                        <td className="px-4 py-3 text-left text-xs font-bold text-[var(--text-secondary)]">
+                                                                                            {String(it.paymentMethod || 'CASH').toUpperCase() === 'CREDIT' ? (
+                                                                                                <span className="px-2 py-0.5 bg-rose-100 text-rose-600 border border-rose-200 rounded shrink-0">賒帳</span>
+                                                                                            ) : String(it.paymentMethod || 'CASH').toUpperCase() === 'TRANSFER' ? (
+                                                                                                <span className="px-2 py-0.5 bg-blue-100 text-blue-600 border border-blue-200 rounded shrink-0">匯款</span>
+                                                                                            ) : String(it.paymentMethod || 'CASH').toUpperCase() === 'LINEPAY' || String(it.paymentMethod || 'CASH').toUpperCase() === 'LINE PAY' ? (
+                                                                                                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-600 border border-emerald-200 rounded shrink-0">LINE PAY</span>
+                                                                                            ) : (
+                                                                                                <span className="px-2 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded shrink-0">現金</span>
+                                                                                            )}
+                                                                                        </td>
                                                                                         <td className="px-4 py-3 text-right font-bold text-blue-600 text-lg">{it.soldQty}</td>
                                                                                         <td className="px-4 py-3 text-right text-[var(--text-secondary)] text-lg">${(Number(it.totalAmount) / Number(it.soldQty) || 0).toLocaleString()}</td>
                                                                                         <td className="px-4 py-3 text-right font-mono font-bold text-emerald-800 text-lg">${(Number(it.totalAmount) || 0).toLocaleString()}</td>
@@ -1420,6 +1459,19 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                         })}
                                     </tbody>
                                 </table>
+
+                                {/* 載入更多按鈕 */}
+                                {sortedGroups.length > visibleCount && (
+                                    <div className="p-4 text-center border-t border-[var(--border-primary)] bg-[var(--bg-secondary)] sticky bottom-0 z-20">
+                                        <button
+                                            type="button"
+                                            onClick={() => setVisibleCount(prev => prev + 50)}
+                                            className="btn-primary px-8 py-2.5 rounded-xl text-sm font-bold shadow-md active:scale-95 transition-all"
+                                        >
+                                            顯示更多紀錄 (目前 {visibleCount} / 總共 {sortedGroups.length} 筆)
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

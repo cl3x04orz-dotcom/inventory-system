@@ -34,11 +34,17 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
             if (Array.isArray(data)) {
                 setSettings(data);
                 
-                // 預設選擇第一個
-                if (data.length > 0 && !selectedBuilding) {
-                    const first = data[0].building;
-                    setSelectedBuilding(first);
-                    updateFormFields(first, data);
+                if (data.length > 0) {
+                    // 預設選擇第一個
+                    if (!selectedBuilding || selectedBuilding === '__new__') {
+                        const first = data[0].building;
+                        setSelectedBuilding(first);
+                        updateFormFields(first, data);
+                    }
+                } else {
+                    // 沒有資料 → 自動進入新增模式
+                    setSelectedBuilding('__new__');
+                    setIsAddingNew(true);
                 }
             }
         } catch (error) {
@@ -244,6 +250,9 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                     value={selectedBuilding}
                                     onChange={handleBuildingChange}
                                 >
+                                    {settings.length === 0 && (
+                                        <option value="" disabled>（尚無大樓，請新增）</option>
+                                    )}
                                     {settings.map(s => (
                                         <option key={s.building} value={s.building}>{s.building}</option>
                                     ))}

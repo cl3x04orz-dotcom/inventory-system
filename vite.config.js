@@ -17,6 +17,21 @@ export default defineConfig(({ mode }) => {
         ],
       },
     },
+    server: {
+      proxy: {
+        '/inventory-system/api': {
+          target: 'http://127.0.0.1:3000',
+          changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/inventory-system/, '')
+        },
+        '/api': {
+          target: 'http://127.0.0.1:3000',
+          changeOrigin: true,
+          secure: false
+        }
+      }
+    },
     define: {
       __BUILD_TIME__: JSON.stringify(process.env.VITE_APP_VERSION || Date.now().toString()),
     },
