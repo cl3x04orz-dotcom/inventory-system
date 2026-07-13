@@ -333,6 +333,14 @@ export const GroupBuyService = {
       CloseMessage: targetComm.closeMessage || ''
     };
 
+    // 取得大樓時段設定
+    const bSettings = await prisma.buildingSetting.findMany();
+    const buildingSettings = bSettings.map((s: any) => ({
+      building: s.building,
+      start_time: s.startTime || '',
+      end_time: s.endTime || ''
+    }));
+
     return {
       success: true,
       data: {
@@ -345,7 +353,8 @@ export const GroupBuyService = {
           GroupAnnouncement: activeCampaign.groupAnnouncement || ''
         } : null,
         nextOpenTime: nextCampaign?.startTime || null,
-        products
+        products,
+        buildingSettings
       }
     };
   },

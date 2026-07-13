@@ -95,7 +95,8 @@ function v2_getLiffInitDataService(payload) {
         community: activeComm,
         activeCampaign: activeCampaign,
         nextOpenTime: nextCampaign ? nextCampaign.startTime : null,
-        products: products
+        products: products,
+        buildingSettings: typeof getBuildingSettingsService !== 'undefined' ? getBuildingSettingsService() : []
     });
 }
 

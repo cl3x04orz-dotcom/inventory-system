@@ -128,9 +128,17 @@ export default function LiffOrderPage({ user, apiUrl }) {
   // ── 新增：網址大樓參數、大樓時段設定與下單資訊 ───────────────
   const [urlBuilding, setUrlBuilding] = useState("");
   const [buildingSettings, setBuildingSettings] = useState([]);
+  const [tick, setTick] = useState(0);
   const [successOrderTotal, setSuccessOrderTotal] = useState(0);
   const [isNightOrder, setIsNightOrder] = useState(false);
   const [isReorder, setIsReorder] = useState(false);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTick((t) => t + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // 會員中心狀態
   const [memberProfile, setMemberProfile] = useState(null);
@@ -252,6 +260,9 @@ export default function LiffOrderPage({ user, apiUrl }) {
         if (resData.nextOpenTime) {
           setNextOpenTime(resData.nextOpenTime);
         }
+        if (Array.isArray(resData.buildingSettings)) {
+          setBuildingSettings(resData.buildingSettings);
+        }
       }
     } catch (err) {
       console.error("Failed to load initialization data:", err);
@@ -319,17 +330,50 @@ export default function LiffOrderPage({ user, apiUrl }) {
     // 3. 彙整狀態輸出
     if (isAutoOpen) {
       const autoEndStr = `${dayNames[auto_close_day]} ${auto_close_time}`;
+      
+      // 計算倒數時間
+      const [closeH, closeM] = auto_close_time.split(':').map(Number);
+      const targetDate = new Date(now.getTime());
+      targetDate.setHours(closeH, closeM, 0, 0);
+      
+      const currentDay = targetDate.getDay();
+      let dayDiff = Number(auto_close_day) - currentDay;
+      if (dayDiff < 0 || (dayDiff === 0 && now.getTime() > targetDate.getTime())) {
+        dayDiff += 7;
+      }
+      targetDate.setDate(targetDate.getDate() + dayDiff);
+      
+      const diffMs = targetDate.getTime() - now.getTime();
+      let countdownStr = '';
+      if (diffMs > 0) {
+        const diffDays = Math.floor(diffMs / 86400000);
+        const diffHrs = Math.floor((diffMs % 86400000) / 3600000);
+        const diffMins = Math.floor((diffMs % 3600000) / 60000);
+        const diffSecs = Math.floor((diffMs % 60000) / 1000);
+        const dayStr = diffDays > 0 ? `${diffDays} 天 ` : '';
+        countdownStr = `${dayStr}${diffHrs} 小時 ${diffMins} 分 ${diffSecs} 秒`;
+      }
+
       return {
         status: 'open',
-        message: `⏰ 本期自動團購將於每週 ${autoEndStr} 準時結單，請把握時間！`,
+        message: `⏰ 團購熱烈進行中！距離結單還剩：${countdownStr || '0 秒'} (每週 ${autoEndStr} 結單)`,
         endTime: autoEndStr
       };
     }
 
     if (isManualOpen) {
+      const end = new Date(end_time.replace(/\//g, '-'));
+      const diffMs = end.getTime() - now.getTime();
+      let countdownStr = '';
+      if (diffMs > 0) {
+        const diffHrs = Math.floor(diffMs / 3600000);
+        const diffMins = Math.floor((diffMs % 3600000) / 60000);
+        const diffSecs = Math.floor((diffMs % 60000) / 1000);
+        countdownStr = `${diffHrs} 小時 ${diffMins} 分 ${diffSecs} 秒`;
+      }
       return {
         status: 'open',
-        message: `⏰ 手動加開團購將於 ${end_time} 準時結單，請把握時間！`,
+        message: `⏰ 限時開團中！距離結單還剩：${countdownStr || '0 秒'} (將於 ${end_time} 結單)`,
         endTime: end_time
       };
     }
@@ -337,7 +381,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
     if (isManualUpcoming) {
       return {
         status: 'upcoming',
-        message: `⚠️ 本期加開團購尚未開始！開團時間為：${start_time}，敬請期待。`,
+        message: `⚠️ 本期限時開團尚未開始！開團時間為：${start_time}，敬請期待。`,
         startTime: start_time
       };
     }
@@ -355,7 +399,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
     if (isManualEnded) {
       return {
         status: 'ended',
-        message: `🛑 本期團購已截止下單！謝謝大家的支持。`,
+        message: `🛑 本期限時開團已截止下單！謝謝大家的支持。`,
         endTime: end_time
       };
     }
