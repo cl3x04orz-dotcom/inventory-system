@@ -310,6 +310,9 @@ function AppContent() {
             // 2. 判斷是否為 LIFF 頁面
             const params = new URLSearchParams(window.location.search);
             const isLiff = params.get('page') === 'liffOrder' ||
+                params.has('building') ||
+                params.has('grp') ||
+                params.has('liff.state') ||
                 window.location.pathname.includes('/order') ||
                 (window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === 'liffOrder');
 
@@ -379,6 +382,10 @@ function AppContent() {
 
         const params = new URLSearchParams(window.location.search);
         const isLiff = params.get('page') === 'liffOrder' ||
+            params.has('building') ||
+            params.has('grp') ||
+            params.has('liff.state') ||
+            window.location.pathname.includes('/order') ||
             (window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === 'liffOrder');
 
         if (isLiff && !user) {
