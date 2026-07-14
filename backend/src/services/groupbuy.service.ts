@@ -168,16 +168,17 @@ export const GroupBuyService = {
         operator: user.username,
         customer: (order.customerName || '') + (order.deliveryAddress ? ' ' + order.deliveryAddress : ''),
         paymentMethod: order.paymentMethod === '轉帳' ? 'TRANSFER' : 
+                       order.paymentMethod === 'LINE Pay' ? 'LINEPAY' :
                        (order.paymentMethod === '奶包金扣抵' || order.paymentMethod === '奶包金') ? 'WALLET' : 'CASH',
         status: 'PAID',
-        totalCash: (order.paymentMethod === '轉帳' || order.paymentMethod === '奶包金扣抵' || order.paymentMethod === '奶包金') ? 0 : order.totalAmount,
+        totalCash: (order.paymentMethod === '現金' || !order.paymentMethod) ? order.totalAmount : 0,
         finalTotal: order.totalAmount,
         details: {
           create: (order.details as any[]).map((d: any) => ({
             productId: d.productId || 'UNKNOWN',
             sold: Number(d.qty),
-            picked: 0,
-            original: Number(d.qty),
+            picked: Number(d.qty),
+            original: 0,
             subtotal: Number(d.subtotal),
             unitPrice: Number(d.unitPrice)
           }))
@@ -189,7 +190,7 @@ export const GroupBuyService = {
     for (const d of order.details as any[]) {
       const qty = Number(d.qty || 0);
       if (qty > 0) {
-        await deductInventory(d.productId, qty, 'ORIGINAL');
+        await deductInventory(d.productId, qty, 'STOCK');
       }
     }
 
