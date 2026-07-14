@@ -780,6 +780,16 @@ export const SalesService = {
       );
     }
 
+    const hasFinancePerm = user && (
+      user.role === 'BOSS' ||
+      user.role === 'ADMIN' ||
+      (user.permissions && user.permissions.some((p: string) => p === 'finance' || p.startsWith('finance_')))
+    );
+
+    if (!hasFinancePerm && user && user.username) {
+      expWhere.salesRep = user.username.trim();
+    }
+
     // 1. 撈取記帳日期在範圍內的支出 (Primary Items)
     const expenditures = await prisma.expenditure.findMany({
       where: expWhere,
@@ -855,7 +865,10 @@ export const SalesService = {
               gte: expWhere.timestamp.gte,
               lte: expWhere.timestamp.lte
             }
-          }
+          },
+          ...(!hasFinancePerm && user && user.username ? {
+            salesRep: user.username.trim()
+          } : {})
         },
         orderBy: { timestamp: 'desc' }
       });
