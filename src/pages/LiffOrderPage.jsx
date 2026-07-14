@@ -71,6 +71,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
   }, []);
 
 
+  // ── 自訂美化彈窗提示 ──────────────────────────────────────────
+  const [alertModal, setAlertModal] = useState({ show: false, message: '', callback: null });
+  const alert = (message, callback = null) => {
+    setAlertModal({ show: true, message, callback });
+  };
+
   // ── 商品 state ───────────────────────────────────────────────
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2490,6 +2496,27 @@ export default function LiffOrderPage({ user, apiUrl }) {
         </div>
       )}
       {renderBottomNav()}
+      
+      {/* 自訂美化彈窗提示 */}
+      {alertModal.show && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[var(--bg-secondary)] w-full max-w-[280px] rounded-2xl p-5 shadow-2xl border border-[var(--border-primary)] flex flex-col items-center gap-4 text-center animate-in zoom-in-95 duration-200">
+            <p className="text-sm font-bold text-[var(--text-primary)] leading-relaxed whitespace-pre-line">
+              {alertModal.message}
+            </p>
+            <button
+              onClick={() => {
+                const cb = alertModal.callback;
+                setAlertModal({ show: false, message: '', callback: null });
+                if (cb) cb();
+              }}
+              className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/15"
+            >
+              確定
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
