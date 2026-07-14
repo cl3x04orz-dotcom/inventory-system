@@ -62,6 +62,7 @@ let isLiffInitialized = false;
 export default function LiffOrderPage({ user, apiUrl }) {
   // ── 鎖定 body / html 避免 iOS 橡皮筋 & 網址列跳動 ──────────────
   useEffect(() => {
+    document.title = "米立微";
     document.documentElement.classList.add("liff-order-active");
     document.body.classList.add("liff-order-active");
     return () => {
