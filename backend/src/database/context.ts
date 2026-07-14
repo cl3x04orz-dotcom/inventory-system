@@ -16,7 +16,7 @@ if (process.platform === 'darwin' && !process.env.SSL_CERT_FILE) {
   }
 }
 
-export const prisma = new PrismaClient();
+const globalPrisma = new PrismaClient();
 
 // Storage to hold the active TransactionClient during a transaction context
 const txStorage = new AsyncLocalStorage<Prisma.TransactionClient>();
@@ -25,8 +25,19 @@ const txStorage = new AsyncLocalStorage<Prisma.TransactionClient>();
  * Returns either the active transaction client or the default prisma client.
  */
 export function getDbClient(): Prisma.TransactionClient | PrismaClient {
-  return txStorage.getStore() || prisma;
+  return txStorage.getStore() || globalPrisma;
 }
+
+export const prisma = new Proxy(globalPrisma, {
+  get(target, prop) {
+    const client = getDbClient();
+    const value = Reflect.get(client, prop);
+    if (typeof value === 'function') {
+      return value.bind(client);
+    }
+    return value;
+  }
+}) as unknown as PrismaClient;
 
 /**
  * Executes a callback within a database transaction context, propagating the transaction client
@@ -41,5 +52,8 @@ export async function runInTransaction<T>(fn: () => Promise<T>): Promise<T> {
 
   return prisma.$transaction(async (tx) => {
     return txStorage.run(tx, fn);
+  }, {
+    maxWait: 15000,
+    timeout: 30000
   });
 }

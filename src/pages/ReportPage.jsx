@@ -137,7 +137,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
             normCustomer: String(item.customer || item['對象/備註'] || item['對象'] || ''),
             normSalesRep: String(item.salesRep || item['業務'] || ''),
             normNote: String(item.note || item['備註'] || ''),
-            displayFinalTotal: Number(item[Object.keys(item || {}).find(k => ['finaltotal', '結算', '结算', '總支出金額', '总支出金额'].some(term => String(k).toLowerCase().includes(term)))] || item.finalTotal || 0)
+            displayFinalTotal: (!item.saleId || String(item.saleId).startsWith('exp_')) ? 0 : Number(item[Object.keys(item || {}).find(k => ['finaltotal', '結算', '结算', '總支出金額', '总支出金额'].some(term => String(k).toLowerCase().includes(term)))] || item.finalTotal || 0)
         }));
 
         if (locTerm) {

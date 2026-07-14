@@ -27,7 +27,6 @@ function snapToDispatchSteps(target: number, steps: number[]): number {
 }
 
 export const SalesService = {
-  // 1. 銷售存檔 (Save Sales) - 包含 FIFO 扣庫存與交易控制
   async saveSales(payload: any, user: any) {
     const {
       salesData,
@@ -61,7 +60,7 @@ export const SalesService = {
       const method = paymentMethod || 'CASH';
 
       // 3.1 建立 Sales 主檔
-      const sale = await prisma.sales.create({
+      await prisma.sales.create({
         data: {
           saleId,
           date: today,
@@ -201,6 +200,8 @@ export const SalesService = {
       return { success: true };
     });
   },
+
+
 
   // 獲取單據明細用於修正/複製
   async getSaleToClone(payload: any) {

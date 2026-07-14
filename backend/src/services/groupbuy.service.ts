@@ -426,7 +426,7 @@ export const GroupBuyService = {
             });
           }
         }
-      });
+      }, { maxWait: 15000, timeout: 30000 });
     }
 
     if (deductionApplied > 0) {
@@ -678,7 +678,7 @@ export const GroupBuyService = {
           description: description || (adjustAmount >= 0 ? '管理員手動儲值' : '管理員扣抵調整')
         }
       });
-    });
+    }, { maxWait: 15000, timeout: 30000 });
 
     return { success: true };
   }

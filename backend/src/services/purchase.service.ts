@@ -4,7 +4,7 @@
  */
 
 import crypto from 'crypto';
-import { prisma } from '../database/context.js';
+import { prisma, runInTransaction } from '../database/context.js';
 
 function getUuid() {
   return crypto.randomUUID();
@@ -116,109 +116,108 @@ export const PurchaseService = {
   // ============================================================
   // 2. 進貨存檔 (移植自 addPurchaseService())
   // ============================================================
+
   async addPurchase(payload: any, user: any) {
     const { submissionId, items: rawItems, operator, newProductSettings = {} } = payload;
 
-    // 防重複提交：用 DB 本身做冪等性檢查
-    if (submissionId) {
-      const exists = await prisma.purchase.findFirst({
-        where: { status: { in: ['PAID', 'CREDIT', 'ORDERED', 'UNPAID'] }, purchaseId: { contains: submissionId } }
-      });
-      // 更精確：找 note/submissionId 欄位
-      // 這裡改為以 purchaseId 前綴確保唯一（每個 item 用 `${submissionId}_${idx}` 當 purchaseId）
-    }
-
-    const items = Array.isArray(rawItems) ? rawItems : [payload];
-    const finalOperator = operator || (user ? (user.username || user.displayName || 'Unknown') : 'Unknown');
-    const entryDate = new Date();
-
-    // 查現有產品 (productName → productId)
-    const existingProducts = await prisma.product.findMany({
-      select: { productId: true, productName: true }
-    });
-    const nameToId: Record<string, string> = {};
-    existingProducts.forEach(p => { nameToId[p.productName] = p.productId; });
-
-    let count = 0;
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      const itemVendor = (item.vendor || payload.vendor || '').trim();
-      const itemName = (item.productName || '').trim();
-      const itemQty = Number(item.quantity) || 0;
-      const itemPrice = Number(item.price) || 0;
-      const itemMethod = item.paymentMethod || 'CASH';
-      const itemStatus = itemMethod === 'CREDIT' ? 'UNPAID' : 'PAID';
-
-      // 解析有效期限
-      let expiryDate: Date | null = null;
-      if (item.expiry && String(item.expiry).trim()) {
-        const d = new Date(item.expiry);
-        if (!isNaN(d.getTime())) expiryDate = d;
-      }
-
-      // 自動建立不存在的產品
-      let productId = nameToId[itemName];
-      if (!productId && itemName) {
-        productId = getUuid();
-        nameToId[itemName] = productId;
-
-        const settings = newProductSettings[itemName] || {};
-        await prisma.product.create({
-          data: {
-            productId,
-            productName: itemName,
-            category: 'General',
-            defaultPrice: itemPrice,
-            isActive: true
-          }
+    return runInTransaction(async () => {
+      // 防重複提交：用 DB 本身做冪等性檢查
+      if (submissionId) {
+        const exists = await prisma.purchase.findFirst({
+          where: { status: { in: ['PAID', 'CREDIT', 'ORDERED', 'UNPAID'] }, purchaseId: { contains: submissionId } }
         });
       }
 
-      if (!productId) continue;
+      const items = Array.isArray(rawItems) ? rawItems : [payload];
+      const finalOperator = operator || (user ? (user.username || user.displayName || 'Unknown') : 'Unknown');
+      const entryDate = new Date();
 
-      // 確定唯一的 purchaseId
-      const purchaseId = `${submissionId || 'pur'}_${i}_${getUuid().slice(0, 8)}`;
-
-      // 寫入 Purchase
-      await prisma.purchase.create({
-        data: {
-          purchaseId,
-          date: entryDate,
-          vendor: itemVendor,
-          productId,
-          productName: itemName,
-          quantity: itemQty,
-          unitPrice: itemPrice,
-          expiryDate,
-          buyer: finalOperator,
-          operator: finalOperator,
-          paymentMethod: itemMethod,
-          status: itemStatus
-        }
+      // 查現有產品 (productName → productId)
+      const existingProducts = await prisma.product.findMany({
+        select: { productId: true, productName: true }
       });
+      const nameToId: Record<string, string> = {};
+      existingProducts.forEach(p => { nameToId[p.productName] = p.productId; });
 
-      // 寫入 Inventory (STOCK)
-      await prisma.inventory.create({
-        data: {
-          batchId: getUuid(),
-          productId,
-          productName: itemName,
-          quantity: itemQty,
-          expiryDate,
-          entryDate,
-          type: 'STOCK',
-          cost: itemPrice
+      let count = 0;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const itemVendor = (item.vendor || payload.vendor || '').trim();
+        const itemName = (item.productName || '').trim();
+        const itemQty = Number(item.quantity) || 0;
+        const itemPrice = Number(item.price) || 0;
+        const itemMethod = item.paymentMethod || 'CASH';
+        const itemStatus = itemMethod === 'CREDIT' ? 'UNPAID' : 'PAID';
+
+        // 解析有效期限
+        let expiryDate: Date | null = null;
+        if (item.expiry && String(item.expiry).trim()) {
+          const d = new Date(item.expiry);
+          if (!isNaN(d.getTime())) expiryDate = d;
         }
-      });
 
-      count++;
-    }
+        // 自動建立不存在的產品
+        let productId = nameToId[itemName];
+        if (!productId && itemName) {
+          productId = getUuid();
+          nameToId[itemName] = productId;
 
-    return { success: true, count };
+          const settings = newProductSettings[itemName] || {};
+          await prisma.product.create({
+            data: {
+              productId,
+              productName: itemName,
+              category: 'General',
+              defaultPrice: itemPrice,
+              isActive: true
+            }
+          });
+        }
+
+        if (!productId) continue;
+
+        // 確定唯一的 purchaseId
+        const purchaseId = `${submissionId || 'pur'}_${i}_${getUuid().slice(0, 8)}`;
+
+        // 寫入 Purchase
+        await prisma.purchase.create({
+          data: {
+            purchaseId,
+            date: entryDate,
+            vendor: itemVendor,
+            productId,
+            productName: itemName,
+            quantity: itemQty,
+            unitPrice: itemPrice,
+            expiryDate,
+            buyer: finalOperator,
+            operator: finalOperator,
+            paymentMethod: itemMethod,
+            status: itemStatus
+          }
+        });
+
+        // 寫入 Inventory (STOCK)
+        await prisma.inventory.create({
+          data: {
+            batchId: getUuid(),
+            productId,
+            productName: itemName,
+            quantity: itemQty,
+            expiryDate,
+            entryDate,
+            type: 'STOCK',
+            cost: itemPrice
+          }
+        });
+
+        count++;
+      }
+
+      return { success: true, count };
+    });
   },
-
-  // ============================================================
   // 3. 廠商預設付款方式
   // ============================================================
   async saveVendorDefault(payload: any) {
@@ -322,48 +321,50 @@ export const PurchaseService = {
     const { id } = payload;
     if (!id) throw new Error('缺少單據 ID');
 
-    const purchase = await prisma.purchase.findFirst({
-      where: { purchaseId: id }
-    });
-    if (!purchase) throw new Error('找不到進貨紀錄');
-    if (purchase.status === 'VOID') throw new Error('此單據已作廢');
-
-    const opName = user ? (user.username || user.displayName || 'Unknown') : 'Unknown';
-
-    // 1. 標記 VOID
-    await prisma.purchase.update({
-      where: { purchaseId: id },
-      data: { status: 'VOID', operator: `VOID_BY: ${opName}` }
-    });
-
-    // 2. 扣回庫存
-    if (purchase.quantity > 0) {
-      await prisma.inventory.create({
-        data: {
-          batchId: getUuid(),
-          productId: purchase.productId,
-          productName: purchase.productName || '',
-          quantity: -purchase.quantity,
-          expiryDate: purchase.expiryDate,
-          entryDate: new Date(),
-          type: 'STOCK',
-          cost: purchase.unitPrice
-        }
+    return runInTransaction(async () => {
+      const purchase = await prisma.purchase.findFirst({
+        where: { purchaseId: id }
       });
-    }
+      if (!purchase) throw new Error('找不到進貨紀錄');
+      if (purchase.status === 'VOID') throw new Error('此單據已作廢');
 
-    return {
-      success: true,
-      originalRecord: {
-        vendor: purchase.vendor,
-        productName: purchase.productName || '',
-        productId: purchase.productId,
-        quantity: purchase.quantity,
-        unitPrice: Number(purchase.unitPrice),
-        expiry: purchase.expiryDate,
-        paymentMethod: purchase.paymentMethod || 'CASH'
+      const opName = user ? (user.username || user.displayName || 'Unknown') : 'Unknown';
+
+      // 1. 標記 VOID
+      await prisma.purchase.update({
+        where: { purchaseId: id },
+        data: { status: 'VOID', operator: `VOID_BY: ${opName}` }
+      });
+
+      // 2. 扣回庫存
+      if (purchase.quantity > 0) {
+        await prisma.inventory.create({
+          data: {
+            batchId: getUuid(),
+            productId: purchase.productId,
+            productName: purchase.productName || '',
+            quantity: -purchase.quantity,
+            expiryDate: purchase.expiryDate,
+            entryDate: new Date(),
+            type: 'STOCK',
+            cost: purchase.unitPrice
+          }
+        });
       }
-    };
+
+      return {
+        success: true,
+        originalRecord: {
+          vendor: purchase.vendor,
+          productName: purchase.productName || '',
+          productId: purchase.productId,
+          quantity: purchase.quantity,
+          unitPrice: Number(purchase.unitPrice),
+          expiry: purchase.expiryDate,
+          paymentMethod: purchase.paymentMethod || 'CASH'
+        }
+      };
+    });
   },
 
   // ============================================================
@@ -373,60 +374,62 @@ export const PurchaseService = {
     const { id, actualQty, actualPrice } = payload;
     if (!id) throw new Error('缺少單據 ID');
 
-    const purchase = await prisma.purchase.findFirst({
-      where: { purchaseId: id }
-    });
-    if (!purchase) throw new Error('找不到該筆在途叫貨紀錄');
-    if (purchase.status !== 'ORDERED') throw new Error('此單據非待驗收狀態，或已驗收過');
+    return runInTransaction(async () => {
+      const purchase = await prisma.purchase.findFirst({
+        where: { purchaseId: id }
+      });
+      if (!purchase) throw new Error('找不到該筆在途叫貨紀錄');
+      if (purchase.status !== 'ORDERED') throw new Error('此單據非待驗收狀態，或已驗收過');
 
-    const finalQty = actualQty !== undefined ? Number(actualQty) : purchase.quantity;
-    const finalPrice = actualPrice !== undefined ? Number(actualPrice) : Number(purchase.unitPrice);
-    const verifyDate = new Date();
+      const finalQty = actualQty !== undefined ? Number(actualQty) : purchase.quantity;
+      const finalPrice = actualPrice !== undefined ? Number(actualPrice) : Number(purchase.unitPrice);
+      const verifyDate = new Date();
 
-    const paymentMethod = purchase.paymentMethod || 'CASH';
-    const newStatus = paymentMethod === 'CREDIT' ? 'UNPAID' : 'PAID';
-    const operatorName = user ? (user.displayName || user.name || user.username || 'Unknown') : 'System';
+      const paymentMethod = purchase.paymentMethod || 'CASH';
+      const newStatus = paymentMethod === 'CREDIT' ? 'UNPAID' : 'PAID';
+      const operatorName = user ? (user.displayName || user.name || user.username || 'Unknown') : 'System';
 
-    // 格式化原下單時間
-    const oldDateStr = purchase.date.toISOString().replace('T', ' ').substring(0, 16);
-    const oldNote = purchase.operator || '';
-    const newNote = `[下單:${oldDateStr}] [驗收:${operatorName}] ${oldNote}`.trim();
+      // 格式化原下單時間
+      const oldDateStr = purchase.date.toISOString().replace('T', ' ').substring(0, 16);
+      const oldNote = purchase.operator || '';
+      const newNote = `[下單:${oldDateStr}] [驗收:${operatorName}] ${oldNote}`.trim();
 
-    // 1. 更新 Purchase 狀態與實到數量、單價
-    await prisma.purchase.update({
-      where: { purchaseId: id },
-      data: {
-        date: verifyDate,
-        quantity: finalQty,
-        unitPrice: finalPrice,
-        status: newStatus,
-        operator: newNote
-      }
-    });
-
-    // 2. 正式寫入庫存日誌 (STOCK)
-    if (finalQty > 0) {
-      await prisma.inventory.create({
+      // 1. 更新 Purchase 狀態與實到數量、單價
+      await prisma.purchase.update({
+        where: { purchaseId: id },
         data: {
-          batchId: getUuid(),
-          productId: purchase.productId,
-          productName: purchase.productName || '',
+          date: verifyDate,
           quantity: finalQty,
-          expiryDate: purchase.expiryDate,
-          entryDate: verifyDate,
-          type: 'STOCK',
-          cost: finalPrice
+          unitPrice: finalPrice,
+          status: newStatus,
+          operator: newNote
         }
       });
 
-      // 3. 更新 Product 最新成本
-      await prisma.product.update({
-        where: { productId: purchase.productId },
-        data: { defaultPrice: finalPrice }
-      });
-    }
+      // 2. 正式寫入庫存日誌 (STOCK)
+      if (finalQty > 0) {
+        await prisma.inventory.create({
+          data: {
+            batchId: getUuid(),
+            productId: purchase.productId,
+            productName: purchase.productName || '',
+            quantity: finalQty,
+            expiryDate: purchase.expiryDate,
+            entryDate: verifyDate,
+            type: 'STOCK',
+            cost: finalPrice
+          }
+        });
 
-    return { success: true, actualQty: finalQty, actualPrice: finalPrice };
+        // 3. 更新 Product 最新成本
+        await prisma.product.update({
+          where: { productId: purchase.productId },
+          data: { defaultPrice: finalPrice }
+        });
+      }
+
+      return { success: true, actualQty: finalQty, actualPrice: finalPrice };
+    });
   },
 
   async getVendors() {
