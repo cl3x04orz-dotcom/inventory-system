@@ -425,10 +425,10 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                                     {/* AI 包裝與發貨階梯 */}
                                                     <div className="flex flex-col gap-2">
-                                                        <span className="text-[10px] font-bold text-[var(--text-primary)]">📦 發貨包裝與階梯</span>
+                                                        <span className="text-xs md:text-sm font-semibold text-[var(--text-primary)]">📦 發貨包裝與階梯</span>
                                                         <div className="grid grid-cols-2 gap-2">
                                                             <div className="flex flex-col gap-1">
-                                                                <span className="text-[9px] text-[var(--text-secondary)] font-medium">整箱包裝數 (一箱)</span>
+                                                                <span className="text-[11px] md:text-xs text-[var(--text-secondary)] font-medium">整箱包裝數 (一箱)</span>
                                                                 <input
                                                                     type="number"
                                                                     className="input-field text-xs p-2"
@@ -439,7 +439,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 />
                                                             </div>
                                                             <div className="flex flex-col gap-1">
-                                                                <span className="text-[9px] text-[var(--text-secondary)] font-medium">發貨階梯 (逗號分隔)</span>
+                                                                <span className="text-[11px] md:text-xs text-[var(--text-secondary)] font-medium">發貨階梯 (逗號分隔)</span>
                                                                 <input
                                                                     type="text"
                                                                     className="input-field text-xs p-2 font-mono"
@@ -454,10 +454,10 @@ export default function ProductManagementPage({ user, apiUrl }) {
 
                                                     {/* 進位門檻與上限 */}
                                                     <div className="flex flex-col gap-2">
-                                                        <span className="text-[10px] font-bold text-[var(--text-primary)]">⚖️ 進位門檻與數量上限</span>
+                                                        <span className="text-xs md:text-sm font-semibold text-[var(--text-primary)]">⚖️ 進位門檻與數量上限</span>
                                                         <div className="grid grid-cols-2 gap-2">
                                                             <div className="flex flex-col gap-1">
-                                                                <span className="text-[9px] text-[var(--text-secondary)] font-medium">門檻 (尾數多於此即進箱)</span>
+                                                                <span className="text-[11px] md:text-xs text-[var(--text-secondary)] font-medium">門檻 (尾數多於此即進箱)</span>
                                                                 <input
                                                                     type="number"
                                                                     className="input-field text-xs p-2 text-center"
@@ -468,7 +468,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 />
                                                             </div>
                                                             <div className="flex flex-col gap-1">
-                                                                <span className="text-[9px] text-[var(--text-secondary)] font-medium">最大建議量 (0為無限制)</span>
+                                                                <span className="text-[11px] md:text-xs text-[var(--text-secondary)] font-medium">最大建議量 (0為無限制)</span>
                                                                 <input
                                                                     type="number"
                                                                     className="input-field text-xs p-2 text-center"
@@ -484,7 +484,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                     {/* 智慧領貨抑制 */}
                                                     <div className="flex flex-col gap-2 md:pl-4 md:border-l border-[var(--border-primary)]/50">
                                                         <div className="flex justify-between items-center">
-                                                            <span className="text-[10px] font-bold text-[var(--text-primary)]">🧠 智慧散貨抑制</span>
+                                                            <span className="text-xs md:text-sm font-semibold text-[var(--text-primary)]">🧠 智慧散貨抑制</span>
                                                             <label className="relative inline-flex items-center cursor-pointer">
                                                                 <input
                                                                     type="checkbox"
@@ -498,7 +498,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 <div className="w-9 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
                                                             </label>
                                                         </div>
-                                                        <p className="text-[10px] text-[var(--text-secondary)] font-medium leading-relaxed mt-1">
+                                                        <p className="text-xs text-[var(--text-secondary)] font-medium leading-relaxed mt-1">
                                                             啟用後，若預估需求過低，且車上剩餘量已過半箱，AI 會自動將領貨量歸零，避免出車只為領取極少量的散貨。
                                                         </p>
                                                     </div>
