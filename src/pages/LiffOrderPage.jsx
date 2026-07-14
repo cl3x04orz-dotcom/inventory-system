@@ -1127,59 +1127,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
       setOrderTime(new Date().toLocaleString("zh-TW", { hour12: false }));
       setSuccessOrderTotal(useWallet ? Math.max(0, cartTotal - maxDeduction) : cartTotal);
 
-      // 判斷是否為大樓群組客，以及是否為白天時段 (08:00 - 22:00)
-      const isGroupCustomer = (!!urlBuilding && urlBuilding !== "一般散客") || (!!sourceGroup && sourceGroup !== "一般散客" && groupBindings[sourceGroup] && groupBindings[sourceGroup] !== "一般散客");
-      let shouldSendLiffMsg = false;
-      let localIsNight = false;
-
-      if (isGroupCustomer) {
-        const now = new Date();
-        const hour = now.getHours();
-        const min = now.getMinutes();
-        const currentMin = hour * 60 + min;
-        const startMin = 8 * 60; // 08:00
-        const endMin = 22 * 60;  // 22:00
-
-        if (currentMin >= startMin && currentMin <= endMin) {
-          shouldSendLiffMsg = true;
-        } else {
-          localIsNight = true;
-          setIsNightOrder(true);
-        }
-      }
-
       setCart({});
-
-      if (localIsNight) {
-        alert("訂單已成功送出！因夜深了，系統將不打擾群組鄰居，明早會為您排單出貨。");
-      }
-
-      // LINE 喊單發送 (僅限群組客且在白天)
-      if (shouldSendLiffMsg && isLiffInitialized && window.liff && window.liff.isInClient()) {
-        try {
-          const itemsText = cartItems
-            .map(
-              (i) => ` - ${i.name} x ${i.qty}${i.remark ? " " + i.remark : ""}`,
-            )
-            .join("\n");
-          const bName =
-            selectedBuilding === "其它"
-              ? otherBuildingText.trim()
-              : selectedBuilding;
-          const liffMsg = `【米立微 一鍵喊單】\n我已下單完成！\n單號：${res.orderId}\n大樓：${bName}\n戶號：${detailAddress.trim()}\n明細：\n${itemsText}\n金額：$${cartTotal}\n付款：${paymentMethod}`;
-
-          await window.liff.sendMessages([
-            {
-              type: "text",
-              text: liffMsg,
-            },
-          ]);
-          console.log("LIFF message sent successfully");
-        } catch (e) {
-          console.error("Failed to send LIFF message:", e);
-        }
-      }
-
       setStep("success");
     } catch (err) {
       alert("送出訂單失敗: " + err.message);
@@ -1232,13 +1180,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
             ))}
           </div>
 
-          {/* 夜間靜音提示 */}
-          {isNightOrder && (
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-800">
-              <p className="font-bold mb-1">貼心提示</p>
-              <p>訂單已成功送出！因夜深了，系統將不打擾群組鄰居，明早會為您排單出貨。</p>
-            </div>
-          )}
+
 
           {/* 付款說明 */}
           {paymentMethod === "現金" && (
