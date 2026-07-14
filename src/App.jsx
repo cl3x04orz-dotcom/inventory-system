@@ -309,10 +309,12 @@ function AppContent() {
 
             // 2. 判斷是否為 LIFF 頁面
             const params = new URLSearchParams(window.location.search);
+            const isInLineBrowser = /Line/i.test(navigator.userAgent);
             const isLiff = params.get('page') === 'liffOrder' ||
                 params.has('building') ||
                 params.has('grp') ||
                 params.has('liff.state') ||
+                isInLineBrowser ||
                 window.location.pathname.includes('/order') ||
                 (window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === 'liffOrder');
 
@@ -381,10 +383,12 @@ function AppContent() {
         if (isInitializing) return;
 
         const params = new URLSearchParams(window.location.search);
+        const isInLineBrowser = /Line/i.test(navigator.userAgent);
         const isLiff = params.get('page') === 'liffOrder' ||
             params.has('building') ||
             params.has('grp') ||
             params.has('liff.state') ||
+            isInLineBrowser ||
             window.location.pathname.includes('/order') ||
             (window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === 'liffOrder');
 
