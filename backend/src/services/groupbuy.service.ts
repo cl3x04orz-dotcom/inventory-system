@@ -316,6 +316,24 @@ export const GroupBuyService = {
         endTime: end_time || null
       }
     });
+
+    // 自動同步：如果在 GroupBuyCommunity 中找不到同名社區，自動新增
+    const existingComm = await prisma.groupBuyCommunity.findFirst({
+      where: { communityName: building }
+    });
+    if (!existingComm) {
+      const code = 'C' + Math.random().toString(36).substring(2, 7).toUpperCase();
+      await prisma.groupBuyCommunity.create({
+        data: {
+          communityId: code,
+          communityCode: code,
+          communityName: building,
+          status: 'ACTIVE',
+          orderingMode: 'OPEN'
+        }
+      });
+    }
+
     return { success: true };
   },
 
@@ -346,6 +364,30 @@ export const GroupBuyService = {
   async v2_getLiffInitData(payload: any, user: any) {
     const commCode: string = payload?.c || '';
     const buildingName: string = payload?.building || '';
+
+    // 自動同步：如果該大樓有開團設定，但尚未在 GroupBuyCommunity 建立同名社區，立即在線自動修復
+    if (buildingName) {
+      const bSetting = await prisma.buildingSetting.findUnique({
+        where: { building: buildingName }
+      });
+      if (bSetting) {
+        const existingComm = await prisma.groupBuyCommunity.findFirst({
+          where: { communityName: buildingName }
+        });
+        if (!existingComm) {
+          const code = 'C' + Math.random().toString(36).substring(2, 7).toUpperCase();
+          await prisma.groupBuyCommunity.create({
+            data: {
+              communityId: code,
+              communityCode: code,
+              communityName: buildingName,
+              status: 'ACTIVE',
+              orderingMode: 'OPEN'
+            }
+          });
+        }
+      }
+    }
 
     // 找社區：優先 communityId 精確匹配(c參數)，其次 communityName 匹配(building參數)，最後 fallback 第一筆 ACTIVE
     const communities = await prisma.groupBuyCommunity.findMany({
