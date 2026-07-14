@@ -433,8 +433,8 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                     type="number"
                                                                     className="input-field text-xs p-2"
                                                                     placeholder="例：24"
-                                                                    value={product.packSize || 1}
-                                                                    onChange={(e) => handleFieldChange(product.id, 'packSize', e.target.value !== '' ? Number(e.target.value) : 1)}
+                                                                    value={product.packSize === '' || product.packSize === undefined || product.packSize === null || product.packSize === 1 ? '' : product.packSize}
+                                                                    onChange={(e) => handleFieldChange(product.id, 'packSize', e.target.value !== '' ? Number(e.target.value) : '')}
                                                                     onBlur={(e) => handleSaveProduct(product.id, { packSize: e.target.value !== '' ? Number(e.target.value) : 1 })}
                                                                 />
                                                             </div>
@@ -462,8 +462,8 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                     type="number"
                                                                     className="input-field text-xs p-2 text-center"
                                                                     placeholder="例：5"
-                                                                    value={product.roundThreshold !== undefined ? product.roundThreshold : 99}
-                                                                    onChange={(e) => handleFieldChange(product.id, 'roundThreshold', e.target.value !== '' ? Number(e.target.value) : 99)}
+                                                                    value={product.roundThreshold === '' || product.roundThreshold === undefined || product.roundThreshold === null || product.roundThreshold === 99 ? '' : product.roundThreshold}
+                                                                    onChange={(e) => handleFieldChange(product.id, 'roundThreshold', e.target.value !== '' ? Number(e.target.value) : '')}
                                                                     onBlur={(e) => handleSaveProduct(product.id, { roundThreshold: e.target.value !== '' ? Number(e.target.value) : 99 })}
                                                                 />
                                                             </div>
@@ -473,8 +473,8 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                     type="number"
                                                                     className="input-field text-xs p-2 text-center"
                                                                     placeholder="無"
-                                                                    value={product.maxSuggestion || 0}
-                                                                    onChange={(e) => handleFieldChange(product.id, 'maxSuggestion', e.target.value !== '' ? Number(e.target.value) : 0)}
+                                                                    value={product.maxSuggestion === '' || product.maxSuggestion === undefined || product.maxSuggestion === null || product.maxSuggestion === 0 ? '' : product.maxSuggestion}
+                                                                    onChange={(e) => handleFieldChange(product.id, 'maxSuggestion', e.target.value !== '' ? Number(e.target.value) : '')}
                                                                     onBlur={(e) => handleSaveProduct(product.id, { maxSuggestion: e.target.value !== '' ? Number(e.target.value) : 0 })}
                                                                 />
                                                             </div>
