@@ -680,7 +680,13 @@ export default function LiffOrderPage({ user, apiUrl }) {
     }
   }, [lockedBuilding]);
 
-  const isGeneralUser = selectedBuilding === "一般用戶" || selectedBuilding === "一般散客";
+  const isGeneralUser = 
+    selectedBuilding === "一般用戶" || 
+    selectedBuilding === "一般散客" || 
+    selectedBuilding === "上線下單" || 
+    selectedBuilding === "線上下單" || 
+    selectedBuilding === "一般常態" ||
+    selectedBuilding === "常態零售";
 
   // ── 分類邏輯 ─────────────────────────────────────────────────
   const categories = useMemo(() => {
@@ -939,8 +945,16 @@ export default function LiffOrderPage({ user, apiUrl }) {
     const bName =
       selectedBuilding === "其它" ? otherBuildingText.trim() : selectedBuilding;
     
-    // 如果是一般用戶，大樓名是 "一般用戶" 或 "一般散客"，後面拼上外送地址與公司名稱
-    if (bName === "一般用戶" || bName === "一般散客") {
+    const isGeneral = 
+      bName === "一般用戶" || 
+      bName === "一般散客" || 
+      bName === "上線下單" || 
+      bName === "線上下單" || 
+      bName === "一般常態" ||
+      bName === "常態零售";
+
+    // 如果是一般散客用戶，大樓名是散客標籤，後面拼上完整外送地址與公司名稱
+    if (isGeneral) {
       const baseAddr = detailAddress.trim();
       const comp = companyName.trim();
       if (comp) {
