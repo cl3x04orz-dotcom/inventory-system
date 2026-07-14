@@ -2132,13 +2132,25 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
         {/* 團購限時防呆 Banner 提示 */}
         {gbStatus.message && (
-          <div className={`px-4 py-2 text-xs font-bold text-center border-t border-[var(--border-primary)] ${gbStatus.status === 'upcoming'
-              ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-              : gbStatus.status === 'ended'
-                ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
-                : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+          <div className={`px-4 py-2 text-xs font-bold flex flex-col items-center justify-center border-t border-[var(--border-primary)] ${
+              gbStatus.status === 'upcoming'
+                ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                : gbStatus.status === 'ended'
+                  ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                  : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
             }`}>
-            {gbStatus.message}
+            {gbStatus.message.includes(' (') ? (
+              <>
+                <div className="flex items-center justify-center gap-1">
+                  <span>{gbStatus.message.split(' (')[0]}</span>
+                </div>
+                <div className="text-[10px] opacity-90 mt-0.5 font-normal tracking-wide">
+                  ({gbStatus.message.split(' (')[1].replace(')', '')})
+                </div>
+              </>
+            ) : (
+              <div className="text-center">{gbStatus.message}</div>
+            )}
           </div>
         )}
 
