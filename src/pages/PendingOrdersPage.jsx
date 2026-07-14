@@ -646,7 +646,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     };
 
     return (
-        <div className="max-w-6xl mx-auto h-[calc(100vh-6rem)] flex flex-col p-4 gap-4">
+        <div className="max-w-6xl mx-auto min-h-screen md:h-[calc(100vh-6rem)] flex flex-col p-4 gap-4">
             {/* Header Area */}
             <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shadow-sm gap-4">
                 <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
@@ -805,7 +805,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             </div>
 
             {/* Orders Area */}
-            <div className="flex-1 overflow-y-auto pb-6">
+            <div className="flex-1 overflow-y-visible md:overflow-y-auto pb-6">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-3 text-[var(--text-secondary)]">
                         <RefreshCw className="animate-spin text-blue-500" size={36} />
