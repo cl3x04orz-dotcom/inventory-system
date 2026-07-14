@@ -375,33 +375,24 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
         setIsBatchProcessing(true);
         setLoading(true);
+        setBatchMessage(`正在更新 ${selectedOrderIds.length} 筆訂單的付款狀態...`);
         
-        let successCount = 0;
-        let failCount = 0;
-
-        for (let i = 0; i < selectedOrderIds.length; i++) {
-            const orderId = selectedOrderIds[i];
-            setBatchMessage(`正在更新第 ${i + 1} / ${selectedOrderIds.length} 筆訂單的付款狀態...`);
-            try {
-                const res = await callGAS(apiUrl, 'updatePendingOrder', { 
-                    orderId, 
-                    paymentStatus: '已付款' 
-                }, user.token);
-                if (res && res.error) {
-                    failCount++;
-                } else {
-                    successCount++;
-                }
-            } catch (err) {
-                failCount++;
+        try {
+            const res = await callGAS(apiUrl, 'batchConfirmPayments', { 
+                orderIds: selectedOrderIds 
+            }, user.token);
+            if (res && res.error) {
+                throw new Error(res.error);
             }
+            alert(`批次確認收款執行完畢！共更新 ${selectedOrderIds.length} 筆訂單。`);
+        } catch (err) {
+            alert(`批次收款失敗: ${err.message}`);
+        } finally {
+            setSelectedOrderIds([]);
+            setIsBatchProcessing(false);
+            setBatchMessage('');
+            fetchOrders();
         }
-
-        alert(`批次確認收款執行完畢！\n成功：${successCount} 筆\n失敗：${failCount} 筆`);
-        setSelectedOrderIds([]);
-        setIsBatchProcessing(false);
-        setBatchMessage('');
-        fetchOrders();
     };
 
     // 批次確認出貨邏輯
@@ -413,30 +404,53 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
         setIsBatchProcessing(true);
         setLoading(true);
+        setBatchMessage(`正在出貨 ${selectedOrderIds.length} 筆訂單...`);
         
-        let successCount = 0;
-        let failCount = 0;
-
-        for (let i = 0; i < selectedOrderIds.length; i++) {
-            const orderId = selectedOrderIds[i];
-            setBatchMessage(`正在出貨第 ${i + 1} / ${selectedOrderIds.length} 筆訂單...`);
-            try {
-                const res = await callGAS(apiUrl, 'confirmPendingOrder', { orderId }, user.token);
-                if (res && res.error) {
-                    failCount++;
-                } else {
-                    successCount++;
-                }
-            } catch (err) {
-                failCount++;
+        try {
+            const res = await callGAS(apiUrl, 'batchConfirmPendingOrders', { 
+                orderIds: selectedOrderIds 
+            }, user.token);
+            if (res && res.error) {
+                throw new Error(res.error);
             }
+            alert(`批次出貨執行完畢！共出貨 ${selectedOrderIds.length} 筆訂單，庫存已扣減！`);
+        } catch (err) {
+            alert(`批次出貨失敗: ${err.message}`);
+        } finally {
+            setSelectedOrderIds([]);
+            setIsBatchProcessing(false);
+            setBatchMessage('');
+            fetchOrders();
+        }
+    };
+
+    // 批次刪除邏輯
+    const handleBatchDelete = async () => {
+        if (selectedOrderIds.length === 0) return;
+        if (!window.confirm(`確定要將這 ${selectedOrderIds.length} 筆選取的訂單全部【刪除】嗎？\n此動作無法復原，請小心操作！`)) {
+            return;
         }
 
-        alert(`批次出貨執行完畢！\n成功：${successCount} 筆\n失敗：${failCount} 筆`);
-        setSelectedOrderIds([]);
-        setIsBatchProcessing(false);
-        setBatchMessage('');
-        fetchOrders();
+        setIsBatchProcessing(true);
+        setLoading(true);
+        setBatchMessage(`正在刪除 ${selectedOrderIds.length} 筆訂單...`);
+
+        try {
+            const res = await callGAS(apiUrl, 'batchDeletePendingOrders', { 
+                orderIds: selectedOrderIds 
+            }, user.token);
+            if (res && res.error) {
+                throw new Error(res.error);
+            }
+            alert(`批次刪除執行完畢！共刪除 ${selectedOrderIds.length} 筆訂單。`);
+        } catch (err) {
+            alert(`批次刪除失敗: ${err.message}`);
+        } finally {
+            setSelectedOrderIds([]);
+            setIsBatchProcessing(false);
+            setBatchMessage('');
+            fetchOrders();
+        }
     };
 
     const handleToggleSelectAll = () => {
@@ -716,6 +730,13 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     </div>
                     {selectedOrderIds.length > 0 && (
                         <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={handleBatchDelete}
+                                className="py-1.5 px-4 text-xs font-bold rounded-lg bg-rose-600 hover:bg-rose-700 active:scale-95 transition-transform text-white shadow-sm flex items-center gap-1"
+                            >
+                                <Trash2 size={14} /> 批次刪除 ({selectedOrderIds.length})
+                            </button>
                             <button
                                 type="button"
                                 onClick={handleBatchConfirmPayment}

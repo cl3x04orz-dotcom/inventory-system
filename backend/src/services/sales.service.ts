@@ -1183,7 +1183,7 @@ export const SalesService = {
 };
 
 // FIFO 庫存扣除邏輯 helper
-async function deductInventory(productId: string, qtyToDeduct: number, targetType: string) {
+export async function deductInventory(productId: string, qtyToDeduct: number, targetType: string) {
   let remaining = qtyToDeduct;
   const consumed: Array<{ expiryDate: Date | null; quantity: number }> = [];
 

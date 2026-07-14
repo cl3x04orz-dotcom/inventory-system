@@ -177,6 +177,12 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       return GroupBuyService.confirmPendingOrder(payload, user);
     case 'deletePendingOrder':
       return GroupBuyService.deletePendingOrder(payload, user);
+    case 'batchConfirmPendingOrders':
+      return GroupBuyService.batchConfirmPendingOrders(payload, user);
+    case 'batchConfirmPayments':
+      return GroupBuyService.batchConfirmPayments(payload, user);
+    case 'batchDeletePendingOrders':
+      return GroupBuyService.batchDeletePendingOrders(payload, user);
     case 'updateOrderStatus':
       return GroupBuyService.updateOrderStatus(payload, user);
     case 'getBuildingSettings':

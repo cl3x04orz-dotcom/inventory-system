@@ -1,5 +1,6 @@
-import { prisma } from '../database/context.js';
+import { prisma, runInTransaction } from '../database/context.js';
 import { ProductService } from './product.service.js';
+import { deductInventory } from './sales.service.js';
 
 function generateOrderId(): string {
   const now = new Date();
@@ -184,6 +185,14 @@ export const GroupBuyService = {
       }
     });
 
+    // 扣除庫存 (FIFO)
+    for (const d of order.details as any[]) {
+      const qty = Number(d.qty || 0);
+      if (qty > 0) {
+        await deductInventory(d.productId, qty, 'ORIGINAL');
+      }
+    }
+
     // 更新訂單狀態
     await prisma.groupBuyOrder.update({
       where: { orderId },
@@ -206,6 +215,60 @@ export const GroupBuyService = {
     // Cascade 會自動刪明細
     await prisma.groupBuyOrder.delete({ where: { orderId } });
     return { success: true, orderId };
+  },
+
+  // 5a. 批次確認出貨
+  async batchConfirmPendingOrders(payload: any, user: any) {
+    if (user.role !== 'BOSS') throw new Error('權限不足');
+    const { orderIds } = payload;
+    if (!orderIds || !Array.isArray(orderIds)) throw new Error('缺少 orderIds');
+
+    return runInTransaction(async () => {
+      for (const orderId of orderIds) {
+        await GroupBuyService.confirmPendingOrder({ orderId }, user);
+      }
+      return { success: true, count: orderIds.length };
+    });
+  },
+
+  // 5b. 批次確認收款
+  async batchConfirmPayments(payload: any, user: any) {
+    if (user.role !== 'BOSS') throw new Error('權限不足');
+    const { orderIds } = payload;
+    if (!orderIds || !Array.isArray(orderIds)) throw new Error('缺少 orderIds');
+
+    return runInTransaction(async () => {
+      const now = new Date();
+      await prisma.groupBuyOrder.updateMany({
+        where: { orderId: { in: orderIds } },
+        data: { paymentStatus: '已付款', updatedAt: now }
+      });
+      return { success: true, count: orderIds.length };
+    });
+  },
+
+  // 5c. 批次刪除 pending 訂單
+  async batchDeletePendingOrders(payload: any, user: any) {
+    if (user.role !== 'BOSS') throw new Error('權限不足');
+    const { orderIds } = payload;
+    if (!orderIds || !Array.isArray(orderIds)) throw new Error('缺少 orderIds');
+
+    return runInTransaction(async () => {
+      // 先確認都是 PENDING
+      const orders = await prisma.groupBuyOrder.findMany({
+        where: { orderId: { in: orderIds } }
+      });
+      for (const order of orders) {
+        if (order.status !== 'PENDING') {
+          throw new Error(`訂單 ${order.orderId} 不是 PENDING 狀態，無法刪除`);
+        }
+      }
+
+      await prisma.groupBuyOrder.deleteMany({
+        where: { orderId: { in: orderIds } }
+      });
+      return { success: true, count: orderIds.length };
+    });
   },
 
   // 6. 快速變更訂單狀態
