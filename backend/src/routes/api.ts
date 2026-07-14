@@ -57,6 +57,7 @@ const actionPermissions: Record<string, string> = {
   deleteUser: 'system_config',
   updateUserPermissions: 'system_config',
   updateUserStatus: 'system_config',
+  updateUserPassword: 'system_config',
 
   getActivityLogs: 'system_activity_logs'
 };

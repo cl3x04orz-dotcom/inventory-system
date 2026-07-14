@@ -8,6 +8,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
+import fs from 'fs';
+if (process.platform === 'darwin' && !process.env.SSL_CERT_FILE) {
+  const defaultMacCert = '/etc/ssl/cert.pem';
+  if (fs.existsSync(defaultMacCert)) {
+    process.env.SSL_CERT_FILE = defaultMacCert;
+  }
+}
+
 export const prisma = new PrismaClient();
 
 // Storage to hold the active TransactionClient during a transaction context

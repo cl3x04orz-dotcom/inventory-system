@@ -198,6 +198,20 @@ export const UserService = {
     return { success: true };
   },
 
+  async updateUserPassword(payload: any) {
+    const { username, password } = payload;
+    if (!username || !password) return { error: 'Missing parameters' };
+
+    const passwordHash = generateHash(String(password));
+
+    await prisma.user.update({
+      where: { username: String(username).trim() },
+      data: { passwordHash }
+    });
+
+    return { success: true };
+  },
+
   // 自動續約 Token — 讓前端不用重新登入
   async renewToken(payload: any, user: any) {
     if (!user || !user.username) {

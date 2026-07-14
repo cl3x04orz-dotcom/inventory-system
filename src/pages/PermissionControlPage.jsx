@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, UserPlus, Trash2, Save, RefreshCw, AlertTriangle, CheckSquare } from 'lucide-react';
+import { Shield, UserPlus, Trash2, Save, RefreshCw, AlertTriangle, CheckSquare, KeyRound } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
 export default function PermissionControlPage({ user, apiUrl }) {
@@ -9,6 +9,8 @@ export default function PermissionControlPage({ user, apiUrl }) {
     const [processMessage, setProcessMessage] = useState('');
     const [newUser, setNewUser] = useState({ username: '', password: '', role: 'VIEWER' });
     const [editingUser, setEditingUser] = useState(null); // The user currently being edited for permissions
+    const [passwordModal, setPasswordModal] = useState(null); // { username } when changing password
+    const [newPassword, setNewPassword] = useState('');
 
     const AVAILABLE_PERMISSIONS = [
         {
@@ -108,6 +110,25 @@ export default function PermissionControlPage({ user, apiUrl }) {
             alert('刪除成功');
         } catch (error) {
             alert('刪除失敗: ' + error.message);
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const handleChangePassword = async () => {
+        if (!newPassword || newPassword.length < 1) {
+            alert('請輸入新密碼');
+            return;
+        }
+        setProcessing(true);
+        setProcessMessage('密碼更新中 請稍候...');
+        try {
+            await callGAS(apiUrl, 'updateUserPassword', { username: passwordModal.username, password: newPassword }, user.token);
+            setPasswordModal(null);
+            setNewPassword('');
+            alert(`${passwordModal.username} 的密碼已更新`);
+        } catch (error) {
+            alert('更新失敗: ' + error.message);
         } finally {
             setProcessing(false);
         }
@@ -375,6 +396,13 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                                         <Shield size={16} />
                                                     </button>
                                                     <button
+                                                        onClick={() => { setPasswordModal({ username: u.username }); setNewPassword(''); }}
+                                                        className="p-2 text-[var(--text-tertiary)] hover:text-amber-400 transition-colors"
+                                                        title="更改密碼"
+                                                    >
+                                                        <KeyRound size={16} />
+                                                    </button>
+                                                    <button
                                                         onClick={() => handleDeleteUser(u.username)}
                                                         className="p-2 text-[var(--text-tertiary)] hover:text-rose-400 transition-colors"
                                                         title="刪除"
@@ -451,6 +479,13 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                                     className="w-12 h-12 flex items-center justify-center text-[var(--accent-blue)] bg-[var(--bg-secondary)] rounded-xl active:scale-90 transition-transform shadow-sm"
                                                 >
                                                     <Shield size={22} />
+                                                </button>
+                                                <button
+                                                    onClick={() => { setPasswordModal({ username: u.username }); setNewPassword(''); }}
+                                                    className="w-12 h-12 flex items-center justify-center text-amber-400 bg-[var(--bg-secondary)] rounded-xl active:scale-90 transition-transform shadow-sm"
+                                                    title="更改密碼"
+                                                >
+                                                    <KeyRound size={22} />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDeleteUser(u.username)}
@@ -588,6 +623,48 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                 className="btn-primary px-6 py-2"
                             >
                                 儲存設定
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Password Change Modal */}
+            {passwordModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+                        <div className="p-6 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+                            <h3 className="text-xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+                                <KeyRound className="text-amber-400" /> 更改密碼
+                            </h3>
+                            <p className="text-[var(--text-secondary)] text-sm mt-1">為 <span className="font-bold text-[var(--text-primary)]">{passwordModal.username}</span> 設定新密碼</p>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="space-y-1">
+                                <label className="text-xs text-[var(--text-secondary)] uppercase font-bold px-1">新密碼</label>
+                                <input
+                                    id="input-new-pwd"
+                                    type="password"
+                                    className="input-field w-full"
+                                    value={newPassword}
+                                    onChange={e => setNewPassword(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') handleChangePassword(); }}
+                                    placeholder="輸入新密碼"
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
+                        <div className="p-6 border-t border-[var(--border-primary)] flex justify-end gap-3 bg-[var(--bg-secondary)]">
+                            <button
+                                onClick={() => { setPasswordModal(null); setNewPassword(''); }}
+                                className="px-4 py-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/5 transition-colors"
+                            >
+                                取消
+                            </button>
+                            <button
+                                onClick={handleChangePassword}
+                                className="btn-primary px-6 py-2"
+                            >
+                                儲存
                             </button>
                         </div>
                     </div>

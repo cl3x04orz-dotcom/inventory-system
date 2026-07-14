@@ -24,6 +24,8 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       return UserService.updateUserPermissions(payload);
     case 'updateUserStatus':
       return UserService.updateUserStatus(payload);
+    case 'updateUserPassword':
+      return UserService.updateUserPassword(payload);
     case 'renewToken':
       return UserService.renewToken(payload, user);
 
