@@ -92,6 +92,7 @@ model Sales {
   workHours     Decimal       @default(0)
   paymentDate   DateTime?
   actualPaymentMethod String?
+  cashCounts    Json?
   details       SalesDetail[]
 
   @@index([date])

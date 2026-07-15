@@ -72,7 +72,8 @@ export const SalesService = {
           operator: finalOperator,
           paymentMethod: method,
           status: status,
-          workHours: Number(workHours || 0)
+          workHours: Number(workHours || 0),
+          cashCounts: payload.cashCounts || {}
         }
       });
 
@@ -255,7 +256,7 @@ export const SalesService = {
         salesData,
         reserve: Number(sale.reserve),
         expenses: parsedExpenses,
-        cashCounts: {}, // Can map from a model field if necessary
+        cashCounts: sale.cashCounts || {},
         originalDate: sale.date,
         originalSaleId: saleId,
         workHours: Number(sale.workHours) || ''
