@@ -11,6 +11,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     const [selectedBuilding, setSelectedBuilding] = useState('全部');
     const [copied, setCopied] = useState(false);
     const [detailCopied, setDetailCopied] = useState(false);
+    const [clientDetailCopied, setClientDetailCopied] = useState(false);
     const [newGroupNames, setNewGroupNames] = useState({});
     const [isBinding, setIsBinding] = useState(false);
 
@@ -602,6 +603,63 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             });
     };
 
+    const handleCopyClientDetailSummary = () => {
+        if (filteredOrders.length === 0) {
+            alert('目前沒有訂單可彙整');
+            return;
+        }
+
+        const lines = [];
+        lines.push(`📋 物流分貨明細 (客戶) (${selectedBuilding === '全部' ? '全部大樓' : selectedBuilding})`);
+        lines.push(`彙整時間：${new Date().toLocaleString('zh-TW')}`);
+        lines.push(`訂單總數：${filteredOrders.length} 筆`);
+        lines.push('----------------------------------------');
+
+        filteredOrders.forEach((order, idx) => {
+            const groupName = groupBindings[order.sourceGroup] || order.sourceGroup || '未知群組';
+            const lineNameStr = order.lineDisplayName ? ` [LINE: ${order.lineDisplayName}]` : '';
+            lines.push(`${idx + 1}. ${order.customerName}${lineNameStr}`);
+            lines.push(`   群組/大樓：${groupName}`);
+            if (order.deliveryAddress) {
+                lines.push(`   地址/自取：${order.deliveryAddress}`);
+            }
+            
+            lines.push('   訂購品項：');
+            order.items.forEach(item => {
+                const remarkStr = item.remark ? ` (${item.remark})` : '';
+                lines.push(`   - ${item.productName} x ${item.qty}${remarkStr}`);
+            });
+            
+            lines.push(`   合計金額：$${order.totalAmount}`);
+            lines.push('----------------------------------------');
+        });
+
+        const textToCopy = lines.join('\n');
+
+        navigator.clipboard.writeText(textToCopy)
+            .then(() => {
+                setClientDetailCopied(true);
+                setTimeout(() => setClientDetailCopied(false), 2000);
+            })
+            .catch(err => {
+                console.error('Failed to copy text: ', err);
+                const textArea = document.createElement('textarea');
+                textArea.value = textToCopy;
+                textArea.style.position = 'fixed';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    setClientDetailCopied(true);
+                    setTimeout(() => setClientDetailCopied(false), 2000);
+                } catch (e) {
+                    alert('複製失敗，請手動複製：\n\n' + textToCopy);
+                }
+                document.body.removeChild(textArea);
+            });
+    };
+
     const unnamedGroups = React.useMemo(() => {
         if (!orders || orders.length === 0) return [];
         const groups = new Set();
@@ -800,6 +858,17 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         }`}
                     >
                         <span>{detailCopied ? '✅ 已複製分貨明細！' : '📋 複製分貨明細'}</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={handleCopyClientDetailSummary}
+                        className={`py-1.5 px-3 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-200 border whitespace-nowrap ${clientDetailCopied 
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent' 
+                            : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)]'
+                        }`}
+                    >
+                        <span>{clientDetailCopied ? '✅ 已複製分貨明細(客戶)！' : '📋 複製分貨明細(客戶)'}</span>
                     </button>
                 </div>
             </div>
