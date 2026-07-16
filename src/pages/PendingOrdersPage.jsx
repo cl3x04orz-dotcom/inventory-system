@@ -562,7 +562,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             if (item.remarks.length > 0) {
                 lines.push(`【口味備註：${item.remarks.join(', ')}】`);
             }
-            const prod = products.find(p => p.id === item.productId);
+            const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
             const isBundle = prod ? prod.isBundle : false;
             const bundleSize = prod ? prod.bundleSize : 1;
             if (isBundle) {
@@ -621,7 +621,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             
             lines.push('   訂購品項：');
             order.items.forEach(item => {
-                const prod = products.find(p => p.id === item.productId);
+                const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
                 const isBundle = prod ? prod.isBundle : false;
                 const bundleSize = prod ? prod.bundleSize : 1;
                 const unitStr = isBundle ? `組 (共 ${item.qty * bundleSize} 瓶)` : '瓶';
@@ -685,7 +685,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             
             lines.push('   訂購品項：');
             order.items.forEach(item => {
-                const prod = products.find(p => p.id === item.productId);
+                const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
                 const isBundle = prod ? prod.isBundle : false;
                 const bundleSize = prod ? prod.bundleSize : 1;
                 const unitStr = isBundle ? `組 (共 ${item.qty * bundleSize} 瓶)` : '瓶';
@@ -1105,7 +1105,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                             {order.items.map((item, idx) => (
                                                 <div key={idx} className="flex flex-col pt-2.5 first:pt-0">
                                                     {(() => {
-                                                        const prod = products.find(p => p.id === item.productId);
+                                                        const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
                                                         const isBundle = prod ? prod.isBundle : false;
                                                         const bundleSize = prod ? prod.bundleSize : 1;
                                                         return (
