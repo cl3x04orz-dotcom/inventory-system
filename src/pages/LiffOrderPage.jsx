@@ -2272,6 +2272,11 @@ export default function LiffOrderPage({ user, apiUrl }) {
                                   有效: {product.expiryDate}
                                 </span>
                               )}
+                              {product.isBundle && (
+                                <span className="inline-block text-[10px] text-amber-800 bg-amber-500/10 border border-amber-200/30 px-1.5 py-0.5 rounded ml-1 font-bold">
+                                  捆裝 {product.bundleSize}入
+                                </span>
+                              )}
                             </div>
                             <div className="flex flex-col mt-1.5">
                               <div className="flex justify-between items-center">
