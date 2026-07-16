@@ -2278,9 +2278,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                                 <div className="flex flex-col">
                                   <span className="text-sm font-bold text-blue-600 font-mono">
                                     $
-                                    {product.has_volume_pricing
-                                      ? product.single_price || product.price
-                                      : product.price}
+                                    {product.single_price || product.price}
                                   </span>
                                   {product.has_volume_pricing &&
                                     product.volume_pricing_settings && (
