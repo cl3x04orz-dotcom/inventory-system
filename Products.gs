@@ -16,7 +16,8 @@ function getProductsService(passedSs, bypassCache) {
     var newCols = [
         '是否上架', '圖片網址', '有效日期', '分類',
         'has_flavor_attributes', 'flavor_choices', 'single_price',
-        'has_volume_pricing', 'volume_pricing_settings'
+        'has_volume_pricing', 'volume_pricing_settings',
+        'is_bundle', 'bundle_size'
     ];
     newCols.forEach(col => {
         if (!headerStrs.includes(col)) {
@@ -78,6 +79,14 @@ function getProductsService(passedSs, bypassCache) {
     var idxVolumePricingSettings = productData[0].findIndex(h => {
         var s = String(h || '').trim().toLowerCase();
         return s === 'volume_pricing_settings' || s === '組合價設定' || s === '滿件組合價設定';
+    });
+    var idxIsBundle = productData[0].findIndex(h => {
+        var s = String(h || '').trim().toLowerCase();
+        return s === 'is_bundle' || s === '是否為捆裝' || s === '是否捆裝';
+    });
+    var idxBundleSize = productData[0].findIndex(h => {
+        var s = String(h || '').trim().toLowerCase();
+        return s === 'bundle_size' || s === '捆裝數量' || s === '捆裝規格';
     });
     
     if (idxName === -1) idxName = 1; // Fallback
@@ -174,6 +183,8 @@ function getProductsService(passedSs, bypassCache) {
             single_price: 0,
             has_volume_pricing: idxHasVolumePricing !== -1 ? (row[idxHasVolumePricing] === true || row[idxHasVolumePricing] === 'TRUE' || row[idxHasVolumePricing] === '是' || row[idxHasVolumePricing] === 1 || row[idxHasVolumePricing] === '1') : false,
             volume_pricing_settings: null,
+            isBundle: idxIsBundle !== -1 ? (row[idxIsBundle] === true || row[idxIsBundle] === 'TRUE' || row[idxIsBundle] === '是' || row[idxIsBundle] === 1 || row[idxIsBundle] === '1') : false,
+            bundleSize: idxBundleSize !== -1 && row[idxBundleSize] !== '' ? (Number(row[idxBundleSize]) || 1) : 1,
             _fromSheet: 'Products'
         };
 
@@ -275,7 +286,7 @@ function updateProductSortOrderService(payload) {
 function updateProductDetailsService(payload, user) {
     if (user.role !== 'BOSS') throw new Error('權限不足');
 
-    const { productId, isActive, imageUrl, expiryDate, has_flavor_attributes, flavor_choices, single_price, has_volume_pricing, volume_pricing_settings } = payload;
+    const { productId, isActive, imageUrl, expiryDate, has_flavor_attributes, flavor_choices, single_price, has_volume_pricing, volume_pricing_settings, price, isBundle, bundleSize } = payload;
     if (!productId) throw new Error('缺少 productId');
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -297,6 +308,11 @@ function updateProductDetailsService(payload, user) {
     const idxImage = headers.findIndex(h => String(h || '').trim() === '圖片網址');
     const idxExpiry = headers.findIndex(h => String(h || '').trim() === '有效日期');
 
+    const idxPrice = headers.findIndex(h => {
+        const s = String(h || '').trim().toLowerCase();
+        return s.includes('單價') || s.includes('價格') || s.includes('price') || s.includes('unitprice');
+    });
+
     const idxHasFlavor = headers.findIndex(h => {
         const s = String(h || '').trim().toLowerCase();
         return s === 'has_flavor_attributes' || s === '是否有多規格口味' || s === '多規格口味';
@@ -316,6 +332,14 @@ function updateProductDetailsService(payload, user) {
     const idxVolumePricingSettings = headers.findIndex(h => {
         const s = String(h || '').trim().toLowerCase();
         return s === 'volume_pricing_settings' || s === '組合價設定' || s === '滿件組合價設定';
+    });
+    const idxIsBundle = headers.findIndex(h => {
+        const s = String(h || '').trim().toLowerCase();
+        return s === 'is_bundle' || s === '是否為捆裝' || s === '是否捆裝';
+    });
+    const idxBundleSize = headers.findIndex(h => {
+        const s = String(h || '').trim().toLowerCase();
+        return s === 'bundle_size' || s === '捆裝數量' || s === '捆裝規格';
     });
 
     let foundRow = -1;
@@ -339,6 +363,9 @@ function updateProductDetailsService(payload, user) {
     if (idxExpiry !== -1 && expiryDate !== undefined) {
         sheet.getRange(foundRow, idxExpiry + 1).setValue(expiryDate || '');
     }
+    if (idxPrice !== -1 && price !== undefined) {
+        sheet.getRange(foundRow, idxPrice + 1).setValue(price !== '' && price !== null && !isNaN(Number(price)) ? Number(price) : '');
+    }
     if (idxHasFlavor !== -1 && has_flavor_attributes !== undefined) {
         sheet.getRange(foundRow, idxHasFlavor + 1).setValue(has_flavor_attributes === true || has_flavor_attributes === 'true');
     }
@@ -357,6 +384,12 @@ function updateProductDetailsService(payload, user) {
             settingsStr = typeof volume_pricing_settings === 'string' ? volume_pricing_settings : JSON.stringify(volume_pricing_settings);
         }
         sheet.getRange(foundRow, idxVolumePricingSettings + 1).setValue(settingsStr);
+    }
+    if (idxIsBundle !== -1 && isBundle !== undefined) {
+        sheet.getRange(foundRow, idxIsBundle + 1).setValue(isBundle === true || isBundle === 'true');
+    }
+    if (idxBundleSize !== -1 && bundleSize !== undefined) {
+        sheet.getRange(foundRow, idxBundleSize + 1).setValue(bundleSize !== '' && bundleSize !== null && !isNaN(Number(bundleSize)) ? Number(bundleSize) : 1);
     }
 
     SpreadsheetApp.flush();

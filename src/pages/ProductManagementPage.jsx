@@ -10,21 +10,42 @@ export default function ProductManagementPage({ user, apiUrl }) {
     const [expandedIds, setExpandedIds] = useState(new Set()); // 展開的商品 ID
     const [savingStatus, setSavingStatus] = useState({}); // { [productId]: 'saving' | 'saved' | 'error' }
     const [lastError, setLastError] = useState({}); // { [productId]: string }
+    const [stockMap, setStockMap] = useState({}); // { [productName]: number }
+    const [stockFilter, setStockFilter] = useState('ALL'); // 'ALL' | 'HAS_STOCK' | 'NO_STOCK'
 
     const fetchProducts = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await callGAS(apiUrl, 'getProducts', {}, user.token);
-            if (Array.isArray(data)) {
-                setProducts(data);
+            const [productsData, inventoryData] = await Promise.all([
+                callGAS(apiUrl, 'getProducts', {}, user.token),
+                callGAS(apiUrl, 'getInventory', {}, user.token).catch(err => {
+                    console.error('Fetch inventory in Product Page failed, fallback to empty:', err);
+                    return [];
+                })
+            ]);
+
+            if (Array.isArray(productsData)) {
+                setProducts(productsData);
                 
                 // 初始化口味輸入框的暫存字串
                 const initialTemp = {};
-                data.forEach(p => {
+                productsData.forEach(p => {
                     initialTemp[p.id] = Array.isArray(p.flavor_choices) ? p.flavor_choices.join(', ') : '';
                 });
                 setTempFlavorChoices(initialTemp);
             }
+
+            // 計算庫存對照表
+            const tempStockMap = {};
+            if (Array.isArray(inventoryData)) {
+                inventoryData.forEach(item => {
+                    const name = item.productName;
+                    const qty = Number(item.quantity) || 0;
+                    tempStockMap[name] = (tempStockMap[name] || 0) + qty;
+                });
+            }
+            setStockMap(tempStockMap);
+
         } catch (error) {
             alert('載入商品失敗: ' + error.message);
         } finally {
@@ -92,6 +113,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 single_price: mergedProduct.single_price,
                 has_volume_pricing: mergedProduct.has_volume_pricing,
                 volume_pricing_settings: mergedProduct.volume_pricing_settings,
+                price: mergedProduct.price,
                 
                 packSize: Number(mergedProduct.packSize || 1),
                 dispatchSteps: parsedSteps,
@@ -131,10 +153,20 @@ export default function ProductManagementPage({ user, apiUrl }) {
         }
     };
 
-    const filtered = products.filter(p => 
-        String(p.name || '').toLowerCase().includes(search.toLowerCase()) ||
-        String(p.id || '').toLowerCase().includes(search.toLowerCase())
-    );
+    const filtered = products.filter(p => {
+        const matchSearch = String(p.name || '').toLowerCase().includes(search.toLowerCase()) ||
+                            String(p.id || '').toLowerCase().includes(search.toLowerCase());
+        if (!matchSearch) return false;
+
+        const qty = stockMap[p.name] || 0;
+        if (stockFilter === 'HAS_STOCK') {
+            return qty > 0;
+        } else if (stockFilter === 'NO_STOCK') {
+            return qty === 0;
+        }
+
+        return true;
+    });
 
     return (
         <div className="max-w-6xl mx-auto h-[calc(100vh-6rem)] flex flex-col p-4 gap-4">
@@ -145,7 +177,17 @@ export default function ProductManagementPage({ user, apiUrl }) {
                     商品屬性
                 </h2>
 
-                <div className="flex gap-2 w-full md:w-auto">
+                <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+                    <select
+                        className="input-field py-2.5 px-3 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)] font-bold cursor-pointer w-40"
+                        value={stockFilter}
+                        onChange={(e) => setStockFilter(e.target.value)}
+                    >
+                        <option value="ALL">📦 顯示全部商品</option>
+                        <option value="HAS_STOCK">🟢 只看有庫存</option>
+                        <option value="NO_STOCK">🔴 只看無庫存</option>
+                    </select>
+
                     <div className="relative flex-1 md:flex-none">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
                         <input
@@ -164,7 +206,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
 
             {/* Product List */}
             <div className="flex-1 overflow-y-auto pb-6">
-                {loading ? (
+                {loading && products.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-3 text-[var(--text-secondary)]">
                         <RefreshCw className="animate-spin text-blue-500" size={36} />
                         <span>載入中，請稍候...</span>
@@ -207,8 +249,12 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                     <span className="bg-[var(--bg-tertiary)] px-1.5 py-0.2 rounded border border-[var(--border-primary)] text-[10px]">ID</span> 
                                                     <span className="truncate max-w-[120px] md:max-w-none">{product.id}</span>
                                                 </div>
-                                                <div className="text-xs font-bold text-blue-600 mt-1">
-                                                    庫存單價：<span className="font-mono text-sm">${product.price}</span>
+                                                <div className="text-xs font-bold text-blue-600 mt-1 flex flex-wrap items-center gap-3">
+                                                    <span>銷售原價：<span className="font-mono text-sm text-slate-700 dark:text-slate-300">${product.single_price || '-'}</span></span>
+                                                    <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700" />
+                                                    <span>庫存成本(進價)：<span className="font-mono text-sm text-amber-600">${product.price || '-'}</span></span>
+                                                    <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700" />
+                                                    <span>當前庫存：<span className={`font-mono text-sm ${ (stockMap[product.name] || 0) > 0 ? 'text-emerald-600 font-extrabold' : 'text-slate-400' }`}>{stockMap[product.name] || 0}</span></span>
                                                 </div>
                                             </div>
                                         </div>
@@ -277,7 +323,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                     {isExpanded && (
                                         <div className="p-5 border-t border-[var(--border-primary)]/40 flex flex-col gap-6 animate-slide-down">
                                             {/* 2. 第一大組：行銷與多規格配置 */}
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
                                                 {/* 圖片網址 */}
                                                 <div className="flex flex-col gap-2 bg-[var(--bg-tertiary)]/30 p-3.5 rounded-xl border border-[var(--border-primary)]/40">
                                                     <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">圖片網址</span>
@@ -326,15 +372,50 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                         onBlur={() => handleSaveProduct(product.id)}
                                                     />
                                                 </div>
+                                                
+                                                {/* 捆裝規格設定 */}
+                                                <div className={`flex flex-col gap-2 p-3.5 rounded-xl border transition-colors ${
+                                                    product.isBundle 
+                                                        ? 'bg-amber-500/5 border-amber-500/20' 
+                                                        : 'bg-[var(--bg-tertiary)]/30 border-[var(--border-primary)]/40'
+                                                }`}>
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">捆裝規格設定</span>
+                                                        <label className="relative inline-flex items-center cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="sr-only peer"
+                                                                checked={!!product.isBundle}
+                                                                onChange={(e) => {
+                                                                    handleFieldChange(product.id, 'isBundle', e.target.checked);
+                                                                    handleSaveProduct(product.id, { isBundle: e.target.checked });
+                                                                }}
+                                                            />
+                                                            <div className="w-9 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                                                        </label>
+                                                    </div>
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-[10px] text-[var(--text-secondary)] font-medium">捆裝數量 (一組幾入)</span>
+                                                        <input
+                                                            type="number"
+                                                            className="input-field text-xs p-2.5 font-bold text-amber-600 dark:text-amber-400 bg-amber-500/5"
+                                                            placeholder="例：4 (四入一組)"
+                                                            disabled={!product.isBundle}
+                                                            value={product.bundleSize === '' || product.bundleSize === undefined || product.bundleSize === null || product.bundleSize === 1 ? '' : product.bundleSize}
+                                                            onChange={(e) => handleFieldChange(product.id, 'bundleSize', e.target.value !== '' ? Number(e.target.value) : '')}
+                                                            onBlur={(e) => handleSaveProduct(product.id, { bundleSize: e.target.value !== '' ? Number(e.target.value) : 1 })}
+                                                        />
+                                                    </div>
+                                                </div>
 
                                                 {/* 階梯組合價 */}
-                                                <div className={`flex flex-col gap-2 p-3.5 rounded-xl border transition-colors ${
+                                                <div className={`lg:col-span-1 flex flex-col gap-3.5 p-3.5 rounded-xl border transition-colors ${
                                                     product.has_volume_pricing 
                                                         ? 'bg-blue-500/5 border-blue-500/20' 
                                                         : 'bg-[var(--bg-tertiary)]/30 border-[var(--border-primary)]/40'
                                                 }`}>
                                                     <div className="flex justify-between items-center">
-                                                        <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">階梯組合價設定</span>
+                                                        <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">階梯組合價與成本設定</span>
                                                         <label className="relative inline-flex items-center cursor-pointer">
                                                             <input
                                                                 type="checkbox"
@@ -348,68 +429,90 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                             <div className="w-9 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
                                                         </label>
                                                     </div>
-                                                    <div className="flex gap-2 items-center">
-                                                        <div className="flex-1 min-w-[70px]">
-                                                            <div className="relative">
-                                                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-bold font-mono">$</span>
-                                                                <input
-                                                                    type="number"
-                                                                    className="input-field text-xs pl-6 p-2"
-                                                                    placeholder="原價"
-                                                                    value={product.single_price || ''}
-                                                                    onChange={(e) => handleFieldChange(product.id, 'single_price', e.target.value !== '' ? Number(e.target.value) : '')}
-                                                                    onBlur={(e) => handleSaveProduct(product.id, { single_price: e.target.value !== '' ? Number(e.target.value) : '' })}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <div className={`flex-[1.5] flex gap-1.5 items-center ${product.has_volume_pricing ? '' : 'opacity-40 select-none pointer-events-none'}`}>
-                                                            <span className="text-[10px] text-[var(--text-tertiary)]">滿</span>
+
+                                                    {/* 第一排：進價與原價 */}
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                         {/* 庫存成本 */}
+                                                         <div className="flex flex-col gap-1">
+                                                             <span className="text-[10px] text-[var(--text-secondary)] font-medium">庫存成本 (進價)</span>
+                                                             <div className="relative" title="進貨單價 / 庫存成本">
+                                                                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-600 font-extrabold font-mono text-[10px]">$</span>
+                                                                 <input
+                                                                     type="number"
+                                                                     className="input-field text-xs pl-6 p-2 bg-amber-500/5 text-amber-600 font-extrabold border-amber-300/40 w-full"
+                                                                     placeholder="進價成本"
+                                                                     value={product.price || ''}
+                                                                     onChange={(e) => handleFieldChange(product.id, 'price', e.target.value !== '' ? Number(e.target.value) : '')}
+                                                                     onBlur={(e) => handleSaveProduct(product.id, { price: e.target.value !== '' ? Number(e.target.value) : '' })}
+                                                                 />
+                                                             </div>
+                                                         </div>
+                                                         {/* 銷售原價 */}
+                                                         <div className="flex flex-col gap-1">
+                                                             <span className="text-[10px] text-[var(--text-secondary)] font-medium">銷售原價 (原價)</span>
+                                                             <div className="relative" title="銷售原價">
+                                                                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 font-bold font-mono text-[10px]">$</span>
+                                                                 <input
+                                                                     type="number"
+                                                                     className="input-field text-xs pl-6 p-2 font-bold text-slate-700 dark:text-slate-300 w-full"
+                                                                     placeholder="銷售原價"
+                                                                     value={product.single_price || ''}
+                                                                     onChange={(e) => handleFieldChange(product.id, 'single_price', e.target.value !== '' ? Number(e.target.value) : '')}
+                                                                     onBlur={(e) => handleSaveProduct(product.id, { single_price: e.target.value !== '' ? Number(e.target.value) : '' })}
+                                                                 />
+                                                             </div>
+                                                         </div>
+                                                    </div>
+
+                                                    {/* 第二排：滿件特惠價 */}
+                                                    <div className={`flex items-center gap-2 pt-2 border-t border-[var(--border-primary)]/40 ${product.has_volume_pricing ? '' : 'opacity-40 select-none pointer-events-none'}`}>
+                                                        <span className="text-[10px] text-[var(--text-secondary)] font-bold whitespace-nowrap">特惠價：滿</span>
+                                                        <input
+                                                            type="number"
+                                                            className="input-field text-xs p-2 w-14 text-center font-bold"
+                                                            placeholder="件"
+                                                            disabled={!product.has_volume_pricing}
+                                                            value={product.volume_pricing_settings?.target_quantity || ''}
+                                                            onChange={(e) => {
+                                                                const settings = {
+                                                                    ...(product.volume_pricing_settings || {}),
+                                                                    target_quantity: e.target.value !== '' ? Number(e.target.value) : 0
+                                                                };
+                                                                handleFieldChange(product.id, 'volume_pricing_settings', settings);
+                                                            }}
+                                                            onBlur={(e) => {
+                                                                const settings = {
+                                                                    ...(product.volume_pricing_settings || {}),
+                                                                    target_quantity: e.target.value !== '' ? Number(e.target.value) : 0
+                                                                };
+                                                                handleSaveProduct(product.id, { volume_pricing_settings: settings });
+                                                            }}
+                                                        />
+                                                        <span className="text-[10px] text-[var(--text-secondary)] font-bold">件</span>
+                                                        <span className="text-[10px] text-[var(--text-secondary)] font-bold">，共</span>
+                                                        <div className="relative flex-1">
+                                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-blue-600 font-bold font-mono text-[10px]">$</span>
                                                             <input
                                                                 type="number"
-                                                                className="input-field text-xs p-2 w-14 text-center font-bold"
-                                                                placeholder="件"
+                                                                className="input-field text-xs pl-6 p-2 font-bold text-blue-600 dark:text-blue-400 w-full"
+                                                                placeholder="組合價總金額"
                                                                 disabled={!product.has_volume_pricing}
-                                                                value={product.volume_pricing_settings?.target_quantity || ''}
+                                                                value={product.volume_pricing_settings?.package_price || ''}
                                                                 onChange={(e) => {
                                                                     const settings = {
                                                                         ...(product.volume_pricing_settings || {}),
-                                                                        target_quantity: e.target.value !== '' ? Number(e.target.value) : 0
+                                                                        package_price: e.target.value !== '' ? Number(e.target.value) : 0
                                                                     };
                                                                     handleFieldChange(product.id, 'volume_pricing_settings', settings);
                                                                 }}
                                                                 onBlur={(e) => {
                                                                     const settings = {
                                                                         ...(product.volume_pricing_settings || {}),
-                                                                        target_quantity: e.target.value !== '' ? Number(e.target.value) : 0
+                                                                        package_price: e.target.value !== '' ? Number(e.target.value) : 0
                                                                     };
                                                                     handleSaveProduct(product.id, { volume_pricing_settings: settings });
                                                                 }}
                                                             />
-                                                            <span className="text-[10px] text-[var(--text-tertiary)]">件</span>
-                                                            <div className="relative flex-1">
-                                                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-bold font-mono">$</span>
-                                                                <input
-                                                                    type="number"
-                                                                    className="input-field text-xs pl-6 p-2 font-bold text-blue-600 dark:text-blue-400"
-                                                                    placeholder="組合價"
-                                                                    disabled={!product.has_volume_pricing}
-                                                                    value={product.volume_pricing_settings?.package_price || ''}
-                                                                    onChange={(e) => {
-                                                                        const settings = {
-                                                                            ...(product.volume_pricing_settings || {}),
-                                                                            package_price: e.target.value !== '' ? Number(e.target.value) : 0
-                                                                        };
-                                                                        handleFieldChange(product.id, 'volume_pricing_settings', settings);
-                                                                    }}
-                                                                    onBlur={(e) => {
-                                                                        const settings = {
-                                                                            ...(product.volume_pricing_settings || {}),
-                                                                            package_price: e.target.value !== '' ? Number(e.target.value) : 0
-                                                                        };
-                                                                        handleSaveProduct(product.id, { volume_pricing_settings: settings });
-                                                                    }}
-                                                                />
-                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -421,8 +524,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                     <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                                                     <span className="text-xs uppercase font-extrabold text-blue-600 dark:text-blue-400 tracking-wider">🤖 AI 領貨補貨進階配置參數</span>
                                                 </div>
-
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                                     {/* AI 包裝與發貨階梯 */}
                                                     <div className="flex flex-col gap-2">
                                                         <span className="text-xs md:text-sm font-semibold text-[var(--text-primary)]">📦 發貨包裝與階梯</span>

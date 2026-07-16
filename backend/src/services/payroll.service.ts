@@ -24,6 +24,7 @@ export const PayrollService = {
       attendanceBonus: 0,
       insurance: 0,
       offDaysStandard: 8,
+      monthlyOffDays: 8, // [Fix] 同步給前端
       bonusTiers: [] as any[],
       empType: 'FULL_TIME',
       hourlyWage: 0,
@@ -51,6 +52,7 @@ export const PayrollService = {
         attendanceBonus: Number(setting.attendanceBonus) || 0,
         insurance: Number(setting.insurance) || 0,
         offDaysStandard: setting.offDaysStandard,
+        monthlyOffDays: setting.offDaysStandard, // [Fix] 同步給前端
         bonusTiers,
         empType: setting.empType || 'FULL_TIME',
         hourlyWage: Number(setting.hourlyWage) || 0,
@@ -88,11 +90,18 @@ export const PayrollService = {
       }
     });
 
+    const dailyRecords: Record<string, any> = {};
+
     salesList.forEach((sale: any) => {
       const dateKey = formatLocalYMD(sale.date);
 
       // 累加當日工時
-      totalWorkHours += Number(sale.workHours) || 0;
+      const wHours = Number(sale.workHours) || 0;
+      totalWorkHours += wHours;
+      if (wHours > 0) {
+        if (!dailyRecords[dateKey]) dailyRecords[dateKey] = {};
+        dailyRecords[dateKey].workHours = (dailyRecords[dateKey].workHours || 0) + wHours;
+      }
 
       // 檢查是否是負數結算 (盤損)
       const finalTotal = Number(sale.finalTotal) || 0;
@@ -136,8 +145,6 @@ export const PayrollService = {
       const dateKey = formatLocalYMD(rec.date);
       effectiveRecords[dateKey] = rec;
     });
-
-    const dailyRecords: Record<string, any> = {};
 
     // 篩選出當月生效的紀錄
     for (const [dateKey, rec] of Object.entries(effectiveRecords)) {

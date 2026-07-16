@@ -88,6 +88,26 @@ export default function PendingOrdersPage({ user, apiUrl }) {
          }
      }, [user.token, activeTab, fetchOrders, fetchProducts, fetchGroupBindings, fetchBuildings]);
 
+    // 當切換到特定大樓時，自動在背景導入今日定期配，實現「全自動無感體驗」
+    useEffect(() => {
+        if (user?.token && activeTab === 'PENDING' && selectedBuilding && selectedBuilding !== '全部') {
+            const autoImport = async () => {
+                try {
+                    const res = await callGAS(apiUrl, 'generateSubscriptionOrders', {
+                        building: selectedBuilding
+                    }, user.token);
+                    
+                    if (res && res.success && res.count > 0) {
+                        fetchOrders();
+                    }
+                } catch (error) {
+                    console.error('Auto import subscriptions failed:', error);
+                }
+            };
+            autoImport();
+        }
+    }, [selectedBuilding, activeTab, user.token, apiUrl, fetchOrders]);
+
     const handleConfirmOrder = async (orderId) => {
         if (!window.confirm(`確定要將訂單 ${orderId} 確認出貨嗎？\n此動作會正式扣減商品庫存，並寫入銷售紀錄！`)) {
             return;
@@ -116,6 +136,34 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             fetchOrders();
         } catch (error) {
             alert('刪除失敗: ' + error.message);
+            setLoading(false);
+        }
+    };
+
+    const handleImportSubscriptions = async () => {
+        if (selectedBuilding === '全部') {
+            alert('請先在左側選單中選擇特定大樓社區（不可為「全部社區大樓」），再進行定期配導入！');
+            return;
+        }
+
+        const confirmMsg = `確定要導入大樓【${selectedBuilding}】今天的定期配/月訂鮮奶訂單嗎？\n系統會自動篩選出今天（星期幾）需送貨的住戶，並自動防重複（已導入過的不會重複導入）。`;
+        if (!window.confirm(confirmMsg)) return;
+
+        setLoading(true);
+        try {
+            const res = await callGAS(apiUrl, 'generateSubscriptionOrders', {
+                building: selectedBuilding
+            }, user.token);
+            
+            if (res && res.error) {
+                throw new Error(res.error);
+            }
+            
+            alert(res.message || `定期配導入成功！共導入 ${res.count} 筆訂單。`);
+            fetchOrders();
+        } catch (error) {
+            console.error('Failed to import subscriptions:', error);
+            alert('導入定期配失敗: ' + error.message);
             setLoading(false);
         }
     };
@@ -704,7 +752,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     };
 
     return (
-        <div className="max-w-6xl mx-auto min-h-screen md:h-[calc(100vh-6rem)] flex flex-col p-4 gap-4">
+        <div className="max-w-6xl mx-auto min-h-screen flex flex-col p-4 gap-4">
             {/* Header Area */}
             <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shadow-sm gap-4">
                 <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
@@ -739,6 +787,16 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     <button onClick={fetchOrders} className="btn-secondary p-2 whitespace-nowrap" title="重新整理">
                         <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
                     </button>
+                    {activeTab === 'PENDING' && (
+                        <button
+                            onClick={handleImportSubscriptions}
+                            className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs px-4.5 py-2.5 rounded-xl shadow-lg shadow-amber-500/10 flex items-center gap-1.5 transition-all whitespace-nowrap"
+                            title="導入今日定期配計畫到此大樓"
+                        >
+                            <Calendar size={16} />
+                            ⚡ 導入今日定期配
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -857,7 +915,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)]'
                         }`}
                     >
-                        <span>{detailCopied ? '✅ 已複製分貨明細！' : '📋 複製分貨明細'}</span>
+                        <span>{detailCopied ? '✅ 已複製分貨明細(業務)！' : '📋 複製分貨明細(業務)'}</span>
                     </button>
 
                     <button
@@ -874,8 +932,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             </div>
 
             {/* Orders Area */}
-            <div className="flex-1 overflow-y-visible md:overflow-y-auto pb-6">
-                {loading ? (
+            <div className="flex-1 overflow-y-visible pb-24 mt-4">
+                {loading && orders.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-3 text-[var(--text-secondary)]">
                         <RefreshCw className="animate-spin text-blue-500" size={36} />
                         <span>訂單資料讀取中...</span>
@@ -885,48 +943,76 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         沒有找到任何訂單。
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                         {filteredOrders.map(order => (
-                            <div key={order.orderId} className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] shadow-sm p-5 flex flex-col justify-between hover:border-blue-500/20 transition-colors">
+                            <div key={order.orderId} className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] shadow-md p-6 flex flex-col justify-between hover:border-blue-500/30 hover:shadow-lg transition-all duration-200">
                                 {/* Order Header */}
                                 <div>
-                                    <div className="flex justify-between items-start mb-3 pb-2 border-b border-[var(--border-primary)]">
+                                    <div className="flex justify-between items-center mb-4 pb-3 border-b border-[var(--border-primary)]">
                                         <div className="flex items-center gap-2">
                                             {activeTab === 'PENDING' && (
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedOrderIds.includes(order.orderId)}
                                                     onChange={() => handleToggleSelectOrder(order.orderId)}
-                                                    className="w-4.5 h-4.5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                                                    className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
                                                 />
                                             )}
-                                            <span className="font-mono font-bold text-base text-[var(--text-primary)]">{order.orderId}</span>
+                                            <div className="flex flex-col">
+                                                <span className="font-mono font-bold text-lg md:text-xl text-[var(--text-primary)]">{order.orderId}</span>
+                                                {order.createdAt && (
+                                                    <span className="text-[11px] text-slate-400 font-medium mt-0.5">
+                                                        ⏱️ {new Date(order.createdAt).toLocaleString('zh-TW', {
+                                                            year: 'numeric',
+                                                            month: '2-digit',
+                                                            day: '2-digit',
+                                                            hour: '2-digit',
+                                                            minute: '2-digit',
+                                                            hour12: false
+                                                        })}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                         <div>
-                                            <span className={`inline-block text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider ${order.status === 'PENDING'
-                                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
-                                                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                                }`}>
-                                                {order.status === 'PENDING' ? '待確認' : '已出貨'}
-                                            </span>
+                                            {order.paymentStatus !== 'off' && order.paymentStatus !== '已付款' && order.paymentStatus !== '已入帳' ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleQuickConfirmPayment(order)}
+                                                    className="text-xs px-2.5 py-1 font-bold rounded bg-white hover:bg-emerald-50 text-emerald-600 border border-emerald-200 hover:border-emerald-300 active:scale-95 transition-all shadow-sm flex items-center gap-0.5"
+                                                    title="一鍵標記為已付款"
+                                                >
+                                                    <Check size={12} /> 確認收款
+                                                </button>
+                                            ) : (
+                                                order.status === 'PENDING' ? (
+                                                    <span className="inline-block text-xs px-2.5 py-1 rounded font-extrabold border bg-white text-blue-600 border-blue-200 uppercase tracking-wider">
+                                                        待出貨
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-block text-xs px-2.5 py-1 rounded font-extrabold border bg-white text-emerald-600 border-emerald-200 uppercase tracking-wider">
+                                                        已出貨
+                                                    </span>
+                                                )
+                                            )}
                                         </div>
                                     </div>
 
                                     {/* Client Details */}
-                                    <div className="space-y-1.5 text-sm mb-4">
-                                        <div className="flex flex-wrap items-center gap-2 text-[var(--text-primary)]">
-                                            <User size={16} className="text-[var(--text-tertiary)] flex-shrink-0" />
-                                            <span className="font-bold">{order.customerName}</span>
+                                    <div className="space-y-2.5 text-base mb-4">
+                                        <div className="flex flex-wrap items-center gap-2.5 text-[var(--text-primary)] text-base md:text-lg">
+                                            <User size={18} className="text-[var(--text-tertiary)] flex-shrink-0" />
+                                            <span className="font-extrabold">{order.customerName}</span>
                                             {order.lineDisplayName && (
-                                                <span className="text-xs text-[var(--text-secondary)] font-medium bg-[var(--bg-tertiary)] border border-[var(--border-primary)] px-1.5 py-0.5 rounded">
+                                                <span className="text-xs text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded font-medium">
                                                     LINE: {order.lineDisplayName}
                                                 </span>
                                             )}
                                             {order.sourceGroup && (
-                                                <span className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 font-bold">
+                                                <span className="bg-white text-slate-600 text-xs px-2 py-0.5 rounded flex items-center gap-1 font-bold border border-slate-200">
                                                     {groupBindings[order.sourceGroup] || order.sourceGroup}
                                                     {groupBindings[order.sourceGroup] && (
-                                                        <span className="opacity-50 text-[9px] font-mono font-medium">({order.sourceGroup})</span>
+                                                        <span className="opacity-60 text-[10px] font-mono font-medium">({order.sourceGroup})</span>
                                                     )}
                                                 </span>
                                             )}
@@ -934,132 +1020,123 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                         
                                         {/* 付款方式與狀態標籤 */}
                                         {order.paymentMethod && (
-                                            <div className="flex flex-wrap items-center gap-1.5 py-0.5">
-                                                <span className={`inline-block text-[10px] px-2 py-0.5 rounded font-black border uppercase tracking-wider ${
+                                            <div className="flex flex-wrap items-center gap-2 py-1">
+                                                <span className={`inline-block text-xs px-2.5 py-0.5 rounded font-extrabold border uppercase tracking-wider ${
                                                     order.paymentMethod === '轉帳' 
-                                                        ? 'bg-amber-50 text-amber-600 border-amber-200' 
+                                                        ? 'bg-indigo-50 text-indigo-600 border-indigo-200' 
                                                         : order.paymentMethod === 'LINE Pay'
                                                         ? 'bg-blue-50 text-blue-600 border-blue-200'
-                                                        : 'bg-slate-50 text-slate-600 border-slate-200'
+                                                        : order.paymentMethod === '現金'
+                                                        ? 'bg-sky-50 text-sky-700 border-sky-200'
+                                                        : 'bg-white text-slate-700 border-slate-200'
                                                 }`}>
                                                     💳 {order.paymentMethod}
                                                 </span>
                                                 {order.transferLastFive && (
-                                                    <span className="text-[10px] text-slate-500 font-mono bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                                                        末五碼：{order.transferLastFive}
+                                                    <span className="text-xs text-slate-500 dark:text-slate-400 font-mono bg-transparent px-1">
+                                                        (末五碼：{order.transferLastFive})
                                                     </span>
                                                 )}
                                                 {order.paymentStatus && (
-                                                    <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded font-black ${
+                                                    <span className={`inline-block text-xs px-2 py-0.5 rounded font-black border ${
                                                         order.paymentStatus === '已付款' || order.paymentStatus === '已入帳'
-                                                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                                                            : 'bg-rose-50 text-rose-600 border border-rose-200'
+                                                            ? 'bg-white text-emerald-600 border-emerald-200'
+                                                            : 'bg-white text-rose-600 border-rose-200'
                                                     }`}>
                                                         {order.paymentStatus}
                                                     </span>
                                                 )}
-                                                {/* 快捷收款按鈕 */}
-                                                {order.status === 'PENDING' && order.paymentStatus !== '已付款' && order.paymentStatus !== '已入帳' && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleQuickConfirmPayment(order)}
-                                                        className="text-[10px] px-2 py-0.5 font-bold rounded bg-emerald-500 hover:bg-emerald-600 active:scale-95 transition-transform text-white shadow-sm flex items-center gap-0.5 ml-1"
-                                                        title="一鍵標記為已付款"
-                                                    >
-                                                        <Check size={10} /> 確認收款
-                                                    </button>
-                                                )}
                                             </div>
                                         )}
 
-                                        <div className="flex items-center gap-2 text-[var(--text-secondary)]">
-                                            <Phone size={16} className="text-[var(--text-tertiary)]" />
-                                            <span>{order.customerPhone}</span>
+                                        <div className="flex items-center gap-2 text-[var(--text-secondary)] text-base md:text-lg">
+                                            <Phone size={18} className="text-[var(--text-tertiary)]" />
+                                            <span className="font-semibold">{order.customerPhone}</span>
                                             <button
                                                 type="button"
                                                 onClick={() => handleCopyText(order.customerPhone, '電話')}
                                                 className="p-1 hover:bg-[var(--bg-hover)] rounded text-[var(--text-tertiary)] hover:text-blue-500 transition-colors"
                                                 title="複製電話"
                                             >
-                                                <Copy size={12} />
+                                                <Copy size={13} />
                                             </button>
                                         </div>
                                         {order.deliveryAddress && (
-                                            <div className="flex items-center gap-2 text-[var(--text-secondary)]">
-                                                <MapPin size={16} className="text-[var(--text-tertiary)] animate-pulse" />
-                                                <span className="break-all">{order.deliveryAddress}</span>
+                                            <div className="flex items-center gap-2 text-[var(--text-secondary)] text-base md:text-lg">
+                                                <MapPin size={18} className="text-[var(--text-tertiary)] animate-pulse" />
+                                                <span className="break-all font-semibold">{order.deliveryAddress}</span>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleCopyText(order.deliveryAddress, '地址')}
                                                     className="p-1 hover:bg-[var(--bg-hover)] rounded text-[var(--text-tertiary)] hover:text-blue-500 transition-colors"
                                                     title="複製地址"
                                                 >
-                                                    <Copy size={12} />
+                                                    <Copy size={13} />
                                                 </button>
                                             </div>
                                         )}
                                         {order.note && (
-                                            <div className="flex items-start gap-2 bg-[var(--bg-tertiary)] p-2 rounded-lg border border-[var(--border-primary)] text-xs text-[var(--text-secondary)]">
-                                                <FileText size={14} className="text-[var(--text-tertiary)] mt-0.5 flex-shrink-0" />
-                                                <span className="italic">"{order.note}"</span>
+                                            <div className="flex items-start gap-2 bg-[var(--bg-tertiary)] p-3 rounded-lg border border-[var(--border-primary)] text-sm md:text-base text-[var(--text-secondary)]">
+                                                <FileText size={16} className="text-[var(--text-tertiary)] mt-0.5 flex-shrink-0" />
+                                                <span className="italic font-medium">"{order.note}"</span>
                                             </div>
                                         )}
                                     </div>
 
                                     {/* Items List */}
-                                    <div className="bg-[var(--bg-tertiary)] rounded-lg p-3 border border-[var(--border-primary)] mb-4">
-                                        <div className="text-[10px] uppercase font-bold text-[var(--text-tertiary)] mb-2 tracking-wider">訂單商品明細</div>
-                                        <div className="divide-y divide-[var(--border-primary)] divide-dashed space-y-2">
+                                    <div className="bg-[var(--bg-tertiary)] rounded-lg p-4 border border-[var(--border-primary)] mb-4 shadow-inner">
+                                        <div className="text-xs md:text-sm uppercase font-bold text-[var(--text-tertiary)] mb-2.5 tracking-wider">訂單商品明細</div>
+                                        <div className="divide-y divide-[var(--border-primary)] divide-dashed space-y-3">
                                             {order.items.map((item, idx) => (
-                                                <div key={idx} className="flex flex-col pt-2 first:pt-0">
-                                                    <div className="flex justify-between items-center text-sm">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="font-medium text-[var(--text-primary)]">{item.productName}</span>
-                                                            <span className="text-xs text-[var(--text-tertiary)] font-bold">x {item.qty}</span>
+                                                <div key={idx} className="flex flex-col pt-2.5 first:pt-0">
+                                                    <div className="flex justify-between items-center text-base md:text-lg">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-extrabold text-[var(--text-primary)]">{item.productName}</span>
+                                                            <span className="text-sm md:text-base text-blue-600 dark:text-blue-400 font-black">x {item.qty}</span>
                                                         </div>
-                                                        <span className="font-mono text-[var(--text-secondary)]">${item.subtotal}</span>
+                                                        <span className="font-mono font-bold text-[var(--text-secondary)]">${item.subtotal}</span>
                                                     </div>
                                                     {item.remark && (
-                                                        <div className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold ml-1">
+                                                        <div className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-bold mt-1 ml-1">
                                                             {item.remark}
                                                         </div>
                                                     )}
                                                 </div>
                                             ))}
                                         </div>
-                                        <div className="flex justify-between items-center border-t border-[var(--border-primary)] mt-3 pt-2 font-bold text-base">
+                                        <div className="flex justify-between items-center border-t border-[var(--border-primary)] mt-3.5 pt-2.5 font-bold text-lg md:text-xl">
                                             <span className="text-[var(--text-primary)]">金額合計</span>
-                                            <span className="text-blue-600 font-mono">${order.totalAmount}</span>
+                                            <span className="text-blue-600 dark:text-blue-400 font-mono font-extrabold">${order.totalAmount}</span>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Actions */}
                                 {order.status === 'PENDING' && (
-                                    <div className="grid grid-cols-3 gap-2 border-t border-[var(--border-primary)] pt-3 mt-auto">
+                                    <div className="grid grid-cols-3 gap-3 border-t border-[var(--border-primary)] pt-4 mt-auto">
                                         <button
                                             onClick={() => handleDeleteOrder(order.orderId)}
-                                            className="col-span-1 py-2 text-xs flex items-center justify-center gap-1 rounded-lg border border-red-200 dark:border-red-800/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors font-bold"
+                                            className="col-span-1 py-3.5 text-sm flex items-center justify-center gap-1.5 rounded-lg border border-red-200 dark:border-red-800/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all font-bold active:scale-95"
                                         >
-                                            <Trash2 size={13} /> 刪除
+                                            <Trash2 size={16} /> 刪除
                                         </button>
                                         <button
                                             onClick={() => handleOpenEdit(order)}
-                                            className="btn-secondary py-2 text-xs flex items-center justify-center gap-1"
+                                            className="btn-secondary py-3.5 text-sm flex items-center justify-center gap-1.5"
                                         >
-                                            <Edit size={14} /> 修改
+                                            <Edit size={16} /> 修改
                                         </button>
                                         <button
                                             onClick={() => handleConfirmOrder(order.orderId)}
-                                            className="btn-primary py-2 text-xs flex items-center justify-center gap-1 bg-emerald-600 hover:bg-emerald-700 border-none"
+                                            className="btn-primary py-3.5 text-sm flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 border-none"
                                         >
-                                            <CheckCircle size={14} /> 出貨
+                                            <CheckCircle size={16} /> 出貨
                                         </button>
                                     </div>
                                 )}
                                 {order.status === 'CONFIRMED' && (
-                                    <div className="border-t border-[var(--border-primary)] pt-3 mt-auto flex items-center gap-1.5 justify-center text-xs text-[var(--text-secondary)] font-semibold">
-                                        <Check className="text-emerald-500" size={16} />
+                                    <div className="border-t border-[var(--border-primary)] pt-4 mt-auto flex items-center gap-2 justify-center text-sm text-[var(--text-secondary)] font-bold">
+                                        <Check className="text-emerald-500" size={18} />
                                         <span>已於 {formatDate(order.confirmedAt)} 由 {order.confirmedBy} 確認出貨</span>
                                     </div>
                                 )}

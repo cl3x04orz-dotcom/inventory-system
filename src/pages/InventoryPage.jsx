@@ -316,7 +316,7 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border-primary)]">
-                        {loading ? (
+                        {loading && inventory.length === 0 ? (
                             <tr><td colSpan={user.role === 'EMPLOYEE' ? "3" : "6"} className="p-6 text-center text-[var(--text-secondary)]">載入中...</td></tr>
                         ) : groupedItems.length === 0 ? (
                             <tr><td colSpan={user.role === 'EMPLOYEE' ? "3" : "6"} className="p-6 text-center text-[var(--text-secondary)]">無資料</td></tr>
@@ -451,7 +451,7 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
                 <Icon size={20} /> {title}
             </h3>
             <div className="space-y-4">
-                {loading ? (
+                {loading && inventory.length === 0 ? (
                     <div className="text-center py-8 text-[var(--text-secondary)]">載入中...</div>
                 ) : groupedItems.length === 0 ? (
                     <div className="text-center py-8 text-[var(--text-secondary)] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">無資料</div>
@@ -564,8 +564,8 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <button onClick={fetchInventory} className="btn-secondary p-2 whitespace-nowrap" title="重新整理">
-                        <RefreshCw size={20} />
+                    <button onClick={fetchInventory} className="btn-secondary p-2 whitespace-nowrap" title="重新整理" disabled={loading}>
+                        <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
                     </button>
                 </div>
             </div>

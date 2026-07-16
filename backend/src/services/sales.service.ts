@@ -220,6 +220,40 @@ export const SalesService = {
       where: { saleId }
     });
 
+    let goodsVendor = '';
+    let gasRemark = '';
+    let parkingRemark = '';
+    let othersRemark = '';
+    let salaryRemark = '';
+    let reserveFundRemark = '';
+    let vehicleMaintenanceRemark = '';
+
+    if (expenditure && expenditure.note) {
+      const note = expenditure.note;
+      const matchBracket = note.match(/^\[(.*?)\]/);
+      if (matchBracket) {
+        const content = matchBracket[1];
+        const parts = content.split(',').map(p => p.trim());
+        parts.forEach(part => {
+          if (part.startsWith('貨款廠商:')) {
+            goodsVendor = part.replace('貨款廠商:', '').trim();
+          } else if (part.startsWith('加油:')) {
+            gasRemark = part.replace('加油:', '').trim();
+          } else if (part.startsWith('停車:')) {
+            parkingRemark = part.replace('停車:', '').trim();
+          } else if (part.startsWith('其他:')) {
+            othersRemark = part.replace('其他:', '').trim();
+          } else if (part.startsWith('薪資:')) {
+            salaryRemark = part.replace('薪資:', '').trim();
+          } else if (part.startsWith('公積金:')) {
+            reserveFundRemark = part.replace('公積金:', '').trim();
+          } else if (part.startsWith('保養:')) {
+            vehicleMaintenanceRemark = part.replace('保養:', '').trim();
+          }
+        });
+      }
+    }
+
     const parsedExpenses = expenditure ? {
       stall: Number(expenditure.stall),
       cleaning: Number(expenditure.cleaning),
@@ -234,6 +268,13 @@ export const SalesService = {
       vehicleMaintenance: Number(expenditure.vehicleMaintenance),
       salary: Number(expenditure.salary),
       reserveFund: Number(expenditure.reserve),
+      goodsVendor,
+      gasRemark,
+      parkingRemark,
+      othersRemark,
+      salaryRemark,
+      reserveFundRemark,
+      vehicleMaintenanceRemark,
       remarksRaw: expenditure.note || ''
     } : null;
 

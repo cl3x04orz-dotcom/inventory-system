@@ -787,5 +787,183 @@ export const GroupBuyService = {
     }, { maxWait: 15000, timeout: 30000 });
 
     return { success: true };
+  },
+
+  // 定期配相關實作
+  async getSubscriptions(payload: any, user: any) {
+    const list = await prisma.subscription.findMany();
+    return list.map((item: any) => ({
+      ...item,
+      frequency: JSON.parse(item.frequency || '[]')
+    }));
+  },
+
+  async saveSubscription(payload: any, user: any) {
+    if (user.role !== 'BOSS') throw new Error('權限不足');
+    const { subscriptionId, building, customerName, phone, productId, productName, quantity, frequency, paymentMethod, isActive, note } = payload;
+    
+    const freqStr = Array.isArray(frequency) ? JSON.stringify(frequency) : '[]';
+    const data = {
+      building,
+      customerName,
+      phone: phone || null,
+      productId,
+      productName,
+      quantity: Number(quantity) || 0,
+      frequency: freqStr,
+      paymentMethod: paymentMethod || '奶包金',
+      isActive: isActive !== undefined ? Boolean(isActive) : true,
+      note: note || null
+    };
+
+    if (subscriptionId) {
+      await prisma.subscription.update({
+        where: { subscriptionId },
+        data
+      });
+      return { success: true, subscriptionId };
+    } else {
+      const created = await prisma.subscription.create({
+        data
+      });
+      return { success: true, subscriptionId: created.subscriptionId };
+    }
+  },
+
+  async deleteSubscription(payload: any, user: any) {
+    if (user.role !== 'BOSS') throw new Error('權限不足');
+    const { subscriptionId } = payload;
+    await prisma.subscription.delete({
+      where: { subscriptionId }
+    });
+    return { success: true };
+  },
+
+  async generateSubscriptionOrders(payload: any, user: any) {
+    if (user.role !== 'BOSS') throw new Error('權限不足');
+
+    const { building, date } = payload;
+    if (!building) throw new Error('請指定配送大樓');
+
+    const targetDateStr = date || new Date().toISOString().split('T')[0];
+    const parts = targetDateStr.split('-');
+    const targetDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    const dayOfWeek = targetDate.getDay(); // 0 = 日, 1-6 = 一到六
+
+    // 1. 取得所有有效的定期配計畫
+    const subs = await prisma.subscription.findMany({
+      where: { building, isActive: true }
+    });
+
+    const filteredSubs = subs.filter((sub: any) => {
+      try {
+        const freq = JSON.parse(sub.frequency || '[]');
+        return Array.isArray(freq) && freq.includes(dayOfWeek);
+      } catch {
+        return false;
+      }
+    });
+
+    if (filteredSubs.length === 0) {
+      return { success: true, count: 0, message: '今日無符合的定期配項目' };
+    }
+
+    // 2. 獲取商品定價
+    const products = await prisma.product.findMany();
+    const prodPriceMap: Record<string, number> = {};
+    products.forEach((p: any) => {
+      prodPriceMap[p.productId] = Number(p.singlePrice) || Number(p.defaultPrice) || 0;
+    });
+
+    // 3. 按客戶分組
+    const customerGroups: Record<string, any> = {};
+    filteredSubs.forEach((sub: any) => {
+      const key = `${sub.customerName}_${sub.phone || ''}`;
+      if (!customerGroups[key]) {
+        customerGroups[key] = {
+          customerName: sub.customerName,
+          phone: sub.phone || '',
+          paymentMethod: sub.paymentMethod || '奶包金',
+          note: sub.note || '',
+          items: []
+        };
+      }
+      const price = prodPriceMap[sub.productId] || 0;
+      customerGroups[key].items.push({
+        productId: sub.productId,
+        productName: sub.productName,
+        unitPrice: price,
+        qty: sub.quantity,
+        remark: '定期配匯入'
+      });
+    });
+
+    // 4. 防重複檢查 (同一天該大樓已匯入過該客戶定期配)
+    const flagNote = `定期配(${targetDateStr})`;
+    const existingOrders = await prisma.groupBuyOrder.findMany({
+      where: {
+        note: { contains: flagNote }
+      }
+    });
+
+    const alreadyImportedKeys = new Set(
+      existingOrders.map((o: any) => `${o.customerName}_${o.customerPhone || ''}`)
+    );
+
+    let importCount = 0;
+    const now = new Date();
+
+    // 5. 逐一寫入訂單
+    for (const key in customerGroups) {
+      if (alreadyImportedKeys.has(key)) {
+        continue;
+      }
+
+      const group = customerGroups[key];
+      const orderId = `GB${targetDateStr.replace(/-/g, '')}${now.getHours()}${now.getMinutes()}${now.getSeconds()}_${Math.floor(Math.random() * 100)}`;
+      const totalAmount = group.items.reduce((sum: number, item: any) => sum + (item.unitPrice * item.qty), 0);
+
+      // 用交易寫入主表和明細表
+      await prisma.$transaction(async (tx) => {
+        await tx.groupBuyOrder.create({
+          data: {
+            orderId,
+            status: 'PENDING',
+            customerName: group.customerName,
+            customerPhone: group.phone,
+            deliveryAddress: `${building} ${group.note}`.trim(),
+            note: flagNote,
+            totalAmount,
+            paymentMethod: group.paymentMethod,
+            paymentStatus: group.paymentMethod === '奶包金' ? '已付款(扣餘額)' : '待確認',
+            source: 'SUBSCRIPTION',
+            createdAt: now,
+            updatedAt: now
+          }
+        });
+
+        for (const item of group.items) {
+          await tx.groupBuyOrderDetail.create({
+            data: {
+              orderId,
+              productId: item.productId,
+              productName: item.productName,
+              unitPrice: item.unitPrice,
+              qty: item.qty,
+              subtotal: item.unitPrice * item.qty,
+              remark: item.remark
+            }
+          });
+        }
+      });
+
+      importCount++;
+    }
+
+    return { 
+      success: true, 
+      count: importCount, 
+      message: `成功導入 ${importCount} 筆定期配訂單` 
+    };
   }
 };

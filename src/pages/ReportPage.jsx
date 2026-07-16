@@ -267,18 +267,18 @@ export default function ReportPage({ user, apiUrl, setPage }) {
             <div className="flex gap-1 mt-1 flex-wrap">
                 {methods.map(m => {
                     if (['CREDIT', '賒帳', '賒銷'].includes(m)) {
-                        return <span key={m} className="px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-100 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/30">賒帳</span>;
+                        return <span key={m} className="px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-50 text-rose-600 border border-rose-200">賒帳</span>;
                     }
                     if (['TRANSFER', '匯款'].includes(m)) {
-                        return <span key={m} className="px-1.5 py-0.5 rounded text-[10px] font-black bg-blue-100 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/30">匯款</span>;
+                        return <span key={m} className="px-1.5 py-0.5 rounded text-[10px] font-black bg-indigo-50 text-indigo-600 border border-indigo-200">匯款</span>;
                     }
                     if (['LINEPAY', 'LINE PAY'].includes(m)) {
-                        return <span key={m} className="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/30">LINE PAY</span>;
+                        return <span key={m} className="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-50 text-emerald-600 border border-emerald-200">LINE PAY</span>;
                     }
                     if (['WALLET', '奶包金', '奶包金扣抵'].includes(m)) {
-                        return <span key={m} className="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-100 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30">奶包金</span>;
+                        return <span key={m} className="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200">奶包金</span>;
                     }
-                    return <span key={m} className="px-1.5 py-0.5 rounded text-[10px] font-black bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">現金</span>;
+                    return <span key={m} className="px-1.5 py-0.5 rounded text-[10px] font-black bg-sky-50 text-sky-700 border border-sky-200">現金</span>;
                 })}
             </div>
         );

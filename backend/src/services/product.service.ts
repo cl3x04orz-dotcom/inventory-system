@@ -101,6 +101,8 @@ export const ProductService = {
         has_volume_pricing: p.hasVolumePricing,
         volume_pricing_settings: p.volumePricingSettings,
         sortWeight: p.sortWeight,
+        isBundle: Boolean(p.isBundle),
+        bundleSize: Number(p.bundleSize || 1),
         _fromSheet: 'Products'
       };
     });
@@ -147,7 +149,10 @@ export const ProductService = {
       dispatchSteps,
       roundThreshold,
       autoSuppress,
-      maxSuggestion
+      maxSuggestion,
+      price,
+      isBundle,
+      bundleSize
     } = payload;
 
     if (!productId) {
@@ -160,6 +165,7 @@ export const ProductService = {
         isActive: isActive !== undefined ? Boolean(isActive) : undefined,
         imageUrl: imageUrl !== undefined ? String(imageUrl) : undefined,
         expiryDate: expiryDate !== undefined ? String(expiryDate) : undefined,
+        defaultPrice: price !== undefined && price !== '' && price !== null ? Number(price) : undefined,
         hasFlavorAttributes: has_flavor_attributes !== undefined ? Boolean(has_flavor_attributes) : undefined,
         flavorChoices: flavor_choices !== undefined ? flavor_choices : undefined,
         singlePrice: single_price !== undefined && single_price !== '' && single_price !== null ? Number(single_price) : undefined,
@@ -169,7 +175,9 @@ export const ProductService = {
         dispatchSteps: dispatchSteps !== undefined ? dispatchSteps : undefined,
         roundThreshold: roundThreshold !== undefined ? Number(roundThreshold) : undefined,
         autoSuppress: autoSuppress !== undefined ? Boolean(autoSuppress) : undefined,
-        maxSuggestion: maxSuggestion !== undefined ? Number(maxSuggestion) : undefined
+        maxSuggestion: maxSuggestion !== undefined ? Number(maxSuggestion) : undefined,
+        isBundle: isBundle !== undefined ? Boolean(isBundle) : undefined,
+        bundleSize: bundleSize !== undefined ? Number(bundleSize) : undefined
       }
     });
 

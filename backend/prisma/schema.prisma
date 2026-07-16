@@ -38,6 +38,8 @@ model Product {
   roundThreshold        Int           @default(99)
   autoSuppress          Boolean       @default(false)
   maxSuggestion         Int           @default(0)
+  isBundle              Boolean       @default(false)
+  bundleSize            Int           @default(1)
   inventories           Inventory[]
   salesDetails          SalesDetail[]
 }
@@ -379,4 +381,19 @@ model WalletTransaction {
   description   String?
   createdAt     DateTime @default(now())
   member        Member   @relation(fields: [memberId], references: [memberId], onDelete: Cascade)
+}
+
+model Subscription {
+  subscriptionId String   @id @default(uuid())
+  building       String
+  customerName   String
+  phone          String?
+  productId      String
+  productName    String
+  quantity       Int
+  frequency      String   // 例如 "[1,3,5]"
+  paymentMethod  String   @default("奶包金")
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  note           String?
 }

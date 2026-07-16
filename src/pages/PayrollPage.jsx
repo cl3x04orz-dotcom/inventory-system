@@ -229,6 +229,20 @@ export default function PayrollPage({ user, apiUrl }) {
         }
     };
 
+    const openSettingsModal = () => {
+        if (data?.config) {
+            setSettingsForm({
+                ...data.config,
+                monthlyOffDays: data.config.monthlyOffDays || data.config.offDaysStandard || 8,
+                bonusTiers: JSON.stringify(data.config.bonusTiers || []),
+                commissionRate: data.config.commissionRate != null
+                    ? (data.config.commissionRate * 100)
+                    : 0.5
+            });
+        }
+        setShowSettings(true);
+    };
+
     const handleSettingKeyDown = (e, currentField) => {
         const sequence = ['baseSalary', 'attendanceBonus', 'monthlyOffDays', 'insurance', 'bonusTiers'];
         const currentIndex = sequence.indexOf(currentField);
@@ -426,7 +440,7 @@ export default function PayrollPage({ user, apiUrl }) {
                 {user.role === 'BOSS' && (
                     <div className="flex justify-center">
                         <div className="bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)] shadow-sm h-10 px-1 flex items-center gap-1 w-full max-w-[340px] justify-center">
-                            <button onClick={() => setShowSettings(true)} className="h-8 px-2 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] rounded-md flex items-center gap-1">
+                            <button onClick={openSettingsModal} className="h-8 px-2 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] rounded-md flex items-center gap-1">
                                 <User size={14} /> 薪資設定
                             </button>
                             <div className="w-px h-4 bg-slate-200"></div>
@@ -476,7 +490,7 @@ export default function PayrollPage({ user, apiUrl }) {
                     )}
                     {user.role === 'BOSS' && (
                         <>
-                            <button onClick={() => setShowSettings(true)} className="btn-secondary flex items-center gap-2">
+                            <button onClick={openSettingsModal} className="btn-secondary flex items-center gap-2">
                                 <User size={16} /> 薪資設定
                             </button>
                             <button onClick={() => setShowProfile(true)} className="btn-secondary flex items-center gap-2 border-[var(--border-primary)] text-emerald-500 hover:bg-[var(--bg-secondary)]">

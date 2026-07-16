@@ -227,9 +227,44 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 const applyDataToState = (data, isBackgroundSync = false) => {
                     const { products, systemCustomers, empType, usersList } = data;
                     
+                    // [Fix] 將 Cloned 狀態的載入移出 setRows 內部，避免在 setState 內部調用其他 setState 造成的 React 狀態丟失
+                    if (clonedRaw && !isBackgroundSync) {
+                        try {
+                            const cloned = JSON.parse(clonedRaw);
+                            if (cloned.customer) setLocation(cloned.customer);
+                            if (cloned.salesRep) setTargetSalesRep(cloned.salesRep);
+                            if (cloned.paymentMethod) setPaymentType(cloned.paymentMethod);
+                            if (cloned.reserve !== undefined) setReserve(Number(cloned.reserve));
+                            if (cloned.cashCounts) setCashCounts(prev => ({ ...prev, ...cloned.cashCounts }));
+                            if (cloned.expenses) setExpenses(prev => ({ ...prev, ...cloned.expenses }));
+                            if (cloned.originalDate) setOriginalDate(cloned.originalDate);
+                            if (cloned.originalSaleId) setOriginalSaleId(cloned.originalSaleId);
+                            if (cloned.workHours) setWorkHours(cloned.workHours);
+                        } catch (e) {
+                            console.error('Failed to parse cloned data', e);
+                        }
+                    }
+                    
                     // 1. Process Products
                     if (Array.isArray(products)) {
-                        const content = products.filter(p => (Number(p.stock) || 0) > 0 || (Number(p.originalStock) || 0) > 0);
+                        // [Fix] 修正模式下，必須包含舊單中已選購的商品，即使該商品目前庫存為 0，否則會帶不進來！
+                        let clonedProductIds = new Set();
+                        if (clonedRaw) {
+                            try {
+                                const cloned = JSON.parse(clonedRaw);
+                                if (Array.isArray(cloned.salesData)) {
+                                    cloned.salesData.forEach(d => clonedProductIds.add(String(d.productId)));
+                                }
+                            } catch (e) {
+                                console.error('Failed to parse cloned salesData for filter', e);
+                            }
+                        }
+
+                        const content = products.filter(p => 
+                            (Number(p.stock) || 0) > 0 || 
+                            (Number(p.originalStock) || 0) > 0 ||
+                            clonedProductIds.has(String(p.id))
+                        );
                         const sortedProducts = sortProducts(content, 'name');
                         setAllAvailableProducts(sortProducts(products, 'name'));
                         
@@ -281,43 +316,30 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             } else {
                                 // First time initialization
                                 newRows = sortedProducts.map(p => createInitRow(p));
-                                
-                                // Process Cloned Data ONLY ONCE (when initializing fresh)
-                                if (clonedRaw) {
-                                    try {
-                                        const cloned = JSON.parse(clonedRaw);
-                                        // Set global states if not in background sync
-                                        if (!isBackgroundSync) {
-                                            if (cloned.customer) setLocation(cloned.customer);
-                                            if (cloned.salesRep) setTargetSalesRep(cloned.salesRep);
-                                            if (cloned.paymentMethod) setPaymentType(cloned.paymentMethod);
-                                            if (cloned.reserve !== undefined) setReserve(Number(cloned.reserve));
-                                            if (cloned.cashCounts) setCashCounts(prev => ({ ...prev, ...cloned.cashCounts }));
-                                            if (cloned.expenses) setExpenses(prev => ({ ...prev, ...cloned.expenses }));
-                                            if (cloned.originalDate) setOriginalDate(cloned.originalDate);
-                                            if (cloned.originalSaleId) setOriginalSaleId(cloned.originalSaleId);
-                                            if (cloned.workHours) setWorkHours(cloned.workHours);
+                            }
+
+                            // [Fix] 只要 clonedRaw 存在，不論是否為初次初始化，皆確保舊單數據正確寫入（覆蓋）對應商品，避免因為 React StrictMode 重複觸發或 SMART MERGE 重置導致金額遺失！
+                            if (clonedRaw) {
+                                try {
+                                    const cloned = JSON.parse(clonedRaw);
+                                    newRows = newRows.map(row => {
+                                        const match = cloned.salesData.find(d => String(d.productId) === String(row.id));
+                                        if (match) {
+                                            const updated = {
+                                                ...row,
+                                                picked: match.picked,
+                                                original: match.original,
+                                                returns: match.returns,
+                                                price: match.unitPrice
+                                            };
+                                            updated.sold = getSafeNum(updated.picked) + getSafeNum(updated.original) - getSafeNum(updated.returns);
+                                            updated.subtotal = updated.sold * getSafeNum(updated.price);
+                                            return updated;
                                         }
-                                        
-                                        newRows = newRows.map(row => {
-                                            const match = cloned.salesData.find(d => String(d.productId) === String(row.id));
-                                            if (match) {
-                                                const updated = {
-                                                    ...row,
-                                                    picked: match.picked,
-                                                    original: match.original,
-                                                    returns: match.returns,
-                                                    price: match.unitPrice
-                                                };
-                                                updated.sold = getSafeNum(updated.picked) + getSafeNum(updated.original) - getSafeNum(updated.returns);
-                                                updated.subtotal = updated.sold * getSafeNum(updated.price);
-                                                return updated;
-                                            }
-                                            return row;
-                                        });
-                                    } catch (e) {
-                                        console.error('Failed to parse cloned data', e);
-                                    }
+                                        return row;
+                                    });
+                                } catch (e) {
+                                    console.error('Failed to parse cloned salesData', e);
                                 }
                             }
                             return newRows;
@@ -396,6 +418,22 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             setTargetSalesRep(user.username);
         }
     }, [user, targetSalesRep]);
+
+    // [New] 當業績歸屬業務員變更時，動態查詢其是否為工讀生，自動更新 isPartTime 狀態
+    useEffect(() => {
+        const fetchSalesRepEmpType = async () => {
+            if (!targetSalesRep || !user?.token) return;
+            try {
+                const res = await callGAS(apiUrl, 'getEmpType', { targetUser: targetSalesRep }, user.token);
+                if (res && res.empType) {
+                    setIsPartTime(res.empType === 'PART_TIME');
+                }
+            } catch (e) {
+                console.error('Failed to fetch empType for', targetSalesRep, e);
+            }
+        };
+        fetchSalesRepEmpType();
+    }, [targetSalesRep, apiUrl, user?.token]);
 
     // Recalculate row
     const handleRowChange = (id, field, value) => {
@@ -801,7 +839,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
             // [New] 工讀生必填工時
             if (isPartTime && (!workHours || Number(workHours) <= 0)) {
-                alert('您的帳號為工讀人員，送出前請填寫「今日工時」！');
+                alert('此單據業務為工讀人員，送出前請務必填寫「工讀計時」！');
                 document.getElementById('input-work-hours')?.focus();
                 return;
             }

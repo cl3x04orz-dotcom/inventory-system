@@ -189,6 +189,14 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       return GroupBuyService.getBuildingSettings(payload, user);
     case 'saveBuildingSettings':
       return GroupBuyService.saveBuildingSettings(payload, user);
+    case 'getSubscriptions':
+      return GroupBuyService.getSubscriptions(payload, user);
+    case 'saveSubscription':
+      return GroupBuyService.saveSubscription(payload, user);
+    case 'deleteSubscription':
+      return GroupBuyService.deleteSubscription(payload, user);
+    case 'generateSubscriptionOrders':
+      return GroupBuyService.generateSubscriptionOrders(payload, user);
     case 'getGroupBindings':
       return GroupBuyService.getGroupBindings(payload, user);
     case 'saveGroupBinding':

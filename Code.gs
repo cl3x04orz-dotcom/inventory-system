@@ -163,6 +163,10 @@ function apiHandler(request) {
         'updateOrderStatus': 'sales_pending',
         'getBuildingSettings': null,
         'saveBuildingSettings': 'sales_pending',
+        'getSubscriptions': 'sales_pending',
+        'saveSubscription': 'sales_pending',
+        'deleteSubscription': 'sales_pending',
+        'generateSubscriptionOrders': 'sales_pending',
         'getLiffInitData': null,
         'v2_getLiffInitData': null,
         'v2_createOrder': null,
@@ -304,6 +308,10 @@ function apiHandler(request) {
                     return res;
                 }
             case 'updateOrderStatus': return typeof updateOrderStatusService !== 'undefined' ? updateOrderStatusService(payload, user) : {error: '後端服務缺失: updateOrderStatusService'};
+            case 'getSubscriptions': return typeof getSubscriptionsService !== 'undefined' ? getSubscriptionsService(payload, user) : {error: '後端服務缺失: getSubscriptionsService'};
+            case 'saveSubscription': return typeof saveSubscriptionService !== 'undefined' ? saveSubscriptionService(payload, user) : {error: '後端服務缺失: saveSubscriptionService'};
+            case 'deleteSubscription': return typeof deleteSubscriptionService !== 'undefined' ? deleteSubscriptionService(payload, user) : {error: '後端服務缺失: deleteSubscriptionService'};
+            case 'generateSubscriptionOrders': return typeof generateSubscriptionOrdersService !== 'undefined' ? generateSubscriptionOrdersService(payload, user) : {error: '後端服務缺失: generateSubscriptionOrdersService'};
             case 'getBuildingSettings': return typeof getBuildingSettingsService !== 'undefined' ? getBuildingSettingsService(payload, user) : {error: '後端服務缺失: getBuildingSettingsService'};
             case 'saveBuildingSettings':
                 {
