@@ -34,15 +34,13 @@
        ┌────────────────────────┐
        │  PostgreSQL (Supabase)  │
        │       Database         │
-       └────────────────────────┘
+       └───────────┬────────────┘
 ```
 
 ### 核心架構原則：
 * **前後端完全分離**：前端 React (Vite) 透過網域 Secrets 連線生產環境 Node.js 後端 API。
 * **Prisma 強型別約束**：資料庫 Schema 統一由 Prisma 定義，支援 Schema 遷移與強型別開發。
 * **Service 商業邏輯集中化**：Controller 僅負責請求分發與輸入校驗，所有核心商業邏輯（如 FIFO、轉單、定期配、庫存扣減）皆封裝在 Service 層。
-
----
 
 # 📂 專案結構
 
@@ -94,3 +92,5 @@ const prodMap = new Map(products.map(p => [p.productId, p]));
 * [ ] 是否已徹底移除任何歷史 GAS / Spreadsheet 的殘留寫入邏輯？
 * [ ] 新增或修改 API 是否維持向下相容，不破壞舊有下單頁面的正常運行？
 * [ ] 高頻操作是否做好了防重複導入 (如定期配一鍵轉單的防重機制)？
+
+<!-- Trigger rebuild: 2026-07-16 20:30 -->
