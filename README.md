@@ -93,4 +93,4 @@ const prodMap = new Map(products.map(p => [p.productId, p]));
 * [ ] 新增或修改 API 是否維持向下相容，不破壞舊有下單頁面的正常運行？
 * [ ] 高頻操作是否做好了防重複導入 (如定期配一鍵轉單的防重機制)？
 
-<!-- Trigger rebuild: 2026-07-16 20:30 -->
+<!-- Trigger rebuild: 2026-07-16 20:55 -->
