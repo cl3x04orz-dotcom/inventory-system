@@ -114,6 +114,8 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 has_volume_pricing: mergedProduct.has_volume_pricing,
                 volume_pricing_settings: mergedProduct.volume_pricing_settings,
                 price: mergedProduct.price,
+                isBundle: mergedProduct.isBundle,
+                bundleSize: mergedProduct.bundleSize !== undefined ? Number(mergedProduct.bundleSize) : 1,
                 
                 packSize: Number(mergedProduct.packSize || 1),
                 dispatchSteps: parsedSteps,
