@@ -1,10 +1,9 @@
 services:
   - type: web
-    name: inventory-backend
+    name: inventory-system
     runtime: node
-    rootDir: backend
-    buildCommand: npm install && npm run build
-    startCommand: npm start
+    buildCommand: cd backend && npm install && npm run build
+    startCommand: cd backend && npm start
     envVars:
       - key: DATABASE_URL
         sync: false
@@ -13,4 +12,4 @@ services:
       - key: GAS_API_URL
         sync: false
       - key: PORT
-        value: "3000"
+        value: "10000"
