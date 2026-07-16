@@ -562,7 +562,14 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             if (item.remarks.length > 0) {
                 lines.push(`【口味備註：${item.remarks.join(', ')}】`);
             }
-            lines.push(`x${item.totalQty}`);
+            const prod = products.find(p => p.id === item.productId);
+            const isBundle = prod ? prod.isBundle : false;
+            const bundleSize = prod ? prod.bundleSize : 1;
+            if (isBundle) {
+                lines.push(`x${item.totalQty} 組 (共 ${item.totalQty * bundleSize} 瓶)`);
+            } else {
+                lines.push(`x${item.totalQty}`);
+            }
         });
 
         const textToCopy = lines.join('\n');
@@ -614,8 +621,12 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             
             lines.push('   訂購品項：');
             order.items.forEach(item => {
+                const prod = products.find(p => p.id === item.productId);
+                const isBundle = prod ? prod.isBundle : false;
+                const bundleSize = prod ? prod.bundleSize : 1;
+                const unitStr = isBundle ? `組 (共 ${item.qty * bundleSize} 瓶)` : '瓶';
                 const remarkStr = item.remark ? ` (${item.remark})` : '';
-                lines.push(`   - ${item.productName} x ${item.qty}${remarkStr}`);
+                lines.push(`   - ${item.productName} x ${item.qty} ${unitStr}${remarkStr}`);
             });
             
             lines.push(`   合計金額：$${order.totalAmount}`);
@@ -674,8 +685,12 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             
             lines.push('   訂購品項：');
             order.items.forEach(item => {
+                const prod = products.find(p => p.id === item.productId);
+                const isBundle = prod ? prod.isBundle : false;
+                const bundleSize = prod ? prod.bundleSize : 1;
+                const unitStr = isBundle ? `組 (共 ${item.qty * bundleSize} 瓶)` : '瓶';
                 const remarkStr = item.remark ? ` (${item.remark})` : '';
-                lines.push(`   - ${item.productName} x ${item.qty}${remarkStr}`);
+                lines.push(`   - ${item.productName} x ${item.qty} ${unitStr}${remarkStr}`);
             });
             
             lines.push(`   合計金額：$${order.totalAmount}`);
@@ -1089,13 +1104,25 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                         <div className="divide-y divide-[var(--border-primary)] divide-dashed space-y-3">
                                             {order.items.map((item, idx) => (
                                                 <div key={idx} className="flex flex-col pt-2.5 first:pt-0">
-                                                    <div className="flex justify-between items-center text-base md:text-lg">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-extrabold text-[var(--text-primary)]">{item.productName}</span>
-                                                            <span className="text-sm md:text-base text-blue-600 dark:text-blue-400 font-black">x {item.qty}</span>
-                                                        </div>
-                                                        <span className="font-mono font-bold text-[var(--text-secondary)]">${item.subtotal}</span>
-                                                    </div>
+                                                    {(() => {
+                                                        const prod = products.find(p => p.id === item.productId);
+                                                        const isBundle = prod ? prod.isBundle : false;
+                                                        const bundleSize = prod ? prod.bundleSize : 1;
+                                                        return (
+                                                            <div className="flex justify-between items-center text-base md:text-lg">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="font-extrabold text-[var(--text-primary)]">
+                                                                        {item.productName}
+                                                                        {isBundle && <span className="text-[10px] font-extrabold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md ml-1.5">捆裝 {bundleSize}入</span>}
+                                                                    </span>
+                                                                    <span className="text-sm md:text-base text-blue-600 dark:text-blue-400 font-black">
+                                                                        x {item.qty} {isBundle ? '組' : '瓶'}
+                                                                    </span>
+                                                                </div>
+                                                                <span className="font-mono font-bold text-[var(--text-secondary)]">${item.subtotal}</span>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                     {item.remark && (
                                                         <div className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-bold mt-1 ml-1">
                                                             {item.remark}

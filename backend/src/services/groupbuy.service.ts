@@ -159,6 +159,12 @@ export const GroupBuyService = {
 
     const now = new Date();
 
+    const productIds = (order.details as any[]).map((d: any) => d.productId).filter(Boolean);
+    const orderProds = await prisma.product.findMany({
+      where: { productId: { in: productIds } }
+    });
+    const orderProdMap = new Map(orderProds.map(p => [p.productId, p]));
+
     // 寫入正式銷售單
     await prisma.sales.create({
       data: {
@@ -174,14 +180,20 @@ export const GroupBuyService = {
         totalCash: (order.paymentMethod === '現金' || !order.paymentMethod) ? order.totalAmount : 0,
         finalTotal: order.totalAmount,
         details: {
-          create: (order.details as any[]).map((d: any) => ({
-            productId: d.productId || 'UNKNOWN',
-            sold: Number(d.qty),
-            picked: Number(d.qty),
-            original: 0,
-            subtotal: Number(d.subtotal),
-            unitPrice: Number(d.unitPrice)
-          }))
+          create: (order.details as any[]).map((d: any) => {
+            const prod = orderProdMap.get(d.productId);
+            const multiplier = (prod && prod.isBundle) ? Number(prod.bundleSize || 1) : 1;
+            const finalSold = Number(d.qty) * multiplier;
+
+            return {
+              productId: d.productId || 'UNKNOWN',
+              sold: finalSold,
+              picked: finalSold,
+              original: 0,
+              subtotal: Number(d.subtotal),
+              unitPrice: Number(d.unitPrice)
+            };
+          })
         }
       }
     });
@@ -190,7 +202,11 @@ export const GroupBuyService = {
     for (const d of order.details as any[]) {
       const qty = Number(d.qty || 0);
       if (qty > 0) {
-        await deductInventory(d.productId, qty, 'STOCK');
+        const prod = orderProdMap.get(d.productId);
+        const multiplier = (prod && prod.isBundle) ? Number(prod.bundleSize || 1) : 1;
+        const totalDeduct = qty * multiplier;
+
+        await deductInventory(d.productId, totalDeduct, 'STOCK');
       }
     }
 
