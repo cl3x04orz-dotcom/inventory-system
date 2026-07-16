@@ -5,8 +5,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables from the root .env file
+// 本地開發：從上層目錄讀取 .env；雲端部署：直接使用系統環境變數
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+dotenv.config(); // fallback: 讀取同目錄或系統 env
 
 import { buildApp } from './app.js';
 
