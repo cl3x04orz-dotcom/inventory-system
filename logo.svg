@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F0FDF4" />
+      <stop offset="100%" stop-color="#DCFCE7" />
+    </linearGradient>
+  </defs>
+  <!-- 圓形背景 -->
+  <circle cx="50" cy="50" r="46" fill="url(#bgGrad)" />
+  <!-- 減碳循環外圈 -->
+  <circle cx="50" cy="50" r="40" fill="none" stroke="#A7F3D0" stroke-width="2" stroke-dasharray="6 4" stroke-linecap="round" />
+  <!-- 米粒與葉子融合的品牌圖形 -->
+  <g transform="translate(0, 0)">
+    <!-- 葉子/米粒左半側 -->
+    <path d="M50 22 C33 35 33 65 50 78 Z" fill="url(#logoGrad)" />
+    <!-- 葉子/米粒右半側，使用稍深的顏色製造立體光影 -->
+    <path d="M50 22 C67 35 67 65 50 78 Z" fill="#047857" opacity="0.85" />
+    <!-- 中間葉脈 (米粒中線) & 露珠/牛奶滴線條 -->
+    <path d="M50 22 L50 78" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity="0.6" />
+    <!-- 葉面上的白色小水滴/米粒雕飾 -->
+    <path d="M50 35 C54 35 55 42 50 45 C45 42 46 35 50 35 Z" fill="#FFFFFF" />
+    <path d="M50 50 C54 50 55 57 50 60 C45 57 46 50 50 50 Z" fill="#FFFFFF" />
+  </g>
+</svg>
