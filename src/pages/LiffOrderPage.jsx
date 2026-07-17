@@ -91,6 +91,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const sectionRefs = useRef({});
   const isManualScrollRef = useRef(false);
   const manualScrollTimeoutRef = useRef(null);
+  // 記錄這次表單 Session 進入時的原始配送區域（用來比較所有區域變更警語）
+  const originalCommunityIdRef = useRef("");
 
   // ── 口味規格 state ─────────────────────────────────────────────
   const [flavorSelections, setFlavorSelections] = useState({}); // { [productId]: { [flavor]: qty } }
@@ -1129,6 +1131,9 @@ export default function LiffOrderPage({ user, apiUrl }) {
       if (saved.city) setSelectedCity(saved.city);
       if (saved.communityId) setSelectedCommunityId(saved.communityId);
 
+      // 記錄這次 session 的原始配送區域（給 confirmModal 比較用）
+      originalCommunityIdRef.current = saved.communityId || selectedCommunityId || "";
+
     } catch (_) { }
     setStep("confirm");
   };
@@ -1738,7 +1743,14 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm font-bold"
                     value={selectedCity}
                     onChange={(e) => {
-                      setSelectedCity(e.target.value);
+                      const newCity = e.target.value;
+                      // 如果已選過區域，就警告切換縣市會影響運費
+                      if (originalCommunityIdRef.current) {
+                        const oldComm = allCommunities.find(c => c.CommunityId === originalCommunityIdRef.current);
+                        alert(`🔄 已切換縣市，原配送區域${oldComm ? `（${oldComm.CommunityName}）` : ''}已清除。
+請重新選擇配送區域，運費將依新區域重新計算。`);
+                      }
+                      setSelectedCity(newCity);
                       setSelectedCommunityId(""); // 切換縣市時重設已選區域
                       setDetailAddress(""); // 切換縣市時重置地址
                     }}
@@ -1759,9 +1771,9 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     onChange={(e) => {
                       const commId = e.target.value;
 
-                      // 如果已經有選過區域，且這次換的不同 → 跳出運費警語
-                      if (selectedCommunityId && commId && commId !== selectedCommunityId) {
-                        const oldComm = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+                      // 如果「這次 session 的原始區域」存在，且這次選的不同 → 跳出運費警語
+                      if (originalCommunityIdRef.current && commId && commId !== originalCommunityIdRef.current) {
+                        const oldComm = allCommunities.find(c => c.CommunityId === originalCommunityIdRef.current);
                         const newComm = allCommunities.find(c => c.CommunityId === commId);
                         if (oldComm && newComm) {
                           const oldFee = Number(oldComm.ShippingFee) || 0;
@@ -1776,6 +1788,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                             return '';
                           };
                           const applyChange = () => {
+                            originalCommunityIdRef.current = commId; // 更新基準區域
                             setSelectedCommunityId(commId);
                             // 智慧前綴帶入/替換邏輯
                             const prefix = newComm.CommunityName;
