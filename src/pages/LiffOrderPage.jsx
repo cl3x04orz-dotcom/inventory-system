@@ -2124,6 +2124,38 @@ export default function LiffOrderPage({ user, apiUrl }) {
             )}
           </button>
         </div>
+
+        {/* ⚠️ 配送區域變更確認 Dialog（form step 專用） */}
+        {confirmModal.show && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-[var(--bg-secondary)] w-full max-w-[300px] rounded-2xl p-5 shadow-2xl border border-[var(--border-primary)] flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+              <p className="text-sm font-bold text-[var(--text-primary)] leading-relaxed whitespace-pre-line text-center">
+                {confirmModal.message}
+              </p>
+              <div className="flex gap-2.5">
+                <button
+                  onClick={() => {
+                    setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null });
+                    if (confirmModal.onCancel) confirmModal.onCancel();
+                  }}
+                  className="flex-1 py-2.5 px-4 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs font-bold transition-all active:scale-95"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    const fn = confirmModal.onConfirm;
+                    setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null });
+                    if (fn) fn();
+                  }}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/15"
+                >
+                  確定變更
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
