@@ -268,9 +268,28 @@ export default function LiffOrderPage({ user, apiUrl }) {
           
           const isVirtual = ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(resData.community.CommunityName);
           if (isVirtual) {
-            setSelectedCommunityId("");
-            setSelectedCity("");
-            setShowAreaModal(true);
+            // 嘗試從 localStorage 帶入上次記錄的區域
+            try {
+              const prevSaved = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+              const savedCities = prevSaved.city || "";
+              const savedCommId = prevSaved.communityId || "";
+              // 確認 savedCommId 在可用社區清單中（以 resData.allCommunities 驗證）
+              const validComms = Array.isArray(resData.allCommunities) ? resData.allCommunities : [];
+              const isValidSaved = savedCommId && validComms.some(c => c.CommunityId === savedCommId);
+              if (isValidSaved) {
+                setSelectedCity(savedCities);
+                setSelectedCommunityId(savedCommId);
+                setShowAreaModal(false); // 有舊資料，直接跳過彈窗
+              } else {
+                setSelectedCommunityId("");
+                setSelectedCity("");
+                setShowAreaModal(true);
+              }
+            } catch (_) {
+              setSelectedCommunityId("");
+              setSelectedCity("");
+              setShowAreaModal(true);
+            }
           } else {
             setSelectedCommunityId(resData.community.CommunityId || "");
             if (resData.community.CommunityName.startsWith("台南市")) {
@@ -1105,6 +1124,11 @@ export default function LiffOrderPage({ user, apiUrl }) {
           }
         }
       }
+
+      // 一般散客：回填城市與配送區域
+      if (saved.city) setSelectedCity(saved.city);
+      if (saved.communityId) setSelectedCommunityId(saved.communityId);
+
     } catch (_) { }
     setStep("confirm");
   };
@@ -1114,14 +1138,24 @@ export default function LiffOrderPage({ user, apiUrl }) {
     setIsSubmitting(true);
     try {
       // 儲存客戶資料到 LocalStorage（下次自動帶入）
+      // 正規化 detailAddress：去除行政區前綴再存，避免下次疊加
+      let saveDetail = detailAddress.trim();
+      if (isGeneralUser && selectedCommunityId && allCommunities.length > 0) {
+        const commMatch = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+        if (commMatch && saveDetail.startsWith(commMatch.CommunityName)) {
+          saveDetail = saveDetail.substring(commMatch.CommunityName.length).trim();
+        }
+      }
       localStorage.setItem(
         LS_KEY,
         JSON.stringify({
           name: customerName,
           phone: customerPhone,
           building: selectedBuilding === "其它" ? otherBuildingText.trim() : selectedBuilding,
-          detailAddress: detailAddress.trim(),
+          detailAddress: saveDetail,
           companyName: isGeneralUser ? companyName.trim() : "",
+          city: isGeneralUser ? selectedCity : "",
+          communityId: isGeneralUser ? selectedCommunityId : "",
           address: getFullAddress(),
         }),
       );
@@ -1735,6 +1769,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
                           const oldMin = Number(oldComm.FreeShippingMin) || 0;
                           const newMin = Number(newComm.FreeShippingMin) || 0;
                           const feeText = (fee, min) => fee > 0 ? `$${fee}（滿$${min}免運）` : '免運';
+                          const freeNote = (fee, min) => {
+                            if (fee === 0) return '✅ 此區免運';
+                            if (min > 0 && cartTotal >= min) return `✅ 已達免運門檻（購物車 $${cartTotal} ≥ $${min}）`;
+                            if (min > 0) return `❌ 未達免運（差 $${min - cartTotal} 即免運）`;
+                            return '';
+                          };
                           const applyChange = () => {
                             setSelectedCommunityId(commId);
                             // 智慧前綴帶入/替換邏輯
@@ -1761,9 +1801,11 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
 原區域：${oldComm.CommunityName}
 運費：${feeText(oldFee, oldMin)}
+${freeNote(oldFee, oldMin)}
 
 新區域：${newComm.CommunityName}
 運費：${feeText(newFee, newMin)}
+${freeNote(newFee, newMin)}
 
 確定要變更嗎？`,
                             onConfirm: applyChange,
