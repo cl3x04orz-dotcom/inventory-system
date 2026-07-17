@@ -1574,8 +1574,25 @@ export default function LiffOrderPage({ user, apiUrl }) {
       selectedBuilding &&
       (selectedBuilding !== "其它" || safeOther.trim());
     
-    // 如果是一般散客，配送地址與外送區域皆為必填
-    const isGeneralAddressValid = !isGeneralUser || (safeAddress.trim() && selectedCity !== "" && selectedCommunityId !== "");
+    // 找出目前選中的行政區前綴
+    let communityPrefix = "";
+    if (selectedCommunityId && allCommunities.length > 0) {
+      const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+      if (match) communityPrefix = match.CommunityName;
+    }
+
+    // 計算去除行政區前綴後的自填路名門牌
+    let userEnteredStreet = safeAddress.trim();
+    if (communityPrefix && userEnteredStreet.startsWith(communityPrefix)) {
+      userEnteredStreet = userEnteredStreet.substring(communityPrefix.length).trim();
+    }
+
+    // 如果是一般散客，配送地址與外送區域皆為必填，且「路名門牌自填部分」不可為空
+    const isGeneralAddressValid = !isGeneralUser || (
+      selectedCity !== "" &&
+      selectedCommunityId !== "" &&
+      userEnteredStreet !== ""
+    );
 
     const canProceed =
       safeName.trim() &&
@@ -1688,6 +1705,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     onChange={(e) => {
                       setSelectedCity(e.target.value);
                       setSelectedCommunityId(""); // 切換縣市時重設已選區域
+                      setDetailAddress(""); // 切換縣市時重置地址
                     }}
                   >
                     <option value="">-- 請選擇縣市 --</option>
@@ -1812,6 +1830,11 @@ export default function LiffOrderPage({ user, apiUrl }) {
                       }}
                     />
                   </div>
+                  {selectedCommunityId && !userEnteredStreet && (
+                    <p className="text-[11px] text-red-500 font-medium mt-1">
+                      ⚠️ 請輸入詳細收件路名與門牌資訊
+                    </p>
+                  )}
                 </div>
               </>
             ) : (
@@ -2903,6 +2926,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                   onChange={(e) => {
                     setSelectedCity(e.target.value);
                     setSelectedCommunityId(""); // 重置區域
+                    setDetailAddress(""); // 重置地址
                   }}
                 >
                   <option value="">-- 請選擇縣市 --</option>
