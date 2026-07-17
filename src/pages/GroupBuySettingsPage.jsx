@@ -909,15 +909,13 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                         >
                                                             編輯
                                                         </button>
-                                                        {c.communityName !== '線上下單' && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleDeleteArea(c.communityId, c.communityName)}
-                                                                className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500 text-rose-600 hover:text-white rounded border border-rose-500/20 active:scale-95 transition-all"
-                                                            >
-                                                                刪除
-                                                            </button>
-                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDeleteArea(c.communityId, c.communityName)}
+                                                            className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500 text-rose-600 hover:text-white rounded border border-rose-500/20 active:scale-95 transition-all"
+                                                        >
+                                                            刪除
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             ))

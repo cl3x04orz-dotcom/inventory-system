@@ -1652,11 +1652,13 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     onChange={(e) => setSelectedCommunityId(e.target.value)}
                   >
                     <option value="">-- 請選擇外送區域 --</option>
-                    {allCommunities.map((c) => (
-                      <option key={c.CommunityId} value={c.CommunityId}>
-                        {c.CommunityName} {Number(c.ShippingFee) > 0 ? `(運費$${c.ShippingFee}/滿$${c.FreeShippingMin}免運)` : '(免運)'}
-                      </option>
-                    ))}
+                    {allCommunities
+                      .filter(c => !["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(c.CommunityName))
+                      .map((c) => (
+                        <option key={c.CommunityId} value={c.CommunityId}>
+                          {c.CommunityName} {Number(c.ShippingFee) > 0 ? `(運費$${c.ShippingFee}/滿$${c.FreeShippingMin}免運)` : '(免運)'}
+                        </option>
+                      ))}
                   </select>
                 </div>
                 <div className="space-y-1">
