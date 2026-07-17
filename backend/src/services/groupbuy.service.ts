@@ -1070,8 +1070,8 @@ export const GroupBuyService = {
         data: {
           communityName,
           defaultFreeShipping: !!defaultFreeShipping,
-          freeShippingMin: Number(free_shipping_min ?? freeShippingMin) || 0,
-          shippingFee: Number(shipping_fee ?? shippingFee) || 0,
+          freeShippingMin: Number(freeShippingMin) || 0,
+          shippingFee: Number(shippingFee) || 0,
           status: status || 'ACTIVE',
           updatedAt: new Date()
         }
