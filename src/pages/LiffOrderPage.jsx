@@ -77,6 +77,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const alert = (message, callback = null) => {
     setAlertModal({ show: true, message, callback });
   };
+  const [confirmModal, setConfirmModal] = useState({ show: false, message: '', onConfirm: null, onCancel: null });
 
   // ── 商品 state ───────────────────────────────────────────────
   const [products, setProducts] = useState([]);
@@ -1723,6 +1724,56 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     value={selectedCommunityId}
                     onChange={(e) => {
                       const commId = e.target.value;
+
+                      // 如果已經有選過區域，且這次換的不同 → 跳出運費警語
+                      if (selectedCommunityId && commId && commId !== selectedCommunityId) {
+                        const oldComm = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+                        const newComm = allCommunities.find(c => c.CommunityId === commId);
+                        if (oldComm && newComm) {
+                          const oldFee = Number(oldComm.ShippingFee) || 0;
+                          const newFee = Number(newComm.ShippingFee) || 0;
+                          const oldMin = Number(oldComm.FreeShippingMin) || 0;
+                          const newMin = Number(newComm.FreeShippingMin) || 0;
+                          const feeText = (fee, min) => fee > 0 ? `$${fee}（滿$${min}免運）` : '免運';
+                          const applyChange = () => {
+                            setSelectedCommunityId(commId);
+                            // 智慧前綴帶入/替換邏輯
+                            const prefix = newComm.CommunityName;
+                            const currentAddr = detailAddress || "";
+                            if (!currentAddr.trim()) {
+                              setDetailAddress(prefix);
+                            } else {
+                              let replaced = false;
+                              for (const c of allCommunities) {
+                                if (currentAddr.startsWith(c.CommunityName)) {
+                                  const rest = currentAddr.substring(c.CommunityName.length);
+                                  setDetailAddress(prefix + rest);
+                                  replaced = true;
+                                  break;
+                                }
+                              }
+                              if (!replaced) setDetailAddress(prefix + currentAddr);
+                            }
+                          };
+                          setConfirmModal({
+                            show: true,
+                            message: `⚠️ 更改配送區域將影響運費
+
+原區域：${oldComm.CommunityName}
+運費：${feeText(oldFee, oldMin)}
+
+新區域：${newComm.CommunityName}
+運費：${feeText(newFee, newMin)}
+
+確定要變更嗎？`,
+                            onConfirm: applyChange,
+                            onCancel: null,
+                          });
+                          return; // 先不套用，等使用者確認
+                        }
+                      }
+
+                      // 首次選或相同區域直接套用
                       setSelectedCommunityId(commId);
                       
                       // 智慧前綴帶入/替換邏輯
@@ -2898,6 +2949,38 @@ export default function LiffOrderPage({ user, apiUrl }) {
             >
               確定
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 確認 Dialog（有取消/確定雙按鈕）*/}
+      {confirmModal.show && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[var(--bg-secondary)] w-full max-w-[300px] rounded-2xl p-5 shadow-2xl border border-[var(--border-primary)] flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+            <p className="text-sm font-bold text-[var(--text-primary)] leading-relaxed whitespace-pre-line text-center">
+              {confirmModal.message}
+            </p>
+            <div className="flex gap-2.5">
+              <button
+                onClick={() => {
+                  setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null });
+                  if (confirmModal.onCancel) confirmModal.onCancel();
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs font-bold transition-all active:scale-95"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  const fn = confirmModal.onConfirm;
+                  setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null });
+                  if (fn) fn();
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/15"
+              >
+                確定變更
+              </button>
+            </div>
           </div>
         </div>
       )}
