@@ -204,6 +204,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
   // ── 新增：V2 架構狀態 ─────────────────────────────────────────
   const [currentCommunity, setCurrentCommunity] = useState(null);
   const [allCommunities, setAllCommunities] = useState([]);
+  const [selectedCity, setSelectedCity] = useState("");
   const [selectedCommunityId, setSelectedCommunityId] = useState("");
   const [activeCampaign, setActiveCampaign] = useState(null);
   const [nextOpenTime, setNextOpenTime] = useState(null);
@@ -264,6 +265,11 @@ export default function LiffOrderPage({ user, apiUrl }) {
           // 為了相容部分舊邏輯，將 selectedBuilding 設為 CommunityName
           setSelectedBuilding(resData.community.CommunityName);
           setSelectedCommunityId(resData.community.CommunityId || "");
+          if (resData.community.CommunityName.startsWith("台南市")) {
+            setSelectedCity("台南市");
+          } else if (resData.community.CommunityName.startsWith("高雄市")) {
+            setSelectedCity("高雄市");
+          }
         }
         if (Array.isArray(resData.allCommunities)) {
           setAllCommunities(resData.allCommunities);
@@ -1539,7 +1545,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
       (selectedBuilding !== "其它" || safeOther.trim());
     
     // 如果是一般散客，配送地址與外送區域皆為必填
-    const isGeneralAddressValid = !isGeneralUser || (safeAddress.trim() && selectedCommunityId !== "");
+    const isGeneralAddressValid = !isGeneralUser || (safeAddress.trim() && selectedCity !== "" && selectedCommunityId !== "");
 
     const canProceed =
       safeName.trim() &&
@@ -1641,7 +1647,25 @@ export default function LiffOrderPage({ user, apiUrl }) {
             {/* 根據一般用戶與大樓用戶分流顯示 */}
             {isGeneralUser ? (
               <>
-                {/* 一般用戶：選擇外送區域、顯示地址與公司，隱藏大外框與任何大樓欄位 */}
+                {/* 一般用戶：兩段式選擇縣市與外送區域、顯示地址與公司，隱藏大外框與任何大樓欄位 */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                    <MapPin size={12} className="text-blue-500" /> 選擇縣市 <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm font-bold"
+                    value={selectedCity}
+                    onChange={(e) => {
+                      setSelectedCity(e.target.value);
+                      setSelectedCommunityId(""); // 切換縣市時重設已選區域
+                    }}
+                  >
+                    <option value="">-- 請選擇縣市 --</option>
+                    <option value="台南市">台南市</option>
+                    <option value="高雄市">高雄市</option>
+                  </select>
+                </div>
+
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
                     <MapPin size={12} className="text-emerald-500" /> 配送區域 <span className="text-red-500">*</span>
@@ -1650,16 +1674,15 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm font-bold"
                     value={selectedCommunityId}
                     onChange={(e) => setSelectedCommunityId(e.target.value)}
+                    disabled={!selectedCity}
                   >
-                    <option value="">-- 請選擇外送區域 --</option>
-                    {allCommunities
+                    <option value="">{selectedCity ? "-- 請選擇外送區域 --" : "-- 請先選取縣市 --"}</option>
+                    {selectedCity && allCommunities
                       .filter(c => !["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(c.CommunityName))
+                      .filter(c => c.CommunityName.startsWith(selectedCity))
                       .map((c) => {
                         // 去除「台南市」、「高雄市」前綴以縮短長度
                         let shortName = c.CommunityName.replace("台南市", "").replace("高雄市", "");
-                        if (c.CommunityName.includes("高雄市")) {
-                          shortName = `高雄 ${shortName}`;
-                        }
                         const fee = Number(c.ShippingFee) || 0;
                         const min = Number(c.FreeShippingMin) || 0;
                         
