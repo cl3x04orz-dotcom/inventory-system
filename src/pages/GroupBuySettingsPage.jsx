@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, Calendar, Clock, Copy, Save, Plus, Check, RefreshCw } from 'lucide-react';
+import { Link, Calendar, Clock, Copy, Save, Plus, Check, RefreshCw, Truck } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
 export default function GroupBuySettingsPage({ user, apiUrl }) {
@@ -24,6 +24,12 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
     
     const [isSaving, setIsSaving] = useState(false);
     const [copied, setCopied] = useState(false);
+
+    // 運費設定 state
+    const [isFreeShipping, setIsFreeShipping] = useState(false);
+    const [freeShippingMin, setFreeShippingMin] = useState('');
+    const [shippingFee, setShippingFee] = useState('');
+    const [isSavingShipping, setIsSavingShipping] = useState(false);
 
     const LIFF_ID = '2010308873-ur2zL2cc';
 
@@ -96,6 +102,11 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
             setAutoOpenTime(found.auto_open_time || '');
             setAutoCloseDay(found.auto_close_day !== undefined && found.auto_close_day !== '' ? String(found.auto_close_day) : '');
             setAutoCloseTime(found.auto_close_time || '');
+
+            // 運費設定
+            setIsFreeShipping(!!found.default_free_shipping);
+            setFreeShippingMin(found.free_shipping_min != null ? String(found.free_shipping_min) : '');
+            setShippingFee(found.shipping_fee != null ? String(found.shipping_fee) : '');
         } else {
             setStartDate('');
             setStartTime('');
@@ -107,6 +118,11 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
             setAutoOpenTime('');
             setAutoCloseDay('');
             setAutoCloseTime('');
+
+            // 運費設定預設
+            setIsFreeShipping(false);
+            setFreeShippingMin('');
+            setShippingFee('');
         }
     };
 
@@ -198,6 +214,31 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
             alert('儲存失敗: ' + error.message);
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    // 儲存運費設定
+    const handleSaveShipping = async () => {
+        const targetBuilding = isAddingNew ? newBuildingName.trim() : selectedBuilding;
+        if (!targetBuilding || targetBuilding === '__new__') {
+            alert('請先選擇或建立大樓！');
+            return;
+        }
+        setIsSavingShipping(true);
+        try {
+            const res = await callGAS(apiUrl, 'saveCommunityShipping', {
+                building: targetBuilding,
+                default_free_shipping: isFreeShipping,
+                free_shipping_min: isFreeShipping ? 0 : (Number(freeShippingMin) || 0),
+                shipping_fee: isFreeShipping ? 0 : (Number(shippingFee) || 0),
+            }, user.token);
+            if (res && res.error) throw new Error(res.error);
+            alert(`「${targetBuilding}」運費設定儲存成功！`);
+            await fetchSettings();
+        } catch (error) {
+            alert('儲存運費設定失敗: ' + error.message);
+        } finally {
+            setIsSavingShipping(false);
         }
     };
 
@@ -523,6 +564,92 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                 </button>
                             </div>
                         </div>
+
+                        {/* Shipping Settings Card */}
+                        {!isAddingNew && selectedBuilding && (
+                            <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
+                                <div className="flex justify-between items-center pb-2.5 border-b border-[var(--border-primary)]">
+                                    <h3 className="font-extrabold text-base text-[var(--text-primary)] flex items-center gap-1.5">
+                                        <Truck size={18} className="text-emerald-500" />
+                                        運費設定
+                                    </h3>
+                                    {/* 免運切換 */}
+                                    <label className="relative inline-flex items-center cursor-pointer gap-2">
+                                        <span className="text-sm font-semibold text-[var(--text-secondary)]">永久免運</span>
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={isFreeShipping}
+                                            onChange={(e) => setIsFreeShipping(e.target.checked)}
+                                        />
+                                        <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                                    </label>
+                                </div>
+
+                                {isFreeShipping ? (
+                                    <p className="text-sm text-emerald-600 font-semibold bg-emerald-50 rounded-xl p-3 flex items-center gap-2">
+                                        ✅ 此社區永久免運，不加收任何運費。
+                                    </p>
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        {/* 免運門檻 */}
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-sm font-extrabold text-[var(--text-primary)]">
+                                                免運門檻
+                                            </label>
+                                            <p className="text-xs text-[var(--text-tertiary)]">訂單滿此金額免運（填 0 表示不開放免運）</p>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-bold font-mono text-sm">$</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    className="input-field pl-7 p-3 w-full text-base font-bold"
+                                                    placeholder="例：500"
+                                                    value={freeShippingMin}
+                                                    onChange={(e) => setFreeShippingMin(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                        {/* 運費金額 */}
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-sm font-extrabold text-[var(--text-primary)]">
+                                                未達門檻運費
+                                            </label>
+                                            <p className="text-xs text-[var(--text-tertiary)]">未達免運門檻時加收的運費</p>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-bold font-mono text-sm">$</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    className="input-field pl-7 p-3 w-full text-base font-bold"
+                                                    placeholder="例：60"
+                                                    value={shippingFee}
+                                                    onChange={(e) => setShippingFee(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 預覽 */}
+                                {!isFreeShipping && (Number(shippingFee) > 0 || Number(freeShippingMin) > 0) && (
+                                    <div className="text-xs text-slate-500 bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                        📦 規則預覽：訂單滿 <strong>${Number(freeShippingMin) || 0}</strong> 免運；未滿則加收 <strong>${Number(shippingFee) || 0}</strong> 運費。
+                                    </div>
+                                )}
+
+                                <div className="flex justify-end border-t border-[var(--border-primary)]/50 pt-3">
+                                    <button
+                                        onClick={handleSaveShipping}
+                                        disabled={isSavingShipping}
+                                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
+                                    >
+                                        <Truck size={14} />
+                                        {isSavingShipping ? '儲存中...' : '儲存運費設定'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         {/* URL Generation display */}
                         {activeUrl && (

@@ -235,7 +235,18 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             if (cloned.salesRep) setTargetSalesRep(cloned.salesRep);
                             if (cloned.paymentMethod) setPaymentType(cloned.paymentMethod);
                             if (cloned.reserve !== undefined) setReserve(Number(cloned.reserve));
-                            if (cloned.cashCounts) setCashCounts(prev => ({ ...prev, ...cloned.cashCounts }));
+                            // cashCounts 復原邏輯：若 DB 有存面額資料則直接帶入；否則用 totalCash 做 fallback
+                            const hasCashCountData = cloned.cashCounts && Object.values(cloned.cashCounts).some(v => Number(v) > 0);
+                            if (hasCashCountData) {
+                                setCashCounts(prev => ({ ...prev, ...cloned.cashCounts }));
+                            } else if (cloned.totalCash > 0) {
+                                // 舊單沒存面額明細，用千元面額填入 totalCash+reserve 讓使用者看到原始金額（可手動調整）
+                                const totalWithReserve = Number(cloned.totalCash) + Number(cloned.reserve || 0);
+                                const thousands = Math.floor(totalWithReserve / 1000);
+                                const remainder = totalWithReserve % 1000;
+                                const hundreds = Math.floor(remainder / 100);
+                                setCashCounts({ 1000: thousands, 500: 0, 100: hundreds, 50: 0, 10: 0, 5: 0, 1: 0 });
+                            }
                             if (cloned.expenses) setExpenses(prev => ({ ...prev, ...cloned.expenses }));
                             if (cloned.originalDate) setOriginalDate(cloned.originalDate);
                             if (cloned.originalSaleId) setOriginalSaleId(cloned.originalSaleId);
@@ -1657,6 +1668,19 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             <h2 className="text-lg font-bold mb-3 flex items-center gap-2 text-[var(--text-primary)]">
                                 <Calculator size={20} className="text-amber-500" /> 錢點清算
                             </h2>
+                            {/* 修正模式提示：若為舊單（無面額明細），顯示提示 */}
+                            {originalSaleId && !Object.values(cashCounts).some(v => Number(v) > 0) && (
+                                <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700 flex items-start gap-1.5">
+                                    <span className="shrink-0">⚠️</span>
+                                    <span>此單建立時未記錄面額明細，錢點清算需重新填寫。</span>
+                                </div>
+                            )}
+                            {originalSaleId && Object.values(cashCounts).some(v => Number(v) > 0) && !Object.values(cashCounts).every((v, i, a) => i === 0 || Number(v) === 0) && (
+                                <div className="mb-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 flex items-start gap-1.5">
+                                    <span className="shrink-0">ℹ️</span>
+                                    <span>已從原始單據還原面額資料，請確認無誤。</span>
+                                </div>
+                            )}
                             {/* Full-Width Cash Counter with 3-Column Grid */}
                             <div className="space-y-0.5">
                                 {[1000, 500, 100, 50, 10, 5, 1].map((denom, idx, arr) => {

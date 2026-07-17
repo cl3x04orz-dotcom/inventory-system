@@ -53,9 +53,9 @@ export default function PurchaseConfigModal({ isOpen, onClose, apiUrl, token, ve
     const handleToggleProduct = async (prod, currentStatus) => {
         setSubmittingId(prod.id);
         try {
-            await callGAS(apiUrl, 'updateProductDetails', { productId: prod.id, isActive: !currentStatus }, token);
+            await callGAS(apiUrl, 'updateProductPurchasable', { productId: prod.id, isPurchasable: !currentStatus }, token);
             setProducts(prev => prev.map(p => 
-                p.id === prod.id ? { ...p, isActive: !currentStatus } : p
+                p.id === prod.id ? { ...p, isPurchasable: !currentStatus } : p
             ));
         } catch (e) {
             alert("更新商品狀態失敗: " + e.message);
@@ -347,14 +347,14 @@ export default function PurchaseConfigModal({ isOpen, onClose, apiUrl, token, ve
                                         <label className="relative inline-flex items-center cursor-pointer shrink-0">
                                             <input
                                                 type="checkbox"
-                                                checked={p.isActive}
+                                                checked={p.isPurchasable !== false}
                                                 disabled={submittingId === p.id}
-                                                onChange={() => handleToggleProduct(p, p.isActive)}
+                                                onChange={() => handleToggleProduct(p, p.isPurchasable !== false)}
                                                 className="sr-only peer"
                                             />
                                             <div className="w-10 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
                                             <span className="ml-2.5 text-xs font-bold w-12 text-right">
-                                                {p.isActive ? (
+                                                {p.isPurchasable !== false ? (
                                                     <span className="text-emerald-600">販售中</span>
                                                 ) : (
                                                     <span className="text-gray-400">已停售</span>

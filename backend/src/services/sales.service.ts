@@ -296,6 +296,7 @@ export const SalesService = {
         paymentMethod: sale.paymentMethod || 'CASH',
         salesData,
         reserve: Number(sale.reserve),
+        totalCash: Number(sale.totalCash), // 總現金（含備用金），供 cashCounts 無資料時參考
         expenses: parsedExpenses,
         cashCounts: sale.cashCounts || {},
         originalDate: sale.date,

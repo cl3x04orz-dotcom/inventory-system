@@ -235,9 +235,24 @@ export default function PermissionControlPage({ user, apiUrl }) {
                     </h1>
                     <p className="text-[10px] md:text-sm text-[var(--text-tertiary)] font-medium">(Permission Control)</p>
                 </div>
-                <button onClick={fetchUsers} className="btn-secondary p-2 rounded-xl">
-                    <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-                </button>
+                <div className="flex items-center gap-2">
+                    {user?.role === 'BOSS' && (
+                        <button
+                            onClick={() => {
+                                const backupUrl = `${apiUrl.replace(/\/$/, '')}/backup?token=${encodeURIComponent(user.token)}`;
+                                window.location.href = backupUrl;
+                            }}
+                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
+                            title="一鍵備份並下載資料庫 Excel 檔案"
+                        >
+                            <Save size={14} />
+                            下載資料庫備份 (.xlsx)
+                        </button>
+                    )}
+                    <button onClick={fetchUsers} className="btn-secondary p-2 rounded-xl">
+                        <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                    </button>
+                </div>
             </div>
 
             {/* Add User Panel */}

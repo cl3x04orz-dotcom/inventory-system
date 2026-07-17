@@ -1,0 +1,544 @@
+diff --git a/src/components/MergePrintModal.jsx b/src/components/MergePrintModal.jsx
+index 5500f86..7eaeb4f 100644
+--- a/src/components/MergePrintModal.jsx
++++ b/src/components/MergePrintModal.jsx
+@@ -18,7 +18,8 @@ export default function MergePrintModal({
+     onDateChange,
+     onSearch,
+     isSearchLoading, // [New] 查詢載入狀態
+-    systemCustomers = [] // [New] 全系統客戶名單
++    systemCustomers = [], // [New] 全系統客戶名單
++    onUpdateCustomerSettings // [New] 更新客戶設定
+ }) {
+     const [aiCustomer, setAiCustomer] = useState('');
+     const [aiWeather, setAiWeather] = useState('SUNNY');
+@@ -27,6 +28,17 @@ export default function MergePrintModal({
+     const [isAiLoading, setIsAiLoading] = useState(false);
+     const [aiMessage, setAiMessage] = useState(null);
+     const [showAllLocations, setShowAllLocations] = useState(false); // [New] 是否顯示全部地點
++    const [showScheduleMgr, setShowScheduleMgr] = useState(false); // 控制排程後台子視窗
++    const [searchCustQuery, setSearchCustQuery] = useState(''); // 排程後台搜尋框
++    const [editingCustomers, setEditingCustomers] = useState({}); // 暫存正在編輯的客戶設定
++    const [showProductRuleMgr, setShowProductRuleMgr] = useState(false); // 控制商品規格後台子視窗
++    const [searchProductQuery, setSearchProductQuery] = useState(''); // 商品規格搜尋框
++    const [mgrProducts, setMgrProducts] = useState([]); // 商品規格管理名單
++    const [loadingProducts, setLoadingProducts] = useState(false);
++    const [savingProductId, setSavingProductId] = useState(null); // 正在儲存的商品 ID
++
++    // 防禦：確保 records 一定是 array，避免 API 失敗時 crash (宣告在 hooks 前讓 useEffect 也能使用)
++    const safeRecords = Array.isArray(records) ? records : [];
+ 
+     // [New] 自動推算當前日期的星期幾
+     const getDOWString = (dateStr) => {
+@@ -72,7 +84,7 @@ export default function MergePrintModal({
+     // [New] 自動從選中的單據中抓取客戶名稱作為預設
+     useEffect(() => {
+         if (show && selectedIds.length > 0 && !aiCustomer) {
+-            const firstRecord = records.find(r => r.saleId === selectedIds[0]);
++            const firstRecord = safeRecords.find(r => r.saleId === selectedIds[0]);
+             if (firstRecord) setAiCustomer(firstRecord.customer);
+         }
+     }, [show, selectedIds, records, aiCustomer]);
+@@ -84,10 +96,138 @@ export default function MergePrintModal({
+         }
+     }, [endDate]);
+ 
++    // ==========================================
++    // 地點排程管理後台相關輔助函式
++    // ==========================================
++    const getCustSetting = (custName) => {
++        if (editingCustomers[custName]) {
++            return editingCustomers[custName];
++        }
++        const orig = systemCustomers.find(c => (typeof c === 'string' ? c : c.name) === custName);
++        let origSchedule = [0,1,2,3,4,5,6];
++        let origAiEnabled = true;
++        let origCategory = '市場';
++        if (orig && typeof orig === 'object') {
++            origSchedule = orig.schedule || [0,1,2,3,4,5,6];
++            origAiEnabled = orig.isAiEnabled !== false;
++            origCategory = orig.category || '市場';
++        }
++        return {
++            customerName: custName,
++            isAiEnabled: origAiEnabled,
++            schedule: origSchedule,
++            category: origCategory,
++            isSaving: false
++        };
++    };
++
++    const handleEditCust = (custName, field, value) => {
++        const current = getCustSetting(custName);
++        const next = { ...current, [field]: value };
++        setEditingCustomers(prev => ({
++            ...prev,
++            [custName]: next
++        }));
++    };
++
++    const handleSaveCust = async (custName) => {
++        const setting = getCustSetting(custName);
++        setEditingCustomers(prev => ({
++            ...prev,
++            [custName]: { ...setting, isSaving: true }
++        }));
++        if (onUpdateCustomerSettings) {
++            const success = await onUpdateCustomerSettings({
++                customerName: setting.customerName,
++                isAiEnabled: setting.isAiEnabled,
++                schedule: setting.schedule,
++                category: setting.category
++            });
++            if (success) {
++                setEditingCustomers(prev => {
++                    const copy = { ...prev };
++                    delete copy[custName];
++                    return copy;
++                });
++            } else {
++                setEditingCustomers(prev => ({
++                    ...prev,
++                    [custName]: { ...setting, isSaving: false }
++                }));
++            }
++    };
++
++    // 載入商品規格清單
++    useEffect(() => {
++        const loadProducts = async () => {
++            setLoadingProducts(true);
++            try {
++                const data = await callGAS(apiUrl, 'getProducts', {}, user?.token);
++                if (Array.isArray(data)) {
++                    setMgrProducts(data);
++                }
++            } catch (e) {
++                console.error("Failed to load products for rule manager", e);
++            } finally {
++                setLoadingProducts(false);
++            }
++        };
++        if (showProductRuleMgr && user?.token) {
++            loadProducts();
++        }
++    }, [showProductRuleMgr, user?.token]);
++
++    const handleEditProductField = (productId, field, value) => {
++        setMgrProducts(prev => prev.map(p => {
++            if (p.id === productId) {
++                return { ...p, [field]: value, _dirty: true };
++            }
++            return p;
++        }));
++    };
++
++    const handleSaveProductRule = async (product) => {
++        setSavingProductId(product.id);
++        try {
++            // 解析發貨階梯
++            let parsedSteps = [];
++            if (typeof product.dispatchSteps === 'string') {
++                parsedSteps = product.dispatchSteps.split(/[,，]/).map(s => Number(s.trim())).filter(n => !isNaN(n));
++            } else if (Array.isArray(product.dispatchSteps)) {
++                parsedSteps = product.dispatchSteps.map(Number);
++            }
++
++            const res = await callGAS(apiUrl, 'updateProductDetails', {
++                productId: product.id,
++                packSize: Number(product.packSize || 1),
++                dispatchSteps: parsedSteps,
++                roundThreshold: Number(product.roundThreshold !== undefined ? product.roundThreshold : 99),
++                autoSuppress: Boolean(product.autoSuppress),
++                maxSuggestion: Number(product.maxSuggestion || 0)
++            }, user?.token);
++
++            if (res && res.error) {
++                throw new Error(res.error);
++            }
++
++            setMgrProducts(prev => prev.map(p => {
++                if (p.id === product.id) {
++                    return { ...p, dispatchSteps: parsedSteps, _dirty: false };
++                }
++                return p;
++            }));
++            alert(`${product.name} 規格儲存成功！`);
++        } catch (e) {
++            alert('儲存商品規格失敗: ' + e.message);
++        } finally {
++            setSavingProductId(null);
++        }
++    };
++
+     if (!show) return null;
+ 
+     // Group records by date
+-    const groupedRecords = records.reduce((groups, record) => {
++    const groupedRecords = safeRecords.reduce((groups, record) => {
+         const dateKey = new Date(record.date).toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
+         if (!groups[dateKey]) groups[dateKey] = [];
+         groups[dateKey].push(record);
+@@ -103,7 +243,7 @@ export default function MergePrintModal({
+             return;
+         }
+ 
+-        const selectedRecords = records.filter(r => selectedIds.includes(r.saleId));
++        const selectedRecords = safeRecords.filter(r => selectedIds.includes(r.saleId));
+         // 如果沒選單據，currentOriginals 就會是空物件，表示車上目前沒貨量
+ 
+         // 1. 統計目前選中單據中的 原貨+退貨 (即目前車上有的貨)
+@@ -209,9 +349,18 @@ export default function MergePrintModal({
+                                 {/* ROW 1: Logic Grid */}
+                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                                     <div className="flex flex-col gap-2">
+-                                        <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-2 px-1">
+-                                            <MapPin size={12} className="text-blue-500 shrink-0" /> 特定地點預測目標
+-                                        </label>
++                                        <div className="flex items-center justify-between px-1">
++                                            <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-2">
++                                                <MapPin size={12} className="text-blue-500 shrink-0" /> 特定地點預測目標
++                                            </label>
++                                            <button
++                                                type="button"
++                                                onClick={() => setShowScheduleMgr(true)}
++                                                className="text-[10px] text-blue-500 hover:text-blue-600 font-black flex items-center gap-0.5"
++                                            >
++                                                ⚙️ 管理排程
++                                            </button>
++                                        </div>
+                                         <div className="relative bg-gray-50/50 p-1 rounded-xl border-2 border-blue-100 flex items-center h-12">
+                                             <select
+                                                 className="w-full bg-transparent appearance-none rounded-lg px-3 text-xs sm:text-sm font-black text-blue-900 outline-none cursor-pointer"
+@@ -300,22 +449,33 @@ export default function MergePrintModal({
+                                     </div>
+ 
+                                     {/* Right: AI Button */}
+-                                    <button
+-                                        onClick={handleAIReplenish}
+-                                        disabled={isAiLoading || !aiCustomer}
+-                                        className={`w-full lg:w-auto shrink-0 group relative flex items-center justify-center gap-3 px-6 py-3 sm:py-4 rounded-xl sm:rounded-[2rem] font-black transition-all duration-300 shadow-lg active:scale-95 ${isAiLoading || !aiCustomer ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none' : 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white hover:brightness-110 shadow-blue-200/50 text-sm sm:text-xl'}`}
+-                                    >
+-                                        {isAiLoading ? (
+-                                            <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+-                                        ) : (
+-                                            <div className="flex items-center gap-3 whitespace-nowrap">
+-                                                <div className="p-1 bg-white/20 rounded-md shadow-inner group-hover:rotate-12 transition-transform">
+-                                                    <Sparkles size={18} />
++                                    <div className="flex flex-col gap-1 w-full lg:w-auto items-center lg:items-end">
++                                        <button
++                                            onClick={handleAIReplenish}
++                                            disabled={isAiLoading || !aiCustomer}
++                                            className={`w-full lg:w-auto shrink-0 group relative flex items-center justify-center gap-3 px-6 py-3 sm:py-4 rounded-xl sm:rounded-[2rem] font-black transition-all duration-300 shadow-lg active:scale-95 ${isAiLoading || !aiCustomer ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none' : 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white hover:brightness-110 shadow-blue-200/50 text-sm sm:text-xl'}`}
++                                        >
++                                            {isAiLoading ? (
++                                                <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
++                                            ) : (
++                                                <div className="flex items-center gap-3 whitespace-nowrap">
++                                                    <div className="p-1 bg-white/20 rounded-md shadow-inner group-hover:rotate-12 transition-transform">
++                                                        <Sparkles size={18} />
++                                                    </div>
++                                                    <span>生成 AI 補貨</span>
+                                                 </div>
+-                                                <span>生成 AI 補貨</span>
+-                                            </div>
++                                            )}
++                                        </button>
++                                        {!isAiLoading && (
++                                            <button
++                                                type="button"
++                                                onClick={() => setShowProductRuleMgr(true)}
++                                                className="text-[10px] text-blue-500 hover:text-blue-600 font-black mt-1 text-center hover:underline self-center lg:self-end flex items-center gap-1"
++                                            >
++                                                ⚙️ 設定商品箱數與 AI 預估規則
++                                            </button>
+                                         )}
+-                                    </button>
++                                    </div>
+                                 </div>
+                             </div>
+                         </div>
+@@ -332,7 +492,7 @@ export default function MergePrintModal({
+ 
+                 {/* Modal Body */}
+                 <div className="py-4 sm:py-6 flex-1">
+-                    {records.length === 0 ? (
++                    {safeRecords.length === 0 ? (
+                         <div className="flex flex-col items-center justify-center py-10 text-center opacity-50 mx-[15px]">
+                             <ListOrdered size={32} className="mb-4" />
+                             <h4 className="font-bold text-sm">請先點擊查詢載入資料</h4>
+@@ -366,9 +526,9 @@ export default function MergePrintModal({
+                                                     </div>
+                                                     <div className="mt-2 sm:mt-3 pt-2 border-t border-current/10 flex justify-between items-baseline">
+                                                         <span className="text-[9px] sm:text-[10px] uppercase tracking-widest opacity-60">Total</span>
+-                                                        <span className="text-base sm:text-lg font-black font-mono">${record.totalAmount.toLocaleString()}</span>
++                                                        <span className="text-base sm:text-lg font-black font-mono">${(record.totalAmount ?? 0).toLocaleString()}</span>
+                                                     </div>
+-                                                    {isSelected && <CheckCircle2 className="absolute top-2 right-2 opacity-20" size={24} sm:size={40} />}
++                                                    {isSelected && <CheckCircle2 className="absolute top-2 right-2 opacity-20" size={32} />}
+                                                 </div>
+                                             );
+                                         })}
+@@ -407,6 +567,262 @@ export default function MergePrintModal({
+                     </div>
+                 </div>
+             </div>
++
++            {/* 2. Customer Schedule Settings Sub-Modal */}
++            {showScheduleMgr && (
++                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
++                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-[80vh] flex flex-col border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
++                        {/* Header */}
++                        <div className="p-6 bg-gray-50 border-b border-gray-100 flex items-center justify-between shrink-0">
++                            <div>
++                                <h3 className="text-lg font-black text-gray-900">地點送貨排程管理後台</h3>
++                                <p className="text-xs text-gray-400 mt-1">手動設定每個地點是否啟用 AI 智慧預測，以及星期幾送貨的排程規則。</p>
++                            </div>
++                            <button
++                                onClick={() => {
++                                    setShowScheduleMgr(false);
++                                    setSearchCustQuery('');
++                                    setEditingCustomers({});
++                                }}
++                                className="p-2 hover:bg-gray-200 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
++                            >
++                                <X size={20} />
++                            </button>
++                        </div>
++
++                        {/* Search & Filter bar */}
++                        <div className="p-4 border-b border-gray-100 flex gap-4 shrink-0">
++                            <input
++                                type="text"
++                                placeholder="🔍 輸入關鍵字搜尋地點名稱..."
++                                value={searchCustQuery}
++                                onChange={(e) => setSearchCustQuery(e.target.value)}
++                                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 placeholder-gray-400 outline-none focus:border-blue-400 focus:bg-white transition-all"
++                            />
++                        </div>
++
++                        {/* Table / List area */}
++                        <div className="flex-1 overflow-y-auto p-6 space-y-3">
++                            <div className="grid grid-cols-12 gap-3 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 mb-2">
++                                <div className="col-span-4">地點名稱</div>
++                                <div className="col-span-2 text-center">AI 預測開關</div>
++                                <div className="col-span-4 text-center">星期送貨排程</div>
++                                <div className="col-span-2 text-center">操作</div>
++                            </div>
++
++                            {systemCustomers
++                                .filter(c => {
++                                    const name = typeof c === 'string' ? c : c.name;
++                                    return name.toLowerCase().includes(searchCustQuery.toLowerCase());
++                                })
++                                .map(c => {
++                                    const name = typeof c === 'string' ? c : c.name;
++                                    const setting = getCustSetting(name);
++                                    
++                                    const orig = systemCustomers.find(sc => (typeof sc === 'string' ? sc : sc.name) === name) || {};
++                                    const origSchedule = orig.schedule || [0,1,2,3,4,5,6];
++                                    const origAiEnabled = orig.isAiEnabled !== false;
++                                    
++                                    const isModified = 
++                                        setting.isAiEnabled !== origAiEnabled ||
++                                        JSON.stringify(setting.schedule.slice().sort()) !== JSON.stringify(origSchedule.slice().sort());
++
++                                    return (
++                                        <div key={name} className={`grid grid-cols-12 gap-3 items-center p-3 rounded-2xl border transition-all ${isModified ? 'bg-blue-50/20 border-blue-200 shadow-sm' : 'bg-white border-gray-100 hover:border-gray-200'}`}>
++                                            {/* Location Name */}
++                                            <div className="col-span-4 font-black text-sm text-gray-800 truncate" title={name}>
++                                                {name}
++                                            </div>
++
++                                            {/* AI Switch */}
++                                            <div className="col-span-2 flex justify-center">
++                                                <button
++                                                    type="button"
++                                                    onClick={() => handleEditCust(name, 'isAiEnabled', !setting.isAiEnabled)}
++                                                    className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all ${setting.isAiEnabled ? 'bg-emerald-500 text-white shadow-sm' : 'bg-gray-100 text-gray-400'}`}
++                                                >
++                                                    {setting.isAiEnabled ? 'ON 啟用' : 'OFF 關閉'}
++                                                </button>
++                                            </div>
++
++                                            {/* Weekly Schedule */}
++                                            <div className="col-span-4 flex justify-center gap-1">
++                                                {['日', '一', '二', '三', '四', '五', '六'].map((day, idx) => {
++                                                    const isChecked = setting.schedule.includes(idx);
++                                                    return (
++                                                        <button
++                                                            key={idx}
++                                                            type="button"
++                                                            onClick={() => {
++                                                                const newSchedule = isChecked
++                                                                    ? setting.schedule.filter(d => d !== idx)
++                                                                    : [...setting.schedule, idx];
++                                                                handleEditCust(name, 'schedule', newSchedule);
++                                                            }}
++                                                            className={`w-7 h-7 rounded-lg font-black text-xs transition-all ${isChecked ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-50 text-gray-300 hover:text-gray-500'}`}
++                                                        >
++                                                            {day}
++                                                        </button>
++                                                    );
++                                                })}
++                                            </div>
++
++                                            {/* Save Button */}
++                                            <div className="col-span-2 flex justify-center">
++                                                <button
++                                                    type="button"
++                                                    disabled={!isModified || setting.isSaving}
++                                                    onClick={() => handleSaveCust(name)}
++                                                    className={`w-full py-2 rounded-xl font-black text-xs flex items-center justify-center gap-1 transition-all ${setting.isSaving ? 'bg-gray-100 text-gray-300' : isModified ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-100 active:scale-95' : 'bg-gray-50 text-gray-300 pointer-events-none'}`}
++                                                >
++                                                    {setting.isSaving ? (
++                                                        <span className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
++                                                    ) : (
++                                                        <span>儲存設定</span>
++                                                    )}
++                                                </button>
++                                            </div>
++                                        </div>
++                                    );
++                                })}
++                        </div>
++                    </div>
++                </div>
++            )}
++
++            {/* 3. Product Rules Settings Sub-Modal */}
++            {showProductRuleMgr && (
++                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
++                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-[80vh] flex flex-col border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
++                        {/* Header */}
++                        <div className="p-6 bg-gray-50 border-b border-gray-100 flex items-center justify-between shrink-0">
++                            <div>
++                                <h3 className="text-lg font-black text-gray-900">商品預估與箱數規格管理後台</h3>
++                                <p className="text-xs text-gray-400 mt-1">手動設定每個商品的包裝箱數、發貨階梯規格、智慧抑制門檻，用來微調 AI 生成補貨時的進位標準。</p>
++                            </div>
++                            <button
++                                onClick={() => {
++                                    setShowProductRuleMgr(false);
++                                    setSearchProductQuery('');
++                                    setMgrProducts([]);
++                                }}
++                                className="p-2 hover:bg-gray-200 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
++                            >
++                                <X size={20} />
++                            </button>
++                        </div>
++
++                        {/* Search & Filter bar */}
++                        <div className="p-4 border-b border-gray-100 flex gap-4 shrink-0">
++                            <input
++                                type="text"
++                                placeholder="🔍 輸入商品名稱搜尋..."
++                                value={searchProductQuery}
++                                onChange={(e) => setSearchProductQuery(e.target.value)}
++                                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 placeholder-gray-400 outline-none focus:border-blue-400 focus:bg-white transition-all"
++                            />
++                        </div>
++
++                        {/* Table / List area */}
++                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
++                            {loadingProducts ? (
++                                <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-400">
++                                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
++                                    <span>商品載入中...</span>
++                                </div>
++                            ) : mgrProducts.length === 0 ? (
++                                <div className="text-center py-20 text-gray-400">無符合的商品資料</div>
++                            ) : (
++                                mgrProducts
++                                    .filter(p => p.name.toLowerCase().includes(searchProductQuery.toLowerCase()))
++                                    .map(product => {
++                                        const stepsVal = Array.isArray(product.dispatchSteps)
++                                            ? product.dispatchSteps.join(', ')
++                                            : product.dispatchSteps || '';
++
++                                        return (
++                                            <div key={product.id} className={`p-4 rounded-2xl border transition-all ${product._dirty ? 'bg-blue-50/20 border-blue-200 shadow-sm' : 'bg-white border-gray-100 hover:border-gray-200'}`}>
++                                                {/* Grid Layout */}
++                                                <div className="grid grid-cols-12 gap-4 items-center">
++                                                    {/* Product Name */}
++                                                    <div className="col-span-3">
++                                                        <div className="font-black text-sm text-gray-800 truncate" title={product.name}>
++                                                            {product.name}
++                                                        </div>
++                                                        <div className="text-[10px] text-gray-400 font-mono mt-0.5">ID: {product.id}</div>
++                                                    </div>
++
++                                                    {/* Pack Size & Steps */}
++                                                    <div className="col-span-4 grid grid-cols-2 gap-2 text-xs">
++                                                        <div className="flex flex-col gap-1">
++                                                            <span className="text-[9px] text-gray-400 font-black">整箱規格</span>
++                                                            <input
++                                                                type="number"
++                                                                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 font-bold outline-none focus:border-blue-400 focus:bg-white"
++                                                                value={product.packSize || 1}
++                                                                onChange={(e) => handleEditProductField(product.id, 'packSize', e.target.value !== '' ? Number(e.target.value) : 1)}
++                                                            />
++                                                        </div>
++                                                        <div className="flex flex-col gap-1">
++                                                            <span className="text-[9px] text-gray-400 font-black">發貨階梯 (以逗號分隔)</span>
++                                                            <input
++                                                                type="text"
++                                                                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 font-bold outline-none focus:border-blue-400 focus:bg-white"
++                                                                placeholder="例: 24, 48"
++                                                                value={stepsVal}
++                                                                onChange={(e) => handleEditProductField(product.id, 'dispatchSteps', e.target.value)}
++                                                            />
++                                                        </div>
++                                                    </div>
++
++                                                    {/* Threshold & Max Limit */}
++                                                    <div className="col-span-3 grid grid-cols-2 gap-2 text-xs">
++                                                        <div className="flex flex-col gap-1">
++                                                            <span className="text-[9px] text-gray-400 font-black">進位門檻 (尾數多於此)</span>
++                                                            <input
++                                                                type="number"
++                                                                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 font-bold outline-none focus:border-blue-400 focus:bg-white"
++                                                                value={product.roundThreshold !== undefined ? product.roundThreshold : 99}
++                                                                onChange={(e) => handleEditProductField(product.id, 'roundThreshold', e.target.value !== '' ? Number(e.target.value) : 99)}
++                                                            />
++                                                        </div>
++                                                        <div className="flex flex-col gap-1">
++                                                            <span className="text-[9px] text-gray-400 font-black">智慧抑制</span>
++                                                            <div className="h-[34px] flex items-center justify-center bg-gray-50 border border-gray-200 rounded-lg">
++                                                                <input
++                                                                    type="checkbox"
++                                                                    checked={!!product.autoSuppress}
++                                                                    onChange={(e) => handleEditProductField(product.id, 'autoSuppress', e.target.checked)}
++                                                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
++                                                                />
++                                                            </div>
++                                                        </div>
++                                                    </div>
++
++                                                    {/* Save Button */}
++                                                    <div className="col-span-2">
++                                                        <button
++                                                            type="button"
++                                                            disabled={!product._dirty || savingProductId === product.id}
++                                                            onClick={() => handleSaveProductRule(product)}
++                                                            className={`w-full py-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all ${product._dirty ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-100 active:scale-95' : 'bg-gray-50 text-gray-300 pointer-events-none'}`}
++                                                        >
++                                                            {savingProductId === product.id ? (
++                                                                <span className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
++                                                            ) : (
++                                                                <span>儲存規則</span>
++                                                            )}
++                                                        </button>
++                                                    </div>
++                                                </div>
++                                            </div>
++                                        );
++                                    })
++                            )}
++                        </div>
++                    </div>
++                </div>
++            )}
+         </div>
+     );
+ }

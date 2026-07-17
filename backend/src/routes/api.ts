@@ -41,6 +41,7 @@ const actionPermissions: Record<string, string> = {
   getStocktakeHistory: 'inventory_history',
   updateProductSortOrder: 'system_config',
   updateProductDetails: 'system_config',
+  updateProductPurchasable: 'system_config',
 
   getPendingOrders: 'sales_pending',
   updatePendingOrder: 'sales_pending',
@@ -125,6 +126,49 @@ export async function apiRoutes(app: FastifyInstance) {
     } catch (error: any) {
       app.log.error(error);
       return reply.send({ error: error.message || 'Internal Server Error' });
+    }
+  });
+
+  // GET /api/backup - 一鍵備份資料庫並下載 Excel 檔
+  app.get('/api/backup', async (request, reply) => {
+    const { token, secret } = request.query as { token?: string; secret?: string };
+
+    const BACKUP_SECRET_KEY = process.env.BACKUP_SECRET_KEY || 'milipack_db_backup_secure_secret_2026_xyz';
+    let isAuthorized = false;
+
+    if (secret && secret === BACKUP_SECRET_KEY) {
+      isAuthorized = true;
+    } else if (token) {
+      try {
+        const user = jwt.verify(token, JWT_SECRET) as any;
+        if (user.role === 'BOSS') {
+          isAuthorized = true;
+        }
+      } catch (err) {
+        return reply.status(401).send({ error: 'TokenExpired' });
+      }
+    }
+
+    if (!isAuthorized) {
+      return reply.status(403).send({ error: 'Forbidden: 權限不足或無效的金鑰/Token' });
+    }
+
+    try {
+
+      // 動態載入 BackupService 避免循環依賴
+      const { BackupService } = await import('../services/backup.service.js');
+      const excelBuffer = await BackupService.exportDatabaseToExcel();
+
+      const timeStr = new Date().toISOString().replace(/[-:T]/g, '').substring(0, 14);
+      const filename = `database_backup_${timeStr}.xlsx`;
+
+      reply
+        .header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        .header('Content-Disposition', `attachment; filename="${filename}"`)
+        .send(excelBuffer);
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.status(500).send({ error: err.message || '備份下載失敗' });
     }
   });
 }

@@ -31,10 +31,13 @@ function formatExpiryDate(val: string | null | undefined): string {
 
 export const ProductService = {
   async getProducts(payload: any = {}) {
-    const { activeOnly } = payload;
+    const { activeOnly, purchasableOnly } = payload;
     const whereClause: any = {};
     if (activeOnly) {
       whereClause.isActive = true;
+    }
+    if (purchasableOnly) {
+      whereClause.isPurchasable = true;
     }
 
     // 1. Fetch products sorted by sortWeight
@@ -103,6 +106,7 @@ export const ProductService = {
         sortWeight: p.sortWeight,
         isBundle: Boolean(p.isBundle),
         bundleSize: Number(p.bundleSize || 1),
+        isPurchasable: p.isPurchasable !== false, // 進貨清單顯示，與前台上架無關
         _fromSheet: 'Products'
       };
     });
@@ -139,6 +143,7 @@ export const ProductService = {
       productId,
       isActive,
       imageUrl,
+      category,
       expiryDate,
       has_flavor_attributes,
       flavor_choices,
@@ -164,6 +169,7 @@ export const ProductService = {
       data: {
         isActive: isActive !== undefined ? Boolean(isActive) : undefined,
         imageUrl: imageUrl !== undefined ? String(imageUrl) : undefined,
+        category: category !== undefined ? String(category) : undefined,
         expiryDate: expiryDate !== undefined ? String(expiryDate) : undefined,
         defaultPrice: price !== undefined && price !== '' && price !== null ? Number(price) : undefined,
         hasFlavorAttributes: has_flavor_attributes !== undefined ? Boolean(has_flavor_attributes) : undefined,
@@ -179,6 +185,21 @@ export const ProductService = {
         isBundle: isBundle !== undefined ? Boolean(isBundle) : undefined,
         bundleSize: bundleSize !== undefined ? Number(bundleSize) : undefined
       }
+    });
+
+    return { success: true };
+  },
+
+  async updateProductPurchasable(payload: any, user: any) {
+    if (user.role !== 'BOSS') {
+      throw new Error('權限不足');
+    }
+    const { productId, isPurchasable } = payload;
+    if (!productId) throw new Error('缺少 productId');
+
+    await prisma.product.update({
+      where: { productId: String(productId).trim() },
+      data: { isPurchasable: Boolean(isPurchasable) }
     });
 
     return { success: true };

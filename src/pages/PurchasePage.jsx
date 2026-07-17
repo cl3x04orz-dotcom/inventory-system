@@ -30,7 +30,7 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
             if (data.vendors) setSuggestions(data);
             
             // [新增] 抓取完整的產品主檔清單
-            const products = await callGAS(apiUrl, 'getProducts', { activeOnly: true }, user.token);
+            const products = await callGAS(apiUrl, 'getProducts', { purchasableOnly: true }, user.token);
             if (Array.isArray(products)) {
                 setAllProductNames(products.map(p => p.name));
             }

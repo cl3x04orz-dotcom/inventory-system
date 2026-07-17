@@ -26,6 +26,7 @@ model Product {
   safetyStock           Int           @default(0)
   sortWeight            Int           @default(0)
   isActive              Boolean       @default(true)
+  isPurchasable         Boolean       @default(true) // 是否出現在進貨清單（與前台上架 isActive 完全獨立）
   imageUrl              String?
   expiryDate            String?
   hasFlavorAttributes   Boolean       @default(false)
@@ -189,6 +190,8 @@ model GroupBuyCommunity {
   closeMessage          String?
   defaultDeliveryTime   String?
   defaultFreeShipping   Boolean   @default(false)
+  freeShippingMin       Decimal   @default(0)   // 免運門檻金額（0 = 無門檻，直接免運）
+  shippingFee           Decimal   @default(0)   // 未達門檻時加收的運費
   defaultPaymentMethods Json      @default("[]")
   defaultRoute          String?
   deliveryInstruction   String?
@@ -211,6 +214,7 @@ model GroupBuyOrder {
   sourceGroup        String?
   note               String?
   totalAmount        Decimal              @default(0)
+  shippingFee        Decimal              @default(0)   // 此筆訂單實收運費
   paymentMethod      String?
   transferLastFive   String?
   paymentStatus      String?

@@ -281,9 +281,9 @@ async function main() {
     insurance: parseDecimal(row.Insurance || row.insurance),
     offDaysStandard: parseInteger(row.MonthlyOffDays || row.offDaysStandard || 8),
     bonusTiersJson: parseJson(row.BonusTiersJSON || row.bonusTiersJson, []),
-    empType: String(row.EmpType || row.empType || 'FULL_TIME').trim().toUpperCase(),
-    hourlyWage: parseDecimal(row.HourlyWage || row.hourlyWage),
-    commissionRate: parseDecimal(row.CommissionRate || row.commissionRate)
+    empType: String(row.EmpType || row.empType || row.__EMPTY || 'FULL_TIME').trim().toUpperCase(),
+    hourlyWage: parseDecimal(row.HourlyWage || row.hourlyWage || row.__EMPTY_1),
+    commissionRate: parseDecimal(row.CommissionRate || row.commissionRate || row.__EMPTY_2)
   })).filter(p => p.username);
 
   await prisma.payrollSetting.createMany({ data: payrollSettings });

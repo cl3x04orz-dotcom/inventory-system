@@ -34,6 +34,7 @@ export const GroupBuyService = {
       sourceGroup: o.sourceGroup || '',
       note: o.note || '',
       totalAmount: Number(o.totalAmount),
+      shippingFee: Number(o.shippingFee) || 0,
       paymentMethod: o.paymentMethod || '',
       transferLastFive: o.transferLastFive || '',
       paymentStatus: o.paymentStatus || '',
@@ -302,16 +303,34 @@ export const GroupBuyService = {
     return { success: true };
   },
 
-  // 7. 取得大樓設定列表
+  // 7. 取得大樓設定列表（含對應社區的運費設定）
   async getBuildingSettings(payload: any, user: any) {
     const settings = await prisma.buildingSetting.findMany({
       orderBy: { building: 'asc' }
     });
-    return settings.map((s: any) => ({
-      building: s.building,
-      start_time: s.startTime || '',
-      end_time: s.endTime || ''
-    }));
+    // 一次查出所有社區的運費設定（依名稱匹配）
+    const allComms = await prisma.groupBuyCommunity.findMany({
+      select: { communityName: true, defaultFreeShipping: true, freeShippingMin: true, shippingFee: true }
+    });
+    const commMap = new Map(allComms.map((c: any) => [c.communityName, c]));
+
+    return settings.map((s: any) => {
+      const comm = commMap.get(s.building);
+      return {
+        building: s.building,
+        start_time: s.startTime || '',
+        end_time: s.endTime || '',
+        is_auto: s.isAuto || false,
+        auto_open_day: s.autoOpenDay !== null && s.autoOpenDay !== undefined ? s.autoOpenDay : '',
+        auto_open_time: s.autoOpenTime || '',
+        auto_close_day: s.autoCloseDay !== null && s.autoCloseDay !== undefined ? s.autoCloseDay : '',
+        auto_close_time: s.autoCloseTime || '',
+        // 運費設定
+        default_free_shipping: comm?.defaultFreeShipping || false,
+        free_shipping_min: Number(comm?.freeShippingMin) || 0,
+        shipping_fee: Number(comm?.shippingFee) || 0,
+      };
+    });
   },
 
   // 8. 儲存/更新大樓設定
@@ -350,6 +369,29 @@ export const GroupBuyService = {
       });
     }
 
+    return { success: true };
+  },
+
+  // 8b. 儲存社區運費設定
+  async saveCommunityShipping(payload: any, user: any) {
+    if (user.role !== 'BOSS') throw new Error('權限不足');
+    const { building, default_free_shipping, free_shipping_min, shipping_fee } = payload;
+    if (!building) throw new Error('缺少大樓名稱');
+
+    // 找到對應的社區
+    const comm = await prisma.groupBuyCommunity.findFirst({
+      where: { communityName: building }
+    });
+    if (!comm) throw new Error(`找不到社區「${building}」，請先建立大樓設定`);
+
+    await prisma.groupBuyCommunity.update({
+      where: { communityId: comm.communityId },
+      data: {
+        defaultFreeShipping: !!default_free_shipping,
+        freeShippingMin: Number(free_shipping_min) || 0,
+        shippingFee: Number(shipping_fee) || 0,
+      }
+    });
     return { success: true };
   },
 
@@ -452,7 +494,10 @@ export const GroupBuyService = {
       CommunityName: targetComm.communityName,
       OrderingMode: targetComm.orderingMode || 'OPEN',
       OpenMessage: targetComm.openMessage || '',
-      CloseMessage: targetComm.closeMessage || ''
+      CloseMessage: targetComm.closeMessage || '',
+      DefaultFreeShipping: targetComm.defaultFreeShipping || false,
+      FreeShippingMin: Number(targetComm.freeShippingMin) || 0,
+      ShippingFee: Number(targetComm.shippingFee) || 0,
     };
 
     // 取得大樓時段設定
@@ -488,7 +533,8 @@ export const GroupBuyService = {
       CommunityId, CampaignId, sourceGroup,
       note, paymentMethod, transferLastFive,
       lineDisplayName, lineUserId, items,
-      useWalletDeduction, walletDeductionAmount
+      useWalletDeduction, walletDeductionAmount,
+      shippingFee
     } = payload;
 
     if (!items || items.length === 0) throw new Error('購物車為空');
@@ -512,8 +558,10 @@ export const GroupBuyService = {
       if (camp) campNameSnap = camp.campaignName;
     }
 
-    const totalAmount = items.reduce((sum: number, item: any) =>
+    const productTotal = items.reduce((sum: number, item: any) =>
       sum + (Number(item.unitPrice) * Number(item.qty)), 0);
+    const appliedShippingFee = Number(shippingFee) || 0;
+    const totalAmount = productTotal + appliedShippingFee;
 
     let finalNote = note || '';
     let deductionApplied = 0;
@@ -577,6 +625,7 @@ export const GroupBuyService = {
         sourceGroup: commNameSnap || sourceGroup || '',
         note: combinedNote,
         totalAmount,
+        shippingFee: appliedShippingFee,
         paymentMethod: actualPaymentMethod,
         transferLastFive: transferLastFive || '',
         paymentStatus,

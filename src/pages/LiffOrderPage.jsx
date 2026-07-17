@@ -900,6 +900,18 @@ export default function LiffOrderPage({ user, apiUrl }) {
     [cart, products],
   );
 
+  // ── 運費計算 ──────────────────────────────────────────────────
+  const shippingFee = useMemo(() => {
+    if (!currentCommunity) return 0;
+    if (currentCommunity.DefaultFreeShipping) return 0;
+    const min = Number(currentCommunity.FreeShippingMin) || 0;
+    const fee = Number(currentCommunity.ShippingFee) || 0;
+    if (fee === 0) return 0; // 未設定運費視為免運
+    return cartTotal >= min ? 0 : fee;
+  }, [cartTotal, currentCommunity]);
+
+  const orderTotal = cartTotal + shippingFee;
+
   const cartItems = useMemo(
     () =>
       Object.entries(cart).map(([pid, qty]) => {
@@ -1104,6 +1116,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
           lineUserId: finalLineUserId,
           useWalletDeduction: useWallet,
           walletDeductionAmount: maxDeduction,
+          shippingFee,
           items: cartItems.map((i) => ({
             productId: i.id,
             productName: i.name,
@@ -1127,7 +1140,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
       setOrderId(res.orderId || "");
       setOrderTime(new Date().toLocaleString("zh-TW", { hour12: false }));
       
-      const finalTotal = useWallet ? Math.max(0, cartTotal - maxDeduction) : cartTotal;
+      const finalTotal = useWallet ? Math.max(0, orderTotal - maxDeduction) : orderTotal;
       setSuccessOrderTotal(finalTotal);
 
       // 自動背景發送明細：僅限一般散客，且在 1對1 官方聊天室 (utou) 中點開
@@ -1396,10 +1409,60 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 </div>
               </div>
             ))}
+            {/* 運費進度條與費用明細 */}
+            {(() => {
+              const hasShipping = currentCommunity && !currentCommunity.DefaultFreeShipping && Number(currentCommunity.ShippingFee) > 0;
+              const freeMin = Number(currentCommunity?.FreeShippingMin) || 0;
+              const fee = Number(currentCommunity?.ShippingFee) || 0;
+              const gap = freeMin > 0 ? Math.max(0, freeMin - cartTotal) : 0;
+              const progress = freeMin > 0 ? Math.min(100, Math.round((cartTotal / freeMin) * 100)) : 100;
+              const isFree = shippingFee === 0;
+
+              return hasShipping ? (
+                <div className="px-4 pt-3 pb-1 space-y-2">
+                  {/* 進度條 */}
+                  {freeMin > 0 && (
+                    <div className="space-y-1">
+                      {isFree ? (
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600">
+                          <span>🚚</span>
+                          <span>已達免運門檻！</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+                          <span>🚚</span>
+                          <span>再買 <strong className="text-[var(--text-primary)]">${gap}</strong> 即可免運</span>
+                        </div>
+                      )}
+                      <div className="w-full h-1.5 bg-[var(--border-primary)] rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${isFree ? 'bg-emerald-500' : 'bg-blue-400'}`}
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {/* 費用明細 */}
+                  <div className="flex justify-between items-center text-sm text-[var(--text-secondary)]">
+                    <span>商品小計</span>
+                    <span className="font-mono">${cartTotal}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className={isFree ? 'text-emerald-600 font-semibold' : 'text-[var(--text-secondary)]'}>運費</span>
+                    {isFree ? (
+                      <span className="font-mono text-emerald-600 font-bold">免運</span>
+                    ) : (
+                      <span className="font-mono text-orange-500 font-semibold">+${fee}</span>
+                    )}
+                  </div>
+                </div>
+              ) : null;
+            })()}
+
             <div className="flex justify-between items-center px-4 py-3 bg-[var(--bg-tertiary)]">
-              <span className="font-bold text-[var(--text-primary)]">總計</span>
+              <span className="font-bold text-[var(--text-primary)]">應付總金額</span>
               <span className="font-mono text-xl font-extrabold text-blue-600">
-                ${cartTotal}
+                ${orderTotal}
               </span>
             </div>
           </div>
@@ -1437,10 +1500,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
     const safeOther = String(otherBuildingText || "");
     const safeTransfer = String(transferLastFive || "");
 
-    // 奶包金抵扣計算
+    // 奶包金抵扣計算（以含運費的 orderTotal 為基準，但運費不可折抵）
     const hasWallet = memberProfile?.WalletBalance > 0;
     const maxDeduction = hasWallet ? Math.min(Number(memberProfile.WalletBalance), cartTotal) : 0;
-    const payAmount = useWallet ? Math.max(0, cartTotal - maxDeduction) : cartTotal;
+    const payAmount = useWallet ? Math.max(0, orderTotal - maxDeduction) : orderTotal;
     const isFullyCovered = useWallet && payAmount === 0;
 
     const isPhoneValid = /^09\d{8}$/.test(safePhone.trim());
@@ -1498,7 +1561,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
               配送資訊
             </h2>
             <p className="text-xs text-[var(--text-secondary)]">
-              {totalQty} 件商品，合計 ${cartTotal}
+              {totalQty} 件商品，合計 ${orderTotal}{shippingFee > 0 ? `（含運 $${shippingFee}）` : ''}
             </p>
           </div>
         </div>
@@ -1669,8 +1732,16 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
               {useWallet && (
                 <div className="border-t border-amber-200/50 pt-2.5 grid grid-cols-2 gap-y-1 text-xs">
-                  <div className="text-amber-700">商品總計：</div>
+                  <div className="text-amber-700">商品小計：</div>
                   <div className="text-right font-mono font-bold text-slate-700">${cartTotal}</div>
+                  {shippingFee > 0 && (<>
+                    <div className="text-amber-700">運費：</div>
+                    <div className="text-right font-mono font-bold text-orange-500">+${shippingFee}</div>
+                  </>)}
+                  {shippingFee === 0 && currentCommunity && !currentCommunity.DefaultFreeShipping && Number(currentCommunity.ShippingFee) > 0 && (<>
+                    <div className="text-amber-700">運費：</div>
+                    <div className="text-right font-mono font-bold text-emerald-600">免運</div>
+                  </>)}
                   <div className="text-amber-700">奶包金折抵：</div>
                   <div className="text-right font-mono font-bold text-red-600">-${maxDeduction}</div>
                   <div className="text-amber-800 font-bold border-t border-dashed border-amber-200/60 pt-1.5">賸餘應付：</div>
@@ -2373,7 +2444,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     已選 {totalQty} 件
                   </div>
                   <div className="text-2xl font-black text-blue-600 font-mono">
-                    ${cartTotal}
+                    ${orderTotal}
                   </div>
                 </div>
               </div>

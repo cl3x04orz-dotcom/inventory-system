@@ -36,6 +36,8 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       return ProductService.updateProductSortOrder(payload);
     case 'updateProductDetails':
       return ProductService.updateProductDetails(payload, user);
+    case 'updateProductPurchasable':
+      return ProductService.updateProductPurchasable(payload, user);
 
     // 3. 銷售與收支 (Sales & Report)
     case 'saveSales':
@@ -189,6 +191,8 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       return GroupBuyService.getBuildingSettings(payload, user);
     case 'saveBuildingSettings':
       return GroupBuyService.saveBuildingSettings(payload, user);
+    case 'saveCommunityShipping':
+      return GroupBuyService.saveCommunityShipping(payload, user);
     case 'getSubscriptions':
       return GroupBuyService.getSubscriptions(payload, user);
     case 'saveSubscription':
