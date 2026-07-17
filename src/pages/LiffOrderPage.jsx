@@ -1673,7 +1673,39 @@ export default function LiffOrderPage({ user, apiUrl }) {
                   <select
                     className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm font-bold"
                     value={selectedCommunityId}
-                    onChange={(e) => setSelectedCommunityId(e.target.value)}
+                    onChange={(e) => {
+                      const commId = e.target.value;
+                      setSelectedCommunityId(commId);
+                      
+                      // 智慧前綴帶入/替換邏輯
+                      if (commId) {
+                        const target = allCommunities.find(c => c.CommunityId === commId);
+                        if (target) {
+                          const prefix = target.CommunityName; // 例如 "台南市永康區"
+                          const currentAddr = detailAddress || "";
+
+                          // 1. 如果原本是空的，直接帶入
+                          if (!currentAddr.trim()) {
+                            setDetailAddress(prefix);
+                          } else {
+                            // 2. 檢查原本地址是否已經有其他選取區域的前綴，如果有，直接替換成新的前綴
+                            let replaced = false;
+                            for (const c of allCommunities) {
+                              if (currentAddr.startsWith(c.CommunityName)) {
+                                const rest = currentAddr.substring(c.CommunityName.length);
+                                setDetailAddress(prefix + rest);
+                                replaced = true;
+                                break;
+                              }
+                            }
+                            // 3. 如果原本有打字但沒有包含舊的行政區前綴，就把新前綴塞在最前面
+                            if (!replaced) {
+                              setDetailAddress(prefix + currentAddr);
+                            }
+                          }
+                        }
+                      }
+                    }}
                     disabled={!selectedCity}
                   >
                     <option value="">{selectedCity ? "-- 請選擇外送區域 --" : "-- 請先選取縣市 --"}</option>
