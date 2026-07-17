@@ -31,6 +31,16 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
     const [shippingFee, setShippingFee] = useState('');
     const [isSavingShipping, setIsSavingShipping] = useState(false);
 
+    // ── 外送區域管理 (散客專用) 狀態 ───────────────────────────────
+    const [communities, setCommunities] = useState([]);
+    const [loadingCommunities, setLoadingCommunities] = useState(false);
+    const [isSavingArea, setIsSavingArea] = useState(false);
+    const [editingAreaId, setEditingAreaId] = useState(''); // 空字串代表新增模式，有值代表編輯模式
+    const [areaName, setAreaName] = useState('');
+    const [areaFee, setAreaFee] = useState('');
+    const [areaFreeMin, setAreaFreeMin] = useState('');
+    const [areaFreeShipping, setAreaFreeShipping] = useState(false);
+
     const LIFF_ID = '2010308873-ur2zL2cc';
 
     const fetchSettings = useCallback(async () => {
@@ -63,8 +73,68 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
     useEffect(() => {
         if (user?.token) {
             fetchSettings();
+            fetchCommunities();
         }
     }, [user.token, fetchSettings]);
+
+    const fetchCommunities = async () => {
+        setLoadingCommunities(true);
+        try {
+            const data = await callGAS(apiUrl, 'getCommunities', {}, user.token);
+            if (Array.isArray(data)) {
+                setCommunities(data);
+            }
+        } catch (error) {
+            console.error('載入外送區域失敗:', error);
+        } finally {
+            setLoadingCommunities(false);
+        }
+    };
+
+    const handleSaveArea = async (e) => {
+        e.preventDefault();
+        if (!areaName.trim()) {
+            alert('請輸入外送區域名稱！');
+            return;
+        }
+
+        setIsSavingArea(true);
+        try {
+            await callGAS(apiUrl, 'saveCommunityArea', {
+                communityId: editingAreaId || undefined,
+                communityName: areaName.trim(),
+                defaultFreeShipping: areaFreeShipping,
+                freeShippingMin: areaFreeShipping ? 0 : (Number(areaFreeMin) || 0),
+                shippingFee: areaFreeShipping ? 0 : (Number(areaFee) || 0)
+            }, user.token);
+
+            // 清空表單
+            setEditingAreaId('');
+            setAreaName('');
+            setAreaFee('');
+            setAreaFreeMin('');
+            setAreaFreeShipping(false);
+
+            await fetchCommunities();
+            alert('外送區域儲存成功！');
+        } catch (error) {
+            alert('儲存外送區域失敗: ' + error.message);
+        } finally {
+            setIsSavingArea(false);
+        }
+    };
+
+    const handleDeleteArea = async (communityId, name) => {
+        if (!window.confirm(`確定要刪除「${name}」外送區域嗎？`)) return;
+
+        try {
+            await callGAS(apiUrl, 'deleteCommunityArea', { communityId }, user.token);
+            await fetchCommunities();
+            alert('刪除成功！');
+        } catch (error) {
+            alert('刪除區域失敗: ' + error.message);
+        }
+    };
 
     const parseDateTime = (str) => {
         if (!str) return { date: '', time: '' };
@@ -683,6 +753,187 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                     </div>
                 </div>
             )}
+
+            {/* 🚚 線上下單散客外送區域管理面板 */}
+            <div className="bg-[var(--bg-secondary)] p-6 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-6 mt-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-[var(--border-primary)] gap-2">
+                    <div>
+                        <h3 className="font-extrabold text-lg text-[var(--text-primary)] flex items-center gap-2">
+                            <Truck className="text-emerald-500" />
+                            線上下單外送區域與運費管理 (散客專用)
+                        </h3>
+                        <p className="text-xs text-[var(--text-secondary)] mt-1">針對「一般常態線上下單」的散客，依據台南不同行政區(如東區、永康、白河)設定各自的配送運費與免運門檻。</p>
+                    </div>
+                    <button
+                        onClick={fetchCommunities}
+                        className="btn-secondary px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5"
+                        disabled={loadingCommunities}
+                    >
+                        <RefreshCw size={12} className={loadingCommunities ? 'animate-spin' : ''} />
+                        重新整理
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* 新增/編輯區域區 */}
+                    <div className="lg:col-span-1 border-r border-[var(--border-primary)]/50 pr-0 lg:pr-6 space-y-4">
+                        <h4 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-1.5">
+                            {editingAreaId ? '📝 編輯外送區域' : '➕ 新增外送區域'}
+                        </h4>
+                        
+                        <form onSubmit={handleSaveArea} className="space-y-4">
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-extrabold text-[var(--text-secondary)]">外送區域名稱 <span className="text-red-500">*</span></label>
+                                <input
+                                    type="text"
+                                    className="input-field p-2.5 w-full text-sm font-bold"
+                                    placeholder="例：台南東區散客、台南白河區"
+                                    value={areaName}
+                                    onChange={(e) => setAreaName(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="flex justify-between items-center bg-[var(--bg-tertiary)] p-3 rounded-xl border border-[var(--border-primary)]">
+                                <span className="text-xs font-bold text-[var(--text-secondary)]">此區域永久免運</span>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        className="sr-only peer"
+                                        checked={areaFreeShipping}
+                                        onChange={(e) => setAreaFreeShipping(e.target.checked)}
+                                    />
+                                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                                </label>
+                            </div>
+
+                            {!areaFreeShipping && (
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-xs font-extrabold text-[var(--text-secondary)]">未達門檻運費</label>
+                                        <div className="relative">
+                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] text-xs font-bold font-mono">$</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                className="input-field pl-6 p-2.5 w-full text-sm font-bold"
+                                                placeholder="例：60"
+                                                value={areaFee}
+                                                onChange={(e) => setAreaFee(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-xs font-extrabold text-[var(--text-secondary)]">免運門檻金額</label>
+                                        <div className="relative">
+                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] text-xs font-bold font-mono">$</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                className="input-field pl-6 p-2.5 w-full text-sm font-bold"
+                                                placeholder="例：500"
+                                                value={areaFreeMin}
+                                                onChange={(e) => setAreaFreeMin(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex gap-2 justify-end pt-2">
+                                {editingAreaId && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setEditingAreaId('');
+                                            setAreaName('');
+                                            setAreaFee('');
+                                            setAreaFreeMin('');
+                                            setAreaFreeShipping(false);
+                                        }}
+                                        className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold active:scale-95 transition-all"
+                                    >
+                                        取消編輯
+                                    </button>
+                                )}
+                                <button
+                                    type="submit"
+                                    disabled={isSavingArea}
+                                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-500/20 active:scale-95 transition-all"
+                                >
+                                    <Save size={12} />
+                                    {isSavingArea ? '儲存中...' : (editingAreaId ? '更新區域' : '新增區域')}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    {/* 已設定區域列表 */}
+                    <div className="lg:col-span-2 space-y-3">
+                        <h4 className="font-bold text-sm text-[var(--text-primary)]">📦 目前已設定的外送區域列表</h4>
+                        
+                        {loadingCommunities && communities.length === 0 ? (
+                            <div className="text-center py-10 text-xs text-[var(--text-secondary)]">載入外送區域中...</div>
+                        ) : (
+                            <div className="border border-[var(--border-primary)] rounded-xl overflow-hidden">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="bg-[var(--bg-secondary)] text-[var(--text-secondary)] font-bold">
+                                        <tr className="border-b border-[var(--border-primary)]">
+                                            <th className="p-3">區域名稱</th>
+                                            <th className="p-3">運費</th>
+                                            <th className="p-3">免運門檻</th>
+                                            <th className="p-3 text-center">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[var(--border-primary)] bg-[var(--bg-primary)]">
+                                        {communities.length > 0 ? (
+                                            communities.map((c) => (
+                                                <tr key={c.communityId} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="p-3 font-bold text-slate-800">{c.communityName}</td>
+                                                    <td className="p-3 font-mono font-bold text-orange-500">
+                                                        {c.defaultFreeShipping ? '免運' : `$${c.shippingFee}`}
+                                                    </td>
+                                                    <td className="p-3 font-mono font-bold text-slate-600">
+                                                        {c.defaultFreeShipping ? '-' : (c.freeShippingMin > 0 ? `滿 $${c.freeShippingMin} 免運` : '無免運門檻')}
+                                                    </td>
+                                                    <td className="p-3 text-center space-x-1.5">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setEditingAreaId(c.communityId);
+                                                                setAreaName(c.communityName);
+                                                                setAreaFreeShipping(c.defaultFreeShipping);
+                                                                setAreaFee(c.shippingFee || '');
+                                                                setAreaFreeMin(c.freeShippingMin || '');
+                                                            }}
+                                                            className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500 text-amber-600 hover:text-white rounded border border-amber-500/20 active:scale-95 transition-all"
+                                                        >
+                                                            編輯
+                                                        </button>
+                                                        {c.communityName !== '線上下單' && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDeleteArea(c.communityId, c.communityName)}
+                                                                className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500 text-rose-600 hover:text-white rounded border border-rose-500/20 active:scale-95 transition-all"
+                                                            >
+                                                                刪除
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan="4" className="text-center p-8 text-slate-400">目前尚無外送區域，請在左側表單建立第一個區域！</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
         </div>
     );
 }

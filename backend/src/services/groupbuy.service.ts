@@ -1037,5 +1037,77 @@ export const GroupBuyService = {
       count: importCount, 
       message: `成功導入 ${importCount} 筆定期配訂單` 
     };
+  },
+
+  // 17. 取得所有社區列表 (用於後台社區/外送區域管理)
+  async getCommunities(payload: any, user: any) {
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
+    const communities = await prisma.groupBuyCommunity.findMany({
+      where: { deletedAt: null },
+      orderBy: { communityName: 'asc' }
+    });
+    return communities.map((c: any) => ({
+      communityId: c.communityId,
+      communityCode: c.communityCode,
+      communityName: c.communityName,
+      defaultFreeShipping: c.defaultFreeShipping || false,
+      freeShippingMin: Number(c.freeShippingMin) || 0,
+      shippingFee: Number(c.shippingFee) || 0,
+      status: c.status || 'ACTIVE'
+    }));
+  },
+
+  // 18. 新增/更新外送區域
+  async saveCommunityArea(payload: any, user: any) {
+    if (user.role !== 'BOSS') throw new Error('權限不足');
+    const { communityId, communityName, defaultFreeShipping, freeShippingMin, shippingFee, status } = payload;
+    if (!communityName) throw new Error('缺少區域名稱');
+
+    if (communityId) {
+      // 編輯現有
+      await prisma.groupBuyCommunity.update({
+        where: { communityId },
+        data: {
+          communityName,
+          defaultFreeShipping: !!defaultFreeShipping,
+          freeShippingMin: Number(free_shipping_min ?? freeShippingMin) || 0,
+          shippingFee: Number(shipping_fee ?? shippingFee) || 0,
+          status: status || 'ACTIVE',
+          updatedAt: new Date()
+        }
+      });
+    } else {
+      // 新增
+      const code = 'C' + Math.random().toString(36).substring(2, 7).toUpperCase();
+      await prisma.groupBuyCommunity.create({
+        data: {
+          communityId: code,
+          communityCode: code,
+          communityName,
+          defaultFreeShipping: !!defaultFreeShipping,
+          freeShippingMin: Number(freeShippingMin) || 0,
+          shippingFee: Number(shippingFee) || 0,
+          status: 'ACTIVE',
+          orderingMode: 'OPEN'
+        }
+      });
+    }
+    return { success: true };
+  },
+
+  // 19. 刪除外送區域 (軟刪除)
+  async deleteCommunityArea(payload: any, user: any) {
+    if (user.role !== 'BOSS') throw new Error('權限不足');
+    const { communityId } = payload;
+    if (!communityId) throw new Error('缺少區域 ID');
+
+    await prisma.groupBuyCommunity.update({
+      where: { communityId },
+      data: {
+        deletedAt: new Date(),
+        status: 'DELETED'
+      }
+    });
+    return { success: true };
   }
 };

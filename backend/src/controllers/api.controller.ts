@@ -209,6 +209,12 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       return GroupBuyService.v2_getLiffInitData(payload, user);
     case 'v2_createOrder':
       return GroupBuyService.v2_createOrder(payload, user);
+    case 'getCommunities':
+      return GroupBuyService.getCommunities(payload, user);
+    case 'saveCommunityArea':
+      return GroupBuyService.saveCommunityArea(payload, user);
+    case 'deleteCommunityArea':
+      return GroupBuyService.deleteCommunityArea(payload, user);
 
     // 11. LIFF V1 會員相關與後台管理
     case 'v1_getMember':
