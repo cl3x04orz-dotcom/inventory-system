@@ -944,9 +944,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   // ── 運費計算 ──────────────────────────────────────────────────
   const shippingFee = useMemo(() => {
+    // 只有一般散客群才需要計算運費，其餘社區大樓一律免運 (0元)
+    if (!isGeneralUser) return 0;
+
     // 優先尋找使用者手動選定的社區
     let activeComm = currentCommunity;
-    if (isGeneralUser && selectedCommunityId && allCommunities.length > 0) {
+    if (selectedCommunityId && allCommunities.length > 0) {
       const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
       if (match) {
         activeComm = match;
@@ -1503,7 +1506,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 if (match) activeComm = match;
               }
 
-              const hasShipping = activeComm && !activeComm.DefaultFreeShipping && Number(activeComm.ShippingFee) > 0;
+              const hasShipping = isGeneralUser && activeComm && !activeComm.DefaultFreeShipping && Number(activeComm.ShippingFee) > 0;
               const freeMin = Number(activeComm?.FreeShippingMin) || 0;
               const fee = Number(activeComm?.ShippingFee) || 0;
               const gap = freeMin > 0 ? Math.max(0, freeMin - cartTotal) : 0;
@@ -2051,7 +2054,7 @@ ${freeNote(newFee, newMin)}
                       const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
                       if (match) activeComm = match;
                     }
-                    return activeComm && !activeComm.DefaultFreeShipping && Number(activeComm.ShippingFee) > 0;
+                    return isGeneralUser && activeComm && !activeComm.DefaultFreeShipping && Number(activeComm.ShippingFee) > 0;
                   })() && (<>
                     <div className="text-amber-700">運費：</div>
                     <div className="text-right font-mono font-bold text-emerald-600">免運</div>
