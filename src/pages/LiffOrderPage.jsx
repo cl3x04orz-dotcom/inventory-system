@@ -1474,23 +1474,34 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 <div className="px-4 pt-3 pb-1 space-y-2">
                   {/* 進度條 */}
                   {freeMin > 0 && (
-                    <div className="space-y-1">
-                      {isFree ? (
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600">
-                          <span>🚚</span>
-                          <span>已達免運門檻！</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
-                          <span>🚚</span>
-                          <span>再買 <strong className="text-[var(--text-primary)]">${gap}</strong> 即可免運</span>
-                        </div>
-                      )}
-                      <div className="w-full h-1.5 bg-[var(--border-primary)] rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${isFree ? 'bg-emerald-500' : 'bg-blue-400'}`}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center text-xs font-bold">
+                        {isFree ? (
+                          <span className="text-emerald-600 flex items-center gap-1">🎉 已達成免運門檻！已享免運</span>
+                        ) : (
+                          <span className="text-[var(--text-secondary)]">
+                            🚚 再買 <strong className="text-orange-500 font-extrabold font-mono">${gap}</strong> 即可免運
+                          </span>
+                        )}
+                        <span className="text-[10px] text-slate-400 font-mono font-normal">門檻 ${freeMin}</span>
+                      </div>
+                      {/* 軌道與小車車 */}
+                      <div className="relative w-full h-1.5 bg-slate-100 rounded-full border border-slate-200/60 overflow-visible">
+                        {/* 進度填充 */}
+                        <div 
+                          className={`h-full rounded-full transition-all duration-300 ${isFree ? 'bg-emerald-500' : 'bg-gradient-to-r from-orange-400 to-amber-500'}`}
                           style={{ width: `${progress}%` }}
                         />
+                        {/* 小車車圖示 */}
+                        <span 
+                          className="absolute -top-[7px] text-base transition-all duration-300 pointer-events-none select-none"
+                          style={{ 
+                            left: `calc(${progress}% - 9px)`, 
+                            transform: 'scaleX(-1)' // 將車車開的方向轉為朝右
+                          }}
+                        >
+                          🚚
+                        </span>
                       </div>
                     </div>
                   )}
@@ -2721,7 +2732,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                       已選 {totalQty} 件
                     </div>
                     <div className="text-2xl font-black text-blue-600 font-mono">
-                      ${orderTotal}
+                      ${cartTotal}
                     </div>
                   </div>
                 </div>
