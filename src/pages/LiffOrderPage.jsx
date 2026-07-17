@@ -1070,8 +1070,18 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
       if (saved.building !== undefined || saved.detailAddress !== undefined) {
         const savedBuilding = saved.building || "";
-        const savedDetail = saved.detailAddress || "";
+        let savedDetail = saved.detailAddress || "";
         const savedCompany = saved.companyName || "";
+
+        // 去除任何可能殘留的行政區前綴
+        if (allCommunities.length > 0) {
+          for (const c of allCommunities) {
+            if (savedDetail.startsWith(c.CommunityName)) {
+              savedDetail = savedDetail.substring(c.CommunityName.length).trim();
+              break;
+            }
+          }
+        }
 
         if (isLocked) {
           setSelectedBuilding(lockedBuilding);
@@ -1093,7 +1103,16 @@ export default function LiffOrderPage({ user, apiUrl }) {
           }
         }
       } else if (saved.address) {
-        const addr = String(saved.address).trim();
+        let addr = String(saved.address).trim();
+        // 去除任何可能殘留的行政區前綴
+        if (allCommunities.length > 0) {
+          for (const c of allCommunities) {
+            if (addr.startsWith(c.CommunityName)) {
+              addr = addr.substring(c.CommunityName.length).trim();
+              break;
+            }
+          }
+        }
         let matched = false;
 
         if (isLocked) {
@@ -1130,12 +1149,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
         }
       }
 
-      // 一般散客：回填城市與配送區域
-      if (saved.city) setSelectedCity(saved.city);
-      if (saved.communityId) setSelectedCommunityId(saved.communityId);
+      // 一般散客：僅在當前未選取時才從上次紀錄帶入（優先使用本次下單選取的區域）
+      if (!selectedCity && saved.city) setSelectedCity(saved.city);
+      if (!selectedCommunityId && saved.communityId) setSelectedCommunityId(saved.communityId);
 
       // 記錄這次 session 的原始配送區域（給 confirmModal 比較用）
-      originalCommunityIdRef.current = saved.communityId || selectedCommunityId || "";
+      originalCommunityIdRef.current = selectedCommunityId || saved.communityId || "";
 
     } catch (_) { }
     setStep("confirm");
