@@ -997,7 +997,18 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
     // 如果是一般散客用戶，大樓名是散客標籤，後面拼上完整外送地址與公司名稱
     if (isGeneral) {
-      const baseAddr = detailAddress.trim();
+      let districtPrefix = "";
+      if (selectedCommunityId && allCommunities.length > 0) {
+        const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+        if (match) districtPrefix = match.CommunityName; // "台南市佳里區"
+      }
+
+      let baseAddr = detailAddress.trim();
+      // 如果輸入的地址不以已選取的行政區開頭，拼上行政區前綴
+      if (districtPrefix && !baseAddr.startsWith(districtPrefix)) {
+        baseAddr = districtPrefix + baseAddr;
+      }
+
       const comp = companyName.trim();
       if (comp) {
         return `${bName} ${baseAddr} (${comp})`;
@@ -1737,29 +1748,59 @@ export default function LiffOrderPage({ user, apiUrl }) {
                       })}
                   </select>
                 </div>
-                <div className="space-y-1">
+                 <div className="space-y-1">
                   <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
-                    公司 / 機關單位名稱 <span className="text-[var(--text-secondary)] text-[10px] font-normal">(選填)</span>
+                    公司 / 機關單位 / 大樓名稱 <span className="text-[var(--text-secondary)] text-[10px] font-normal">(選填)</span>
                   </label>
                   <input
                     type="text"
-                    className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm"
-                    placeholder="例：xx醫院x樓護理站（若無免填）"
+                    className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm font-semibold"
+                    placeholder="例：xx醫院x樓護理站、xx大樓A棟 (若無免填)"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
-                    <MapPin size={12} /> 外送完整地址 <span className="text-red-500">*</span>
+                    <MapPin size={12} className="text-emerald-500" /> 外送地址 <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm"
-                    placeholder="請輸入收件路名、門牌與樓層"
-                    value={detailAddress}
-                    onChange={(e) => setDetailAddress(e.target.value)}
-                  />
+                  <div className="flex items-center border border-[var(--border-primary)] rounded-xl bg-[var(--bg-secondary)] overflow-hidden shadow-sm">
+                    {/* 鎖定不可修改的行政區前綴 */}
+                    {(() => {
+                      if (selectedCommunityId && allCommunities.length > 0) {
+                        const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+                        if (match) {
+                          return (
+                            <span className="bg-slate-100 dark:bg-slate-800 text-[var(--text-primary)] font-extrabold text-sm px-3.5 py-2.5 border-r border-[var(--border-primary)] select-none shrink-0">
+                              {match.CommunityName}
+                            </span>
+                          );
+                        }
+                      }
+                      return null;
+                    })()}
+                    <input
+                      type="text"
+                      className="w-full p-2.5 bg-transparent text-sm font-semibold focus:outline-none placeholder:font-normal"
+                      placeholder="請輸入收件路名、門牌與樓層"
+                      value={(() => {
+                        // 如果 detailAddress 中已經包含選中行政區的前綴，我們將其切掉，只在輸入框展示路名門牌
+                        let displayVal = detailAddress || "";
+                        if (selectedCommunityId && allCommunities.length > 0) {
+                          const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+                          if (match && displayVal.startsWith(match.CommunityName)) {
+                            displayVal = displayVal.substring(match.CommunityName.length);
+                          }
+                        }
+                        return displayVal;
+                      })()}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        // 當用戶輸入時，只保存路名門牌，我們會在送出及驗證時利用 getFullAddress 自動拼裝
+                        setDetailAddress(val);
+                      }}
+                    />
+                  </div>
                 </div>
               </>
             ) : (
@@ -2637,7 +2678,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                             <span className="text-emerald-600 flex items-center gap-1">🎉 已達成免運門檻！已享免運</span>
                           ) : (
                             <span className="text-[var(--text-secondary)]">
-                              🚚 再買 <strong className="text-blue-600 font-mono">${gap}</strong> 即可免運
+                              🚚 再買 <strong className="text-orange-500 font-extrabold font-mono">${gap}</strong> 即可免運
                             </span>
                           )}
                           <span className="text-[10px] text-slate-400 font-mono font-normal">門檻 ${freeMin}</span>
@@ -2646,7 +2687,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                         <div className="relative w-full h-1.5 bg-slate-100 rounded-full border border-slate-200/60 overflow-visible">
                           {/* 進度填充 */}
                           <div 
-                            className={`h-full rounded-full transition-all duration-300 ${isFree ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                            className={`h-full rounded-full transition-all duration-300 ${isFree ? 'bg-emerald-500' : 'bg-gradient-to-r from-orange-400 to-amber-500'}`}
                             style={{ width: `${progress}%` }}
                           />
                           {/* 小車車圖示 */}
