@@ -206,6 +206,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [allCommunities, setAllCommunities] = useState([]);
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedCommunityId, setSelectedCommunityId] = useState("");
+  const [showAreaModal, setShowAreaModal] = useState(false);
   const [activeCampaign, setActiveCampaign] = useState(null);
   const [nextOpenTime, setNextOpenTime] = useState(null);
 
@@ -262,13 +263,20 @@ export default function LiffOrderPage({ user, apiUrl }) {
         // B. 處理 V2 社區與檔期資料
         if (resData.community) {
           setCurrentCommunity(resData.community);
-          // 為了相容部分舊邏輯，將 selectedBuilding 設為 CommunityName
           setSelectedBuilding(resData.community.CommunityName);
-          setSelectedCommunityId(resData.community.CommunityId || "");
-          if (resData.community.CommunityName.startsWith("台南市")) {
-            setSelectedCity("台南市");
-          } else if (resData.community.CommunityName.startsWith("高雄市")) {
-            setSelectedCity("高雄市");
+          
+          const isVirtual = ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(resData.community.CommunityName);
+          if (isVirtual) {
+            setSelectedCommunityId("");
+            setSelectedCity("");
+            setShowAreaModal(true);
+          } else {
+            setSelectedCommunityId(resData.community.CommunityId || "");
+            if (resData.community.CommunityName.startsWith("台南市")) {
+              setSelectedCity("台南市");
+            } else if (resData.community.CommunityName.startsWith("高雄市")) {
+              setSelectedCity("高雄市");
+            }
           }
         }
         if (Array.isArray(resData.allCommunities)) {
@@ -2314,10 +2322,34 @@ export default function LiffOrderPage({ user, apiUrl }) {
         <div className="h-[60px] px-3 flex justify-between items-center">
           <div className="flex-1 flex justify-start items-center gap-3">
             <MilkZeroWasteLogo />
-            {sourceGroup && (
-              <span className="text-xs bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-lg border border-blue-100">
-                {groupBindings[sourceGroup] || sourceGroup}
-              </span>
+            {isGeneralUser ? (
+              <button
+                onClick={() => setShowAreaModal(true)}
+                className={`text-xs font-bold px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all active:scale-95 duration-100 ${
+                  selectedCommunityId
+                    ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+                    : "bg-blue-600 text-white border-blue-700 animate-pulse shadow shadow-blue-500/20"
+                }`}
+              >
+                <span>📍</span>
+                <span>
+                  {(() => {
+                    if (selectedCommunityId && allCommunities.length > 0) {
+                      const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+                      if (match) {
+                        return match.CommunityName.replace("台南市", "").replace("高雄市", "");
+                      }
+                    }
+                    return "選擇配送地區";
+                  })()}
+                </span>
+              </button>
+            ) : (
+              sourceGroup && (
+                <span className="text-xs bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-lg border border-blue-100">
+                  {groupBindings[sourceGroup] || sourceGroup}
+                </span>
+              )
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -2554,31 +2586,111 @@ export default function LiffOrderPage({ user, apiUrl }) {
           {/* 浮動購物車 */}
           {totalQty > 0 && (
             <div
-              className="absolute bottom-[60px] left-0 right-0 bg-[var(--bg-secondary)]/95 backdrop-blur-sm border-t border-[var(--border-primary)] shadow-2xl px-4 py-3 flex justify-between items-center"
+              className="absolute bottom-[60px] left-0 right-0 bg-[var(--bg-secondary)]/95 backdrop-blur-sm border-t border-[var(--border-primary)] shadow-2xl flex flex-col"
               style={{ touchAction: "none" }}
             >
-              <div className="flex items-center gap-3">
-                <div className="relative bg-blue-100 text-blue-600 p-2.5 rounded-full">
-                  <ShoppingCart size={20} />
-                  <span className="absolute -top-1 -right-1.5 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold border-2 border-white">
-                    {totalQty}
-                  </span>
+              {/* 免運進度小車車 (僅散客且有設定免運規則時顯示) */}
+              {isGeneralUser && (
+                <div className="w-full px-4 pt-3 pb-1 border-b border-[var(--border-primary)]/40 select-none">
+                  {(() => {
+                    let activeComm = null;
+                    if (selectedCommunityId && allCommunities.length > 0) {
+                      activeComm = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+                    }
+
+                    if (!activeComm) {
+                      return (
+                        <div 
+                          onClick={() => setShowAreaModal(true)}
+                          className="flex justify-between items-center text-xs font-semibold text-blue-600 cursor-pointer hover:underline py-0.5 animate-pulse"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span>🚚</span>
+                            <span>請先點擊設定送貨地區以計算免運</span>
+                          </span>
+                          <span className="text-[10px] bg-blue-100 px-1.5 py-0.5 rounded font-bold">點我設定</span>
+                        </div>
+                      );
+                    }
+
+                    const freeMin = Number(activeComm.FreeShippingMin) || 0;
+                    const fee = Number(activeComm.ShippingFee) || 0;
+                    
+                    // 如果運費是 0 或者沒有免運門檻 (預設免運)
+                    if (fee === 0 || activeComm.DefaultFreeShipping) {
+                      return (
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 py-0.5">
+                          <span>🎉</span>
+                          <span>此地區外送一律免運費！</span>
+                        </div>
+                      );
+                    }
+
+                    const isFree = cartTotal >= freeMin;
+                    const gap = Math.max(0, freeMin - cartTotal);
+                    const progress = Math.min(100, Math.round((cartTotal / freeMin) * 100));
+
+                    return (
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center text-xs font-bold">
+                          {isFree ? (
+                            <span className="text-emerald-600 flex items-center gap-1">🎉 已達成免運門檻！已享免運</span>
+                          ) : (
+                            <span className="text-[var(--text-secondary)]">
+                              🚚 再買 <strong className="text-blue-600 font-mono">${gap}</strong> 即可免運
+                            </span>
+                          )}
+                          <span className="text-[10px] text-slate-400 font-mono font-normal">門檻 ${freeMin}</span>
+                        </div>
+                        {/* 軌道與小車車 */}
+                        <div className="relative w-full h-1.5 bg-slate-100 rounded-full border border-slate-200/60 overflow-visible">
+                          {/* 進度填充 */}
+                          <div 
+                            className={`h-full rounded-full transition-all duration-300 ${isFree ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                            style={{ width: `${progress}%` }}
+                          />
+                          {/* 小車車圖示 */}
+                          <span 
+                            className="absolute -top-[7px] text-base transition-all duration-300 pointer-events-none select-none"
+                            style={{ 
+                              left: `calc(${progress}% - 9px)`, 
+                              transform: 'scaleX(-1)' // 將車車開的方向轉為朝右
+                            }}
+                          >
+                            🚚
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
-                <div>
-                  <div className="text-[10px] text-[var(--text-secondary)] font-semibold">
-                    已選 {totalQty} 件
+              )}
+
+              {/* 購物車核心按鈕列 */}
+              <div className="px-4 py-3 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="relative bg-blue-100 text-blue-600 p-2.5 rounded-full">
+                    <ShoppingCart size={20} />
+                    <span className="absolute -top-1 -right-1.5 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold border-2 border-white">
+                      {totalQty}
+                    </span>
                   </div>
-                  <div className="text-2xl font-black text-blue-600 font-mono">
-                    ${orderTotal}
+                  <div>
+                    <div className="text-[10px] text-[var(--text-secondary)] font-semibold">
+                      已選 {totalQty} 件
+                    </div>
+                    <div className="text-2xl font-black text-blue-600 font-mono">
+                      ${orderTotal}
+                    </div>
                   </div>
                 </div>
+                <button
+                  onClick={handleProceedToForm}
+                  className="btn-primary px-5 py-2.5 rounded-xl font-bold flex items-center gap-1 shadow-md shadow-blue-500/20"
+                >
+                  前往結帳 <ArrowRight size={16} />
+                </button>
               </div>
-              <button
-                onClick={handleProceedToForm}
-                className="btn-primary px-5 py-2.5 rounded-xl font-bold flex items-center gap-1 shadow-md shadow-blue-500/20"
-              >
-                前往結帳 <ArrowRight size={16} />
-              </button>
             </div>
           )}
         </>
@@ -2711,6 +2823,153 @@ export default function LiffOrderPage({ user, apiUrl }) {
             >
               確定
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 📍 外送地區設定彈窗 (AreaModal) */}
+      {showAreaModal && (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[var(--bg-secondary)] w-full max-w-[320px] rounded-2xl p-5 shadow-2xl border border-[var(--border-primary)] flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+            <div className="text-center">
+              <h3 className="text-base font-extrabold text-[var(--text-primary)] flex items-center justify-center gap-1.5">
+                <MapPin size={18} className="text-blue-500" />
+                設定送貨地區
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-1.5">
+                請先選擇您所在的縣市區域以計算運費
+              </p>
+            </div>
+
+            {/* 兩段式選單 */}
+            <div className="space-y-3 py-1">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">選擇縣市</label>
+                <select
+                  className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)] text-sm font-bold"
+                  value={selectedCity}
+                  onChange={(e) => {
+                    setSelectedCity(e.target.value);
+                    setSelectedCommunityId(""); // 重置區域
+                  }}
+                >
+                  <option value="">-- 請選擇縣市 --</option>
+                  <option value="台南市">台南市</option>
+                  <option value="高雄市">高雄市</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">配送區域</label>
+                <select
+                  className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)] text-sm font-bold"
+                  value={selectedCommunityId}
+                  onChange={(e) => {
+                    const commId = e.target.value;
+                    setSelectedCommunityId(commId);
+                    
+                    // 智慧前綴地址預填
+                    if (commId) {
+                      const target = allCommunities.find(c => c.CommunityId === commId);
+                      if (target) {
+                        const prefix = target.CommunityName;
+                        const currentAddr = detailAddress || "";
+                        if (!currentAddr.trim()) {
+                          setDetailAddress(prefix);
+                        } else {
+                          let replaced = false;
+                          for (const c of allCommunities) {
+                            if (currentAddr.startsWith(c.CommunityName)) {
+                              const rest = currentAddr.substring(c.CommunityName.length);
+                              setDetailAddress(prefix + rest);
+                              replaced = true;
+                              break;
+                            }
+                          }
+                          if (!replaced) {
+                            setDetailAddress(prefix + currentAddr);
+                          }
+                        }
+                      }
+                    }
+                  }}
+                  disabled={!selectedCity}
+                >
+                  <option value="">{selectedCity ? "-- 請選擇外送區域 --" : "-- 請先選取縣市 --"}</option>
+                  {selectedCity && allCommunities
+                    .filter(c => !["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(c.CommunityName))
+                    .filter(c => c.CommunityName.startsWith(selectedCity))
+                    .map((c) => {
+                      let shortName = c.CommunityName.replace("台南市", "").replace("高雄市", "");
+                      const fee = Number(c.ShippingFee) || 0;
+                      const min = Number(c.FreeShippingMin) || 0;
+                      const ruleText = fee > 0 ? `$${fee}/滿$${min}免運` : '免運';
+                      return (
+                        <option key={c.CommunityId} value={c.CommunityId}>
+                          {shortName} ({ruleText})
+                        </option>
+                      );
+                    })}
+                </select>
+              </div>
+            </div>
+
+            {/* 運費規則預覽 */}
+            {selectedCommunityId && (() => {
+              const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+              if (match) {
+                const fee = Number(match.ShippingFee) || 0;
+                const min = Number(match.FreeShippingMin) || 0;
+                return (
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700 font-semibold space-y-1">
+                    <p className="flex items-center gap-1">
+                      <span>🚚</span>
+                      <span>此區運費：<strong>${fee} 元</strong></span>
+                    </p>
+                    {min > 0 ? (
+                      <p className="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
+                        <span>💡</span>
+                        <span>單筆商品滿 <strong>${min} 元</strong> 即可享免運！</span>
+                      </p>
+                    ) : (
+                      <p className="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
+                        <span>💡</span>
+                        <span>此區無免運優惠門檻。</span>
+                      </p>
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {/* 送出與關閉 */}
+            <div className="flex gap-2.5 pt-1.5">
+              {/* 如果已經有選過的區域，才允許按取消關閉 */}
+              {selectedCommunityId && (
+                <button
+                  type="button"
+                  onClick={() => setShowAreaModal(false)}
+                  className="btn-secondary py-2.5 rounded-xl text-xs font-bold flex-1 transition-all active:scale-95"
+                >
+                  取消
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!selectedCity || !selectedCommunityId) {
+                    alert("請確實選擇縣市與配送區域！");
+                    return;
+                  }
+                  setShowAreaModal(false);
+                }}
+                disabled={!selectedCity || !selectedCommunityId}
+                className="btn-primary py-2.5 rounded-xl text-xs font-bold flex-1 shadow-md shadow-blue-500/20 transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+              >
+                確認送出
+              </button>
+            </div>
           </div>
         </div>
       )}
