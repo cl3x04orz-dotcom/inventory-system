@@ -521,7 +521,14 @@ export const GroupBuyService = {
         } : null,
         nextOpenTime: nextCampaign?.startTime || null,
         products,
-        buildingSettings
+        buildingSettings,
+        allCommunities: communities.map((c: any) => ({
+          CommunityId: c.communityId,
+          CommunityName: c.communityName,
+          DefaultFreeShipping: c.defaultFreeShipping || false,
+          FreeShippingMin: Number(c.freeShippingMin) || 0,
+          ShippingFee: Number(c.shippingFee) || 0,
+        }))
       }
     };
   },

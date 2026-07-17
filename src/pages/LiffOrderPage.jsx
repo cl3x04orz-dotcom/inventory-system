@@ -203,6 +203,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   // ── 新增：V2 架構狀態 ─────────────────────────────────────────
   const [currentCommunity, setCurrentCommunity] = useState(null);
+  const [allCommunities, setAllCommunities] = useState([]);
+  const [selectedCommunityId, setSelectedCommunityId] = useState("");
   const [activeCampaign, setActiveCampaign] = useState(null);
   const [nextOpenTime, setNextOpenTime] = useState(null);
 
@@ -261,6 +263,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
           setCurrentCommunity(resData.community);
           // 為了相容部分舊邏輯，將 selectedBuilding 設為 CommunityName
           setSelectedBuilding(resData.community.CommunityName);
+          setSelectedCommunityId(resData.community.CommunityId || "");
+        }
+        if (Array.isArray(resData.allCommunities)) {
+          setAllCommunities(resData.allCommunities);
         }
         if (resData.activeCampaign) {
           setActiveCampaign(resData.activeCampaign);
@@ -902,13 +908,22 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   // ── 運費計算 ──────────────────────────────────────────────────
   const shippingFee = useMemo(() => {
-    if (!currentCommunity) return 0;
-    if (currentCommunity.DefaultFreeShipping) return 0;
-    const min = Number(currentCommunity.FreeShippingMin) || 0;
-    const fee = Number(currentCommunity.ShippingFee) || 0;
+    // 優先尋找使用者手動選定的社區
+    let activeComm = currentCommunity;
+    if (isGeneralUser && selectedCommunityId && allCommunities.length > 0) {
+      const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+      if (match) {
+        activeComm = match;
+      }
+    }
+
+    if (!activeComm) return 0;
+    if (activeComm.DefaultFreeShipping) return 0;
+    const min = Number(activeComm.FreeShippingMin) || 0;
+    const fee = Number(activeComm.ShippingFee) || 0;
     if (fee === 0) return 0; // 未設定運費視為免運
     return cartTotal >= min ? 0 : fee;
-  }, [cartTotal, currentCommunity]);
+  }, [cartTotal, currentCommunity, isGeneralUser, selectedCommunityId, allCommunities]);
 
   const orderTotal = cartTotal + shippingFee;
 
@@ -1106,9 +1121,15 @@ export default function LiffOrderPage({ user, apiUrl }) {
           customerName,
           customerPhone,
           deliveryAddress: getFullAddress(),
-          CommunityId: currentCommunity?.CommunityId || "",
+          CommunityId: (isGeneralUser && selectedCommunityId) ? selectedCommunityId : (currentCommunity?.CommunityId || ""),
           CampaignId: activeCampaign?.CampaignId || "",
-          sourceGroup: selectedBuilding === "其它" ? otherBuildingText.trim() : (selectedBuilding || "一般散客"),
+          sourceGroup: (() => {
+            if (isGeneralUser && selectedCommunityId) {
+              const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+              if (match) return match.CommunityName;
+            }
+            return selectedBuilding === "其它" ? otherBuildingText.trim() : (selectedBuilding || "一般散客");
+          })(),
           note,
           paymentMethod,
           transferLastFive,
@@ -1411,9 +1432,15 @@ export default function LiffOrderPage({ user, apiUrl }) {
             ))}
             {/* 運費進度條與費用明細 */}
             {(() => {
-              const hasShipping = currentCommunity && !currentCommunity.DefaultFreeShipping && Number(currentCommunity.ShippingFee) > 0;
-              const freeMin = Number(currentCommunity?.FreeShippingMin) || 0;
-              const fee = Number(currentCommunity?.ShippingFee) || 0;
+              let activeComm = currentCommunity;
+              if (isGeneralUser && selectedCommunityId && allCommunities.length > 0) {
+                const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+                if (match) activeComm = match;
+              }
+
+              const hasShipping = activeComm && !activeComm.DefaultFreeShipping && Number(activeComm.ShippingFee) > 0;
+              const freeMin = Number(activeComm?.FreeShippingMin) || 0;
+              const fee = Number(activeComm?.ShippingFee) || 0;
               const gap = freeMin > 0 ? Math.max(0, freeMin - cartTotal) : 0;
               const progress = freeMin > 0 ? Math.min(100, Math.round((cartTotal / freeMin) * 100)) : 100;
               const isFree = shippingFee === 0;
@@ -1510,11 +1537,15 @@ export default function LiffOrderPage({ user, apiUrl }) {
     const isBuildingValid =
       selectedBuilding &&
       (selectedBuilding !== "其它" || safeOther.trim());
+    
+    // 如果是一般散客，配送地址與外送區域皆為必填
+    const isGeneralAddressValid = !isGeneralUser || (safeAddress.trim() && selectedCommunityId !== "");
+
     const canProceed =
       safeName.trim() &&
       isPhoneValid &&
       isBuildingValid &&
-      safeAddress.trim() &&
+      isGeneralAddressValid &&
       (isFullyCovered || paymentMethod !== "轉帳" || safeTransfer.trim().length === 5);
 
     const paymentOptions = isFullyCovered
@@ -1610,7 +1641,24 @@ export default function LiffOrderPage({ user, apiUrl }) {
             {/* 根據一般用戶與大樓用戶分流顯示 */}
             {isGeneralUser ? (
               <>
-                {/* 一般用戶：直接顯示地址與公司，隱藏大外框與任何大樓欄位 */}
+                {/* 一般用戶：選擇外送區域、顯示地址與公司，隱藏大外框與任何大樓欄位 */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                    <MapPin size={12} className="text-emerald-500" /> 配送區域 <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm font-bold"
+                    value={selectedCommunityId}
+                    onChange={(e) => setSelectedCommunityId(e.target.value)}
+                  >
+                    <option value="">-- 請選擇外送區域 --</option>
+                    {allCommunities.map((c) => (
+                      <option key={c.CommunityId} value={c.CommunityId}>
+                        {c.CommunityName} {Number(c.ShippingFee) > 0 ? `(運費$${c.ShippingFee}/滿$${c.FreeShippingMin}免運)` : '(免運)'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
                     公司 / 機關單位名稱 <span className="text-[var(--text-secondary)] text-[10px] font-normal">(選填)</span>
@@ -1738,7 +1786,14 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     <div className="text-amber-700">運費：</div>
                     <div className="text-right font-mono font-bold text-orange-500">+${shippingFee}</div>
                   </>)}
-                  {shippingFee === 0 && currentCommunity && !currentCommunity.DefaultFreeShipping && Number(currentCommunity.ShippingFee) > 0 && (<>
+                  {shippingFee === 0 && (() => {
+                    let activeComm = currentCommunity;
+                    if (isGeneralUser && selectedCommunityId && allCommunities.length > 0) {
+                      const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+                      if (match) activeComm = match;
+                    }
+                    return activeComm && !activeComm.DefaultFreeShipping && Number(activeComm.ShippingFee) > 0;
+                  })() && (<>
                     <div className="text-amber-700">運費：</div>
                     <div className="text-right font-mono font-bold text-emerald-600">免運</div>
                   </>)}
