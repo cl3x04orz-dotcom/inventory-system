@@ -1654,11 +1654,24 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     <option value="">-- 請選擇外送區域 --</option>
                     {allCommunities
                       .filter(c => !["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(c.CommunityName))
-                      .map((c) => (
-                        <option key={c.CommunityId} value={c.CommunityId}>
-                          {c.CommunityName} {Number(c.ShippingFee) > 0 ? `(運費$${c.ShippingFee}/滿$${c.FreeShippingMin}免運)` : '(免運)'}
-                        </option>
-                      ))}
+                      .map((c) => {
+                        // 去除「台南市」、「高雄市」前綴以縮短長度
+                        let shortName = c.CommunityName.replace("台南市", "").replace("高雄市", "");
+                        if (c.CommunityName.includes("高雄市")) {
+                          shortName = `高雄 ${shortName}`;
+                        }
+                        const fee = Number(c.ShippingFee) || 0;
+                        const min = Number(c.FreeShippingMin) || 0;
+                        
+                        // 縮短運費文字描述
+                        const ruleText = fee > 0 ? `$${fee}/滿$${min}免運` : '免運';
+                        
+                        return (
+                          <option key={c.CommunityId} value={c.CommunityId}>
+                            {shortName} ({ruleText})
+                          </option>
+                        );
+                      })}
                   </select>
                 </div>
                 <div className="space-y-1">
