@@ -1398,10 +1398,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
           {/* 🛒 商品明細 Card */}
           {successOrderItems.length > 0 && (
-            <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden shadow-sm text-sm">
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl shadow-sm text-sm">
               <div 
                 onClick={() => setIsDetailExpanded(!isDetailExpanded)}
-                className="px-5 py-4 flex justify-between items-center cursor-pointer hover:bg-[var(--bg-hover)] transition-colors select-none"
+                className="px-5 py-4 flex justify-between items-center cursor-pointer hover:bg-[var(--bg-hover)] transition-colors select-none rounded-t-2xl"
               >
                 <span className="font-bold text-[var(--text-primary)] flex items-center gap-1.5">
                   🛒 商品明細 (共 {successOrderItems.reduce((sum, item) => sum + item.qty, 0)} 件)
@@ -1411,7 +1411,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                   className={`text-[var(--text-secondary)] transition-transform duration-300 ${isDetailExpanded ? 'rotate-180' : ''}`} 
                 />
               </div>
-              <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isDetailExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+              {isDetailExpanded && (
                 <div className="divide-y divide-[var(--border-primary)] border-t border-[var(--border-primary)]">
                   {successOrderItems.map((item) => (
                     <div key={item.id} className="flex items-center gap-3 px-5 py-3.5">
@@ -1452,7 +1452,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     </div>
                   ))}
                 </div>
-              </div>
+              )}
             </div>
           )}
 
