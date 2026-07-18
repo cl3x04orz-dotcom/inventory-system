@@ -156,6 +156,36 @@ function getProductsService(passedSs, bypassCache) {
             if (!isNaN(psVal) && psVal > 0) packSize = psVal;
         }
 
+        // 讀取 J 欄位作發貨階梯 (Index 9)
+        var dispatchSteps = [];
+        if (row.length > 9 && String(row[9] || "").trim()) {
+            dispatchSteps = String(row[9])
+                .split(/[,,，]/)
+                .map(function(s) { return Number(s.trim()); })
+                .filter(function(n) { return !isNaN(n) && n > 0; })
+                .sort(function(a, b) { return a - b; });
+        }
+
+        // 讀取 K 欄位作進位門檻 (Index 10)
+        var roundThreshold = 99;
+        if (row.length > 10) {
+            var rtVal = Number(row[10]);
+            if (!isNaN(rtVal) && rtVal > 0) roundThreshold = rtVal;
+        }
+
+        // 讀取 L 欄位作智慧抑制 (Index 11)
+        var autoSuppress = false;
+        if (row.length > 11 && String(row[11] || "").trim()) {
+            autoSuppress = true;
+        }
+
+        // 讀取 M 欄位作最大建議量上限 (Index 12)
+        var maxSuggestion = 0;
+        if (row.length > 12) {
+            var msVal = Number(row[12]);
+            if (!isNaN(msVal) && msVal > 0) maxSuggestion = msVal;
+        }
+
         // [新增] 有效日期格式化
         var expiryStr = '';
         if (idxExpiry !== -1 && row[idxExpiry]) {
@@ -172,6 +202,10 @@ function getProductsService(passedSs, bypassCache) {
             name: nameCell,
             price: idxPrice !== -1 ? row[idxPrice] : 0,
             packSize: packSize,
+            dispatchSteps: dispatchSteps,
+            roundThreshold: roundThreshold,
+            autoSuppress: autoSuppress,
+            maxSuggestion: maxSuggestion,
             stock: stockMap[productId] ? stockMap[productId].stock : 0,
             originalStock: stockMap[productId] ? stockMap[productId].originalStock : 0,
             isActive: idxActive !== -1 ? (row[idxActive] === true || row[idxActive] === 'TRUE' || row[idxActive] === '是') : true,
@@ -286,7 +320,7 @@ function updateProductSortOrderService(payload) {
 function updateProductDetailsService(payload, user) {
     if (user.role !== 'BOSS') throw new Error('權限不足');
 
-    const { productId, isActive, imageUrl, expiryDate, has_flavor_attributes, flavor_choices, single_price, has_volume_pricing, volume_pricing_settings, price, isBundle, bundleSize } = payload;
+    const { productId, isActive, imageUrl, expiryDate, has_flavor_attributes, flavor_choices, single_price, has_volume_pricing, volume_pricing_settings, price, isBundle, bundleSize, packSize, dispatchSteps, roundThreshold, autoSuppress, maxSuggestion } = payload;
     if (!productId) throw new Error('缺少 productId');
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -390,6 +424,29 @@ function updateProductDetailsService(payload, user) {
     }
     if (idxBundleSize !== -1 && bundleSize !== undefined) {
         sheet.getRange(foundRow, idxBundleSize + 1).setValue(bundleSize !== '' && bundleSize !== null && !isNaN(Number(bundleSize)) ? Number(bundleSize) : 1);
+    }
+
+    // 更新 AI 智慧補貨進階規格參數 (I, J, K, L, M 欄位)
+    if (packSize !== undefined) {
+        sheet.getRange(foundRow, 9).setValue(packSize !== '' && packSize !== null && !isNaN(Number(packSize)) ? Number(packSize) : 1);
+    }
+    if (dispatchSteps !== undefined) {
+        var stepsStr = '';
+        if (Array.isArray(dispatchSteps)) {
+            stepsStr = dispatchSteps.join(',');
+        } else if (typeof dispatchSteps === 'string') {
+            stepsStr = dispatchSteps;
+        }
+        sheet.getRange(foundRow, 10).setValue(stepsStr);
+    }
+    if (roundThreshold !== undefined) {
+        sheet.getRange(foundRow, 11).setValue(roundThreshold !== '' && roundThreshold !== null && !isNaN(Number(roundThreshold)) ? Number(roundThreshold) : 99);
+    }
+    if (autoSuppress !== undefined) {
+        sheet.getRange(foundRow, 12).setValue(autoSuppress === true || autoSuppress === 'true' || autoSuppress === 'Y' ? 'Y' : '');
+    }
+    if (maxSuggestion !== undefined) {
+        sheet.getRange(foundRow, 13).setValue(maxSuggestion !== '' && maxSuggestion !== null && !isNaN(Number(maxSuggestion)) ? Number(maxSuggestion) : 0);
     }
 
     SpreadsheetApp.flush();

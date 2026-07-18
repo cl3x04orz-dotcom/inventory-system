@@ -138,6 +138,34 @@ async function main() {
     const price = parseDecimal(row['Price/單價'] ?? row.defaultPrice ?? row.DefaultPrice);
     const singlePrice = parseDecimal(row.single_price ?? row.singlePrice ?? price);
     const savedWeight = existingSortWeights.get(productId);
+
+    const packSizeVal = row['包裝規格'] ?? row.packSize ?? row.PackSize ?? row['整箱包裝數'] ?? row['整箱'];
+    const packSize = packSizeVal !== undefined && packSizeVal !== "" ? Number(packSizeVal) : 1;
+
+    const stepsVal = row['發貨階梯'] ?? row.dispatchSteps ?? row.DispatchSteps;
+    let dispatchSteps = [];
+    if (stepsVal) {
+      if (typeof stepsVal === 'number') {
+        dispatchSteps = [stepsVal];
+      } else if (Array.isArray(stepsVal)) {
+        dispatchSteps = stepsVal;
+      } else {
+        dispatchSteps = String(stepsVal)
+          .split(/[,,，]/)
+          .map(s => Number(s.trim()))
+          .filter(n => !isNaN(n) && n > 0)
+          .sort((a, b) => a - b);
+      }
+    }
+
+    const thresholdVal = row['進位門檻'] ?? row['門檻'] ?? row.roundThreshold ?? row.RoundThreshold;
+    const roundThreshold = thresholdVal !== undefined && thresholdVal !== "" ? Number(thresholdVal) : 99;
+
+    const autoSuppressVal = row['智慧抑制'] ?? row['智慧散貨抑制'] ?? row.autoSuppress ?? row.AutoSuppress;
+    const autoSuppress = autoSuppressVal === true || autoSuppressVal === 'true' || autoSuppressVal === 'Y' || autoSuppressVal === '1';
+
+    const maxSuggestionVal = row['最大建議量'] ?? row['上限'] ?? row.maxSuggestion ?? row.MaxSuggestion;
+    const maxSuggestion = maxSuggestionVal !== undefined && maxSuggestionVal !== "" ? Number(maxSuggestionVal) : 0;
     
     return {
       productId,
@@ -154,7 +182,12 @@ async function main() {
       flavorChoices: parseJson(row.flavor_choices ?? row.flavorChoices, []),
       singlePrice,
       hasVolumePricing: parseBoolean(row.has_volume_pricing ?? row.hasVolumePricing),
-      volumePricingSettings: row.volume_pricing_settings ? parseJson(row.volume_pricing_settings, null) : null
+      volumePricingSettings: row.volume_pricing_settings ? parseJson(row.volume_pricing_settings, null) : null,
+      packSize,
+      dispatchSteps,
+      roundThreshold,
+      autoSuppress,
+      maxSuggestion
     };
   }).filter(p => p.productId && p.productName);
 
