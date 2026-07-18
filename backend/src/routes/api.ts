@@ -53,6 +53,8 @@ const actionPermissions: Record<string, string> = {
   saveGroupBinding: 'sales_pending',
   updateOrderStatus: 'sales_pending',
   saveBuildingSettings: 'sales_pending',
+  deleteBuildingSettings: 'sales_pending',
+  renameBuildingSettings: 'sales_pending',
   admin_getMembers: 'sales_pending',
   admin_adjustWallet: 'sales_pending',
   getCommunities: 'sales_pending',

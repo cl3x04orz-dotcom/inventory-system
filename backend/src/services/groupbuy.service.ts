@@ -419,6 +419,69 @@ export const GroupBuyService = {
     return { success: true };
   },
 
+  // 8a. 刪除大樓設定與社區
+  async deleteBuildingSettings(payload: any, user: any) {
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
+    const { building } = payload;
+    if (!building) throw new Error('缺少大樓名稱');
+
+    await prisma.buildingSetting.delete({
+      where: { building }
+    });
+
+    const comm = await prisma.groupBuyCommunity.findFirst({
+      where: { communityName: building }
+    });
+    if (comm) {
+      await prisma.groupBuyCommunity.update({
+        where: { communityId: comm.communityId },
+        data: {
+          deletedAt: new Date(),
+          status: 'DELETED'
+        }
+      });
+    }
+
+    return { success: true };
+  },
+
+  // 8c. 修改大樓與社區名稱
+  async renameBuildingSettings(payload: any, user: any) {
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
+    const { oldName, newName } = payload;
+    if (!oldName || !newName) throw new Error('缺少舊名稱或新名稱');
+
+    const oldSetting = await prisma.buildingSetting.findUnique({
+      where: { building: oldName }
+    });
+    if (!oldSetting) throw new Error('找不到大樓：' + oldName);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.buildingSetting.create({
+        data: {
+          building: newName,
+          startTime: oldSetting.startTime,
+          endTime: oldSetting.endTime
+        }
+      });
+      await tx.buildingSetting.delete({
+        where: { building: oldName }
+      });
+
+      const comm = await tx.groupBuyCommunity.findFirst({
+        where: { communityName: oldName }
+      });
+      if (comm) {
+        await tx.groupBuyCommunity.update({
+          where: { communityId: comm.communityId },
+          data: { communityName: newName }
+        });
+      }
+    });
+
+    return { success: true };
+  },
+
   // 8b. 儲存社區運費設定
   async saveCommunityShipping(payload: any, user: any) {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');

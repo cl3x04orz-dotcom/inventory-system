@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, Calendar, Clock, Copy, Save, Plus, Check, RefreshCw, Truck } from 'lucide-react';
+import { Link, Calendar, Clock, Copy, Save, Plus, Check, RefreshCw, Truck, Edit2, Trash2 } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
 export default function GroupBuySettingsPage({ user, apiUrl }) {
@@ -247,6 +247,41 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
         return `${formattedDate} ${formattedTime}`;
     };
 
+    const handleDeleteClick = async (buildingName) => {
+        if (!window.confirm(`確定要刪除「${buildingName}」大樓的所有開團設定與社區資料嗎？\n此動作無法還原！`)) return;
+        
+        try {
+            const res = await callGAS(apiUrl, 'deleteBuildingSettings', { building: buildingName }, user.token);
+            if (res && res.error) throw new Error(res.error);
+            alert(`大樓「${buildingName}」已成功刪除！`);
+            setSelectedBuilding('');
+            await fetchSettings();
+        } catch (error) {
+            alert('刪除失敗: ' + error.message);
+        }
+    };
+
+    const handleRenameClick = async (buildingName) => {
+        const newName = window.prompt(`請輸入「${buildingName}」的新大樓名稱：`, buildingName);
+        if (newName === null) return; // 取消
+        const trimmed = newName.trim();
+        if (!trimmed) {
+            alert('大樓名稱不可為空！');
+            return;
+        }
+        if (trimmed === buildingName) return;
+
+        try {
+            const res = await callGAS(apiUrl, 'renameBuildingSettings', { oldName: buildingName, newName: trimmed }, user.token);
+            if (res && res.error) throw new Error(res.error);
+            alert(`已成功將大樓名稱從「${buildingName}」修改為「${trimmed}」！`);
+            setSelectedBuilding(trimmed);
+            await fetchSettings();
+        } catch (error) {
+            alert('修改名稱失敗: ' + error.message);
+        }
+    };
+
     const handleSave = async () => {
         const targetBuilding = isAddingNew ? newBuildingName.trim() : selectedBuilding;
         if (!targetBuilding) {
@@ -399,7 +434,28 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                             <span className="text-base">🏢</span>
                                             <span className="text-base font-bold tracking-wide">{s.building}</span>
                                         </div>
-                                        {isSelected && <Check size={16} className="text-blue-600" />}
+                                        {isSelected ? (
+                                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRenameClick(s.building)}
+                                                    className="p-1 hover:bg-blue-150 rounded text-blue-600 transition-colors"
+                                                    title="修改名稱"
+                                                >
+                                                    <Edit2 size={15} />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteClick(s.building)}
+                                                    className="p-1 hover:bg-red-50 rounded text-red-500 transition-colors"
+                                                    title="刪除大樓"
+                                                >
+                                                    <Trash2 size={15} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="w-4 h-4"></div>
+                                        )}
                                     </button>
                                 );
                             })}
