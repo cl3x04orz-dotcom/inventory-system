@@ -225,6 +225,7 @@ model GroupBuyOrder {
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
   details            GroupBuyOrderDetail[]
+  recipients         GroupBuyOrderRecipient[]
 }
 
 model GroupBuyOrderDetail {
@@ -237,6 +238,30 @@ model GroupBuyOrderDetail {
   subtotal    Decimal       @default(0)
   remark      String?
   order       GroupBuyOrder @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+}
+
+model GroupBuyOrderRecipient {
+  recipientId   String                       @id @default(uuid())
+  orderId       String
+  recipientName String                       // 團員姓名（例如 "王小明"）
+  note          String?                      // 該團員備註
+  createdAt     DateTime                     @default(now())
+  order         GroupBuyOrder                @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  items         GroupBuyOrderRecipientItem[]
+
+  @@index([orderId])
+}
+
+model GroupBuyOrderRecipientItem {
+  id          String                 @id @default(uuid())
+  recipientId String
+  productId   String
+  productName String
+  qty         Int
+  price       Int                    // 商品單價
+  recipient   GroupBuyOrderRecipient @relation(fields: [recipientId], references: [recipientId], onDelete: Cascade)
+
+  @@index([recipientId])
 }
 
 model GroupBuyCampaign {

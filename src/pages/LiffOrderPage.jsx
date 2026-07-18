@@ -168,6 +168,20 @@ export default function LiffOrderPage({ user, apiUrl }) {
     return () => clearInterval(timer);
   }, []);
 
+  // 雙軌狀態同步：當 isGroupOrder 啟用時，自動加總 groupCart 的每一項商品數量至 cart
+  useEffect(() => {
+    if (!isGroupOrder) return;
+    const newCart = {};
+    Object.values(groupCart).forEach((recipientItems) => {
+      if (recipientItems && typeof recipientItems === "object") {
+        Object.entries(recipientItems).forEach(([productId, qty]) => {
+          newCart[productId] = (newCart[productId] || 0) + qty;
+        });
+      }
+    });
+    setCart(newCart);
+  }, [groupCart, isGroupOrder]);
+
   // 會員中心狀態
   const [memberProfile, setMemberProfile] = useState(null);
   const [orders, setOrders] = useState([]);
@@ -229,6 +243,21 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [showAreaModal, setShowAreaModal] = useState(false);
   const [activeCampaign, setActiveCampaign] = useState(null);
   const [nextOpenTime, setNextOpenTime] = useState(null);
+
+  // ── 團購 V2 狀態 ───────────────────────────────────────────────
+  const [isGroupOrder, setIsGroupOrder] = useState(false);
+  const [activeRecipient, setActiveRecipient] = useState("");
+  const [groupCart, setGroupCart] = useState({});
+  const [commonRecipients, setCommonRecipients] = useState(() => {
+    try {
+      const saved = localStorage.getItem("mlw_common_recipients");
+      return saved ? JSON.parse(saved) : ["王小明", "李小華", "張小姐"];
+    } catch (_) {
+      return ["王小明", "李小華", "張小姐"];
+    }
+  });
+  const [showAddRecipientModal, setShowAddRecipientModal] = useState(false);
+  const [newRecipientName, setNewRecipientName] = useState("");
 
   // ── 載入商品與初始化資料（單次 API，後端已過濾） ─────────────────────────────────────────
   const loadAllData = async (overrideBuilding = '') => {
@@ -885,13 +914,36 @@ export default function LiffOrderPage({ user, apiUrl }) {
     setTimeout(() => {
       setAnimatingProductId((prev) => (prev === pid ? null : prev));
     }, 150);
-    setCart((prev) => {
-      const qty = Math.max(0, (prev[pid] || 0) + delta);
-      const next = { ...prev };
-      if (qty === 0) delete next[pid];
-      else next[pid] = qty;
-      return next;
-    });
+
+    if (isGroupOrder) {
+      if (!activeRecipient) {
+        alert("請先選擇或新增團員姓名！");
+        return;
+      }
+      setGroupCart((prev) => {
+        const recipientItems = prev[activeRecipient] || {};
+        const currentQty = recipientItems[pid] || 0;
+        const qty = Math.max(0, currentQty + delta);
+        const nextItems = { ...recipientItems };
+        if (qty === 0) {
+          delete nextItems[pid];
+        } else {
+          nextItems[pid] = qty;
+        }
+        return {
+          ...prev,
+          [activeRecipient]: nextItems,
+        };
+      });
+    } else {
+      setCart((prev) => {
+        const qty = Math.max(0, (prev[pid] || 0) + delta);
+        const next = { ...prev };
+        if (qty === 0) delete next[pid];
+        else next[pid] = qty;
+        return next;
+      });
+    }
   };
 
   const handleProductAction = (product, isPlus) => {
@@ -901,6 +953,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
       return;
     }
     if (product.has_flavor_attributes) {
+      if (isGroupOrder && !activeRecipient) {
+        alert("請先選擇或新增團員姓名！");
+        return;
+      }
       setFlavorModalProduct(product);
       const currentFlavors = flavorSelections[product.id] || {};
       const initialTemp = {};
@@ -947,15 +1003,35 @@ export default function LiffOrderPage({ user, apiUrl }) {
       setAnimatingProductId((prev) => (prev === pid ? null : prev));
     }, 150);
 
-    setCart((prev) => {
-      const next = { ...prev };
-      if (total === 0) {
-        delete next[pid];
-      } else {
-        next[pid] = total;
+    if (isGroupOrder) {
+      if (!activeRecipient) {
+        alert("請先選擇或新增團員姓名！");
+        return;
       }
-      return next;
-    });
+      setGroupCart((prev) => {
+        const recipientItems = prev[activeRecipient] || {};
+        const nextItems = { ...recipientItems };
+        if (total === 0) {
+          delete nextItems[pid];
+        } else {
+          nextItems[pid] = total;
+        }
+        return {
+          ...prev,
+          [activeRecipient]: nextItems,
+        };
+      });
+    } else {
+      setCart((prev) => {
+        const next = { ...prev };
+        if (total === 0) {
+          delete next[pid];
+        } else {
+          next[pid] = total;
+        }
+        return next;
+      });
+    }
 
     setFlavorSelections((prev) => {
       const next = { ...prev };
@@ -1208,6 +1284,23 @@ export default function LiffOrderPage({ user, apiUrl }) {
       originalCommunityIdRef.current = selectedCommunityId || saved.communityId || "";
 
     } catch (_) { }
+
+    // 💡 團購模式 Clean Up：只保留有購買商品的成員
+    if (isGroupOrder) {
+      setGroupCart((prev) => {
+        const cleanedCart = {};
+        Object.entries(prev).forEach(([name, items]) => {
+          if (items && typeof items === "object") {
+            const hasItems = Object.values(items).some((qty) => Number(qty) > 0);
+            if (hasItems) {
+              cleanedCart[name] = items;
+            }
+          }
+        });
+        return cleanedCart;
+      });
+    }
+
     setStep("confirm");
   };
 
@@ -1277,6 +1370,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
           useWalletDeduction: useWallet,
           walletDeductionAmount: maxDeduction,
           shippingFee,
+          isGroupOrder,
+          groupCart: isGroupOrder ? groupCart : undefined,
           items: cartItems.map((i) => ({
             productId: i.id,
             productName: i.name,
@@ -1355,6 +1450,54 @@ export default function LiffOrderPage({ user, apiUrl }) {
   // 感謝頁
   // ════════════════════════════════════════════════════════════
   if (step === "success") {
+    const generateGroupOrderShareText = () => {
+      let text = `📋 【米立微團購】訂單對帳單 (單號: ${orderId})\n`;
+      text += `----------------------------------\n`;
+
+      let grandTotalQty = 0;
+      let grandTotalAmount = 0;
+
+      Object.entries(groupCart).forEach(([name, items]) => {
+        if (!items || typeof items !== 'object') return;
+        const validItems = Object.entries(items).filter(([_, qty]) => Number(qty) > 0);
+        if (validItems.length === 0) return;
+
+        text += `👤 ${name}\n`;
+        let recipientSubtotal = 0;
+        validItems.forEach(([productId, qty]) => {
+          const product = products.find((p) => p.id === productId);
+          const singlePrice = product ? (Number(product.single_price) || Number(product.price)) : 0;
+          
+          let subtotal = 0;
+          if (product && product.has_volume_pricing && product.volume_pricing_settings) {
+            const targetQty = Number(product.volume_pricing_settings.target_quantity);
+            const packagePrice = Number(product.volume_pricing_settings.package_price);
+            const groupCount = Math.floor(qty / targetQty);
+            const remainderCount = qty % targetQty;
+            subtotal = groupCount * packagePrice + remainderCount * singlePrice;
+          } else {
+            subtotal = singlePrice * qty;
+          }
+
+          recipientSubtotal += subtotal;
+          grandTotalQty += qty;
+          text += `   - ${product ? product.name : productId} x ${qty} ($${subtotal})\n`;
+        });
+        text += `   💰 小計：$${recipientSubtotal}\n`;
+        text += `----------------------------------\n`;
+        grandTotalAmount += recipientSubtotal;
+      });
+
+      if (successShippingFee > 0) {
+        text += `🚚 運費：$${successShippingFee}\n`;
+        grandTotalAmount += Number(successShippingFee);
+      }
+
+      text += `總計：${grandTotalQty} 件商品，共 $${grandTotalAmount} 元。\n`;
+      text += `(本文字由米立微系統自動產生，請團員確認無誤後向團長收款)`;
+      return text;
+    };
+
     return (
       <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
         <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-6 pb-10">
@@ -1483,6 +1626,24 @@ export default function LiffOrderPage({ user, apiUrl }) {
               <span className="font-mono text-xl font-extrabold text-blue-600">${successOrderTotal}</span>
             </div>
           </div>
+
+          {/* 👥 團購對帳單分享 Card */}
+          {isGroupOrder && (
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl p-5 shadow-sm space-y-3 text-sm">
+              <div className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1.5 mb-1">
+                👥 團員對帳單 (Line 分享專用)
+              </div>
+              <div className="bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl p-3.5 font-mono text-xs text-[var(--text-primary)] whitespace-pre-wrap max-h-[220px] overflow-y-auto">
+                {generateGroupOrderShareText()}
+              </div>
+              <button
+                onClick={() => handleCopy(generateGroupOrderShareText())}
+                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/15"
+              >
+                {copied ? "✅ 已複製對帳單！" : "📋 複製對帳單文字"}
+              </button>
+            </div>
+          )}
 
           {/* 📢 配送提醒 Card */}
           <div className="bg-amber-50/55 border border-amber-200/85 rounded-2xl p-5 shadow-sm space-y-3 text-xs text-amber-900">
@@ -2836,6 +2997,88 @@ ${freeNote(newFee, newMin)}
           </div>
         )}
 
+        {/* 團購代錄控制區 */}
+        <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-extrabold text-[var(--text-primary)]">👥 團購代錄模式 (V2)</span>
+              <span className="text-[9px] bg-blue-50 text-blue-600 px-1 py-0.2 rounded font-bold border border-blue-100">雙軌同步</span>
+            </div>
+            <button
+              onClick={() => {
+                const nextVal = !isGroupOrder;
+                setIsGroupOrder(nextVal);
+                if (nextVal && commonRecipients.length > 0 && !activeRecipient) {
+                  setActiveRecipient(commonRecipients[0]);
+                }
+              }}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all border ${
+                isGroupOrder
+                  ? "bg-blue-600 text-white border-transparent"
+                  : "bg-transparent border-[var(--border-primary)] text-[var(--text-secondary)]"
+              }`}
+            >
+              {isGroupOrder ? "已啟用" : "啟用代錄"}
+            </button>
+          </div>
+
+          {isGroupOrder && (
+            <div className="flex flex-col gap-2 mt-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[var(--text-secondary)] whitespace-nowrap font-medium">當前團員:</span>
+                <div className="flex-1 relative">
+                  <select
+                    value={activeRecipient}
+                    onChange={(e) => setActiveRecipient(e.target.value)}
+                    className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-lg pl-2.5 pr-8 py-1.5 text-xs font-bold text-[var(--text-primary)] focus:outline-none appearance-none"
+                  >
+                    {commonRecipients.map((name) => {
+                      const qty = Object.values(groupCart[name] || {}).reduce((a, b) => a + b, 0);
+                      return (
+                        <option key={name} value={name}>
+                          👤 {name} {qty > 0 ? `(已選購 ${qty} 件)` : "(未購)"}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--text-secondary)]">
+                    <ChevronDown size={14} />
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAddRecipientModal(true)}
+                  className="px-2 py-1.5 bg-blue-50 text-blue-600 text-xs font-bold rounded-lg border border-blue-100 whitespace-nowrap"
+                >
+                  ➕ 新增團員
+                </button>
+              </div>
+
+              {/* 常用成員快速切換 Tab 區 */}
+              {commonRecipients.length > 0 && (
+                <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none" style={{ WebkitOverflowScrolling: "touch" }}>
+                  {commonRecipients.map((name) => {
+                    const qty = Object.values(groupCart[name] || {}).reduce((a, b) => a + b, 0);
+                    const isActive = activeRecipient === name;
+                    return (
+                      <button
+                        key={name}
+                        onClick={() => setActiveRecipient(name)}
+                        className={`flex-shrink-0 px-3 py-1 rounded-lg text-xs font-bold border transition-all ${
+                          isActive
+                            ? "bg-blue-50 text-blue-600 border-blue-300"
+                            : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)]"
+                        }`}
+                      >
+                        {name} {qty > 0 && <span className="ml-1 px-1.5 bg-blue-600 text-white rounded-full text-[9px]">{qty}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* 分類 Tab 列 */}
         {!loading && categories.length > 1 && (
           <div className="relative">
@@ -2902,7 +3145,7 @@ ${freeNote(newFee, newMin)}
                   </div>
                   <div className="px-4 space-y-2.5">
                     {items.map((product) => {
-                      const qty = cart[product.id] || 0;
+                      const qty = isGroupOrder ? (groupCart[activeRecipient]?.[product.id] || 0) : (cart[product.id] || 0);
                       return (
                         <div
                           key={product.id}
@@ -3303,6 +3546,64 @@ ${freeNote(newFee, newMin)}
                 className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/15"
               >
                 確定變更
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 👥 新增團員彈窗 (AddRecipientModal) */}
+      {showAddRecipientModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[var(--bg-secondary)] w-full max-w-[320px] rounded-2xl p-5 shadow-2xl border border-[var(--border-primary)] flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+            <div className="text-center">
+              <h3 className="text-base font-extrabold text-[var(--text-primary)] flex items-center justify-center gap-1.5">
+                👥 新增團購成員
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-1.5">
+                請輸入成員姓名，以便進行代錄與對帳。
+              </p>
+            </div>
+
+            <input
+              type="text"
+              placeholder="輸入成員姓名 (例如: 王小明)"
+              value={newRecipientName}
+              onChange={(e) => setNewRecipientName(e.target.value)}
+              className="w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)] text-sm font-bold focus:outline-none text-[var(--text-primary)]"
+            />
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowAddRecipientModal(false);
+                  setNewRecipientName("");
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs font-bold transition-all active:scale-95"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  const name = newRecipientName.trim();
+                  if (!name) {
+                    alert("姓名不得為空");
+                    return;
+                  }
+                  if (commonRecipients.includes(name)) {
+                    alert("該成員已存在於名單中");
+                    return;
+                  }
+                  const updatedRecipients = [...commonRecipients, name];
+                  setCommonRecipients(updatedRecipients);
+                  localStorage.setItem("mlw_common_recipients", JSON.stringify(updatedRecipients));
+                  setActiveRecipient(name);
+                  setShowAddRecipientModal(false);
+                  setNewRecipientName("");
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/15"
+              >
+                確定新增
               </button>
             </div>
           </div>

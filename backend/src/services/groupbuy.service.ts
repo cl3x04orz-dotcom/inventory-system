@@ -20,7 +20,12 @@ export const GroupBuyService = {
 
     const orders = await prisma.groupBuyOrder.findMany({
       where,
-      include: { details: true },
+      include: {
+        details: true,
+        recipients: {
+          include: { items: true }
+        }
+      },
       orderBy: { createdAt: 'desc' }
     });
 
@@ -43,6 +48,17 @@ export const GroupBuyService = {
       updatedAt: o.updatedAt?.toISOString() || '',
       confirmedAt: o.confirmedAt?.toISOString() || '',
       confirmedBy: o.confirmedBy || '',
+      recipients: (o.recipients || []).map((r: any) => ({
+        recipientId: r.recipientId,
+        recipientName: r.recipientName,
+        note: r.note || '',
+        items: (r.items || []).map((ri: any) => ({
+          productId: ri.productId,
+          productName: ri.productName,
+          qty: Number(ri.qty),
+          price: Number(ri.price)
+        }))
+      })),
       items: (o.details || []).map((d: any) => ({
         productId: d.productId || '',
         productName: d.productName || '',
@@ -559,7 +575,9 @@ export const GroupBuyService = {
       note, paymentMethod, transferLastFive,
       lineDisplayName, lineUserId, items,
       useWalletDeduction, walletDeductionAmount,
-      shippingFee
+      shippingFee,
+      isGroupOrder,
+      groupCart
     } = payload;
 
     if (!items || items.length === 0) throw new Error('購物車為空');
@@ -639,6 +657,31 @@ export const GroupBuyService = {
       else if (paymentMethod === '轉帳') paymentStatus = '待對帳';
     }
 
+    let recipientsInput: any = undefined;
+    if (isGroupOrder && groupCart && typeof groupCart === 'object') {
+      recipientsInput = {
+        create: Object.entries(groupCart).map(([name, recipientItems]: [string, any]) => {
+          return {
+            recipientName: name,
+            note: '',
+            items: {
+              create: Object.entries(recipientItems).map(([productId, qty]: [string, any]) => {
+                const matchedItem = items.find((it: any) => it.productId === productId);
+                const pName = matchedItem ? matchedItem.productName : productId;
+                const price = matchedItem ? Math.round(Number(matchedItem.unitPrice)) : 0;
+                return {
+                  productId,
+                  productName: pName,
+                  qty: Number(qty) || 0,
+                  price: price
+                };
+              })
+            }
+          };
+        })
+      };
+    }
+
     await prisma.groupBuyOrder.create({
       data: {
         orderId,
@@ -666,7 +709,8 @@ export const GroupBuyService = {
             subtotal: Number(item.unitPrice) * Number(item.qty),
             remark: item.remark || ''
           }))
-        }
+        },
+        recipients: recipientsInput
       }
     });
 
