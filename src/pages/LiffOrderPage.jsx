@@ -78,7 +78,14 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const alert = (message, callback = null) => {
     setAlertModal({ show: true, message, callback });
   };
-  const [confirmModal, setConfirmModal] = useState({ show: false, message: '', onConfirm: null, onCancel: null });
+  const [confirmModal, setConfirmModal] = useState({ 
+    show: false, 
+    message: '', 
+    onConfirm: null, 
+    onCancel: null,
+    confirmText: '確定',
+    cancelText: '取消'
+  });
 
   // ── 商品 state ───────────────────────────────────────────────
   const [products, setProducts] = useState([]);
@@ -2273,6 +2280,8 @@ ${freeNote(newFee, newMin)}
 確定要變更嗎？`,
                             onConfirm: applyChange,
                             onCancel: null,
+                            confirmText: '確定變更',
+                            cancelText: '取消'
                           });
                           return; // 先不套用，等使用者確認
                         }
@@ -3148,21 +3157,28 @@ ${freeNote(newFee, newMin)}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (window.confirm(`確認刪除成員「${name}」？此操作將清除他已代訂的商品。`)) {
-                              const updated = commonRecipients.filter(x => x !== name);
-                              setCommonRecipients(updated);
-                              localStorage.setItem("mlw_common_recipients", JSON.stringify(updated));
-                              
-                              setGroupCart(prev => {
-                                const next = { ...prev };
-                                delete next[name];
-                                return next;
-                              });
+                            setConfirmModal({
+                              show: true,
+                              message: `確認刪除成員「${name}」？\n此操作將清除他已代訂的商品。`,
+                              confirmText: "確定",
+                              cancelText: "取消",
+                              onConfirm: () => {
+                                const updated = commonRecipients.filter(x => x !== name);
+                                setCommonRecipients(updated);
+                                localStorage.setItem("mlw_common_recipients", JSON.stringify(updated));
+                                
+                                setGroupCart(prev => {
+                                  const next = { ...prev };
+                                  delete next[name];
+                                  return next;
+                                });
 
-                              if (activeRecipient === name) {
-                                setActiveRecipient(updated.length > 0 ? updated[0] : "");
-                              }
-                            }
+                                if (activeRecipient === name) {
+                                  setActiveRecipient(updated.length > 0 ? updated[0] : "");
+                                }
+                              },
+                              onCancel: null
+                            });
                           }}
                           className="text-slate-400 hover:text-red-500 ml-1.5 select-none font-sans font-bold flex items-center justify-center w-3 h-3 hover:bg-red-100 rounded-full"
                           style={{ fontSize: "11px" }}
@@ -3629,22 +3645,22 @@ ${freeNote(newFee, newMin)}
             <div className="flex gap-2.5">
               <button
                 onClick={() => {
-                  setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null });
+                  setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null, confirmText: '確定', cancelText: '取消' });
                   if (confirmModal.onCancel) confirmModal.onCancel();
                 }}
                 className="flex-1 py-2.5 px-4 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs font-bold transition-all active:scale-95"
               >
-                取消
+                {confirmModal.cancelText || '取消'}
               </button>
               <button
                 onClick={() => {
                   const fn = confirmModal.onConfirm;
-                  setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null });
+                  setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null, confirmText: '確定', cancelText: '取消' });
                   if (fn) fn();
                 }}
                 className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/15"
               >
-                確定變更
+                {confirmModal.confirmText || '確定'}
               </button>
             </div>
           </div>
