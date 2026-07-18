@@ -92,9 +92,9 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [commonRecipients, setCommonRecipients] = useState(() => {
     try {
       const saved = localStorage.getItem("mlw_common_recipients");
-      return saved ? JSON.parse(saved) : ["王小明", "李小華", "張小姐"];
+      return saved ? JSON.parse(saved) : [];
     } catch (_) {
-      return ["王小明", "李小華", "張小姐"];
+      return [];
     }
   });
   const [showAddRecipientModal, setShowAddRecipientModal] = useState(false);
@@ -3130,17 +3130,46 @@ ${freeNote(newFee, newMin)}
                     const qty = Object.values(groupCart[name] || {}).reduce((a, b) => a + b, 0);
                     const isActive = activeRecipient === name;
                     return (
-                      <button
+                      <div
                         key={name}
-                        onClick={() => setActiveRecipient(name)}
-                        className={`flex-shrink-0 px-3 py-1 rounded-lg text-xs font-bold border transition-all ${
+                        className={`flex items-center gap-1 flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
                           isActive
                             ? "bg-blue-50 text-blue-600 border-blue-300"
                             : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)]"
                         }`}
                       >
-                        {name} {qty > 0 && <span className="ml-1 px-1.5 bg-blue-600 text-white rounded-full text-[9px]">{qty}</span>}
-                      </button>
+                        <button
+                          onClick={() => setActiveRecipient(name)}
+                          className="flex items-center gap-1.5 focus:outline-none"
+                        >
+                          <span>{name}</span>
+                          {qty > 0 && <span className="px-1.5 bg-blue-600 text-white rounded-full text-[9px] font-bold">{qty}</span>}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`確認刪除成員「${name}」？此操作將清除他已代訂的商品。`)) {
+                              const updated = commonRecipients.filter(x => x !== name);
+                              setCommonRecipients(updated);
+                              localStorage.setItem("mlw_common_recipients", JSON.stringify(updated));
+                              
+                              setGroupCart(prev => {
+                                const next = { ...prev };
+                                delete next[name];
+                                return next;
+                              });
+
+                              if (activeRecipient === name) {
+                                setActiveRecipient(updated.length > 0 ? updated[0] : "");
+                              }
+                            }
+                          }}
+                          className="text-slate-400 hover:text-red-500 ml-1.5 select-none font-sans font-bold flex items-center justify-center w-3 h-3 hover:bg-red-100 rounded-full"
+                          style={{ fontSize: "11px" }}
+                        >
+                          ×
+                        </button>
+                      </div>
                     );
                   })}
                 </div>

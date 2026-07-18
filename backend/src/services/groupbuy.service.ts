@@ -124,7 +124,7 @@ export const GroupBuyService = {
   async updatePendingOrder(payload: any, user: any) {
     if (user.role !== 'BOSS') throw new Error('權限不足');
     const { orderId, customerName, customerPhone, deliveryAddress, note,
-            items, paymentMethod, transferLastFive, paymentStatus } = payload;
+            items, paymentMethod, transferLastFive, paymentStatus, recipients } = payload;
     if (!orderId) throw new Error('缺少 orderId');
 
     const updateData: any = { updatedAt: new Date() };
@@ -140,23 +140,54 @@ export const GroupBuyService = {
       const totalAmount = items.reduce((sum: number, item: any) =>
         sum + (Number(item.unitPrice) * Number(item.qty)), 0);
       updateData.totalAmount = totalAmount;
-
-      // 刪舊明細再重建
-      await prisma.groupBuyOrderDetail.deleteMany({ where: { orderId } });
-      await prisma.groupBuyOrderDetail.createMany({
-        data: items.map((item: any) => ({
-          orderId,
-          productId: item.productId || '',
-          productName: item.productName || '',
-          unitPrice: Number(item.unitPrice) || 0,
-          qty: Number(item.qty) || 0,
-          subtotal: Number(item.unitPrice) * Number(item.qty),
-          remark: item.remark || ''
-        }))
-      });
     }
 
-    await prisma.groupBuyOrder.update({ where: { orderId }, data: updateData });
+    await prisma.$transaction(async (tx) => {
+      // 1. 更新主訂單
+      await tx.groupBuyOrder.update({ where: { orderId }, data: updateData });
+
+      // 2. 如果有更新商品明細，刪舊重建
+      if (Array.isArray(items) && items.length > 0) {
+        await tx.groupBuyOrderDetail.deleteMany({ where: { orderId } });
+        await tx.groupBuyOrderDetail.createMany({
+          data: items.map((item: any) => ({
+            orderId,
+            productId: item.productId || '',
+            productName: item.productName || '',
+            unitPrice: Number(item.unitPrice) || 0,
+            qty: Number(item.qty) || 0,
+            subtotal: Number(item.unitPrice) * Number(item.qty),
+            remark: item.remark || ''
+          }))
+        });
+      }
+
+      // 3. 如果有更新團員分配明細，刪舊重建
+      if (recipients !== undefined) {
+        await tx.groupBuyOrderRecipient.deleteMany({ where: { orderId } });
+
+        if (Array.isArray(recipients) && recipients.length > 0) {
+          for (const r of recipients) {
+            await tx.groupBuyOrderRecipient.create({
+              data: {
+                orderId,
+                recipientName: r.recipientName,
+                note: r.note || '',
+                items: {
+                  create: (r.items || []).map((ri: any) => ({
+                    productId: ri.productId,
+                    productName: ri.productName,
+                    qty: Number(ri.qty) || 0,
+                    price: Math.round(Number(ri.price)) || 0
+                  }))
+                }
+              }
+            });
+          }
+        }
+      }
+    });
+
     return { success: true };
   },
 

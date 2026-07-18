@@ -169,10 +169,14 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     };
 
     const handleOpenEdit = (order) => {
-        // 深拷貝 order 的 items，以免直接污染狀態
+        // 深拷貝 order 的 items 和 recipients，以免直接污染狀態
         setEditingOrder({
             ...order,
-            items: order.items.map(item => ({ ...item }))
+            items: order.items.map(item => ({ ...item })),
+            recipients: order.recipients ? order.recipients.map(r => ({
+                ...r,
+                items: r.items.map(ri => ({ ...ri }))
+            })) : []
         });
         setShowEditModal(true);
     };
@@ -182,6 +186,143 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             ...prev,
             [field]: value
         }));
+    };
+
+    // 💡 團員分配雙軌狀態同步邏輯
+    const syncRecipientsToItems = (newRecipients) => {
+        const productTotals = {};
+        
+        newRecipients.forEach(r => {
+            if (r.items) {
+                r.items.forEach(ri => {
+                    const pid = ri.productId;
+                    if (!productTotals[pid]) {
+                        productTotals[pid] = {
+                            productId: pid,
+                            productName: ri.productName,
+                            unitPrice: Number(ri.price),
+                            qty: 0,
+                            remark: ""
+                        };
+                    }
+                    productTotals[pid].qty += Number(ri.qty) || 0;
+                });
+            }
+        });
+
+        const newItems = Object.values(productTotals).map((item) => {
+            const subtotal = calculateItemSubtotal(item.productId, item.qty);
+            const prod = products.find(p => p.id === item.productId);
+            const displayPrice = prod ? (Number(prod.single_price) || Number(prod.price)) : item.unitPrice;
+            
+            return {
+                productId: item.productId,
+                productName: item.productName,
+                unitPrice: displayPrice,
+                qty: item.qty,
+                subtotal: subtotal,
+                remark: item.remark || ""
+            };
+        }).filter(it => it.qty > 0);
+
+        const newTotalAmount = newItems.reduce((sum, it) => sum + it.subtotal, 0);
+
+        return {
+            items: newItems,
+            totalAmount: newTotalAmount
+        };
+    };
+
+    const updateRecipientsState = (nextRecipients) => {
+        const { items, totalAmount } = syncRecipientsToItems(nextRecipients);
+        setEditingOrder(prev => ({
+            ...prev,
+            recipients: nextRecipients,
+            items,
+            totalAmount
+        }));
+    };
+
+    const handleRecipientQtyChange = (recipientId, productId, newQty) => {
+        const qty = Math.max(0, parseInt(newQty) || 0);
+        const nextRecipients = editingOrder.recipients.map(r => {
+            if (r.recipientId === recipientId) {
+                const nextItems = r.items.map(ri => {
+                    if (ri.productId === productId) {
+                        return { ...ri, qty };
+                    }
+                    return ri;
+                }).filter(ri => ri.qty > 0);
+                return { ...r, items: nextItems };
+            }
+            return r;
+        });
+        updateRecipientsState(nextRecipients);
+    };
+
+    const handleRemoveRecipientItem = (recipientId, productId) => {
+        const nextRecipients = editingOrder.recipients.map(r => {
+            if (r.recipientId === recipientId) {
+                return {
+                    ...r,
+                    items: r.items.filter(ri => ri.productId !== productId)
+                };
+            }
+            return r;
+        });
+        updateRecipientsState(nextRecipients);
+    };
+
+    const handleRemoveRecipient = (recipientId) => {
+        const nextRecipients = editingOrder.recipients.filter(r => r.recipientId !== recipientId);
+        updateRecipientsState(nextRecipients);
+    };
+
+    const handleAddRecipientInModal = (name) => {
+        const trimmed = name?.trim();
+        if (!trimmed) return;
+        
+        if (editingOrder.recipients.some(r => r.recipientName === trimmed)) {
+            alert("該成員已在此訂單中");
+            return;
+        }
+
+        const newRecipient = {
+            recipientId: 'temp-' + Math.random().toString(36).substring(2, 9),
+            recipientName: trimmed,
+            note: "",
+            items: []
+        };
+
+        updateRecipientsState([...editingOrder.recipients, newRecipient]);
+    };
+
+    const handleAddRecipientItemInModal = (recipientId, productId) => {
+        const prod = products.find(p => p.id === productId);
+        if (!prod) return;
+
+        const nextRecipients = editingOrder.recipients.map(r => {
+            if (r.recipientId === recipientId) {
+                if (r.items.some(ri => ri.productId === productId)) {
+                    return r;
+                }
+                const newItem = {
+                    id: 'temp-item-' + Math.random().toString(36).substring(2, 9),
+                    recipientId,
+                    productId,
+                    productName: prod.name,
+                    qty: 1,
+                    price: prod.price
+                };
+                return {
+                    ...r,
+                    items: [...r.items, newItem]
+                };
+            }
+            return r;
+        });
+
+        updateRecipientsState(nextRecipients);
     };
 
     const calculateItemSubtotal = (productId, qty) => {
@@ -303,7 +444,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 items: editingOrder.items,
                 paymentMethod: editingOrder.paymentMethod,
                 transferLastFive: editingOrder.transferLastFive,
-                paymentStatus: editingOrder.paymentStatus
+                paymentStatus: editingOrder.paymentStatus,
+                recipients: editingOrder.recipients
             }, user.token);
 
             if (res && res.error) {
@@ -1310,107 +1452,239 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             </div>
 
                             {/* 商品細明修改 */}
-                            <div className="border-t border-[var(--border-primary)] pt-4">
-                                <div className="flex justify-between items-center mb-3">
-                                    <span className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-                                        <Package size={16} className="text-blue-500" />
-                                        訂單品項與數量
-                                    </span>
-
-                                    {/* 新增商品選單 */}
-                                    <div className="flex gap-1.5 items-center">
-                                        <select
-                                            id="add-item-select"
-                                            className="input-field text-xs py-1.5 px-2 bg-[var(--bg-tertiary)] border-[var(--border-primary)] rounded-lg max-w-[180px]"
-                                            defaultValue=""
-                                            onChange={(e) => {
-                                                if (e.target.value) {
-                                                    handleAddItem(e.target.value);
-                                                    e.target.value = ""; // 重設選單
-                                                }
-                                            }}
-                                        >
-                                            <option value="" disabled>-- 新增商品到訂單 --</option>
-                                            {products.map(p => (
-                                                <option key={p.id} value={p.id}>
-                                                    {p.name} (${p.price})
-                                                </option>
-                                            ))}
-                                        </select>
+                            {editingOrder.recipients && editingOrder.recipients.length > 0 ? (
+                                <div className="border-t border-[var(--border-primary)] pt-4 space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                                            <Users size={16} className="text-blue-500" />
+                                            👥 團購成員與代訂分配修改
+                                        </span>
+                                        {/* 新增團員 */}
+                                        <div className="flex items-center gap-1.5">
+                                            <input
+                                                type="text"
+                                                id="new-modal-recipient-name"
+                                                placeholder="輸入成員姓名"
+                                                className="input-field text-xs py-1.5 px-2 max-w-[120px]"
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") {
+                                                        e.preventDefault();
+                                                        handleAddRecipientInModal(e.target.value);
+                                                        e.target.value = "";
+                                                    }
+                                                }}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const input = document.getElementById("new-modal-recipient-name");
+                                                    if (input && input.value) {
+                                                        handleAddRecipientInModal(input.value);
+                                                        input.value = "";
+                                                    }
+                                                }}
+                                                className="btn-primary text-xs py-1.5 px-2 bg-blue-600 hover:bg-blue-700 border-none rounded-lg"
+                                            >
+                                                ➕ 新增團員
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
 
-                                <div className="divide-y divide-[var(--border-primary)] bg-[var(--bg-tertiary)] rounded-xl border border-[var(--border-primary)] overflow-hidden">
-                                    {editingOrder.items.length === 0 ? (
-                                        <div className="p-4 text-center text-xs text-[var(--text-secondary)]">訂單目前沒有任何商品</div>
-                                    ) : (
-                                        editingOrder.items.map((item, idx) => (
-                                            <div key={idx} className="flex justify-between items-center p-3 text-sm hover:bg-[var(--bg-hover)]">
-                                                <div className="flex-1 mr-4">
-                                                    <div className="font-bold text-[var(--text-primary)]">{item.productName}</div>
-                                                    <div className="text-[10px] text-[var(--text-tertiary)] font-semibold mt-0.5">單價: ${item.unitPrice}</div>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="商品規格口味備註"
-                                                        className="input-field text-xs p-1 w-full mt-1.5 border-dashed"
-                                                        value={item.remark || ''}
-                                                        onChange={(e) => {
-                                                            const val = e.target.value;
-                                                            setEditingOrder(prev => ({
-                                                                ...prev,
-                                                                items: prev.items.map((it, i) => i === idx ? { ...it, remark: val } : it)
-                                                            }));
-                                                        }}
-                                                    />
-                                                </div>
-
-                                                <div className="flex items-center gap-4">
-                                                    {/* 數量調整 */}
-                                                    <div className="flex items-center gap-1 bg-[var(--bg-primary)] rounded-lg p-0.5 border border-[var(--border-primary)]">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleItemQtyChange(item.productId, item.qty - 1)}
-                                                            className="w-6 h-6 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-                                                        >
-                                                            <Minus size={12} />
-                                                        </button>
-                                                        <input
-                                                            type="number"
-                                                            className="w-10 text-center font-bold font-mono text-xs bg-transparent border-none focus:outline-none"
-                                                            value={item.qty}
-                                                            onChange={(e) => handleItemQtyChange(item.productId, e.target.value)}
-                                                            min="1"
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleItemQtyChange(item.productId, item.qty + 1)}
-                                                            className="w-6 h-6 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-                                                        >
-                                                            <Plus size={12} />
-                                                        </button>
+                                    <div className="space-y-4">
+                                        {editingOrder.recipients.map((r, rIdx) => {
+                                            const rTotal = r.items ? r.items.reduce((sum, ri) => sum + (ri.qty * ri.price), 0) : 0;
+                                            return (
+                                                <div key={r.recipientId || rIdx} className="bg-[var(--bg-tertiary)] rounded-xl border border-[var(--border-primary)] p-4 space-y-3">
+                                                    <div className="flex justify-between items-center border-b border-[var(--border-primary)] pb-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-extrabold text-[var(--text-primary)] text-sm">👤 {r.recipientName}</span>
+                                                            <span className="text-xs text-[var(--text-tertiary)] font-mono">(${rTotal} 元)</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            {/* 新增商品到此成員 */}
+                                                            <select
+                                                                className="input-field text-[11px] py-0.5 px-2 bg-[var(--bg-secondary)] border-[var(--border-primary)] rounded-md max-w-[150px]"
+                                                                defaultValue=""
+                                                                onChange={(e) => {
+                                                                    if (e.target.value) {
+                                                                        handleAddRecipientItemInModal(r.recipientId, e.target.value);
+                                                                        e.target.value = "";
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <option value="" disabled>+ 新增商品</option>
+                                                                {products.map(p => (
+                                                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                                                ))}
+                                                            </select>
+                                                            {/* 刪除此成員 */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveRecipient(r.recipientId)}
+                                                                className="text-red-500 hover:text-red-600 p-1 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-md"
+                                                                title="刪除此成員"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
                                                     </div>
 
-                                                    <span className="w-16 text-right font-mono font-bold text-[var(--text-primary)]">${item.subtotal}</span>
-
-                                                    {/* 刪除鈕 */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleRemoveItem(item.productId)}
-                                                        className="text-red-500 hover:text-red-600 p-1 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-md"
-                                                    >
-                                                        <Trash2 size={15} />
-                                                    </button>
+                                                    <div className="space-y-2.5">
+                                                        {(!r.items || r.items.length === 0) ? (
+                                                            <div className="text-[11px] text-[var(--text-tertiary)] italic pl-2">尚未分配任何商品</div>
+                                                        ) : (
+                                                            r.items.map((ri, riIdx) => (
+                                                                <div key={ri.id || riIdx} className="flex justify-between items-center pl-2 text-xs">
+                                                                    <span className="text-[var(--text-secondary)] font-medium">{ri.productName}</span>
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="flex items-center gap-0.5 bg-[var(--bg-primary)] rounded-md p-0.5 border border-[var(--border-primary)]">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleRecipientQtyChange(r.recipientId, ri.productId, ri.qty - 1)}
+                                                                                className="w-5 h-5 flex items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                                                                            >
+                                                                                <Minus size={10} />
+                                                                            </button>
+                                                                            <input
+                                                                                type="number"
+                                                                                className="w-7 text-center font-bold font-mono text-[11px] bg-transparent border-none focus:outline-none"
+                                                                                value={ri.qty}
+                                                                                onChange={(e) => handleRecipientQtyChange(r.recipientId, ri.productId, e.target.value)}
+                                                                                min="1"
+                                                                            />
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleRecipientQtyChange(r.recipientId, ri.productId, ri.qty + 1)}
+                                                                                className="w-5 h-5 flex items-center justify-center rounded text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                                                                            >
+                                                                                <Plus size={10} />
+                                                                            </button>
+                                                                        </div>
+                                                                        <span className="w-12 text-right font-mono text-[var(--text-secondary)]">${ri.qty * ri.price}</span>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleRemoveRecipientItem(r.recipientId, ri.productId)}
+                                                                            className="text-red-400 hover:text-red-500 p-0.5"
+                                                                        >
+                                                                            <X size={12} />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            ))
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))
-                                    )}
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="flex justify-between items-center p-3 bg-blue-50/50 dark:bg-blue-950/10 border border-blue-100 dark:border-blue-900/30 rounded-xl font-bold text-base">
+                                        <span className="text-[var(--text-primary)]">團購應付總額</span>
+                                        <span className="text-blue-600 font-mono">${editingOrder.totalAmount}</span>
+                                    </div>
                                 </div>
+                            ) : (
+                                <div className="border-t border-[var(--border-primary)] pt-4">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <span className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                                            <Package size={16} className="text-blue-500" />
+                                            訂單品項與數量
+                                        </span>
 
-                                <div className="flex justify-between items-center mt-4 p-3 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-xl font-bold text-lg">
-                                    <span className="text-[var(--text-primary)]">金額合計</span>
-                                    <span className="text-blue-600 font-mono">${editingOrder.totalAmount}</span>
+                                        {/* 新增商品選單 */}
+                                        <div className="flex gap-1.5 items-center">
+                                            <select
+                                                id="add-item-select"
+                                                className="input-field text-xs py-1.5 px-2 bg-[var(--bg-tertiary)] border-[var(--border-primary)] rounded-lg max-w-[180px]"
+                                                defaultValue=""
+                                                onChange={(e) => {
+                                                    if (e.target.value) {
+                                                        handleAddItem(e.target.value);
+                                                        e.target.value = ""; // 重設選單
+                                                    }
+                                                }}
+                                            >
+                                                <option value="" disabled>-- 新增商品到訂單 --</option>
+                                                {products.map(p => (
+                                                    <option key={p.id} value={p.id}>
+                                                        {p.name} (${p.price})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="divide-y divide-[var(--border-primary)] bg-[var(--bg-tertiary)] rounded-xl border border-[var(--border-primary)] overflow-hidden">
+                                        {editingOrder.items.length === 0 ? (
+                                            <div className="p-4 text-center text-xs text-[var(--text-secondary)]">訂單目前沒有任何商品</div>
+                                        ) : (
+                                            editingOrder.items.map((item, idx) => (
+                                                <div key={idx} className="flex justify-between items-center p-3 text-sm hover:bg-[var(--bg-hover)]">
+                                                    <div className="flex-1 mr-4">
+                                                        <div className="font-bold text-[var(--text-primary)]">{item.productName}</div>
+                                                        <div className="text-[10px] text-[var(--text-tertiary)] font-semibold mt-0.5">單價: ${item.unitPrice}</div>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="商品規格口味備註"
+                                                            className="input-field text-xs p-1 w-full mt-1.5 border-dashed"
+                                                            value={item.remark || ''}
+                                                            onChange={(e) => {
+                                                                    const val = e.target.value;
+                                                                    setEditingOrder(prev => ({
+                                                                        ...prev,
+                                                                        items: prev.items.map((it, i) => i === idx ? { ...it, remark: val } : it)
+                                                                    }));
+                                                                }}
+                                                        />
+                                                    </div>
+
+                                                    <div className="flex items-center gap-4">
+                                                        {/* 數量調整 */}
+                                                        <div className="flex items-center gap-1 bg-[var(--bg-primary)] rounded-lg p-0.5 border border-[var(--border-primary)]">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleItemQtyChange(item.productId, item.qty - 1)}
+                                                                className="w-6 h-6 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                                                            >
+                                                                <Minus size={12} />
+                                                            </button>
+                                                            <input
+                                                                type="number"
+                                                                className="w-10 text-center font-bold font-mono text-xs bg-transparent border-none focus:outline-none"
+                                                                value={item.qty}
+                                                                onChange={(e) => handleItemQtyChange(item.productId, e.target.value)}
+                                                                min="1"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleItemQtyChange(item.productId, item.qty + 1)}
+                                                                className="w-6 h-6 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                                                            >
+                                                                <Plus size={12} />
+                                                            </button>
+                                                        </div>
+
+                                                        <span className="w-16 text-right font-mono font-bold text-[var(--text-primary)]">${item.subtotal}</span>
+
+                                                        {/* 刪除鈕 */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveItem(item.productId)}
+                                                            className="text-red-500 hover:text-red-600 p-1 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-md"
+                                                        >
+                                                            <Trash2 size={15} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+
+                                    <div className="flex justify-between items-center mt-4 p-3 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-xl font-bold text-lg">
+                                        <span className="text-[var(--text-primary)]">金額合計</span>
+                                        <span className="text-blue-600 font-mono">${editingOrder.totalAmount}</span>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
 
                         {/* Footer */}
