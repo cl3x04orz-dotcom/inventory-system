@@ -149,6 +149,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [buildingSettings, setBuildingSettings] = useState([]);
   const [tick, setTick] = useState(0);
   const [successOrderTotal, setSuccessOrderTotal] = useState(0);
+  const [successOrderItems, setSuccessOrderItems] = useState([]);
+  const [successCartTotal, setSuccessCartTotal] = useState(0);
+  const [successShippingFee, setSuccessShippingFee] = useState(0);
+  const [successWalletDeduction, setSuccessWalletDeduction] = useState(0);
   const [isNightOrder, setIsNightOrder] = useState(false);
   const [isReorder, setIsReorder] = useState(false);
   const [isMsgSentAuto, setIsMsgSentAuto] = useState(false);
@@ -1315,6 +1319,11 @@ export default function LiffOrderPage({ user, apiUrl }) {
         }
       }
 
+      setSuccessOrderItems(cartItems);
+      setSuccessCartTotal(cartTotal);
+      setSuccessShippingFee(shippingFee);
+      setSuccessWalletDeduction(useWallet ? maxDeduction : 0);
+
       setCart({});
       setStep("success");
     } catch (err) {
@@ -1367,6 +1376,86 @@ export default function LiffOrderPage({ user, apiUrl }) {
               </div>
             ))}
           </div>
+
+          {/* 訂單明細 */}
+          {successOrderItems.length > 0 && (
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden text-sm">
+              <div className="px-4 py-2.5 border-b border-[var(--border-primary)] text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider bg-[var(--bg-tertiary)]/50">
+                訂購商品明細
+              </div>
+              <div className="divide-y divide-[var(--border-primary)]">
+                {successOrderItems.map((item) => (
+                  <div key={item.id} className="flex items-center gap-3 px-4 py-3">
+                    {/* 商品圖片 */}
+                    <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-primary)] overflow-hidden shrink-0 flex items-center justify-center">
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Package size={16} className="text-[var(--text-tertiary)]" />
+                      )}
+                    </div>
+
+                    {/* 名稱與備註 */}
+                    <div className="flex-1 min-w-0">
+                      <span className="font-semibold text-[var(--text-primary)] block truncate">
+                        {item.name}
+                      </span>
+                      {item.remark && (
+                        <span className="text-xs text-blue-600 block mt-0.5 truncate">
+                          {item.remark}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 數量與金額 */}
+                    <div className="text-right shrink-0">
+                      <span className="text-xs text-[var(--text-secondary)] mr-2 font-mono">
+                        x{item.qty}
+                      </span>
+                      <span className="font-mono font-bold text-[var(--text-primary)]">
+                        ${item.subtotal}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 費用計算 */}
+              <div className="bg-[var(--bg-tertiary)]/30 px-4 py-3 border-t border-[var(--border-primary)] space-y-1.5 text-xs text-[var(--text-secondary)]">
+                <div className="flex justify-between">
+                  <span>商品小計</span>
+                  <span className="font-mono">${successCartTotal}</span>
+                </div>
+                {successShippingFee > 0 ? (
+                  <div className="flex justify-between">
+                    <span>運費</span>
+                    <span className="font-mono">+${successShippingFee}</span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between text-emerald-600 font-medium">
+                    <span>運費</span>
+                    <span>免運</span>
+                  </div>
+                )}
+                {successWalletDeduction > 0 && (
+                  <div className="flex justify-between text-rose-500 font-medium">
+                    <span>奶包金折抵</span>
+                    <span className="font-mono">-${successWalletDeduction}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center text-sm font-bold text-[var(--text-primary)] pt-1.5 border-t border-[var(--border-primary)]/60">
+                  <span>合計金額</span>
+                  <span className="font-mono text-base font-extrabold text-blue-600">
+                    ${successOrderTotal}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
 
 
@@ -1481,6 +1570,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 setTransferLastFive("");
                 setIsNightOrder(false);
                 setIsMsgSentAuto(false);
+                setSuccessOrderItems([]);
+                setSuccessCartTotal(0);
+                setSuccessShippingFee(0);
+                setSuccessWalletDeduction(0);
               }}
               className="w-full py-3 rounded-xl font-bold btn-secondary flex-shrink-0"
             >
@@ -1557,19 +1650,19 @@ export default function LiffOrderPage({ user, apiUrl }) {
                       const product = products.find(p => p.id === item.id);
                       if (!product) return null;
                       return (
-                        <div className="flex items-center gap-1 select-none">
+                        <div className="flex items-center bg-[var(--bg-tertiary)] rounded-xl p-0.5 border border-[var(--border-primary)] shadow-sm select-none">
                           <button
                             onClick={() => handleProductAction(product, false)}
-                            className="w-7 h-7 flex items-center justify-center rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-100 active:scale-90"
+                            className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-all duration-100 active:scale-90"
                           >
                             <Minus size={12} />
                           </button>
-                          <span className="w-7 text-center font-bold font-mono text-sm text-[var(--text-primary)]">
+                          <span className="w-8 text-center font-extrabold font-mono text-sm text-[var(--text-primary)]">
                             {item.qty}
                           </span>
                           <button
                             onClick={() => handleProductAction(product, true)}
-                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-700 text-white hover:bg-slate-800 transition-all duration-100 active:scale-90"
+                            className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-all duration-100 active:scale-90"
                           >
                             <Plus size={12} />
                           </button>
