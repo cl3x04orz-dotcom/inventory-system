@@ -154,7 +154,9 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [successCartTotal, setSuccessCartTotal] = useState(0);
   const [successShippingFee, setSuccessShippingFee] = useState(0);
   const [successWalletDeduction, setSuccessWalletDeduction] = useState(0);
-  const [isDetailExpanded, setIsDetailExpanded] = useState(false);
+  const [successDeliveryDate, setSuccessDeliveryDate] = useState("");
+  const [successDeliveryTime, setSuccessDeliveryTime] = useState("");
+  const [isDetailExpanded, setIsDetailExpanded] = useState(true);
   const [isNightOrder, setIsNightOrder] = useState(false);
   const [isReorder, setIsReorder] = useState(false);
   const [isMsgSentAuto, setIsMsgSentAuto] = useState(false);
@@ -1325,6 +1327,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
       setSuccessCartTotal(cartTotal);
       setSuccessShippingFee(shippingFee);
       setSuccessWalletDeduction(useWallet ? maxDeduction : 0);
+      setSuccessDeliveryDate(activeCampaign?.DeliveryDate || "");
+      setSuccessDeliveryTime(
+        activeCampaign?.DeliveryStartTime && activeCampaign?.DeliveryEndTime
+          ? `${activeCampaign.DeliveryStartTime}~${activeCampaign.DeliveryEndTime}`
+          : ""
+      );
 
       setCart({});
       setStep("success");
@@ -1348,46 +1356,53 @@ export default function LiffOrderPage({ user, apiUrl }) {
   if (step === "success") {
     return (
       <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
-        <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-5 pb-10">
-          <div className="flex flex-col items-center text-center pt-6 pb-2">
-            <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-4 text-emerald-600">
-              <CheckCircle size={44} />
+        <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-6 pb-10">
+          {/* 成功 Header */}
+          <div className="flex flex-col items-center text-center pt-8 pb-4">
+            <div className="w-24 h-24 bg-emerald-100 dark:bg-emerald-950/40 rounded-full flex items-center justify-center mb-5 text-emerald-600 dark:text-emerald-400 shadow-md shadow-emerald-500/5 animate-bounce-subtle">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
             </div>
-            <h2 className="text-2xl font-bold text-[var(--text-primary)]">
-              感謝您的購買！
+            <h2 className="text-2xl font-black text-[var(--text-primary)] tracking-wide">
+              訂單成立
             </h2>
-            <p className="text-sm text-[var(--text-secondary)] mt-1">
-              我們已收到您的訂單，請耐心等候。
+            <p className="text-sm font-bold text-[var(--text-secondary)] mt-2">
+              感謝您的訂購！
+            </p>
+            <p className="text-xs text-[var(--text-tertiary)] mt-1.5 max-w-[280px] leading-relaxed">
+              我們已收到您的訂單，配送前將透過 LINE 通知您。
             </p>
           </div>
 
-          {/* 訂單資訊 */}
-          <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl divide-y divide-[var(--border-primary)] text-sm font-mono">
-            {[
-              { label: "訂單編號", value: orderId, bold: true },
-              { label: "完成時間", value: orderTime },
-              { label: "付款方式", value: paymentMethod },
-            ].map(({ label, value, bold }) => (
-              <div key={label} className="flex justify-between px-4 py-3">
-                <span className="text-[var(--text-secondary)]">{label}</span>
-                <span
-                  className={`text-[var(--text-primary)] ${bold ? "font-bold" : ""}`}
-                >
-                  {value}
-                </span>
-              </div>
-            ))}
+          {/* 📋 訂單資訊 Card */}
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl p-5 shadow-sm space-y-3.5 text-sm font-mono">
+            <div className="text-xs font-bold text-[var(--text-secondary)] font-sans flex items-center gap-1.5 mb-1.5">
+              📋 訂單資訊
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[var(--text-secondary)] font-medium font-sans">訂單編號</span>
+              <span className="font-bold text-[var(--text-primary)]">{orderId}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[var(--text-secondary)] font-medium font-sans">建立時間</span>
+              <span className="text-[var(--text-primary)]">{orderTime}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[var(--text-secondary)] font-medium font-sans">付款方式</span>
+              <span className="font-semibold text-[var(--text-primary)] font-sans">{paymentMethod}</span>
+            </div>
           </div>
 
-          {/* 訂單明細 */}
+          {/* 🛒 商品明細 Card */}
           {successOrderItems.length > 0 && (
-            <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden text-sm">
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden shadow-sm text-sm">
               <div 
                 onClick={() => setIsDetailExpanded(!isDetailExpanded)}
-                className="px-4 py-3.5 flex justify-between items-center cursor-pointer hover:bg-[var(--bg-hover)] transition-colors select-none"
+                className="px-5 py-4 flex justify-between items-center cursor-pointer hover:bg-[var(--bg-hover)] transition-colors select-none"
               >
-                <span className="font-bold text-[var(--text-primary)]">
-                  訂購商品明細 (共 {successOrderItems.reduce((sum, item) => sum + item.qty, 0)} 件)
+                <span className="font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                  🛒 商品明細 (共 {successOrderItems.reduce((sum, item) => sum + item.qty, 0)} 件)
                 </span>
                 <ChevronDown 
                   size={18} 
@@ -1397,7 +1412,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
               <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isDetailExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
                 <div className="divide-y divide-[var(--border-primary)] border-t border-[var(--border-primary)]">
                   {successOrderItems.map((item) => (
-                    <div key={item.id} className="flex items-center gap-3 px-4 py-3">
+                    <div key={item.id} className="flex items-center gap-3 px-5 py-3.5">
                       {/* 商品圖片 */}
                       <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-primary)] overflow-hidden shrink-0 flex items-center justify-center">
                         {item.imageUrl ? (
@@ -1435,164 +1450,177 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     </div>
                   ))}
                 </div>
-
-                {/* 費用計算 */}
-                <div className="bg-[var(--bg-tertiary)]/30 px-4 py-3 border-t border-[var(--border-primary)] space-y-1.5 text-xs text-[var(--text-secondary)]">
-                  <div className="flex justify-between">
-                    <span>商品小計</span>
-                    <span className="font-mono">${successCartTotal}</span>
-                  </div>
-                  {successShippingFee > 0 ? (
-                    <div className="flex justify-between">
-                      <span>運費</span>
-                      <span className="font-mono">+${successShippingFee}</span>
-                    </div>
-                  ) : (
-                    <div className="flex justify-between text-emerald-600 font-medium">
-                      <span>運費</span>
-                      <span>免運</span>
-                    </div>
-                  )}
-                  {successWalletDeduction > 0 && (
-                    <div className="flex justify-between text-rose-500 font-medium">
-                      <span>奶包金折抵</span>
-                      <span className="font-mono">-${successWalletDeduction}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center text-sm font-bold text-[var(--text-primary)] pt-1.5 border-t border-[var(--border-primary)]/60">
-                    <span>合計金額</span>
-                    <span className="font-mono text-base font-extrabold text-blue-600">
-                      ${successOrderTotal}
-                    </span>
-                  </div>
-                </div>
               </div>
             </div>
           )}
 
-
-
-          {/* 付款說明 */}
-          {paymentMethod === "現金" && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-              <p className="font-bold mb-1">現金注意事項</p>
-              <p>採現金支付，請自備零錢，現場不找零。</p>
+          {/* 💰 金額摘要 Card */}
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl p-5 shadow-sm space-y-3 text-sm">
+            <div className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1.5 mb-1">
+              💰 金額摘要
             </div>
-          )}
-          {paymentMethod === "轉帳" && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
-              <p className="font-bold text-sm text-blue-800">
-                請轉帳至以下帳戶
-              </p>
-              <div className="space-y-1.5 text-sm">
-                <div className="flex justify-between text-[var(--text-primary)]">
-                  <span className="text-[var(--text-secondary)]">銀行</span>
-                  <span className="font-semibold">{BANK_INFO.bank}</span>
-                </div>
-                <div className="flex justify-between items-center text-[var(--text-primary)]">
-                  <span className="text-[var(--text-secondary)]">帳號</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold tracking-wider">
-                      {BANK_INFO.account}
-                    </span>
-                    <button
-                      onClick={() => handleCopy(BANK_INFO.account)}
-                      className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-lg font-semibold"
-                    >
-                      {copied ? "已複製！" : "複製"}
-                    </button>
-                  </div>
-                </div>
-                <div className="flex justify-between text-[var(--text-primary)]">
-                  <span className="text-[var(--text-secondary)]">戶名</span>
-                  <span className="font-semibold">{BANK_INFO.name}</span>
-                </div>
-              </div>
+            <div className="flex justify-between text-[var(--text-secondary)] font-medium">
+              <span>商品金額</span>
+              <span className="font-mono">${successCartTotal}</span>
             </div>
-          )}
-
-
-          {/* 聯繫 LINE */}
-          <p className="text-center text-xs text-[var(--text-secondary)]">
-            若訂單有任何疑問，歡迎透過 LINE 與我們聯繫。
-          </p>
-          <div className="w-full flex flex-col gap-3">
-            {/* 1. 如果選擇 LINE Pay，一律提供付款按鈕 */}
-            {paymentMethod === "LINE Pay" && (
-              <div className="w-full">
-                <button
-                  onClick={() => window.open(LINE_PAY_URL, "_blank")}
-                  className="w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 text-white shadow-md shadow-emerald-500/20 hover:opacity-95 active:scale-95 transition-all flex-shrink-0"
-                  style={{ background: "#06C755" }}
-                >
-                  前往官方 LINE 付款 ➔
-                </button>
+            <div className="flex justify-between text-[var(--text-secondary)] font-medium">
+              <span>運費</span>
+              {successShippingFee > 0 ? (
+                <span className="font-mono">+${successShippingFee}</span>
+              ) : (
+                <span className="text-emerald-600 font-semibold">免運</span>
+              )}
+            </div>
+            {successWalletDeduction > 0 && (
+              <div className="flex justify-between text-rose-500 font-medium">
+                <span>折扣 (奶包金折抵)</span>
+                <span className="font-mono">-${successWalletDeduction}</span>
               </div>
             )}
+            <div className="pt-3 border-t border-[var(--border-primary)] flex justify-between items-center font-bold text-[var(--text-primary)]">
+              <span className="text-base">合計</span>
+              <span className="font-mono text-xl font-extrabold text-blue-600">${successOrderTotal}</span>
+            </div>
+          </div>
 
-            {/* 2. 一般散客：顯示明細發送狀態（已自動發送或引導手動發送） */}
-            {(isGeneralUser || !selectedBuilding || selectedBuilding === "其它") && (
-              <div className="w-full">
-                {isMsgSentAuto ? (
+          {/* 📢 配送提醒 Card */}
+          <div className="bg-amber-50/55 border border-amber-200/85 rounded-2xl p-5 shadow-sm space-y-3 text-xs text-amber-900">
+            <div className="font-extrabold text-sm flex items-center gap-1.5 text-amber-800">
+              📢 配送注意事項
+            </div>
+            <div className="space-y-2 font-medium text-amber-800/90">
+              {paymentMethod === "現金" && (
+                <div className="flex items-start gap-2">
+                  <span className="text-amber-500 mt-0.5">✓</span>
+                  <span>採現金支付，<strong>請自備零錢</strong>，現場恕不找零。</span>
+                </div>
+              )}
+              {paymentMethod === "轉帳" && (
+                <div className="bg-white/80 border border-blue-100 rounded-xl p-3.5 space-y-2.5 text-xs text-blue-900 mb-2 font-sans">
+                  <p className="font-bold text-blue-800 flex items-center gap-1">🏦 請轉帳至以下帳戶</p>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between">
+                      <span className="text-blue-700/80">銀行</span>
+                      <span className="font-semibold text-blue-950">{BANK_INFO.bank}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-blue-700/80">帳號</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono font-bold tracking-wider text-blue-950">{BANK_INFO.account}</span>
+                        <button
+                          onClick={() => handleCopy(BANK_INFO.account)}
+                          className="text-[10px] bg-blue-100 hover:bg-blue-200 text-blue-600 px-2 py-0.5 rounded font-bold"
+                        >
+                          {copied ? "已複製！" : "複製"}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-blue-700/80">戶名</span>
+                      <span className="font-semibold text-blue-950">{BANK_INFO.name}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="flex items-start gap-2">
+                <span className="text-amber-500 mt-0.5">✓</span>
+                <span>配送前一天將透過 LINE 訊息與您聯絡通知。</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-amber-500 mt-0.5">✓</span>
+                <span>如需修改訂購項目或地址，請直接聯絡 LINE 客服。</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 客服與行動引導按鈕 */}
+          <div className="w-full flex flex-col gap-3 pt-2">
+            {paymentMethod === "LINE Pay" && (
+              <button
+                onClick={() => window.open(LINE_PAY_URL, "_blank")}
+                className="w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 text-white shadow-md shadow-emerald-500/20 hover:opacity-95 active:scale-95 transition-all flex-shrink-0"
+                style={{ background: "#06C755" }}
+              >
+                前往官方 LINE 付款 ➔
+              </button>
+            )}
+
+            {/* 聯繫客服按鈕 */}
+            {(() => {
+              const isGeneral = isGeneralUser || !selectedBuilding || selectedBuilding === "其它";
+              const actionUrl = isGeneral ? getOaMessageUrl() : LINE_CONTACT_URL;
+              const isMsgSent = isGeneral && isMsgSentAuto;
+
+              if (isMsgSent) {
+                return (
                   <div className="w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 text-emerald-600 bg-emerald-50 border border-emerald-200 text-sm select-none">
                     <CheckCircle size={18} />
                     訂單明細已自動發送給客服
                   </div>
-                ) : (
-                  <button
-                    onClick={() => window.open(getOaMessageUrl(), "_blank")}
-                    className="w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 text-white shadow-md shadow-emerald-500/20 hover:opacity-95 active:scale-95 transition-all flex-shrink-0"
-                    style={{ background: "#06C755" }}
-                  >
-                    {/* LINE icon */}
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                      <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
-                    </svg>
-                    傳送訂單明細至官方 LINE
-                  </button>
-                )}
-              </div>
-            )}
+                );
+              }
 
-            {/* 3. 大樓用戶且為現金/轉帳：顯示一般的 LINE 客服按鈕 */}
-            {!(isGeneralUser || !selectedBuilding || selectedBuilding === "其它") && paymentMethod !== "LINE Pay" && (
-              <div className="w-full">
+              return (
                 <button
-                  onClick={() => window.open(LINE_CONTACT_URL, "_blank")}
-                  className="w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 text-white flex-shrink-0 active:scale-95 transition-all"
-                  style={{ background: "#06C755" }}
+                  onClick={() => window.open(actionUrl, "_blank")}
+                  className="w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-sm active:scale-95 transition-all flex-shrink-0"
                 >
-                  {/* LINE icon */}
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                    <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
-                  </svg>
-                  前往官方 LINE 客服
+                  <span className="text-sm flex items-center gap-1.5">
+                    💬 有問題？立即聯絡 LINE 客服
+                  </span>
                 </button>
-              </div>
-            )}
-          </div>
-          <div className="w-full">
-            <button
-              onClick={() => {
-                setStep("shop");
-                setCustomerName("");
-                setCustomerPhone("");
-                setDeliveryAddress("");
-                setNote("");
-                setPaymentMethod("現金");
-                setTransferLastFive("");
-                setIsNightOrder(false);
-                setIsMsgSentAuto(false);
-                setSuccessOrderItems([]);
-                setSuccessCartTotal(0);
-                setSuccessShippingFee(0);
-                setSuccessWalletDeduction(0);
-                setIsDetailExpanded(false);
-              }}
-              className="w-full py-3 rounded-xl font-bold btn-secondary flex-shrink-0"
-            >
-              繼續購物
-            </button>
+              );
+            })()}
+
+            {/* 下方行動按鈕組 */}
+            <div className="grid grid-cols-2 gap-3 w-full">
+              <button
+                onClick={() => {
+                  setStep("shop");
+                  setCustomerName("");
+                  setCustomerPhone("");
+                  setDeliveryAddress("");
+                  setNote("");
+                  setPaymentMethod("現金");
+                  setTransferLastFive("");
+                  setIsNightOrder(false);
+                  setIsMsgSentAuto(false);
+                  setSuccessOrderItems([]);
+                  setSuccessCartTotal(0);
+                  setSuccessShippingFee(0);
+                  setSuccessWalletDeduction(0);
+                  setSuccessDeliveryDate("");
+                  setSuccessDeliveryTime("");
+                  setIsDetailExpanded(true);
+                }}
+                className="py-3 rounded-xl font-bold text-sm bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/10 active:scale-95 transition-all"
+              >
+                🛍 再次購買
+              </button>
+              <button
+                onClick={() => {
+                  setStep("shop");
+                  setCustomerName("");
+                  setCustomerPhone("");
+                  setDeliveryAddress("");
+                  setNote("");
+                  setPaymentMethod("現金");
+                  setTransferLastFive("");
+                  setIsNightOrder(false);
+                  setIsMsgSentAuto(false);
+                  setSuccessOrderItems([]);
+                  setSuccessCartTotal(0);
+                  setSuccessShippingFee(0);
+                  setSuccessWalletDeduction(0);
+                  setSuccessDeliveryDate("");
+                  setSuccessDeliveryTime("");
+                  setIsDetailExpanded(true);
+                }}
+                className="py-3 rounded-xl font-bold text-sm btn-secondary active:scale-95 transition-all"
+              >
+                🏠 返回首頁
+              </button>
+            </div>
           </div>
         </div>
       </div>

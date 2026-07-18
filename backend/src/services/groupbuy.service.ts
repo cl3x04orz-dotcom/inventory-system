@@ -532,7 +532,10 @@ export const GroupBuyService = {
           CampaignName: activeCampaign.campaignName,
           ThemeColor: activeCampaign.themeColor || '',
           SystemAnnouncement: activeCampaign.systemAnnouncement || '',
-          GroupAnnouncement: activeCampaign.groupAnnouncement || ''
+          GroupAnnouncement: activeCampaign.groupAnnouncement || '',
+          DeliveryDate: activeCampaign.deliveryDate ? activeCampaign.deliveryDate.toISOString() : null,
+          DeliveryStartTime: activeCampaign.deliveryStartTime || '',
+          DeliveryEndTime: activeCampaign.deliveryEndTime || ''
         } : null,
         nextOpenTime: nextCampaign?.startTime || null,
         products,
