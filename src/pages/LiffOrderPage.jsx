@@ -130,7 +130,16 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   // ── 大樓群組綁定與管理員 State ──────────────────────────────
   const [groupBindings, setGroupBindings] = useState({});
-  const [selectedBuilding, setSelectedBuilding] = useState("一般用戶");
+  const [selectedBuilding, setSelectedBuilding] = useState(() => {
+    try {
+      const savedStr = localStorage.getItem("inventory_liff_order");
+      if (savedStr) {
+        const savedObj = JSON.parse(savedStr);
+        if (savedObj.building) return savedObj.building;
+      }
+    } catch (_) {}
+    return "一般用戶";
+  });
   const [otherBuildingText, setOtherBuildingText] = useState("");
   const [detailAddress, setDetailAddress] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -232,7 +241,16 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
       const cParam = getP("c");
       const urlGrp = getP("grp");
-      const buildingParam = (typeof overrideBuilding === 'string' ? overrideBuilding : '') || getP("building");
+      let buildingParam = (typeof overrideBuilding === 'string' ? overrideBuilding : '') || getP("building");
+      if (!buildingParam) {
+        try {
+          const savedStr = localStorage.getItem(LS_KEY);
+          if (savedStr) {
+            const savedObj = JSON.parse(savedStr);
+            if (savedObj.building) buildingParam = savedObj.building;
+          }
+        } catch (_) {}
+      }
 
       const initData = await callGAS(
         apiUrl,
@@ -642,6 +660,14 @@ export default function LiffOrderPage({ user, apiUrl }) {
       if (buildingParam) {
         setUrlBuilding(buildingParam);
         setSelectedBuilding(buildingParam);
+        try {
+          const savedStr = localStorage.getItem(LS_KEY);
+          let savedObj = savedStr ? JSON.parse(savedStr) : {};
+          savedObj.building = buildingParam;
+          localStorage.setItem(LS_KEY, JSON.stringify(savedObj));
+        } catch (e) {
+          console.error("Failed to save urlBuilding to localStorage:", e);
+        }
       }
       if (urlGrp) {
         setSourceGroup(urlGrp);
@@ -694,6 +720,18 @@ export default function LiffOrderPage({ user, apiUrl }) {
     if (sourceGroup && groupBindings[sourceGroup] && groupBindings[sourceGroup] !== "一般散客") {
       return groupBindings[sourceGroup];
     }
+    // 如果 URL 沒有，但 localStorage 有儲存社區大樓且非一般用戶/散客，也將其視為 lockedBuilding
+    try {
+      const savedStr = localStorage.getItem("inventory_liff_order");
+      if (savedStr) {
+        const savedObj = JSON.parse(savedStr);
+        const b = savedObj.building;
+        const isVirtual = ["線上下單", "一般散客", "一般用戶", "上線下單", "線上下單", "一般常態", "常態零售"].includes(b);
+        if (b && !isVirtual) {
+          return b;
+        }
+      }
+    } catch (_) {}
     return "";
   }, [urlBuilding, sourceGroup, groupBindings]);
 
