@@ -159,7 +159,7 @@ async function main() {
     }
 
     const thresholdVal = row['進位門檻'] ?? row['門檻'] ?? row.roundThreshold ?? row.RoundThreshold;
-    const roundThreshold = thresholdVal !== undefined && thresholdVal !== "" ? Number(thresholdVal) : 99;
+    const roundThreshold = thresholdVal !== undefined && thresholdVal !== "" && Number(thresholdVal) !== 99 ? Number(thresholdVal) : null;
 
     const autoSuppressVal = row['智慧抑制'] ?? row['智慧散貨抑制'] ?? row.autoSuppress ?? row.AutoSuppress;
     const autoSuppress = autoSuppressVal === true || autoSuppressVal === 'true' || autoSuppressVal === 'Y' || autoSuppressVal === '1';

@@ -36,7 +36,7 @@ model Product {
   volumePricingSettings Json?
   packSize              Int           @default(1)
   dispatchSteps         Json          @default("[]") // e.g. [28, 42, 70]
-  roundThreshold        Int           @default(99)
+  roundThreshold        Int?
   autoSuppress          Boolean       @default(false)
   maxSuggestion         Int           @default(0)
   isBundle              Boolean       @default(false)

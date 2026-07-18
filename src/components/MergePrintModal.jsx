@@ -207,7 +207,7 @@ export default function MergePrintModal({
                 productId: product.id,
                 packSize: Number(product.packSize || 1),
                 dispatchSteps: parsedSteps,
-                roundThreshold: (product.roundThreshold !== undefined && product.roundThreshold !== '' && product.roundThreshold !== null) ? Number(product.roundThreshold) : 99,
+                roundThreshold: (product.roundThreshold !== undefined && product.roundThreshold !== '' && product.roundThreshold !== null) ? Number(product.roundThreshold) : null,
                 autoSuppress: Boolean(product.autoSuppress),
                 maxSuggestion: Number(product.maxSuggestion || 0)
             }, user?.token);
@@ -254,7 +254,7 @@ export default function MergePrintModal({
                     productId: product.id,
                     packSize: Number(product.packSize || 1),
                     dispatchSteps: parsedSteps,
-                    roundThreshold: (product.roundThreshold !== undefined && product.roundThreshold !== '' && product.roundThreshold !== null) ? Number(product.roundThreshold) : 99,
+                    roundThreshold: (product.roundThreshold !== undefined && product.roundThreshold !== '' && product.roundThreshold !== null) ? Number(product.roundThreshold) : null,
                     autoSuppress: Boolean(product.autoSuppress),
                     maxSuggestion: Number(product.maxSuggestion || 0)
                 }, user?.token);

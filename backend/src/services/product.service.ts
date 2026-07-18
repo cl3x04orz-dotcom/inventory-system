@@ -89,7 +89,7 @@ export const ProductService = {
         price: Number(p.defaultPrice),
         packSize: Number(p.packSize || 1),
         dispatchSteps: p.dispatchSteps,
-        roundThreshold: Number(p.roundThreshold !== undefined ? p.roundThreshold : 99),
+        roundThreshold: p.roundThreshold !== null && p.roundThreshold !== undefined ? Number(p.roundThreshold) : null,
         autoSuppress: Boolean(p.autoSuppress),
         maxSuggestion: Number(p.maxSuggestion || 0),
         stock: stockInfo.stock,
@@ -179,7 +179,9 @@ export const ProductService = {
         volumePricingSettings: volume_pricing_settings !== undefined ? volume_pricing_settings : undefined,
         packSize: packSize !== undefined ? Number(packSize) : undefined,
         dispatchSteps: dispatchSteps !== undefined ? dispatchSteps : undefined,
-        roundThreshold: roundThreshold !== undefined ? Number(roundThreshold) : undefined,
+        roundThreshold: roundThreshold !== undefined
+          ? (roundThreshold === '' || roundThreshold === null || Number(roundThreshold) === 99 || isNaN(Number(roundThreshold)) ? null : Number(roundThreshold))
+          : undefined,
         autoSuppress: autoSuppress !== undefined ? Boolean(autoSuppress) : undefined,
         maxSuggestion: maxSuggestion !== undefined ? Number(maxSuggestion) : undefined,
         isBundle: isBundle !== undefined ? Boolean(isBundle) : undefined,

@@ -703,7 +703,7 @@ export const SalesService = {
       } else {
         const fullBoxes = Math.floor(target / packSize);
         const remainder = target % packSize;
-        if (remainder >= roundThreshold) {
+        if (roundThreshold !== null && roundThreshold !== undefined && remainder >= roundThreshold) {
           target = (fullBoxes + 1) * packSize;
         } else {
           target = (fullBoxes * packSize) + Math.ceil(remainder);
@@ -717,7 +717,7 @@ export const SalesService = {
 
       if (rawNeed <= 0) {
         needToPick = 0;
-      } else if (autoSuppress && rawNeed < roundThreshold && onTruck >= (packSize / 2)) {
+      } else if (autoSuppress && roundThreshold !== null && roundThreshold !== undefined && rawNeed < roundThreshold && onTruck >= (packSize / 2)) {
         // [智慧抑制] 雖有缺口但身上還有一半貨，且缺口小於門檻，建議不領
         needToPick = 0;
       } else {
@@ -727,7 +727,7 @@ export const SalesService = {
         } else {
           const pickFullBoxes = Math.floor(needToPick / packSize);
           const pickRemainder = needToPick % packSize;
-          if (pickRemainder >= roundThreshold) {
+          if (roundThreshold !== null && roundThreshold !== undefined && pickRemainder >= roundThreshold) {
             needToPick = (pickFullBoxes + 1) * packSize;
           } else {
             needToPick = (pickFullBoxes * packSize) + Math.ceil(pickRemainder);

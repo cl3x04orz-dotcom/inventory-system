@@ -120,7 +120,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 
                 packSize: Number(mergedProduct.packSize || 1),
                 dispatchSteps: parsedSteps,
-                roundThreshold: Number(mergedProduct.roundThreshold !== undefined ? mergedProduct.roundThreshold : 99),
+                roundThreshold: (mergedProduct.roundThreshold !== undefined && mergedProduct.roundThreshold !== '' && mergedProduct.roundThreshold !== null) ? Number(mergedProduct.roundThreshold) : null,
                 autoSuppress: Boolean(mergedProduct.autoSuppress),
                 maxSuggestion: Number(mergedProduct.maxSuggestion || 0)
             }, user.token);
@@ -556,9 +556,9 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                     type="number"
                                                                     className="input-field text-xs p-2 text-center"
                                                                     placeholder="例：5"
-                                                                    value={product.roundThreshold === '' || product.roundThreshold === undefined || product.roundThreshold === null || product.roundThreshold === 99 ? '' : product.roundThreshold}
+                                                                    value={product.roundThreshold === '' || product.roundThreshold === undefined || product.roundThreshold === null ? '' : product.roundThreshold}
                                                                     onChange={(e) => handleFieldChange(product.id, 'roundThreshold', e.target.value !== '' ? Number(e.target.value) : '')}
-                                                                    onBlur={(e) => handleSaveProduct(product.id, { roundThreshold: e.target.value !== '' ? Number(e.target.value) : 99 })}
+                                                                    onBlur={(e) => handleSaveProduct(product.id, { roundThreshold: e.target.value !== '' ? Number(e.target.value) : null })}
                                                                 />
                                                             </div>
                                                             <div className="flex flex-col gap-1">
