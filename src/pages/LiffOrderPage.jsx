@@ -3080,8 +3080,7 @@ ${freeNote(newFee, newMin)}
         <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-extrabold text-[var(--text-primary)]">👥 團購代訂模式 (V2)</span>
-              <span className="text-[9px] bg-blue-50 text-blue-600 px-1 py-0.2 rounded font-bold border border-blue-100">雙軌同步</span>
+              <span className="text-xs font-extrabold text-[var(--text-primary)]">👥 團購代訂模式</span>
             </div>
             <button
               onClick={() => {
