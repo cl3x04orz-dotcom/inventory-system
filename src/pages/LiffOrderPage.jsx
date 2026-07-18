@@ -540,10 +540,15 @@ export default function LiffOrderPage({ user, apiUrl }) {
               savedObj.phone = formattedPhone;
             } else if (savedObj.phone) setCustomerPhone(formatTaiwanPhone(savedObj.phone));
             
-            if (mRes.member.Community) {
+            if (lockedBuilding) {
+              setSelectedBuilding(lockedBuilding);
+              savedObj.building = lockedBuilding;
+            } else if (mRes.member.Community) {
               setSelectedBuilding(mRes.member.Community);
               savedObj.building = mRes.member.Community;
-            } else if (savedObj.building) setSelectedBuilding(savedObj.building);
+            } else if (savedObj.building) {
+              setSelectedBuilding(savedObj.building);
+            }
             
             if (mRes.member.FloorRoom) {
               setDetailAddress(mRes.member.FloorRoom);
@@ -3088,7 +3093,7 @@ ${freeNote(newFee, newMin)}
       )}
 
       {/* 📍 外送地區設定彈窗 (AreaModal) */}
-      {showAreaModal && (
+      {showAreaModal && isGeneralUser && (
         <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-[var(--bg-secondary)] w-full max-w-[320px] rounded-2xl p-5 shadow-2xl border border-[var(--border-primary)] flex flex-col gap-4 animate-in zoom-in-95 duration-200">
             <div className="text-center">
