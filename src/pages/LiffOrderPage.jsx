@@ -1323,7 +1323,43 @@ export default function LiffOrderPage({ user, apiUrl }) {
         }
       }
 
-      setSuccessOrderItems(cartItems);
+      const itemsList = Object.entries(cart).map(([pid, qty]) => {
+        const p = products.find((x) => x.id === pid);
+        let subtotal = 0;
+        let displayPrice = p?.price ?? 0;
+
+        if (p) {
+          const singlePrice = Number(p.single_price) || Number(p.price);
+          if (p.has_volume_pricing && p.volume_pricing_settings) {
+            const targetQty = Number(p.volume_pricing_settings.target_quantity);
+            const packagePrice = Number(
+              p.volume_pricing_settings.package_price,
+            );
+
+            const groupCount = Math.floor(qty / targetQty);
+            const remainderCount = qty % targetQty;
+            subtotal = groupCount * packagePrice + remainderCount * singlePrice;
+          } else {
+            subtotal = singlePrice * qty;
+          }
+          displayPrice = qty > 0 ? subtotal / qty : singlePrice;
+        }
+
+        const remark = p?.has_flavor_attributes
+          ? getFlavorRemark(pid, flavorSelections)
+          : "";
+        return {
+          id: pid,
+          name: p?.name ?? pid,
+          price: displayPrice,
+          qty,
+          remark,
+          subtotal,
+          imageUrl: p?.imageUrl ?? "",
+        };
+      });
+
+      setSuccessOrderItems(itemsList);
       setSuccessCartTotal(cartTotal);
       setSuccessShippingFee(shippingFee);
       setSuccessWalletDeduction(useWallet ? maxDeduction : 0);
@@ -1593,7 +1629,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                   setSuccessDeliveryTime("");
                   setIsDetailExpanded(true);
                 }}
-                className="py-3 rounded-xl font-bold text-sm bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/10 active:scale-95 transition-all"
+                className="py-3 rounded-xl font-bold text-sm bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-100 active:scale-95 transition-all"
               >
                 🛍 再次購買
               </button>
