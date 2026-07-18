@@ -1568,7 +1568,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
       }
 
       text += `總計：${grandTotalQty} 件商品，共 $${grandTotalAmount} 元。\n`;
-      text += `(本文字由米立微系統自動產生，請團員確認無誤後向團長收款)`;
+      text += `(本文字由米立微系統自動產生，請團員確認無誤後向團長「收」款)`;
       return text;
     };
 
