@@ -113,6 +113,9 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const tabBarRef = useRef(null);
   const listRef = useRef(null);
   const sectionRefs = useRef({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const searchInputRef = useRef(null);
   const isManualScrollRef = useRef(false);
   const manualScrollTimeoutRef = useRef(null);
   // 記錄這次表單 Session 進入時的原始配送區域（用來比較所有區域變更警語）
@@ -819,17 +822,24 @@ export default function LiffOrderPage({ user, apiUrl }) {
     selectedBuilding === "一般常態" ||
     selectedBuilding === "常態零售";
 
+  // ── 搜尋過濾邏輯 ───────────────────────────────────────────────
+  const filteredProducts = useMemo(() => {
+    if (!searchQuery.trim()) return products;
+    const query = searchQuery.toLowerCase().trim();
+    return products.filter((p) => p.name.toLowerCase().includes(query));
+  }, [products, searchQuery]);
+
   // ── 分類邏輯 ─────────────────────────────────────────────────
   const categories = useMemo(() => {
-    const cats = products.map((p) => p.category?.trim() || "其他");
+    const cats = filteredProducts.map((p) => p.category?.trim() || "其他");
     const unique = [...new Set(cats)];
     const without = unique.filter((c) => c !== "其他");
     return [...without, ...(unique.includes("其他") ? ["其他"] : [])];
-  }, [products]);
+  }, [filteredProducts]);
 
   const groupedProducts = useMemo(() => {
     const map = {};
-    products.forEach((p) => {
+    filteredProducts.forEach((p) => {
       const cat = p.category?.trim() || "其他";
       if (!map[cat]) map[cat] = [];
       map[cat].push(p);
@@ -837,7 +847,24 @@ export default function LiffOrderPage({ user, apiUrl }) {
     return categories
       .map((cat) => ({ cat, items: map[cat] || [] }))
       .filter((g) => g.items.length > 0);
-  }, [products, categories]);
+  }, [filteredProducts, categories]);
+
+  // 當分類變更時，若當前分類已失效，自動指向第一個可用分類
+  useEffect(() => {
+    if (categories.length > 0 && !categories.includes(activeCategory)) {
+      setActiveCategory(categories[0]);
+    }
+  }, [categories, activeCategory]);
+
+  // 當展開搜尋欄時，自動聚焦到輸入框上
+  useEffect(() => {
+    if (isSearchExpanded && searchInputRef.current) {
+      const timer = setTimeout(() => {
+        searchInputRef.current.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isSearchExpanded]);
 
   const handleCategoryChange = (cat) => {
     setActiveCategory(cat);
@@ -3129,6 +3156,34 @@ ${freeNote(newFee, newMin)}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
+              onClick={() => {
+                const nextExpanded = !isSearchExpanded;
+                setIsSearchExpanded(nextExpanded);
+                if (!nextExpanded) {
+                  setSearchQuery("");
+                }
+              }}
+              className={`p-1.5 rounded-lg transition-colors duration-100 ${
+                isSearchExpanded
+                  ? "bg-blue-50 text-blue-600 dark:bg-blue-950/40"
+                  : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </button>
+            <button
               onClick={() => loadAllData()}
               className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             >
@@ -3278,6 +3333,61 @@ ${freeNote(newFee, newMin)}
           )}
         </div>
 
+        {/* 展開式搜尋欄位 */}
+        <div 
+          className={`overflow-hidden transition-all duration-300 ease-in-out ${
+            isSearchExpanded 
+              ? "max-h-[60px] opacity-100 py-2 border-t border-[var(--border-primary)]" 
+              : "max-h-0 opacity-0 py-0 border-t-0"
+          } px-4 bg-[var(--bg-secondary)]`}
+        >
+          <div className="relative flex items-center">
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="搜尋商品名稱..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 text-xs font-semibold rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all duration-150"
+            />
+            <div className="absolute left-3 text-[var(--text-tertiary)] flex items-center pointer-events-none">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </div>
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 p-1 rounded-full text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all"
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* 分類 Tab 列 */}
         {!loading && categories.length > 1 && (
           <div className="relative">
@@ -3326,6 +3436,10 @@ ${freeNote(newFee, newMin)}
             {products.length === 0 ? (
               <div className="text-center py-16 text-[var(--text-secondary)]">
                 目前沒有商品
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="text-center py-16 text-[var(--text-secondary)]">
+                找不到符合「{searchQuery}」的商品
               </div>
             ) : (
               groupedProducts.map(({ cat, items }) => (
