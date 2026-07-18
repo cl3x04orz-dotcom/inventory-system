@@ -2946,7 +2946,7 @@ ${freeNote(newFee, newMin)}
                       onClick={async () => {
                         setIsMemberLoading(true);
                         try {
-                          const res = await memberApi.reorder(apiUrl, { orderId: o.OrderId });
+                          const res = await memberApi.reorder(apiUrl, { orderId: o.OrderId, userId: lineUserId });
                           if (res && res.success) {
                             const newCart = {};
                             const newFlavorSelections = {};

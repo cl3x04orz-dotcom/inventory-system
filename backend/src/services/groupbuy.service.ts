@@ -753,36 +753,88 @@ export const GroupBuyService = {
     const { userId } = payload;
     if (!userId) throw new Error('缺少 userId');
 
+    // 1. 查找該 LINE 使用者在 Member 資料庫中的資料
+    const member = await prisma.member.findUnique({
+      where: { memberId: String(userId).trim() }
+    });
+
+    const conditions: any[] = [
+      { customerLineId: String(userId).trim() }
+    ];
+
+    if (member) {
+      const names = [member.receiverName, member.displayName].filter(Boolean) as string[];
+      if (names.length > 0) {
+        conditions.push({
+          recipients: {
+            some: {
+              recipientName: { in: names }
+            }
+          }
+        });
+      }
+    }
+
+    // 2. 獲取自己建立的訂單，或是自己是團員（收件人）被代訂的訂單
     const dbOrders = await prisma.groupBuyOrder.findMany({
-      where: { customerLineId: String(userId).trim() },
-      include: { details: true },
+      where: {
+        OR: conditions
+      },
+      include: {
+        details: true,
+        recipients: {
+          include: { items: true }
+        }
+      },
       orderBy: { createdAt: 'desc' }
     });
 
-    // 格式化輸出對齊 GAS 的大寫駝峰欄位名稱
+    // 3. 格式化輸出
     const orders = dbOrders.map((o: any) => {
-      // 解析備註跟後五碼的拆分（如果有的話，前端用以顯示）
-      const items = o.details.map((d: any) => ({
-        OrderId: o.orderId,
-        ProductId: d.productId,
-        ProductName: d.productName,
-        UnitPrice: Number(d.unitPrice),
-        Qty: Number(d.qty),
-        Subtotal: Number(d.subtotal)
-      }));
+      const isCreator = o.customerLineId === String(userId).trim();
+      
+      let items: any[] = [];
+      let totalAmount = Number(o.totalAmount);
+
+      if (isCreator) {
+        // 建立者（團長或自己下單的人）看到完整訂單
+        items = o.details.map((d: any) => ({
+          OrderId: o.orderId,
+          ProductId: d.productId,
+          ProductName: d.productName,
+          UnitPrice: Number(d.unitPrice),
+          Qty: Number(d.qty),
+          Subtotal: Number(d.subtotal)
+        }));
+      } else {
+        // 團員看到自己的代訂部分
+        const names = member ? [member.receiverName, member.displayName].filter(Boolean) as string[] : [];
+        const myRecipient = o.recipients?.find((r: any) => names.includes(r.recipientName));
+        if (myRecipient) {
+          items = (myRecipient.items || []).map((ri: any) => ({
+            OrderId: o.orderId,
+            ProductId: ri.productId,
+            ProductName: ri.productName,
+            UnitPrice: Number(ri.price),
+            Qty: Number(ri.qty),
+            Subtotal: Number(ri.price) * Number(ri.qty)
+          }));
+          totalAmount = items.reduce((sum, it) => sum + it.Subtotal, 0);
+        }
+      }
 
       return {
         OrderId: o.orderId,
-        OrderNo: o.orderId, // 使用 uuid / orderId 作為訂單序號
+        OrderNo: o.orderId,
         Status: o.status === 'PENDING' ? '未確認' : o.status === 'CONFIRMED' ? '已確認' : o.status === 'CANCELLED' ? '已取消' : o.status,
         DeliveryStatus: o.deliveryStatus || 'ORDER_RECEIVED',
         CustomerLineId: o.customerLineId,
-        CustomerName: o.customerName,
-        CustomerPhone: o.customerPhone,
+        CustomerName: isCreator ? o.customerName : (member?.receiverName || member?.displayName || o.customerName),
+        CustomerPhone: isCreator ? o.customerPhone : (member?.phone || o.customerPhone),
         DeliveryAddress: o.deliveryAddress,
         SourceGroup: o.sourceGroup,
         Note: o.note,
-        TotalAmount: Number(o.totalAmount),
+        TotalAmount: totalAmount,
         PaymentMethodSnapshot: o.paymentMethod,
         PaymentStatus: o.paymentStatus || '',
         Source: o.source,
@@ -798,23 +850,48 @@ export const GroupBuyService = {
 
   // 14. LIFF V1 重新下單 (取得舊單資訊)
   async v1_reorder(payload: any, user: any) {
-    const { orderId } = payload;
+    const { orderId, userId } = payload;
     if (!orderId) throw new Error('缺少 orderId');
 
     const o = await prisma.groupBuyOrder.findUnique({
       where: { orderId },
-      include: { details: true }
+      include: {
+        details: true,
+        recipients: {
+          include: { items: true }
+        }
+      }
     });
 
     if (!o) throw new Error('找不到該訂單');
 
-    const items = o.details.map((d: any) => ({
-      productId: d.productId,
-      productName: d.productName,
-      unitPrice: Number(d.unitPrice),
-      qty: Number(d.qty),
-      remark: d.remark || ''
-    }));
+    let items: any[] = [];
+    const isCreator = userId ? o.customerLineId === String(userId).trim() : true;
+
+    if (isCreator) {
+      items = o.details.map((d: any) => ({
+        productId: d.productId,
+        productName: d.productName,
+        unitPrice: Number(d.unitPrice),
+        qty: Number(d.qty),
+        remark: d.remark || ''
+      }));
+    } else {
+      const member = await prisma.member.findUnique({
+        where: { memberId: String(userId).trim() }
+      });
+      const names = member ? [member.receiverName, member.displayName].filter(Boolean) as string[] : [];
+      const myRecipient = o.recipients?.find((r: any) => names.includes(r.recipientName));
+      if (myRecipient) {
+        items = (myRecipient.items || []).map((ri: any) => ({
+          productId: ri.productId,
+          productName: ri.productName,
+          unitPrice: Number(ri.price),
+          qty: Number(ri.qty),
+          remark: ''
+        }));
+      }
+    }
 
     return {
       success: true,
