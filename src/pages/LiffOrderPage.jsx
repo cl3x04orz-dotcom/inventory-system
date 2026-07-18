@@ -12,6 +12,7 @@ import {
   ArrowRight,
   RefreshCw,
   ChevronLeft,
+  ChevronDown,
   CreditCard,
   Banknote,
   Smartphone,
@@ -153,6 +154,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [successCartTotal, setSuccessCartTotal] = useState(0);
   const [successShippingFee, setSuccessShippingFee] = useState(0);
   const [successWalletDeduction, setSuccessWalletDeduction] = useState(0);
+  const [isDetailExpanded, setIsDetailExpanded] = useState(false);
   const [isNightOrder, setIsNightOrder] = useState(false);
   const [isReorder, setIsReorder] = useState(false);
   const [isMsgSentAuto, setIsMsgSentAuto] = useState(false);
@@ -1380,78 +1382,89 @@ export default function LiffOrderPage({ user, apiUrl }) {
           {/* 訂單明細 */}
           {successOrderItems.length > 0 && (
             <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden text-sm">
-              <div className="px-4 py-2.5 border-b border-[var(--border-primary)] text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider bg-[var(--bg-tertiary)]/50">
-                訂購商品明細
+              <div 
+                onClick={() => setIsDetailExpanded(!isDetailExpanded)}
+                className="px-4 py-3.5 flex justify-between items-center cursor-pointer hover:bg-[var(--bg-hover)] transition-colors select-none"
+              >
+                <span className="font-bold text-[var(--text-primary)]">
+                  訂購商品明細 (共 {successOrderItems.reduce((sum, item) => sum + item.qty, 0)} 件)
+                </span>
+                <ChevronDown 
+                  size={18} 
+                  className={`text-[var(--text-secondary)] transition-transform duration-300 ${isDetailExpanded ? 'rotate-180' : ''}`} 
+                />
               </div>
-              <div className="divide-y divide-[var(--border-primary)]">
-                {successOrderItems.map((item) => (
-                  <div key={item.id} className="flex items-center gap-3 px-4 py-3">
-                    {/* 商品圖片 */}
-                    <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-primary)] overflow-hidden shrink-0 flex items-center justify-center">
-                      {item.imageUrl ? (
-                        <img
-                          src={item.imageUrl}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Package size={16} className="text-[var(--text-tertiary)]" />
-                      )}
-                    </div>
+              <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isDetailExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                <div className="divide-y divide-[var(--border-primary)] border-t border-[var(--border-primary)]">
+                  {successOrderItems.map((item) => (
+                    <div key={item.id} className="flex items-center gap-3 px-4 py-3">
+                      {/* 商品圖片 */}
+                      <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-primary)] overflow-hidden shrink-0 flex items-center justify-center">
+                        {item.imageUrl ? (
+                          <img
+                            src={item.imageUrl}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Package size={16} className="text-[var(--text-tertiary)]" />
+                        )}
+                      </div>
 
-                    {/* 名稱與備註 */}
-                    <div className="flex-1 min-w-0">
-                      <span className="font-semibold text-[var(--text-primary)] block truncate">
-                        {item.name}
-                      </span>
-                      {item.remark && (
-                        <span className="text-xs text-blue-600 block mt-0.5 truncate">
-                          {item.remark}
+                      {/* 名稱與備註 */}
+                      <div className="flex-1 min-w-0">
+                        <span className="font-semibold text-[var(--text-primary)] block truncate">
+                          {item.name}
                         </span>
-                      )}
-                    </div>
+                        {item.remark && (
+                          <span className="text-xs text-blue-600 block mt-0.5 truncate">
+                            {item.remark}
+                          </span>
+                        )}
+                      </div>
 
-                    {/* 數量與金額 */}
-                    <div className="text-right shrink-0">
-                      <span className="text-xs text-[var(--text-secondary)] mr-2 font-mono">
-                        x{item.qty}
-                      </span>
-                      <span className="font-mono font-bold text-[var(--text-primary)]">
-                        ${item.subtotal}
-                      </span>
+                      {/* 數量與金額 */}
+                      <div className="text-right shrink-0">
+                        <span className="text-xs text-[var(--text-secondary)] mr-2 font-mono">
+                          x{item.qty}
+                        </span>
+                        <span className="font-mono font-bold text-[var(--text-primary)]">
+                          ${item.subtotal}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* 費用計算 */}
-              <div className="bg-[var(--bg-tertiary)]/30 px-4 py-3 border-t border-[var(--border-primary)] space-y-1.5 text-xs text-[var(--text-secondary)]">
-                <div className="flex justify-between">
-                  <span>商品小計</span>
-                  <span className="font-mono">${successCartTotal}</span>
+                  ))}
                 </div>
-                {successShippingFee > 0 ? (
+
+                {/* 費用計算 */}
+                <div className="bg-[var(--bg-tertiary)]/30 px-4 py-3 border-t border-[var(--border-primary)] space-y-1.5 text-xs text-[var(--text-secondary)]">
                   <div className="flex justify-between">
-                    <span>運費</span>
-                    <span className="font-mono">+${successShippingFee}</span>
+                    <span>商品小計</span>
+                    <span className="font-mono">${successCartTotal}</span>
                   </div>
-                ) : (
-                  <div className="flex justify-between text-emerald-600 font-medium">
-                    <span>運費</span>
-                    <span>免運</span>
+                  {successShippingFee > 0 ? (
+                    <div className="flex justify-between">
+                      <span>運費</span>
+                      <span className="font-mono">+${successShippingFee}</span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between text-emerald-600 font-medium">
+                      <span>運費</span>
+                      <span>免運</span>
+                    </div>
+                  )}
+                  {successWalletDeduction > 0 && (
+                    <div className="flex justify-between text-rose-500 font-medium">
+                      <span>奶包金折抵</span>
+                      <span className="font-mono">-${successWalletDeduction}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center text-sm font-bold text-[var(--text-primary)] pt-1.5 border-t border-[var(--border-primary)]/60">
+                    <span>合計金額</span>
+                    <span className="font-mono text-base font-extrabold text-blue-600">
+                      ${successOrderTotal}
+                    </span>
                   </div>
-                )}
-                {successWalletDeduction > 0 && (
-                  <div className="flex justify-between text-rose-500 font-medium">
-                    <span>奶包金折抵</span>
-                    <span className="font-mono">-${successWalletDeduction}</span>
-                  </div>
-                )}
-                <div className="flex justify-between items-center text-sm font-bold text-[var(--text-primary)] pt-1.5 border-t border-[var(--border-primary)]/60">
-                  <span>合計金額</span>
-                  <span className="font-mono text-base font-extrabold text-blue-600">
-                    ${successOrderTotal}
-                  </span>
                 </div>
               </div>
             </div>
@@ -1574,6 +1587,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 setSuccessCartTotal(0);
                 setSuccessShippingFee(0);
                 setSuccessWalletDeduction(0);
+                setIsDetailExpanded(false);
               }}
               className="w-full py-3 rounded-xl font-bold btn-secondary flex-shrink-0"
             >
