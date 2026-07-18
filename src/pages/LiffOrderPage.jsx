@@ -77,6 +77,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const alert = (message, callback = null) => {
     setAlertModal({ show: true, message, callback });
   };
+  const [confirmModal, setConfirmModal] = useState({ show: false, message: '', onConfirm: null, onCancel: null });
 
   // ── 商品 state ───────────────────────────────────────────────
   const [products, setProducts] = useState([]);
@@ -90,6 +91,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const sectionRefs = useRef({});
   const isManualScrollRef = useRef(false);
   const manualScrollTimeoutRef = useRef(null);
+  // 記錄這次表單 Session 進入時的原始配送區域（用來比較所有區域變更警語）
+  const originalCommunityIdRef = useRef("");
 
   // ── 口味規格 state ─────────────────────────────────────────────
   const [flavorSelections, setFlavorSelections] = useState({}); // { [productId]: { [flavor]: qty } }
@@ -1150,6 +1153,9 @@ export default function LiffOrderPage({ user, apiUrl }) {
       if (!selectedCity && saved.city) setSelectedCity(saved.city);
       if (!selectedCommunityId && saved.communityId) setSelectedCommunityId(saved.communityId);
 
+      // 記錄這次 session 的原始配送區域（給 confirmModal 比較用）
+      originalCommunityIdRef.current = selectedCommunityId || saved.communityId || "";
+
     } catch (_) { }
     setStep("confirm");
   };
@@ -1779,6 +1785,65 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     value={selectedCommunityId}
                     onChange={(e) => {
                       const commId = e.target.value;
+
+                      // 如果「這次 session 的原始區域」存在，且這次選的不同 → 跳出運費警語
+                      if (originalCommunityIdRef.current && commId && commId !== originalCommunityIdRef.current) {
+                        const oldComm = allCommunities.find(c => c.CommunityId === originalCommunityIdRef.current);
+                        const newComm = allCommunities.find(c => c.CommunityId === commId);
+                        if (oldComm && newComm) {
+                          const oldFee = Number(oldComm.ShippingFee) || 0;
+                          const newFee = Number(newComm.ShippingFee) || 0;
+                          const oldMin = Number(oldComm.FreeShippingMin) || 0;
+                          const newMin = Number(newComm.FreeShippingMin) || 0;
+                          const feeText = (fee, min) => fee > 0 ? `$${fee}（滿$${min}免運）` : '免運';
+                          const freeNote = (fee, min) => {
+                            if (fee === 0) return '✅ 此區免運';
+                            if (min > 0 && cartTotal >= min) return `✅ 已達免運門檻（購物車 $${cartTotal} ≥ $${min}）`;
+                            if (min > 0) return `❌ 未達免運（差 $${min - cartTotal} 即免運）`;
+                            return '';
+                          };
+                          const applyChange = () => {
+                            originalCommunityIdRef.current = commId; // 更新基準區域
+                            setSelectedCommunityId(commId);
+                            // 智慧前綴帶入/替換邏輯
+                            const prefix = newComm.CommunityName;
+                            const currentAddr = detailAddress || "";
+                            if (!currentAddr.trim()) {
+                              setDetailAddress(prefix);
+                            } else {
+                              let replaced = false;
+                              for (const c of allCommunities) {
+                                if (currentAddr.startsWith(c.CommunityName)) {
+                                  const rest = currentAddr.substring(c.CommunityName.length);
+                                  setDetailAddress(prefix + rest);
+                                  replaced = true;
+                                  break;
+                                }
+                              }
+                              if (!replaced) setDetailAddress(prefix + currentAddr);
+                            }
+                          };
+                          setConfirmModal({
+                            show: true,
+                            message: `⚠️ 更改配送區域將影響運費
+
+原區域：${oldComm.CommunityName}
+運費：${feeText(oldFee, oldMin)}
+${freeNote(oldFee, oldMin)}
+
+新區域：${newComm.CommunityName}
+運費：${feeText(newFee, newMin)}
+${freeNote(newFee, newMin)}
+
+確定要變更嗎？`,
+                            onConfirm: applyChange,
+                            onCancel: null,
+                          });
+                          return; // 先不套用，等使用者確認
+                        }
+                      }
+
+                      // 首次選或相同區域直接套用
                       setSelectedCommunityId(commId);
                       
                       // 智慧前綴帶入/替換邏輯
@@ -2129,6 +2194,38 @@ export default function LiffOrderPage({ user, apiUrl }) {
             )}
           </button>
         </div>
+
+        {/* ⚠️ 配送區域變更確認 Dialog（form step 專用） */}
+        {confirmModal.show && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-[var(--bg-secondary)] w-full max-w-[300px] rounded-2xl p-5 shadow-2xl border border-[var(--border-primary)] flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+              <p className="text-sm font-bold text-[var(--text-primary)] leading-relaxed whitespace-pre-line text-center">
+                {confirmModal.message}
+              </p>
+              <div className="flex gap-2.5">
+                <button
+                  onClick={() => {
+                    setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null });
+                    if (confirmModal.onCancel) confirmModal.onCancel();
+                  }}
+                  className="flex-1 py-2.5 px-4 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs font-bold transition-all active:scale-95"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    const fn = confirmModal.onConfirm;
+                    setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null });
+                    if (fn) fn();
+                  }}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/15"
+                >
+                  確定變更
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -2954,6 +3051,38 @@ export default function LiffOrderPage({ user, apiUrl }) {
             >
               確定
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 確認 Dialog（有取消/確定雙按鈕）*/}
+      {confirmModal.show && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[var(--bg-secondary)] w-full max-w-[300px] rounded-2xl p-5 shadow-2xl border border-[var(--border-primary)] flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+            <p className="text-sm font-bold text-[var(--text-primary)] leading-relaxed whitespace-pre-line text-center">
+              {confirmModal.message}
+            </p>
+            <div className="flex gap-2.5">
+              <button
+                onClick={() => {
+                  setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null });
+                  if (confirmModal.onCancel) confirmModal.onCancel();
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs font-bold transition-all active:scale-95"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  const fn = confirmModal.onConfirm;
+                  setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null });
+                  if (fn) fn();
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/15"
+              >
+                確定變更
+              </button>
+            </div>
           </div>
         </div>
       )}
