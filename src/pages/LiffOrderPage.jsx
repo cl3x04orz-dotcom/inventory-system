@@ -1496,6 +1496,11 @@ export default function LiffOrderPage({ user, apiUrl }) {
   // 訂單確認頁
   // ════════════════════════════════════════════════════════════
   if (step === "confirm") {
+    if (cartItems.length === 0) {
+      setStep("shop");
+      return null;
+    }
+
     return (
       <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
         <div 
@@ -1548,9 +1553,29 @@ export default function LiffOrderPage({ user, apiUrl }) {
                   </div>
                   <div className="flex justify-between items-center mt-1 text-xs text-[var(--text-secondary)]">
                     <span>單價 ${item.price}</span>
-                    <span className="font-bold bg-[var(--bg-tertiary)] px-2 py-0.5 rounded border border-[var(--border-primary)]">
-                      × {item.qty}
-                    </span>
+                    {(() => {
+                      const product = products.find(p => p.id === item.id);
+                      if (!product) return null;
+                      return (
+                        <div className="flex items-center gap-1 select-none">
+                          <button
+                            onClick={() => handleProductAction(product, false)}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-100 active:scale-90"
+                          >
+                            <Minus size={12} />
+                          </button>
+                          <span className="w-7 text-center font-bold font-mono text-sm text-[var(--text-primary)]">
+                            {item.qty}
+                          </span>
+                          <button
+                            onClick={() => handleProductAction(product, true)}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-700 text-white hover:bg-slate-800 transition-all duration-100 active:scale-90"
+                          >
+                            <Plus size={12} />
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
                   {item.remark && (
                     <div className="text-xs text-blue-600 font-medium mt-1">
