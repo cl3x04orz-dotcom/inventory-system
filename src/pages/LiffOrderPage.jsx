@@ -1378,8 +1378,9 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
           {/* 📋 訂單資訊 Card */}
           <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl p-5 shadow-sm space-y-3.5 text-sm font-mono">
-            <div className="text-xs font-bold text-[var(--text-secondary)] font-sans flex items-center gap-1.5 mb-1.5">
-              📋 訂單資訊
+            <div className="text-xs font-bold text-[var(--text-secondary)] font-sans flex items-center gap-1.5 mb-1.5 justify-between">
+              <span>📋 訂單資訊</span>
+              <span className="text-rose-500 font-mono text-[10px]">明細數: {successOrderItems.length}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-[var(--text-secondary)] font-medium font-sans">訂單編號</span>
