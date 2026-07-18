@@ -84,6 +84,22 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState({});
+
+  // ── 團購 V2 狀態 ───────────────────────────────────────────────
+  const [isGroupOrder, setIsGroupOrder] = useState(false);
+  const [activeRecipient, setActiveRecipient] = useState("");
+  const [groupCart, setGroupCart] = useState({});
+  const [commonRecipients, setCommonRecipients] = useState(() => {
+    try {
+      const saved = localStorage.getItem("mlw_common_recipients");
+      return saved ? JSON.parse(saved) : ["王小明", "李小華", "張小姐"];
+    } catch (_) {
+      return ["王小明", "李小華", "張小姐"];
+    }
+  });
+  const [showAddRecipientModal, setShowAddRecipientModal] = useState(false);
+  const [newRecipientName, setNewRecipientName] = useState("");
+
   const [activeCategory, setActiveCategory] = useState("");
   const [sourceGroup, setSourceGroup] = useState("");
   const [animatingProductId, setAnimatingProductId] = useState(null);
@@ -243,21 +259,6 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [showAreaModal, setShowAreaModal] = useState(false);
   const [activeCampaign, setActiveCampaign] = useState(null);
   const [nextOpenTime, setNextOpenTime] = useState(null);
-
-  // ── 團購 V2 狀態 ───────────────────────────────────────────────
-  const [isGroupOrder, setIsGroupOrder] = useState(false);
-  const [activeRecipient, setActiveRecipient] = useState("");
-  const [groupCart, setGroupCart] = useState({});
-  const [commonRecipients, setCommonRecipients] = useState(() => {
-    try {
-      const saved = localStorage.getItem("mlw_common_recipients");
-      return saved ? JSON.parse(saved) : ["王小明", "李小華", "張小姐"];
-    } catch (_) {
-      return ["王小明", "李小華", "張小姐"];
-    }
-  });
-  const [showAddRecipientModal, setShowAddRecipientModal] = useState(false);
-  const [newRecipientName, setNewRecipientName] = useState("");
 
   // ── 載入商品與初始化資料（單次 API，後端已過濾） ─────────────────────────────────────────
   const loadAllData = async (overrideBuilding = '') => {
