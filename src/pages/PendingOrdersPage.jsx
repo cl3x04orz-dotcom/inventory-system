@@ -1135,6 +1135,32 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                             <span className="text-[var(--text-primary)]">金額合計</span>
                                             <span className="text-blue-600 dark:text-blue-400 font-mono font-extrabold">${order.totalAmount}</span>
                                         </div>
+                                        {order.recipients && order.recipients.length > 0 && (
+                                            <div className="border-t border-[var(--border-primary)] mt-3.5 pt-3.5 space-y-2">
+                                                <div className="text-xs uppercase font-extrabold text-[var(--text-tertiary)] tracking-wider">👤 團員代訂分配明細</div>
+                                                <div className="space-y-2">
+                                                    {order.recipients.map((r, rIdx) => {
+                                                        const recipientTotal = r.items.reduce((sum, ri) => sum + (Number(ri.qty) * Number(ri.price)), 0);
+                                                        return (
+                                                            <div key={rIdx} className="bg-[var(--bg-secondary)] p-3 rounded-lg border border-[var(--border-primary)]">
+                                                                <div className="flex justify-between items-center text-sm font-bold text-[var(--text-primary)]">
+                                                                    <span>👤 {r.recipientName}</span>
+                                                                    <span className="text-blue-600 font-mono">${recipientTotal} 元</span>
+                                                                </div>
+                                                                <div className="pl-3 mt-1.5 space-y-0.5 text-xs text-[var(--text-secondary)]">
+                                                                    {r.items.map((ri, riIdx) => (
+                                                                        <div key={riIdx} className="flex justify-between items-center font-mono">
+                                                                            <span>{ri.productName} x{ri.qty}</span>
+                                                                            <span>${ri.qty * ri.price}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
