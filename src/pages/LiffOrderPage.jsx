@@ -2928,18 +2928,47 @@ ${freeNote(newFee, newMin)}
                     
                     <div className="mt-2 pt-2 border-t border-[var(--border-primary)]">
                       <div className="font-bold text-[var(--text-primary)] mb-2 flex justify-between">
-                        <span>訂單內容</span>
-                        <span className="text-blue-600">Total: ${o.TotalAmount}</span>
+                        <span>{o.recipients && o.recipients.length > 0 ? "訂單總明細" : "訂單內容"}</span>
+                        <span className="text-blue-600 font-mono font-bold">Total: ${o.TotalAmount}</span>
                       </div>
                       <div className="flex flex-col gap-1">
                         {o.items?.map((item, i) => (
-                          <div key={i} className="text-xs flex justify-between">
+                          <div key={i} className="text-xs flex justify-between text-[var(--text-secondary)]">
                             <span className="truncate flex-1">{item.ProductName} {item.Remark ? `(${item.Remark})` : ''}</span>
-                            <span className="flex-shrink-0 ml-2">x {item.Qty}</span>
+                            <span className="flex-shrink-0 ml-2 font-mono">x {item.Qty}</span>
                           </div>
                         ))}
                       </div>
                     </div>
+
+                    {o.recipients && o.recipients.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-dashed border-[var(--border-primary)]">
+                        <div className="font-bold text-[var(--text-primary)] text-xs mb-2">
+                          👥 團員訂購明細
+                        </div>
+                        <div className="space-y-2">
+                          {o.recipients.map((r, ri) => {
+                            const rTotal = (r.items || []).reduce((sum, item) => sum + (Number(item.price) * Number(item.qty)), 0);
+                            return (
+                              <div key={ri} className="bg-[var(--bg-tertiary)] p-2.5 rounded-xl border border-[var(--border-primary)]/50">
+                                <div className="font-bold text-xs text-[var(--text-primary)] mb-1.5 flex justify-between items-center">
+                                  <span>👤 {r.recipientName}</span>
+                                  <span className="text-blue-600 font-mono font-bold">${rTotal}</span>
+                                </div>
+                                <div className="space-y-1 pl-3.5 border-l-2 border-slate-200 dark:border-slate-700">
+                                  {(r.items || []).map((item, ii) => (
+                                    <div key={ii} className="flex justify-between text-[11px] text-[var(--text-secondary)]">
+                                      <span className="truncate flex-1">{item.productName}</span>
+                                      <span className="flex-shrink-0 ml-2 font-mono">x {item.qty}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="p-3 border-t border-[var(--border-primary)] bg-[var(--bg-tertiary)]">
                     <button 

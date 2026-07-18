@@ -898,13 +898,24 @@ export const GroupBuyService = {
         SourceGroup: o.sourceGroup,
         Note: o.note,
         TotalAmount: totalAmount,
+        PaymentMethod: o.paymentMethod,
         PaymentMethodSnapshot: o.paymentMethod,
         PaymentStatus: o.paymentStatus || '',
         Source: o.source,
         CreatedAt: o.createdAt,
         UpdatedAt: o.updatedAt,
         LineDisplayName: o.lineDisplayName,
-        items
+        items,
+        recipients: (o.recipients || []).map((r: any) => ({
+          recipientName: r.recipientName,
+          note: r.note || '',
+          items: (r.items || []).map((ri: any) => ({
+            productId: ri.productId,
+            productName: ri.productName,
+            qty: Number(ri.qty),
+            price: Number(ri.price)
+          }))
+        }))
       };
     });
 
