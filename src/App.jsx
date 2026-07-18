@@ -446,7 +446,7 @@ function AppContent() {
 
         switch (targetPage) {
             case 'liffOrder':
-                return user.username === 'guest' || user.role === 'BOSS' || perms.includes('sales_liff');
+                return true; // 點餐頁面所有人（包括一般員工或訪客）都可以存取
             case 'pendingOrders':
                 return perms.includes('sales_pending') || user.role === 'BOSS';
             case 'groupBuySettings':
