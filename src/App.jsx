@@ -311,13 +311,22 @@ function AppContent() {
             // 2. 判斷是否為 LIFF 頁面
             const params = new URLSearchParams(window.location.search);
             const isInLineBrowser = /Line/i.test(navigator.userAgent);
-            const isLiff = params.get('page') === 'liffOrder' ||
+            const hasLiffParams = params.get('page') === 'liffOrder' ||
                 params.has('building') ||
                 params.has('grp') ||
                 params.has('liff.state') ||
                 isInLineBrowser ||
                 window.location.pathname.includes('/order') ||
                 (window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === 'liffOrder');
+            
+            const isLiffCallback = params.has('code') && params.has('state');
+            const isLiff = hasLiffParams || isLiffCallback || safeSessionStorage.getItem('is_liff_context') === 'true';
+
+            if (isLiff) {
+                safeSessionStorage.setItem('is_liff_context', 'true');
+            } else {
+                safeSessionStorage.removeItem('is_liff_context');
+            }
 
             let isQuickLiff = false;
             if (isLiff) {
@@ -385,13 +394,16 @@ function AppContent() {
 
         const params = new URLSearchParams(window.location.search);
         const isInLineBrowser = /Line/i.test(navigator.userAgent);
-        const isLiff = params.get('page') === 'liffOrder' ||
+        const hasLiffParams = params.get('page') === 'liffOrder' ||
             params.has('building') ||
             params.has('grp') ||
             params.has('liff.state') ||
             isInLineBrowser ||
             window.location.pathname.includes('/order') ||
             (window.GAS_PARAMETERS && window.GAS_PARAMETERS.page === 'liffOrder');
+        
+        const isLiffCallback = params.has('code') && params.has('state');
+        const isLiff = hasLiffParams || isLiffCallback || safeSessionStorage.getItem('is_liff_context') === 'true';
 
         if (isLiff && !user) {
             const autoLogin = async () => {
