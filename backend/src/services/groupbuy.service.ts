@@ -12,7 +12,7 @@ export const GroupBuyService = {
 
   // 1. 取得訂單列表（按狀態篩選）
   async getPendingOrders(payload: any, user: any) {
-    if (user.role !== 'BOSS') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { status } = payload || {};
 
     const where: any = {};
@@ -122,7 +122,7 @@ export const GroupBuyService = {
 
   // 3. 管理員修改訂單
   async updatePendingOrder(payload: any, user: any) {
-    if (user.role !== 'BOSS') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { orderId, customerName, customerPhone, deliveryAddress, note,
             items, paymentMethod, transferLastFive, paymentStatus, recipients } = payload;
     if (!orderId) throw new Error('缺少 orderId');
@@ -193,7 +193,7 @@ export const GroupBuyService = {
 
   // 4. 確認出貨：PENDING → CONFIRMED，並寫入正式銷售單
   async confirmPendingOrder(payload: any, user: any) {
-    if (user.role !== 'BOSS') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { orderId } = payload;
     if (!orderId) throw new Error('缺少 orderId');
 
@@ -269,7 +269,7 @@ export const GroupBuyService = {
 
   // 5. 刪除 PENDING 訂單
   async deletePendingOrder(payload: any, user: any) {
-    if (user.role !== 'BOSS') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { orderId } = payload;
     if (!orderId) throw new Error('缺少 orderId');
 
@@ -284,7 +284,7 @@ export const GroupBuyService = {
 
   // 5a. 批次確認出貨
   async batchConfirmPendingOrders(payload: any, user: any) {
-    if (user.role !== 'BOSS') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { orderIds } = payload;
     if (!orderIds || !Array.isArray(orderIds)) throw new Error('缺少 orderIds');
 
@@ -298,7 +298,7 @@ export const GroupBuyService = {
 
   // 5b. 批次確認收款
   async batchConfirmPayments(payload: any, user: any) {
-    if (user.role !== 'BOSS') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { orderIds } = payload;
     if (!orderIds || !Array.isArray(orderIds)) throw new Error('缺少 orderIds');
 
@@ -314,7 +314,7 @@ export const GroupBuyService = {
 
   // 5c. 批次刪除 pending 訂單
   async batchDeletePendingOrders(payload: any, user: any) {
-    if (user.role !== 'BOSS') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { orderIds } = payload;
     if (!orderIds || !Array.isArray(orderIds)) throw new Error('缺少 orderIds');
 
@@ -338,7 +338,7 @@ export const GroupBuyService = {
 
   // 6. 快速變更訂單狀態
   async updateOrderStatus(payload: any, user: any) {
-    if (user.role !== 'BOSS') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { orderId, status, paymentStatus } = payload;
     if (!orderId) throw new Error('缺少 orderId');
 
@@ -382,7 +382,7 @@ export const GroupBuyService = {
 
   // 8. 儲存/更新大樓設定
   async saveBuildingSettings(payload: any, user: any) {
-    if (user.role !== 'BOSS') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { building, start_time, end_time } = payload;
     if (!building) throw new Error('缺少大樓名稱');
 
@@ -421,7 +421,7 @@ export const GroupBuyService = {
 
   // 8b. 儲存社區運費設定
   async saveCommunityShipping(payload: any, user: any) {
-    if (user.role !== 'BOSS') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { building, default_free_shipping, free_shipping_min, shipping_fee } = payload;
     if (!building) throw new Error('缺少大樓名稱');
 
@@ -877,7 +877,7 @@ export const GroupBuyService = {
 
   // 17. 後台管理員獲取所有會員列表
   async admin_getMembers(payload: any, user: any) {
-    if (user.role !== 'BOSS') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
 
     const members = await prisma.member.findMany({
       orderBy: { createdAt: 'desc' },
@@ -921,7 +921,7 @@ export const GroupBuyService = {
 
   // 18. 後台管理員調整餘額/手動儲值
   async admin_adjustWallet(payload: any, user: any) {
-    if (user.role !== 'BOSS') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { memberId, amount, description } = payload;
     if (!memberId) throw new Error('缺少 memberId');
 
@@ -964,7 +964,7 @@ export const GroupBuyService = {
   },
 
   async saveSubscription(payload: any, user: any) {
-    if (user.role !== 'BOSS') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { subscriptionId, building, customerName, phone, productId, productName, quantity, frequency, paymentMethod, isActive, note } = payload;
     
     const freqStr = Array.isArray(frequency) ? JSON.stringify(frequency) : '[]';
@@ -996,7 +996,7 @@ export const GroupBuyService = {
   },
 
   async deleteSubscription(payload: any, user: any) {
-    if (user.role !== 'BOSS') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { subscriptionId } = payload;
     await prisma.subscription.delete({
       where: { subscriptionId }
@@ -1005,7 +1005,7 @@ export const GroupBuyService = {
   },
 
   async generateSubscriptionOrders(payload: any, user: any) {
-    if (user.role !== 'BOSS') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
 
     const { building, date } = payload;
     if (!building) throw new Error('請指定配送大樓');
@@ -1152,7 +1152,7 @@ export const GroupBuyService = {
 
   // 18. 新增/更新外送區域
   async saveCommunityArea(payload: any, user: any) {
-    if (user.role !== 'BOSS') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { communityId, communityName, defaultFreeShipping, freeShippingMin, shippingFee, status } = payload;
     if (!communityName) throw new Error('缺少區域名稱');
 
@@ -1190,7 +1190,7 @@ export const GroupBuyService = {
 
   // 19. 刪除外送區域 (軟刪除)
   async deleteCommunityArea(payload: any, user: any) {
-    if (user.role !== 'BOSS') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { communityId } = payload;
     if (!communityId) throw new Error('缺少區域 ID');
 
