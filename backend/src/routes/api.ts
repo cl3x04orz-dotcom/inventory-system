@@ -58,8 +58,8 @@ const actionPermissions: Record<string, string> = {
   admin_getMembers: 'sales_pending',
   admin_adjustWallet: 'sales_pending',
   getCommunities: 'sales_pending',
-  saveCommunityArea: 'system_config',
-  deleteCommunityArea: 'system_config',
+  saveCommunityArea: 'sales_pending',
+  deleteCommunityArea: 'sales_pending',
 
   getUsers: 'system_config',
   addUser: 'system_config',
