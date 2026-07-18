@@ -954,6 +954,52 @@ export default function LiffOrderPage({ user, apiUrl }) {
     }
   };
 
+  const handleSetQty = (pid, valStr) => {
+    let qty;
+    if (valStr === "") {
+      qty = "";
+    } else {
+      qty = parseInt(valStr, 10);
+      if (isNaN(qty)) qty = 0;
+      qty = Math.max(0, Math.min(99, qty));
+    }
+
+    setAnimatingProductId(pid);
+    setTimeout(() => {
+      setAnimatingProductId((prev) => (prev === pid ? null : prev));
+    }, 150);
+
+    if (isGroupOrder) {
+      if (!activeRecipient) {
+        alert("請先選擇或新增團員姓名！");
+        return;
+      }
+      setGroupCart((prev) => {
+        const recipientItems = prev[activeRecipient] || {};
+        const nextItems = { ...recipientItems };
+        if (qty === 0 || qty === "") {
+          delete nextItems[pid];
+        } else {
+          nextItems[pid] = qty;
+        }
+        return {
+          ...prev,
+          [activeRecipient]: nextItems,
+        };
+      });
+    } else {
+      setCart((prev) => {
+        const next = { ...prev };
+        if (qty === 0 || qty === "") {
+          delete next[pid];
+        } else {
+          next[pid] = qty;
+        }
+        return next;
+      });
+    }
+  };
+
   const handleProductAction = (product, isPlus) => {
     const statusInfo = getGroupBuyStatus();
     if (statusInfo.status === 'upcoming' || statusInfo.status === 'ended') {
@@ -986,9 +1032,21 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   const handleUpdateTempFlavorQty = (flavor, delta) => {
     setTempFlavorQty((prev) => {
-      const val = Math.max(0, (prev[flavor] || 0) + delta);
+      const val = Math.max(0, Math.min(99, (prev[flavor] || 0) + delta));
       return { ...prev, [flavor]: val };
     });
+  };
+
+  const handleSetTempFlavorQty = (flavor, valStr) => {
+    let val;
+    if (valStr === "") {
+      val = "";
+    } else {
+      val = parseInt(valStr, 10);
+      if (isNaN(val)) val = 0;
+      val = Math.max(0, Math.min(99, val));
+    }
+    setTempFlavorQty((prev) => ({ ...prev, [flavor]: val }));
   };
 
   const getFlavorRemark = (productId, pFlavorSelections) => {
@@ -1004,7 +1062,15 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const handleConfirmFlavors = () => {
     if (!flavorModalProduct) return;
     const pid = flavorModalProduct.id;
-    const total = Object.values(tempFlavorQty).reduce((a, b) => a + b, 0);
+
+    // 清理臨時口味數量，將空字串 "" 轉為 0，並限制上限為 99
+    const cleanedTempFlavorQty = {};
+    Object.entries(tempFlavorQty).forEach(([f, val]) => {
+      const parsed = parseInt(val, 10) || 0;
+      cleanedTempFlavorQty[f] = Math.max(0, Math.min(99, parsed));
+    });
+
+    const total = Object.values(cleanedTempFlavorQty).reduce((a, b) => a + b, 0);
 
     setAnimatingProductId(pid);
     setTimeout(() => {
@@ -1046,7 +1112,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
       if (total === 0) {
         delete next[pid];
       } else {
-        next[pid] = tempFlavorQty;
+        next[pid] = cleanedTempFlavorQty;
       }
       return next;
     });
@@ -1869,9 +1935,28 @@ export default function LiffOrderPage({ user, apiUrl }) {
                           >
                             <Minus size={12} />
                           </button>
-                          <span className="w-8 text-center font-extrabold font-mono text-sm text-[var(--text-primary)]">
-                            {item.qty}
-                          </span>
+                          {product.has_flavor_attributes ? (
+                            <span className="w-8 text-center font-extrabold font-mono text-sm text-[var(--text-primary)]">
+                              {item.qty}
+                            </span>
+                          ) : (
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              min="0"
+                              max="99"
+                              value={item.qty}
+                              onChange={(e) => handleSetQty(product.id, e.target.value)}
+                              onBlur={(e) => {
+                                if (e.target.value === "" || isNaN(parseInt(e.target.value, 10))) {
+                                  handleSetQty(product.id, 0);
+                                }
+                              }}
+                              onFocus={(e) => e.target.select()}
+                              className="w-8 text-center font-extrabold font-mono text-sm text-[var(--text-primary)] bg-transparent border-0 p-0 focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                          )}
                           <button
                             onClick={() => handleProductAction(product, true)}
                             className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-all duration-100 active:scale-90"
@@ -3347,9 +3432,28 @@ ${freeNote(newFee, newMin)}
                                       >
                                         <Minus size={13} />
                                       </button>
-                                      <span className="w-7 text-center font-bold font-mono text-sm">
-                                        {qty}
-                                      </span>
+                                      {product.has_flavor_attributes ? (
+                                        <span className="w-7 text-center font-bold font-mono text-sm">
+                                          {qty}
+                                        </span>
+                                      ) : (
+                                        <input
+                                          type="number"
+                                          inputMode="numeric"
+                                          pattern="[0-9]*"
+                                          min="0"
+                                          max="99"
+                                          value={qty}
+                                          onChange={(e) => handleSetQty(product.id, e.target.value)}
+                                          onBlur={(e) => {
+                                            if (e.target.value === "" || isNaN(parseInt(e.target.value, 10))) {
+                                              handleSetQty(product.id, 0);
+                                            }
+                                          }}
+                                          onFocus={(e) => e.target.select()}
+                                          className="w-7 text-center font-bold font-mono text-sm bg-transparent border-0 p-0 focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        />
+                                      )}
                                     </>
                                   )}
                                   <button
@@ -3555,9 +3659,22 @@ ${freeNote(newFee, newMin)}
                       >
                         <Minus size={12} />
                       </button>
-                      <span className="w-8 text-center font-bold font-mono text-sm">
-                        {count}
-                      </span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        min="0"
+                        max="99"
+                        value={count}
+                        onChange={(e) => handleSetTempFlavorQty(flavor, e.target.value)}
+                        onBlur={(e) => {
+                          if (e.target.value === "" || isNaN(parseInt(e.target.value, 10))) {
+                            handleSetTempFlavorQty(flavor, 0);
+                          }
+                        }}
+                        onFocus={(e) => e.target.select()}
+                        className="w-8 text-center font-bold font-mono text-sm bg-transparent border-0 p-0 focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
                       <button
                         type="button"
                         onClick={() => handleUpdateTempFlavorQty(flavor, 1)}
