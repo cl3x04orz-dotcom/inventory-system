@@ -1213,6 +1213,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   // ── 送出訂單 ─────────────────────────────────────────────────
   const handleSubmitOrder = async () => {
+    const successItemsSnap = [...cartItems];
     setIsSubmitting(true);
     try {
       // 儲存客戶資料到 LocalStorage（下次自動帶入）
@@ -1323,43 +1324,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
         }
       }
 
-      const itemsList = Object.entries(cart).map(([pid, qty]) => {
-        const p = products.find((x) => x.id === pid);
-        let subtotal = 0;
-        let displayPrice = p?.price ?? 0;
-
-        if (p) {
-          const singlePrice = Number(p.single_price) || Number(p.price);
-          if (p.has_volume_pricing && p.volume_pricing_settings) {
-            const targetQty = Number(p.volume_pricing_settings.target_quantity);
-            const packagePrice = Number(
-              p.volume_pricing_settings.package_price,
-            );
-
-            const groupCount = Math.floor(qty / targetQty);
-            const remainderCount = qty % targetQty;
-            subtotal = groupCount * packagePrice + remainderCount * singlePrice;
-          } else {
-            subtotal = singlePrice * qty;
-          }
-          displayPrice = qty > 0 ? subtotal / qty : singlePrice;
-        }
-
-        const remark = p?.has_flavor_attributes
-          ? getFlavorRemark(pid, flavorSelections)
-          : "";
-        return {
-          id: pid,
-          name: p?.name ?? pid,
-          price: displayPrice,
-          qty,
-          remark,
-          subtotal,
-          imageUrl: p?.imageUrl ?? "",
-        };
-      });
-
-      setSuccessOrderItems(itemsList);
+      setSuccessOrderItems(successItemsSnap);
       setSuccessCartTotal(cartTotal);
       setSuccessShippingFee(shippingFee);
       setSuccessWalletDeduction(useWallet ? maxDeduction : 0);
