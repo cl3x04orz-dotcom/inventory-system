@@ -207,7 +207,7 @@ export default function MergePrintModal({
                 productId: product.id,
                 packSize: Number(product.packSize || 1),
                 dispatchSteps: parsedSteps,
-                roundThreshold: Number(product.roundThreshold !== undefined ? product.roundThreshold : 99),
+                roundThreshold: (product.roundThreshold !== undefined && product.roundThreshold !== '' && product.roundThreshold !== null) ? Number(product.roundThreshold) : 99,
                 autoSuppress: Boolean(product.autoSuppress),
                 maxSuggestion: Number(product.maxSuggestion || 0)
             }, user?.token);
@@ -254,7 +254,7 @@ export default function MergePrintModal({
                     productId: product.id,
                     packSize: Number(product.packSize || 1),
                     dispatchSteps: parsedSteps,
-                    roundThreshold: Number(product.roundThreshold !== undefined ? product.roundThreshold : 99),
+                    roundThreshold: (product.roundThreshold !== undefined && product.roundThreshold !== '' && product.roundThreshold !== null) ? Number(product.roundThreshold) : 99,
                     autoSuppress: Boolean(product.autoSuppress),
                     maxSuggestion: Number(product.maxSuggestion || 0)
                 }, user?.token);
@@ -854,8 +854,8 @@ export default function MergePrintModal({
                                                             <input
                                                                 type="number"
                                                                 className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 font-bold outline-none focus:border-blue-400 focus:bg-white"
-                                                                value={product.roundThreshold !== undefined ? product.roundThreshold : 99}
-                                                                onChange={(e) => handleEditProductField(product.id, 'roundThreshold', e.target.value !== '' ? Number(e.target.value) : 99)}
+                                                                value={product.roundThreshold === '' || product.roundThreshold === undefined || product.roundThreshold === null || product.roundThreshold === 99 ? '' : product.roundThreshold}
+                                                                onChange={(e) => handleEditProductField(product.id, 'roundThreshold', e.target.value !== '' ? Number(e.target.value) : '')}
                                                             />
                                                         </div>
                                                         <div className="flex flex-col gap-1">
