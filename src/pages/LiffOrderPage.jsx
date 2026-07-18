@@ -1880,6 +1880,21 @@ export default function LiffOrderPage({ user, apiUrl }) {
                       {item.remark}
                     </div>
                   )}
+                  {isGroupOrder && (
+                    <div className="mt-1.5 pt-1.5 border-t border-dashed border-[var(--border-primary)] space-y-1">
+                      {Object.entries(groupCart).map(([name, items]) => {
+                        if (!items || typeof items !== 'object') return null;
+                        const qty = items[item.id] || 0;
+                        if (qty === 0) return null;
+                        return (
+                          <div key={name} className="flex justify-between items-center text-[11px] text-[var(--text-secondary)] font-sans">
+                            <span>👤 {name}</span>
+                            <span className="font-semibold font-mono">x{qty}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -1957,6 +1972,60 @@ export default function LiffOrderPage({ user, apiUrl }) {
               </span>
             </div>
           </div>
+
+          {/* 👥 團員代訂明細 (團購模式專屬) */}
+          {isGroupOrder && (
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-4 py-2.5 border-b border-[var(--border-primary)] text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center justify-between">
+                <span>👥 團員代訂明細</span>
+                <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold">每人小計</span>
+              </div>
+              <div className="divide-y divide-[var(--border-primary)] max-h-[300px] overflow-y-auto">
+                {Object.entries(groupCart).map(([name, items]) => {
+                  if (!items || typeof items !== 'object') return null;
+                  const validItems = Object.entries(items).filter(([_, qty]) => Number(qty) > 0);
+                  if (validItems.length === 0) return null;
+
+                  let memberTotal = 0;
+                  return (
+                    <div key={name} className="p-4 space-y-1.5 bg-[var(--bg-secondary)]">
+                      <div className="flex justify-between items-center text-sm font-bold text-[var(--text-primary)]">
+                        <span>👤 {name}</span>
+                      </div>
+                      <div className="space-y-1 pl-4">
+                        {validItems.map(([productId, qty]) => {
+                          const product = products.find((p) => p.id === productId);
+                          const singlePrice = product ? (Number(product.single_price) || Number(product.price)) : 0;
+                          
+                          let subtotal = 0;
+                          if (product && product.has_volume_pricing && product.volume_pricing_settings) {
+                            const targetQty = Number(product.volume_pricing_settings.target_quantity);
+                            const packagePrice = Number(product.volume_pricing_settings.package_price);
+                            const groupCount = Math.floor(qty / targetQty);
+                            const remainderCount = qty % targetQty;
+                            subtotal = groupCount * packagePrice + remainderCount * singlePrice;
+                          } else {
+                            subtotal = singlePrice * qty;
+                          }
+                          memberTotal += subtotal;
+
+                          return (
+                            <div key={productId} className="flex justify-between items-center text-xs text-[var(--text-secondary)] font-mono">
+                              <span className="font-sans">{product ? product.name : productId} x{qty}</span>
+                              <span>${subtotal}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex justify-end items-center text-xs font-bold text-blue-600 pt-1">
+                        <span>小計：${memberTotal} 元</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
         </div>
 
@@ -2998,11 +3067,11 @@ ${freeNote(newFee, newMin)}
           </div>
         )}
 
-        {/* 團購代錄控制區 */}
+        {/* 團購代訂控制區 */}
         <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-extrabold text-[var(--text-primary)]">👥 團購代錄模式 (V2)</span>
+              <span className="text-xs font-extrabold text-[var(--text-primary)]">👥 團購代訂模式 (V2)</span>
               <span className="text-[9px] bg-blue-50 text-blue-600 px-1 py-0.2 rounded font-bold border border-blue-100">雙軌同步</span>
             </div>
             <button
@@ -3019,7 +3088,7 @@ ${freeNote(newFee, newMin)}
                   : "bg-transparent border-[var(--border-primary)] text-[var(--text-secondary)]"
               }`}
             >
-              {isGroupOrder ? "已啟用" : "啟用代錄"}
+              {isGroupOrder ? "已啟用" : "啟用代訂"}
             </button>
           </div>
 
@@ -3562,7 +3631,7 @@ ${freeNote(newFee, newMin)}
                 👥 新增團購成員
               </h3>
               <p className="text-xs text-[var(--text-secondary)] mt-1.5">
-                請輸入成員姓名，以便進行代錄與對帳。
+                請輸入成員姓名，以便進行代訂與對帳。
               </p>
             </div>
 
