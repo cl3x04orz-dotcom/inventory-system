@@ -455,11 +455,26 @@ export const GroupBuyService = {
     let targetComm: any = null;
     if (commCode) {
       targetComm = communities.find((c: any) => c.communityId === commCode);
+      if (!targetComm) {
+        targetComm = await prisma.groupBuyCommunity.findUnique({
+          where: { communityId: commCode }
+        });
+      }
     }
     if (!targetComm && buildingName) {
       targetComm = communities.find((c: any) =>
         c.communityName === buildingName || c.communityName?.includes(buildingName)
       );
+      if (!targetComm) {
+        targetComm = await prisma.groupBuyCommunity.findFirst({
+          where: {
+            OR: [
+              { communityName: buildingName },
+              { communityName: { contains: buildingName } }
+            ]
+          }
+        });
+      }
     }
     if (!targetComm) {
       targetComm = communities[0] || null;
