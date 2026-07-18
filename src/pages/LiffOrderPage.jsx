@@ -3159,7 +3159,7 @@ ${freeNote(newFee, newMin)}
                             e.stopPropagation();
                             setConfirmModal({
                               show: true,
-                              message: `確認刪除成員「${name}」？\n此操作將清除他已代訂的商品。`,
+                              message: `確認刪除成員「${name}」？`,
                               confirmText: "確定",
                               cancelText: "取消",
                               onConfirm: () => {
