@@ -1378,9 +1378,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
           {/* 📋 訂單資訊 Card */}
           <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl p-5 shadow-sm space-y-3.5 text-sm font-mono">
-            <div className="text-xs font-bold text-[var(--text-secondary)] font-sans flex items-center gap-1.5 mb-1.5 justify-between">
-              <span>📋 訂單資訊</span>
-              <span className="text-rose-500 font-mono text-[10px]">明細數: {successOrderItems.length}</span>
+            <div className="text-xs font-bold text-[var(--text-secondary)] font-sans flex items-center gap-1.5 mb-1.5">
+              📋 訂單資訊
             </div>
             <div className="flex justify-between items-center">
               <span className="text-[var(--text-secondary)] font-medium font-sans">訂單編號</span>
@@ -2466,9 +2465,12 @@ ${freeNote(newFee, newMin)}
             </div>
 
             {/* 配送日小卡 */}
-            <div className="mt-1 bg-blue-50/80 border border-blue-200 rounded-xl p-4 flex justify-between items-center shadow-sm">
+            <div className="mt-1 bg-blue-50/80 border border-blue-200 rounded-xl p-4 flex justify-between items-center shadow-sm relative overflow-hidden">
               <div>
-                <div className="text-xs text-blue-700 font-bold mb-1">今天配送日</div>
+                <div className="text-xs text-blue-700 font-bold mb-1 flex items-center gap-1.5">
+                  今天配送日
+                  <span className="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-bold scale-90">開發中</span>
+                </div>
                 <div className="text-lg font-black text-blue-900">6/28</div>
                 <div className="text-xs text-blue-800/80">下午15:00~17:00</div>
               </div>
@@ -2477,8 +2479,11 @@ ${freeNote(newFee, newMin)}
 
             {/* 奶包金 & 會員卡 */}
             <div className="flex gap-3 mt-1">
-              <div className="flex-1 bg-amber-50/80 border border-amber-200 rounded-xl p-4 shadow-sm">
-                <div className="text-xs text-amber-800 font-bold flex items-center gap-1 mb-1"><Banknote size={14}/> 奶包金餘額</div>
+              <div className="flex-1 bg-amber-50/80 border border-amber-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
+                <div className="text-xs text-amber-800 font-bold flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-1"><Banknote size={14}/> 奶包金餘額</span>
+                  <span className="text-[9px] bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-bold scale-90">開發中</span>
+                </div>
                 <div className="text-2xl font-black text-amber-700 font-mono">${memberProfile?.WalletBalance || 0}</div>
               </div>
               <div className="flex-1 bg-slate-50/80 border border-slate-200 rounded-xl p-4 flex flex-col justify-between shadow-sm">
@@ -2522,6 +2527,9 @@ ${freeNote(newFee, newMin)}
               </button>
               <button className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-tr from-transparent to-rose-500/10 pointer-events-none"></div>
+                <div className="absolute top-0 right-0 bg-rose-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-bl">
+                  開發中
+                </div>
                 <div className="w-10 h-10 rounded-full bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center"><Package size={20}/></div>
                 <span className="text-xs font-bold text-[var(--text-primary)]">最新優惠</span>
               </button>
@@ -2694,9 +2702,12 @@ ${freeNote(newFee, newMin)}
             </div>
 
             {/* 配送日小卡 */}
-            <div className="mt-1 bg-blue-50 border border-blue-100 rounded-xl p-4 flex justify-between items-center">
+            <div className="mt-1 bg-blue-50 border border-blue-100 rounded-xl p-4 flex justify-between items-center relative overflow-hidden">
               <div>
-                <div className="text-xs text-blue-600 font-bold mb-1">今天配送日</div>
+                <div className="text-xs text-blue-600 font-bold mb-1 flex items-center gap-1.5">
+                  今天配送日
+                  <span className="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-bold scale-90">開發中</span>
+                </div>
                 <div className="text-lg font-bold text-[var(--text-primary)]">6/28</div>
                 <div className="text-xs text-[var(--text-secondary)]">下午15:00~17:00</div>
               </div>
@@ -2705,8 +2716,11 @@ ${freeNote(newFee, newMin)}
 
             {/* 奶包金 & 會員卡 */}
             <div className="flex gap-3 mt-1">
-              <div className="flex-1 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 rounded-xl p-4">
-                <div className="text-xs text-amber-700 font-bold flex items-center gap-1 mb-1"><Banknote size={14}/> 奶包金餘額</div>
+              <div className="flex-1 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 rounded-xl p-4 relative overflow-hidden">
+                <div className="text-xs text-amber-700 font-bold flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-1"><Banknote size={14}/> 奶包金餘額</span>
+                  <span className="text-[9px] bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-bold scale-90">開發中</span>
+                </div>
                 <div className="text-2xl font-black text-amber-600">${memberProfile?.WalletBalance || 0}</div>
               </div>
               <div className="flex-1 bg-gradient-to-br from-gray-50 to-slate-50 border border-gray-200 rounded-xl p-4 flex flex-col justify-between">
@@ -2732,6 +2746,9 @@ ${freeNote(newFee, newMin)}
               </button>
               <button className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-tr from-transparent to-rose-500/10 pointer-events-none"></div>
+                <div className="absolute top-0 right-0 bg-rose-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-bl">
+                  開發中
+                </div>
                 <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-600"><Package size={20}/></div>
                 <span className="text-xs font-bold text-[var(--text-primary)]">最新優惠</span>
               </button>
