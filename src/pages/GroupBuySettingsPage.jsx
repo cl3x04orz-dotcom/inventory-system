@@ -47,7 +47,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
     // 專屬價格相關 state
     const [allProducts, setAllProducts] = useState([]);
     const [selectedCommunityId, setSelectedCommunityId] = useState('');
-    const [customPrices, setCustomPrices] = useState({}); // { [productId]: { price, buyX, getY } }
+    const [customPrices, setCustomPrices] = useState({}); // { [productId]: { price, promotions: [{buyX, getY}] } }
     const [loadingCustomPrices, setLoadingCustomPrices] = useState(false);
     const [savingPriceProductId, setSavingPriceProductId] = useState('');
 
@@ -64,8 +64,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                 data.forEach(item => {
                     priceMap[item.productId] = {
                         price: item.customPrice !== undefined && item.customPrice !== null ? Number(item.customPrice) : '',
-                        buyX: item.buyX !== undefined && item.buyX !== null ? Number(item.buyX) : '',
-                        getY: item.getY !== undefined && item.getY !== null ? Number(item.getY) : ''
+                        promotions: Array.isArray(item.promotions) ? item.promotions : []
                     };
                 });
                 setCustomPrices(priceMap);
@@ -93,16 +92,14 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
         setSavingPriceProductId(productId);
 
         const price = itemData?.price;
-        const buyX = itemData?.buyX;
-        const getY = itemData?.getY;
+        const promotions = itemData?.promotions || [];
 
         try {
             const res = await callGAS(apiUrl, 'saveCommunityCustomPrice', {
                 communityId: selectedCommunityId,
                 productId,
                 customPrice: (price !== undefined && price !== '') ? Number(price) : '',
-                buyX: (buyX !== undefined && buyX !== '') ? Number(buyX) : '',
-                getY: (getY !== undefined && getY !== '') ? Number(getY) : ''
+                promotions
             }, user.token);
             if (res && res.error) throw new Error(res.error);
             
@@ -117,8 +114,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                     ...prev,
                     [productId]: {
                         price: (price !== undefined && price !== '') ? Number(price) : '',
-                        buyX: (buyX !== undefined && buyX !== '') ? Number(buyX) : '',
-                        getY: (getY !== undefined && getY !== '') ? Number(getY) : ''
+                        promotions
                     }
                 }));
             }
@@ -128,6 +124,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
             setSavingPriceProductId('');
         }
     };
+
 
     const handleDeleteCustomPrice = async (productId) => {
         if (!selectedCommunityId) return;
@@ -978,44 +975,75 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                 {loadingCustomPrices ? (
                                     <div className="text-center py-6 text-xs text-[var(--text-secondary)]">載入客製化價格中...</div>
                                 ) : (
-                                    <div className="border border-[var(--border-primary)] rounded-xl overflow-hidden max-h-96 overflow-y-auto">
+                                    <div className="border border-[var(--border-primary)] rounded-xl overflow-hidden max-h-[500px] overflow-y-auto">
                                         <table className="w-full text-left text-xs">
-                                            <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] font-bold sticky top-0">
+                                            <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] font-bold sticky top-0 z-10">
                                                 <tr className="border-b border-[var(--border-primary)]">
-                                                    <th className="p-3">商品名稱</th>
-                                                    <th className="p-3 text-right">預設原價</th>
-                                                    <th className="p-3">專屬定價</th>
-                                                    <th className="p-3">買 X 送 Y 促銷</th>
-                                                    <th className="p-3 text-center">狀態/操作</th>
+                                                    <th className="p-3 w-40">商品名稱</th>
+                                                    <th className="p-3 text-right w-24">預設原價</th>
+                                                    <th className="p-3 w-28">專屬定價</th>
+                                                    <th className="p-3">買 X 送 Y 促銷組合</th>
+                                                    <th className="p-3 text-center w-20">操作</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-[var(--border-primary)]">
                                                 {allProducts.map(p => {
-                                                    const customData = customPrices[p.id] || { price: '', buyX: '', getY: '' };
+                                                    const customData = customPrices[p.id] || { price: '', promotions: [] };
                                                     const priceVal = customData.price !== undefined ? customData.price : '';
-                                                    const buyXVal = customData.buyX !== undefined ? customData.buyX : '';
-                                                    const getYVal = customData.getY !== undefined ? customData.getY : '';
+                                                    const promos = Array.isArray(customData.promotions) ? customData.promotions : [];
                                                     const hasCustom = customPrices[p.id] !== undefined;
 
-                                                    const handleFieldBlur = () => {
-                                                        handleSaveCustomPrice(p.id, customData);
+                                                    const saveNow = (newData) => {
+                                                        handleSaveCustomPrice(p.id, newData);
                                                     };
 
-                                                    const handleFieldChange = (field, val) => {
+                                                    const handlePriceChange = (val) => {
                                                         setCustomPrices(prev => ({
                                                             ...prev,
                                                             [p.id]: {
-                                                                ...(prev[p.id] || { price: '', buyX: '', getY: '' }),
-                                                                [field]: val !== '' ? Number(val) : ''
+                                                                ...(prev[p.id] || { price: '', promotions: [] }),
+                                                                price: val !== '' ? Number(val) : ''
                                                             }
                                                         }));
                                                     };
 
+                                                    const handlePromoChange = (idx, field, val) => {
+                                                        setCustomPrices(prev => {
+                                                            const current = prev[p.id] || { price: '', promotions: [] };
+                                                            const newPromos = [...(current.promotions || [])];
+                                                            newPromos[idx] = { ...newPromos[idx], [field]: val !== '' ? Number(val) : '' };
+                                                            return { ...prev, [p.id]: { ...current, promotions: newPromos } };
+                                                        });
+                                                    };
+
+                                                    const handlePromoBlur = () => {
+                                                        saveNow(customPrices[p.id] || { price: '', promotions: [] });
+                                                    };
+
+                                                    const addPromo = () => {
+                                                        setCustomPrices(prev => {
+                                                            const current = prev[p.id] || { price: '', promotions: [] };
+                                                            const newPromos = [...(current.promotions || []), { buyX: '', getY: '' }];
+                                                            return { ...prev, [p.id]: { ...current, promotions: newPromos } };
+                                                        });
+                                                    };
+
+                                                    const removePromo = (idx) => {
+                                                        setCustomPrices(prev => {
+                                                            const current = prev[p.id] || { price: '', promotions: [] };
+                                                            const newPromos = (current.promotions || []).filter((_, i) => i !== idx);
+                                                            const newData = { ...current, promotions: newPromos };
+                                                            // 立即儲存
+                                                            handleSaveCustomPrice(p.id, newData);
+                                                            return { ...prev, [p.id]: newData };
+                                                        });
+                                                    };
+
                                                     return (
-                                                        <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                                                            <td className="p-3 font-bold text-slate-800">{p.name}</td>
-                                                            <td className="p-3 text-right font-mono font-bold text-slate-500">${p.single_price}</td>
-                                                            <td className="p-3">
+                                                        <tr key={p.id} className="hover:bg-slate-50/60 transition-colors align-top">
+                                                            <td className="p-3 font-bold text-slate-800 leading-snug pt-4">{p.name}</td>
+                                                            <td className="p-3 text-right font-mono font-bold text-slate-400 pt-4">${p.single_price}</td>
+                                                            <td className="p-3 pt-4">
                                                                 <div className="relative w-24">
                                                                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
                                                                     <input
@@ -1024,51 +1052,66 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                                         placeholder="未設定"
                                                                         className="input-field pl-5 p-1.5 w-full text-xs font-bold text-slate-800"
                                                                         value={priceVal}
-                                                                        onChange={(e) => handleFieldChange('price', e.target.value)}
-                                                                        onBlur={handleFieldBlur}
+                                                                        onChange={(e) => handlePriceChange(e.target.value)}
+                                                                        onBlur={() => saveNow(customPrices[p.id] || { price: '', promotions: [] })}
                                                                     />
                                                                 </div>
                                                             </td>
-                                                            <td className="p-3">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="text-[10px] text-slate-400">買</span>
-                                                                    <input
-                                                                        type="number"
-                                                                        min="1"
-                                                                        placeholder="X"
-                                                                        className="input-field p-1 w-10 text-center text-xs font-bold text-slate-800"
-                                                                        value={buyXVal}
-                                                                        onChange={(e) => handleFieldChange('buyX', e.target.value)}
-                                                                        onBlur={handleFieldBlur}
-                                                                    />
-                                                                    <span className="text-[10px] text-slate-400">送</span>
-                                                                    <input
-                                                                        type="number"
-                                                                        min="1"
-                                                                        placeholder="Y"
-                                                                        className="input-field p-1 w-10 text-center text-xs font-bold text-slate-800"
-                                                                        value={getYVal}
-                                                                        onChange={(e) => handleFieldChange('getY', e.target.value)}
-                                                                        onBlur={handleFieldBlur}
-                                                                    />
+                                                            <td className="p-3 pt-4">
+                                                                <div className="flex flex-col gap-1.5">
+                                                                    {promos.map((promo, idx) => (
+                                                                        <div key={idx} className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200/60 rounded-lg px-2 py-1">
+                                                                            <span className="text-[10px] text-emerald-700 font-bold shrink-0">買</span>
+                                                                            <input
+                                                                                type="number"
+                                                                                min="1"
+                                                                                placeholder="X"
+                                                                                className="input-field p-1 w-10 text-center text-xs font-bold text-slate-800 bg-white"
+                                                                                value={promo.buyX !== undefined ? promo.buyX : ''}
+                                                                                onChange={(e) => handlePromoChange(idx, 'buyX', e.target.value)}
+                                                                                onBlur={handlePromoBlur}
+                                                                            />
+                                                                            <span className="text-[10px] text-emerald-700 font-bold shrink-0">送</span>
+                                                                            <input
+                                                                                type="number"
+                                                                                min="1"
+                                                                                placeholder="Y"
+                                                                                className="input-field p-1 w-10 text-center text-xs font-bold text-slate-800 bg-white"
+                                                                                value={promo.getY !== undefined ? promo.getY : ''}
+                                                                                onChange={(e) => handlePromoChange(idx, 'getY', e.target.value)}
+                                                                                onBlur={handlePromoBlur}
+                                                                            />
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => removePromo(idx)}
+                                                                                className="ml-auto text-red-400 hover:text-red-600 transition-colors text-[11px] font-bold px-1"
+                                                                                title="刪除此組"
+                                                                            >✕</button>
+                                                                        </div>
+                                                                    ))}
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={addPromo}
+                                                                        className="text-[10px] text-emerald-600 hover:text-emerald-800 font-bold flex items-center gap-1 w-fit transition-colors"
+                                                                    >
+                                                                        <span className="text-base leading-none">＋</span> 新增促銷組合
+                                                                    </button>
                                                                 </div>
                                                             </td>
-                                                            <td className="p-3 text-center space-x-1.5">
-                                                                <div className="inline-block min-w-[50px] text-xs">
-                                                                    {savingPriceProductId === p.id ? (
-                                                                        <span className="text-blue-500 font-semibold animate-pulse">儲存中...</span>
-                                                                    ) : hasCustom ? (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleDeleteCustomPrice(p.id)}
-                                                                            className="px-2 py-1 bg-red-100 hover:bg-red-500 text-red-600 hover:text-white rounded text-[10px] font-bold active:scale-95 transition-all"
-                                                                        >
-                                                                            移除
-                                                                        </button>
-                                                                    ) : (
-                                                                        <span className="text-slate-400">已同步</span>
-                                                                    )}
-                                                                </div>
+                                                            <td className="p-3 text-center pt-4">
+                                                                {savingPriceProductId === p.id ? (
+                                                                    <span className="text-blue-500 font-semibold animate-pulse text-[10px]">儲存中...</span>
+                                                                ) : hasCustom ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleDeleteCustomPrice(p.id)}
+                                                                        className="px-2 py-1 bg-red-100 hover:bg-red-500 text-red-600 hover:text-white rounded text-[10px] font-bold active:scale-95 transition-all"
+                                                                    >
+                                                                        移除全部
+                                                                    </button>
+                                                                ) : (
+                                                                    <span className="text-slate-300 text-[10px]">—</span>
+                                                                )}
                                                             </td>
                                                         </tr>
                                                     );
@@ -1080,6 +1123,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                             </div>
                             </>
                         )}
+
 
                         {/* URL Generation display */}
                         {activeUrl && (

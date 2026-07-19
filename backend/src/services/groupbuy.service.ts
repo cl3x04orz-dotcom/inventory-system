@@ -650,8 +650,7 @@ export const GroupBuyService = {
       cp.productId, 
       {
         customPrice: Number(cp.customPrice),
-        buyX: cp.buyX !== null ? Number(cp.buyX) : null,
-        getY: cp.getY !== null ? Number(cp.getY) : null
+        promotions: Array.isArray(cp.promotions) ? cp.promotions : (cp.promotions ? cp.promotions : [])
       }
     ]));
 
@@ -661,8 +660,7 @@ export const GroupBuyService = {
         return {
           ...p,
           single_price: cp.customPrice,
-          buy_x: cp.buyX,
-          get_y: cp.getY
+          promotions: cp.promotions
         };
       }
       return p;
@@ -1435,23 +1433,24 @@ export const GroupBuyService = {
     return customPrices.map((cp: any) => ({
       productId: cp.productId,
       customPrice: Number(cp.customPrice),
-      buyX: cp.buyX !== null ? Number(cp.buyX) : null,
-      getY: cp.getY !== null ? Number(cp.getY) : null
+      promotions: Array.isArray(cp.promotions) ? cp.promotions : (cp.promotions ? cp.promotions : [])
     }));
   },
 
-  // 21. 儲存/更新社區商品價格 (支援自動刪除)
+  // 21. 儲存/更新社區商品價格 (支援自動刪除 + 多組促銷)
   async saveCommunityCustomPrice(payload: any, user: any) {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
-    const { communityId, productId, customPrice, buyX, getY } = payload;
+    const { communityId, productId, customPrice, promotions } = payload;
     if (!communityId || !productId) throw new Error('缺少必要參數');
 
     const hasPrice = customPrice !== undefined && customPrice !== null && customPrice !== '';
-    const hasBuyX = buyX !== undefined && buyX !== null && buyX !== '';
-    const hasGetY = getY !== undefined && getY !== null && getY !== '';
+    // promotions 是陣列，過濾掉不合法的項目
+    const validPromos: Array<{buyX: number, getY: number}> = Array.isArray(promotions)
+      ? promotions.filter((p: any) => p && p.buyX > 0 && p.getY > 0).map((p: any) => ({ buyX: Number(p.buyX), getY: Number(p.getY) }))
+      : [];
 
     // 全空直接移除
-    if (!hasPrice && !hasBuyX && !hasGetY) {
+    if (!hasPrice && validPromos.length === 0) {
       try {
         await prisma.communityProductPrice.delete({
           where: {
@@ -1463,12 +1462,7 @@ export const GroupBuyService = {
     }
 
     const priceVal = hasPrice ? Number(customPrice) : 0;
-    const buyXVal = hasBuyX ? Number(buyX) : null;
-    const getYVal = hasGetY ? Number(getY) : null;
-
     if (isNaN(priceVal) || priceVal < 0) throw new Error('價格必須為正數');
-    if (buyXVal !== null && (isNaN(buyXVal) || buyXVal < 0)) throw new Error('買幾必須為正整數');
-    if (getYVal !== null && (isNaN(getYVal) || getYVal < 0)) throw new Error('送幾必須為正整數');
 
     await prisma.communityProductPrice.upsert({
       where: {
@@ -1479,15 +1473,13 @@ export const GroupBuyService = {
       },
       update: {
         customPrice: priceVal,
-        buyX: buyXVal,
-        getY: getYVal
+        promotions: validPromos.length > 0 ? validPromos : null
       },
       create: {
         communityId,
         productId,
         customPrice: priceVal,
-        buyX: buyXVal,
-        getY: getYVal
+        promotions: validPromos.length > 0 ? validPromos : null
       }
     });
 

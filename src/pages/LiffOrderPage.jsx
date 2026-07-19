@@ -1167,29 +1167,39 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   const totalQty = Object.values(cart).reduce((s, q) => s + q, 0);
 
+  // 工具：計算某商品在 qty 件時的實際應收金額（含促銷折扣）
+  const calcProductSubtotal = (p, qty) => {
+    const singlePrice = Number(p.single_price) || Number(p.price);
+    // 多組促銷：選折扣最大的那組
+    if (Array.isArray(p.promotions) && p.promotions.length > 0) {
+      let bestFree = 0;
+      for (const promo of p.promotions) {
+        const bx = Number(promo.buyX);
+        const gy = Number(promo.getY);
+        if (bx > 0 && gy > 0) {
+          const free = Math.floor(qty / (bx + gy)) * gy;
+          if (free > bestFree) bestFree = free;
+        }
+      }
+      return singlePrice * (qty - bestFree);
+    }
+    // 階梯組合價
+    if (p.has_volume_pricing && p.volume_pricing_settings) {
+      const targetQty = Number(p.volume_pricing_settings.target_quantity);
+      const packagePrice = Number(p.volume_pricing_settings.package_price);
+      const groupCount = Math.floor(qty / targetQty);
+      const remainderCount = qty % targetQty;
+      return groupCount * packagePrice + remainderCount * singlePrice;
+    }
+    return singlePrice * qty;
+  };
+
   const cartTotal = useMemo(
     () =>
       Object.entries(cart).reduce((s, [pid, qty]) => {
         const p = products.find((x) => x.id === pid);
         if (!p) return s;
-        if (p.buy_x && p.get_y) {
-          const buyX = Number(p.buy_x);
-          const getY = Number(p.get_y);
-          const singlePrice = Number(p.single_price) || Number(p.price);
-          const freeCount = Math.floor(qty / (buyX + getY)) * getY;
-          return s + singlePrice * (qty - freeCount);
-        } else if (p.has_volume_pricing && p.volume_pricing_settings) {
-          const targetQty = Number(p.volume_pricing_settings.target_quantity);
-          const packagePrice = Number(p.volume_pricing_settings.package_price);
-          const singlePrice = Number(p.single_price) || Number(p.price);
-
-          const groupCount = Math.floor(qty / targetQty);
-          const remainderCount = qty % targetQty;
-          return s + groupCount * packagePrice + remainderCount * singlePrice;
-        } else {
-          const singlePrice = Number(p.single_price) || Number(p.price);
-          return s + singlePrice * qty;
-        }
+        return s + calcProductSubtotal(p, qty);
       }, 0),
     [cart, products],
   );
@@ -1227,23 +1237,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
         if (p) {
           const singlePrice = Number(p.single_price) || Number(p.price);
-          if (p.buy_x && p.get_y) {
-            const buyX = Number(p.buy_x);
-            const getY = Number(p.get_y);
-            const freeCount = Math.floor(qty / (buyX + getY)) * getY;
-            subtotal = singlePrice * (qty - freeCount);
-          } else if (p.has_volume_pricing && p.volume_pricing_settings) {
-            const targetQty = Number(p.volume_pricing_settings.target_quantity);
-            const packagePrice = Number(
-              p.volume_pricing_settings.package_price,
-            );
-
-            const groupCount = Math.floor(qty / targetQty);
-            const remainderCount = qty % targetQty;
-            subtotal = groupCount * packagePrice + remainderCount * singlePrice;
-          } else {
-            subtotal = singlePrice * qty;
-          }
+          subtotal = calcProductSubtotal(p, qty);
           displayPrice = qty > 0 ? subtotal / qty : singlePrice;
         }
 
@@ -3580,6 +3574,13 @@ ${freeNote(newFee, newMin)}
                                   🔥 買 {product.buy_x} 送 {product.get_y}
                                 </span>
                               )}
+                              {Array.isArray(product.promotions) && product.promotions.map((promo, idx) => (
+                                promo.buyX > 0 && promo.getY > 0 ? (
+                                  <span key={idx} className="inline-block text-[10px] text-emerald-800 bg-emerald-500/10 border border-emerald-200/30 px-1.5 py-0.5 rounded ml-1 font-bold">
+                                    🔥 買 {promo.buyX} 送 {promo.getY}
+                                  </span>
+                                ) : null
+                              ))}
                             </div>
                             <div className="flex flex-col mt-1.5">
                               <div className="flex justify-between items-center">

@@ -435,8 +435,7 @@ model CommunityProductPrice {
   communityId  String
   productId    String
   customPrice  Decimal
-  buyX         Int?
-  getY         Int?
+  promotions   Json?
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
   community    GroupBuyCommunity @relation(fields: [communityId], references: [communityId], onDelete: Cascade)
