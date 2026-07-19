@@ -55,7 +55,7 @@ export const AnalyticsService = {
         const pName = d.product.productName || pId;
         const qty = d.sold;
         const revenue = Number(d.subtotal) || 0;
-        const unitCost = Number(d.product.reserve) || 0;
+        const unitCost = Number(d.product.defaultPrice) || 0;
         const cost = qty * unitCost;
 
         if (!stats[pId]) {
