@@ -633,6 +633,13 @@ export const GroupBuyService = {
       end_time: s.endTime || ''
     }));
 
+    // 取得群組綁定對照表
+    const gBindings = await prisma.groupBinding.findMany();
+    const groupBindings: Record<string, string> = {};
+    gBindings.forEach((b: any) => {
+      groupBindings[b.groupId] = b.groupName;
+    });
+
     return {
       success: true,
       data: {
@@ -650,6 +657,7 @@ export const GroupBuyService = {
         nextOpenTime: nextCampaign?.startTime || null,
         products,
         buildingSettings,
+        groupBindings,
         allCommunities: communities.map((c: any) => ({
           CommunityId: c.communityId,
           CommunityName: c.communityName,

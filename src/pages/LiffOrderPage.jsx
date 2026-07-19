@@ -379,6 +379,9 @@ export default function LiffOrderPage({ user, apiUrl }) {
         if (Array.isArray(resData.buildingSettings)) {
           setBuildingSettings(resData.buildingSettings);
         }
+        if (resData.groupBindings && typeof resData.groupBindings === "object") {
+          setGroupBindings(resData.groupBindings);
+        }
       }
     } catch (err) {
       console.error("Failed to load initialization data:", err);
@@ -813,6 +816,21 @@ export default function LiffOrderPage({ user, apiUrl }) {
       setSelectedBuilding(lockedBuilding);
     }
   }, [lockedBuilding]);
+
+  const displayGroupName = useMemo(() => {
+    if (!sourceGroup) return "";
+    if (groupBindings[sourceGroup]) return groupBindings[sourceGroup];
+    const isRawId = sourceGroup.includes("-") || (sourceGroup.length > 15 && /^[a-zA-Z0-9_-]+$/.test(sourceGroup));
+    if (isRawId) {
+      if (selectedBuilding && !["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(selectedBuilding)) {
+        return selectedBuilding;
+      }
+      if (currentCommunity?.CommunityName && !["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(currentCommunity.CommunityName)) {
+        return currentCommunity.CommunityName;
+      }
+    }
+    return sourceGroup;
+  }, [sourceGroup, groupBindings, selectedBuilding, currentCommunity]);
 
   const isGeneralUser = 
     selectedBuilding === "一般用戶" || 
@@ -3178,7 +3196,7 @@ ${freeNote(newFee, newMin)}
             ) : (
               sourceGroup && (
                 <span className="text-xs bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-lg border border-blue-100">
-                  {groupBindings[sourceGroup] || sourceGroup}
+                  {displayGroupName}
                 </span>
               )
             )}
