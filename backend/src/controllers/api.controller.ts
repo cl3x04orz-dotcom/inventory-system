@@ -195,6 +195,8 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       return GroupBuyService.deleteBuildingSettings(payload, user);
     case 'renameBuildingSettings':
       return GroupBuyService.renameBuildingSettings(payload, user);
+    case 'reorderBuildings':
+      return GroupBuyService.reorderBuildings(payload, user);
     case 'saveCommunityShipping':
       return GroupBuyService.saveCommunityShipping(payload, user);
     case 'getSubscriptions':

@@ -380,6 +380,8 @@ model BuildingSetting {
   building   String   @id
   startTime  String?
   endTime    String?
+  sortOrder  Int      @default(0)
+  adminNote  String?
   updatedAt  DateTime @updatedAt
 }
 

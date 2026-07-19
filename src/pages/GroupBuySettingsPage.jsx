@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, Calendar, Clock, Copy, Save, Plus, Check, RefreshCw, Truck, Edit2, Trash2 } from 'lucide-react';
+import { Link, Calendar, Clock, Copy, Save, Plus, Check, RefreshCw, Truck, Edit2, Trash2, ChevronUp, ChevronDown, StickyNote } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
 export default function GroupBuySettingsPage({ user, apiUrl }) {
@@ -24,6 +24,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
     
     const [isSaving, setIsSaving] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [adminNote, setAdminNote] = useState('');
 
     // 運費設定 state
     const [isFreeShipping, setIsFreeShipping] = useState(false);
@@ -177,6 +178,9 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
             setIsFreeShipping(!!found.default_free_shipping);
             setFreeShippingMin(found.free_shipping_min != null ? String(found.free_shipping_min) : '');
             setShippingFee(found.shipping_fee != null ? String(found.shipping_fee) : '');
+
+            // 備注
+            setAdminNote(found.admin_note || '');
         } else {
             setStartDate('');
             setStartTime('');
@@ -193,6 +197,9 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
             setIsFreeShipping(false);
             setFreeShippingMin('');
             setShippingFee('');
+
+            // 備注預設
+            setAdminNote('');
         }
     };
 
@@ -245,6 +252,25 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
         const formattedDate = date.replace(/-/g, '/');
         const formattedTime = time || '00:00';
         return `${formattedDate} ${formattedTime}`;
+    };
+
+    const handleMoveBuilding = async (index, direction) => {
+        const newSettings = [...settings];
+        const targetIndex = index + direction;
+        if (targetIndex < 0 || targetIndex >= newSettings.length) return;
+
+        // swap
+        [newSettings[index], newSettings[targetIndex]] = [newSettings[targetIndex], newSettings[index]];
+        setSettings(newSettings);
+
+        try {
+            await callGAS(apiUrl, 'reorderBuildings', {
+                buildings: newSettings.map(s => s.building)
+            }, user.token);
+        } catch (error) {
+            alert('排序更新失敗: ' + error.message);
+            await fetchSettings(); // rollback
+        }
     };
 
     const handleDeleteClick = async (buildingName) => {
@@ -302,7 +328,8 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                 auto_open_day: autoOpenDay !== '' ? Number(autoOpenDay) : '',
                 auto_open_time: autoOpenTime,
                 auto_close_day: autoCloseDay !== '' ? Number(autoCloseDay) : '',
-                auto_close_time: autoCloseTime
+                auto_close_time: autoCloseTime,
+                admin_note: adminNote.trim() || null,
             }, user.token);
 
             if (res && res.error) {
@@ -413,7 +440,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                         
                         {/* 大樓清單區 */}
                         <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
-                            {settings.map(s => {
+                            {settings.map((s, idx) => {
                                 const isSelected = selectedBuilding === s.building && !isAddingNew;
                                 return (
                                     <button
@@ -430,12 +457,35 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                 : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:text-slate-900'
                                         }`}
                                     >
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-base">🏢</span>
-                                            <span className="text-base font-bold tracking-wide">{s.building}</span>
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className="text-base flex-shrink-0">🏢</span>
+                                            <span className="text-base font-bold tracking-wide truncate">{s.building}</span>
+                                            {s.admin_note && (
+                                                <span title={s.admin_note} className="flex-shrink-0 text-amber-500">
+                                                    <StickyNote size={13} />
+                                                </span>
+                                            )}
                                         </div>
                                         {isSelected ? (
-                                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                            <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleMoveBuilding(idx, -1)}
+                                                    disabled={idx === 0}
+                                                    className="p-1 hover:bg-blue-100 rounded text-blue-400 disabled:opacity-30 transition-colors"
+                                                    title="上移"
+                                                >
+                                                    <ChevronUp size={14} />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleMoveBuilding(idx, 1)}
+                                                    disabled={idx === settings.length - 1}
+                                                    className="p-1 hover:bg-blue-100 rounded text-blue-400 disabled:opacity-30 transition-colors"
+                                                    title="下移"
+                                                >
+                                                    <ChevronDown size={14} />
+                                                </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleRenameClick(s.building)}
@@ -693,6 +743,22 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
 
                         {/* Shipping Settings Card */}
                         {!isAddingNew && selectedBuilding && (
+                            <>
+                            {/* 管理員備注 */}
+                            <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-2xl flex flex-col gap-2">
+                                <label className="text-sm font-extrabold text-amber-700 flex items-center gap-1.5">
+                                    <StickyNote size={15} />
+                                    管理員備注（僅自己可見）
+                                </label>
+                                <textarea
+                                    rows={2}
+                                    className="input-field w-full p-2.5 text-sm rounded-xl border border-amber-200 bg-white resize-none focus:outline-none focus:border-amber-400"
+                                    placeholder="例：每週二固定補貨、聯絡人：王小明 0912-345-678"
+                                    value={adminNote}
+                                    onChange={(e) => setAdminNote(e.target.value)}
+                                />
+                                <p className="text-xs text-amber-600/70">備注會在「儲存大樓設定」時一併儲存。</p>
+                            </div>
                             <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
                                 <div className="flex justify-between items-center pb-2.5 border-b border-[var(--border-primary)]">
                                     <h3 className="font-extrabold text-base text-[var(--text-primary)] flex items-center gap-1.5">
@@ -775,6 +841,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                     </button>
                                 </div>
                             </div>
+                            </>  
                         )}
 
                         {/* URL Generation display */}

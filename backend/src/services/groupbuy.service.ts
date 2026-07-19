@@ -353,7 +353,10 @@ export const GroupBuyService = {
   // 7. 取得大樓設定列表（含對應社區的運費設定）
   async getBuildingSettings(payload: any, user: any) {
     const settings = await prisma.buildingSetting.findMany({
-      orderBy: { building: 'asc' }
+      orderBy: [
+        { sortOrder: 'asc' },
+        { building: 'asc' }
+      ]
     });
     // 一次查出所有社區的運費設定（依名稱匹配）
     const allComms = await prisma.groupBuyCommunity.findMany({
@@ -367,6 +370,8 @@ export const GroupBuyService = {
         building: s.building,
         start_time: s.startTime || '',
         end_time: s.endTime || '',
+        sort_order: s.sortOrder !== undefined && s.sortOrder !== null ? s.sortOrder : 0,
+        admin_note: s.adminNote || '',
         is_auto: s.isAuto || false,
         auto_open_day: s.autoOpenDay !== null && s.autoOpenDay !== undefined ? s.autoOpenDay : '',
         auto_open_time: s.autoOpenTime || '',
@@ -383,20 +388,27 @@ export const GroupBuyService = {
   // 8. 儲存/更新大樓設定
   async saveBuildingSettings(payload: any, user: any) {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
-    const { building, start_time, end_time } = payload;
+    const { building, start_time, end_time, sort_order, admin_note } = payload;
     if (!building) throw new Error('缺少大樓名稱');
+
+    const updateData: any = {};
+    if (start_time !== undefined) updateData.startTime = start_time || null;
+    if (end_time !== undefined) updateData.endTime = end_time || null;
+    if (sort_order !== undefined) updateData.sortOrder = Number(sort_order);
+    if (admin_note !== undefined) updateData.adminNote = admin_note || null;
+
+    const createData: any = {
+      building,
+      startTime: start_time || null,
+      endTime: end_time || null,
+      sortOrder: sort_order !== undefined ? Number(sort_order) : 0,
+      adminNote: admin_note || null
+    };
 
     await prisma.buildingSetting.upsert({
       where: { building },
-      update: {
-        startTime: start_time || null,
-        endTime: end_time || null
-      },
-      create: {
-        building,
-        startTime: start_time || null,
-        endTime: end_time || null
-      }
+      update: updateData,
+      create: createData
     });
 
     // 自動同步：如果在 GroupBuyCommunity 中找不到同名社區，自動新增
@@ -442,6 +454,23 @@ export const GroupBuyService = {
       });
     }
 
+    return { success: true };
+  },
+
+  // 8d. 批次更新大樓排序
+  async reorderBuildings(payload: any, user: any) {
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
+    const { buildings } = payload; // string[]
+    if (!Array.isArray(buildings) || buildings.length === 0) throw new Error('缺少 buildings 陣列');
+
+    await prisma.$transaction(
+      buildings.map((name: string, idx: number) =>
+        prisma.buildingSetting.update({
+          where: { building: name },
+          data: { sortOrder: idx }
+        })
+      )
+    );
     return { success: true };
   },
 
@@ -626,7 +655,12 @@ export const GroupBuyService = {
     };
 
     // 取得大樓時段設定
-    const bSettings = await prisma.buildingSetting.findMany();
+    const bSettings = await prisma.buildingSetting.findMany({
+      orderBy: [
+        { sortOrder: 'asc' },
+        { building: 'asc' }
+      ]
+    });
     const buildingSettings = bSettings.map((s: any) => ({
       building: s.building,
       start_time: s.startTime || '',
