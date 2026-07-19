@@ -646,13 +646,23 @@ export const GroupBuyService = {
     const customPrices = await prisma.communityProductPrice.findMany({
       where: { communityId: targetComm.communityId }
     });
-    const customPriceMap = new Map(customPrices.map((cp: any) => [cp.productId, Number(cp.customPrice)]));
+    const customPriceMap = new Map(customPrices.map((cp: any) => [
+      cp.productId, 
+      {
+        customPrice: Number(cp.customPrice),
+        buyX: cp.buyX !== null ? Number(cp.buyX) : null,
+        getY: cp.getY !== null ? Number(cp.getY) : null
+      }
+    ]));
 
     const products = rawProducts.map((p: any) => {
       if (customPriceMap.has(p.id)) {
+        const cp = customPriceMap.get(p.id);
         return {
           ...p,
-          single_price: customPriceMap.get(p.id)
+          single_price: cp.customPrice,
+          buy_x: cp.buyX,
+          get_y: cp.getY
         };
       }
       return p;
@@ -1424,21 +1434,41 @@ export const GroupBuyService = {
 
     return customPrices.map((cp: any) => ({
       productId: cp.productId,
-      customPrice: Number(cp.customPrice)
+      customPrice: Number(cp.customPrice),
+      buyX: cp.buyX !== null ? Number(cp.buyX) : null,
+      getY: cp.getY !== null ? Number(cp.getY) : null
     }));
   },
 
-  // 21. 儲存/更新社區商品價格
+  // 21. 儲存/更新社區商品價格 (支援自動刪除)
   async saveCommunityCustomPrice(payload: any, user: any) {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
-    const { communityId, productId, customPrice } = payload;
+    const { communityId, productId, customPrice, buyX, getY } = payload;
     if (!communityId || !productId) throw new Error('缺少必要參數');
-    if (customPrice === undefined || customPrice === null || customPrice === '') {
-      throw new Error('價格不可為空');
+
+    const hasPrice = customPrice !== undefined && customPrice !== null && customPrice !== '';
+    const hasBuyX = buyX !== undefined && buyX !== null && buyX !== '';
+    const hasGetY = getY !== undefined && getY !== null && getY !== '';
+
+    // 全空直接移除
+    if (!hasPrice && !hasBuyX && !hasGetY) {
+      try {
+        await prisma.communityProductPrice.delete({
+          where: {
+            communityId_productId: { communityId, productId }
+          }
+        });
+      } catch (e) {}
+      return { success: true, deleted: true };
     }
 
-    const price = Number(customPrice);
-    if (isNaN(price) || price < 0) throw new Error('價格必須為正數');
+    const priceVal = hasPrice ? Number(customPrice) : 0;
+    const buyXVal = hasBuyX ? Number(buyX) : null;
+    const getYVal = hasGetY ? Number(getY) : null;
+
+    if (isNaN(priceVal) || priceVal < 0) throw new Error('價格必須為正數');
+    if (buyXVal !== null && (isNaN(buyXVal) || buyXVal < 0)) throw new Error('買幾必須為正整數');
+    if (getYVal !== null && (isNaN(getYVal) || getYVal < 0)) throw new Error('送幾必須為正整數');
 
     await prisma.communityProductPrice.upsert({
       where: {
@@ -1448,12 +1478,16 @@ export const GroupBuyService = {
         }
       },
       update: {
-        customPrice: price
+        customPrice: priceVal,
+        buyX: buyXVal,
+        getY: getYVal
       },
       create: {
         communityId,
         productId,
-        customPrice: price
+        customPrice: priceVal,
+        buyX: buyXVal,
+        getY: getYVal
       }
     });
 

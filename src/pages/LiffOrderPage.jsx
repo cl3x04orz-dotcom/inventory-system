@@ -1172,7 +1172,13 @@ export default function LiffOrderPage({ user, apiUrl }) {
       Object.entries(cart).reduce((s, [pid, qty]) => {
         const p = products.find((x) => x.id === pid);
         if (!p) return s;
-        if (p.has_volume_pricing && p.volume_pricing_settings) {
+        if (p.buy_x && p.get_y) {
+          const buyX = Number(p.buy_x);
+          const getY = Number(p.get_y);
+          const singlePrice = Number(p.single_price) || Number(p.price);
+          const freeCount = Math.floor(qty / (buyX + getY)) * getY;
+          return s + singlePrice * (qty - freeCount);
+        } else if (p.has_volume_pricing && p.volume_pricing_settings) {
           const targetQty = Number(p.volume_pricing_settings.target_quantity);
           const packagePrice = Number(p.volume_pricing_settings.package_price);
           const singlePrice = Number(p.single_price) || Number(p.price);
@@ -1221,7 +1227,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
         if (p) {
           const singlePrice = Number(p.single_price) || Number(p.price);
-          if (p.has_volume_pricing && p.volume_pricing_settings) {
+          if (p.buy_x && p.get_y) {
+            const buyX = Number(p.buy_x);
+            const getY = Number(p.get_y);
+            const freeCount = Math.floor(qty / (buyX + getY)) * getY;
+            subtotal = singlePrice * (qty - freeCount);
+          } else if (p.has_volume_pricing && p.volume_pricing_settings) {
             const targetQty = Number(p.volume_pricing_settings.target_quantity);
             const packagePrice = Number(
               p.volume_pricing_settings.package_price,
@@ -3562,6 +3573,11 @@ ${freeNote(newFee, newMin)}
                               {product.isBundle && (
                                 <span className="inline-block text-[10px] text-amber-800 bg-amber-500/10 border border-amber-200/30 px-1.5 py-0.5 rounded ml-1 font-bold">
                                   捆裝 {product.bundleSize}入
+                                </span>
+                              )}
+                              {product.buy_x && product.get_y && (
+                                <span className="inline-block text-[10px] text-emerald-800 bg-emerald-500/10 border border-emerald-200/30 px-1.5 py-0.5 rounded ml-1 font-bold">
+                                  🔥 買 {product.buy_x} 送 {product.get_y}
                                 </span>
                               )}
                             </div>
