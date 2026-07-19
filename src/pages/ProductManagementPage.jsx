@@ -407,7 +407,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                             className="input-field text-xs p-2.5 mt-auto"
                                                             placeholder="捆裝數量，例：4 (四入一組)"
                                                             disabled={!product.isBundle}
-                                                            value={product.bundleSize === '' || product.bundleSize === undefined || product.bundleSize === null || product.bundleSize === 1 ? '' : product.bundleSize}
+                                                            value={product.bundleSize === '' || product.bundleSize === undefined || product.bundleSize === null ? '' : product.bundleSize}
                                                             onChange={(e) => handleFieldChange(product.id, 'bundleSize', e.target.value !== '' ? Number(e.target.value) : '')}
                                                             onBlur={(e) => handleSaveProduct(product.id, { bundleSize: e.target.value !== '' ? Number(e.target.value) : 1 })}
                                                         />
@@ -527,7 +527,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                     type="number"
                                                                     className="input-field text-xs p-2"
                                                                     placeholder="例：24"
-                                                                    value={product.packSize === '' || product.packSize === undefined || product.packSize === null || product.packSize === 1 ? '' : product.packSize}
+                                                                    value={product.packSize === '' || product.packSize === undefined || product.packSize === null ? '' : product.packSize}
                                                                     onChange={(e) => handleFieldChange(product.id, 'packSize', e.target.value !== '' ? Number(e.target.value) : '')}
                                                                     onBlur={(e) => handleSaveProduct(product.id, { packSize: e.target.value !== '' ? Number(e.target.value) : 1 })}
                                                                 />
