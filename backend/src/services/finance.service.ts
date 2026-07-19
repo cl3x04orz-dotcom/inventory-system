@@ -124,7 +124,7 @@ export const FinanceService = {
 
   // 3. 將薪資存檔至 Expenditures
   async savePayrollToExpenditure(payload: any, user: any) {
-    if (user.role !== 'BOSS') {
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') {
       throw new Error('權限不足：只有管理員可以存檔薪資');
     }
 

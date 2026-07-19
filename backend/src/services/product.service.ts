@@ -135,7 +135,7 @@ export const ProductService = {
   },
 
   async updateProductDetails(payload: any, user: any) {
-    if (user.role !== 'BOSS') {
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') {
       throw new Error('權限不足');
     }
 
@@ -193,7 +193,7 @@ export const ProductService = {
   },
 
   async updateProductPurchasable(payload: any, user: any) {
-    if (user.role !== 'BOSS') {
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') {
       throw new Error('權限不足');
     }
     const { productId, isPurchasable } = payload;

@@ -287,7 +287,7 @@ export const PayrollService = {
 
   // 2. 儲存出勤/扣款紀錄
   async saveDailyRecord(payload: any, user: any) {
-    if (user.role !== 'BOSS') {
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') {
       throw new Error('權限不足：您沒有權限編輯出勤紀錄');
     }
 
@@ -333,7 +333,7 @@ export const PayrollService = {
 
   // 3. 儲存薪資設定
   async savePayrollSettings(payload: any, user: any) {
-    if (user.role !== 'BOSS') {
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') {
       throw new Error('權限不足：您沒有權限修改薪資設定');
     }
 
@@ -405,7 +405,7 @@ export const PayrollService = {
 
   // 5. 儲存員工基本資料
   async saveEmployeeProfile(payload: any, user: any) {
-    if (user.role !== 'BOSS') {
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') {
       throw new Error('權限不足：您沒有權限修改基本資料');
     }
 
