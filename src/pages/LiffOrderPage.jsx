@@ -2956,6 +2956,12 @@ ${freeNote(newFee, newMin)}
                             <span className="flex-shrink-0 ml-2 font-mono">x {item.Qty}</span>
                           </div>
                         ))}
+                        {Number(o.ShippingFee) > 0 && (
+                          <div className="text-xs flex justify-between text-[var(--text-secondary)] mt-1.5 pt-1.5 border-t border-dashed border-[var(--border-primary)]">
+                            <span>運費</span>
+                            <span className="font-mono font-semibold">+${o.ShippingFee}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 

@@ -906,6 +906,7 @@ export const GroupBuyService = {
         SourceGroup: o.sourceGroup,
         Note: o.note,
         TotalAmount: totalAmount,
+        ShippingFee: Number(o.shippingFee || 0),
         PaymentMethod: o.paymentMethod,
         PaymentMethodSnapshot: o.paymentMethod,
         PaymentStatus: o.paymentStatus || '',
