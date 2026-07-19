@@ -43,6 +43,103 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
     const [areaFreeShipping, setAreaFreeShipping] = useState(false);
 
     const LIFF_ID = '2010308873-ur2zL2cc';
+    
+    // 專屬價格相關 state
+    const [allProducts, setAllProducts] = useState([]);
+    const [selectedCommunityId, setSelectedCommunityId] = useState('');
+    const [customPrices, setCustomPrices] = useState({}); // { [productId]: number | '' }
+    const [loadingCustomPrices, setLoadingCustomPrices] = useState(false);
+    const [savingPriceProductId, setSavingPriceProductId] = useState('');
+
+    const fetchCustomPrices = useCallback(async (commId) => {
+        if (!commId) {
+            setCustomPrices({});
+            return;
+        }
+        setLoadingCustomPrices(true);
+        try {
+            const data = await callGAS(apiUrl, 'getCommunityCustomPrices', { communityId: commId }, user.token);
+            if (Array.isArray(data)) {
+                const priceMap = {};
+                data.forEach(item => {
+                    priceMap[item.productId] = item.customPrice;
+                });
+                setCustomPrices(priceMap);
+            }
+        } catch (error) {
+            console.error('載入社區專屬價格失敗:', error);
+        } finally {
+            setLoadingCustomPrices(false);
+        }
+    }, [apiUrl, user.token]);
+
+    const fetchAllProducts = useCallback(async () => {
+        try {
+            const data = await callGAS(apiUrl, 'getProducts', {}, user.token);
+            if (Array.isArray(data)) {
+                setAllProducts(data);
+            }
+        } catch (error) {
+            console.error('載入商品清單失敗:', error);
+        }
+    }, [apiUrl, user.token]);
+
+    const handleSaveCustomPrice = async (productId, customPrice) => {
+        if (!selectedCommunityId) {
+            alert('缺少社區識別！');
+            return;
+        }
+        if (customPrice === undefined || customPrice === '') {
+            alert('價格不可為空！');
+            return;
+        }
+        setSavingPriceProductId(productId);
+        try {
+            const res = await callGAS(apiUrl, 'saveCommunityCustomPrice', {
+                communityId: selectedCommunityId,
+                productId,
+                customPrice: Number(customPrice)
+            }, user.token);
+            if (res && res.error) throw new Error(res.error);
+            
+            // 更新本地 state
+            setCustomPrices(prev => ({
+                ...prev,
+                [productId]: Number(customPrice)
+            }));
+            alert('專屬售價儲存成功！');
+        } catch (error) {
+            alert('儲存專屬售價失敗: ' + error.message);
+        } finally {
+            setSavingPriceProductId('');
+        }
+    };
+
+    const handleDeleteCustomPrice = async (productId) => {
+        if (!selectedCommunityId) return;
+        if (!window.confirm('確定要移除此商品的客製專屬售價，並恢復預設原價嗎？')) return;
+
+        setSavingPriceProductId(productId);
+        try {
+            const res = await callGAS(apiUrl, 'deleteCommunityCustomPrice', {
+                communityId: selectedCommunityId,
+                productId
+            }, user.token);
+            if (res && res.error) throw new Error(res.error);
+            
+            // 更新本地 state
+            setCustomPrices(prev => {
+                const next = { ...prev };
+                delete next[productId];
+                return next;
+            });
+            alert('專屬售價已移除，恢復為商品預設原價。');
+        } catch (error) {
+            alert('移除專屬售價失敗: ' + error.message);
+        } finally {
+            setSavingPriceProductId('');
+        }
+    };
 
     const fetchSettings = useCallback(async () => {
         setLoading(true);
@@ -75,8 +172,9 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
         if (user?.token) {
             fetchSettings();
             fetchCommunities();
+            fetchAllProducts();
         }
-    }, [user.token, fetchSettings]);
+    }, [user.token, fetchSettings, fetchAllProducts]);
 
     const fetchCommunities = async () => {
         setLoadingCommunities(true);
@@ -181,6 +279,11 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
 
             // 備注
             setAdminNote(found.admin_note || '');
+
+            // 社區專屬價格相關
+            const commId = found.community_id || '';
+            setSelectedCommunityId(commId);
+            fetchCustomPrices(commId);
         } else {
             setStartDate('');
             setStartTime('');
@@ -200,6 +303,10 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
 
             // 備注預設
             setAdminNote('');
+
+            // 社區專屬價格相關
+            setSelectedCommunityId('');
+            setCustomPrices({});
         }
     };
 
@@ -843,7 +950,87 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                     </button>
                                 </div>
                             </div>
-                            </>  
+
+                            {/* 社區專屬定價管理區塊 */}
+                            <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
+                                <h3 className="font-extrabold text-base text-[var(--text-primary)] pb-2.5 border-b border-[var(--border-primary)] flex items-center gap-1.5">
+                                    <span className="text-base flex-shrink-0">🏷️</span>
+                                    群組/大樓專屬商品定價設定
+                                </h3>
+                                <p className="text-xs text-[var(--text-tertiary)]">
+                                    在此針對特定商品設定專屬售價（如：調高或調低）。若無設定或點選「移除」則預設採用商品的原始原價。
+                                </p>
+
+                                {loadingCustomPrices ? (
+                                    <div className="text-center py-6 text-xs text-[var(--text-secondary)]">載入客製化價格中...</div>
+                                ) : (
+                                    <div className="border border-[var(--border-primary)] rounded-xl overflow-hidden max-h-96 overflow-y-auto">
+                                        <table className="w-full text-left text-xs">
+                                            <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] font-bold sticky top-0">
+                                                <tr className="border-b border-[var(--border-primary)]">
+                                                    <th className="p-3">商品名稱</th>
+                                                    <th className="p-3 text-right">預設原價</th>
+                                                    <th className="p-3">專屬價格設定</th>
+                                                    <th className="p-3 text-center">操作</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-[var(--border-primary)]">
+                                                {allProducts.map(p => {
+                                                    const priceVal = customPrices[p.id] !== undefined && customPrices[p.id] !== null ? customPrices[p.id] : '';
+                                                    const hasCustom = customPrices[p.id] !== undefined && customPrices[p.id] !== null;
+
+                                                    return (
+                                                        <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                                                            <td className="p-3 font-bold text-slate-800">{p.name}</td>
+                                                            <td className="p-3 text-right font-mono font-bold text-slate-500">${p.single_price}</td>
+                                                            <td className="p-3">
+                                                                <div className="relative w-28">
+                                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        placeholder="未設定"
+                                                                        className="input-field pl-5 p-1.5 w-full text-xs font-bold text-slate-800"
+                                                                        value={priceVal}
+                                                                        onChange={(e) => {
+                                                                            const val = e.target.value;
+                                                                            setCustomPrices(prev => ({
+                                                                                ...prev,
+                                                                                [p.id]: val !== '' ? Number(val) : ''
+                                                                            }));
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-3 text-center space-x-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleSaveCustomPrice(p.id, customPrices[p.id])}
+                                                                    disabled={savingPriceProductId === p.id}
+                                                                    className="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-[10px] font-bold active:scale-95 transition-all"
+                                                                >
+                                                                    {savingPriceProductId === p.id ? '儲存中...' : '儲存'}
+                                                                </button>
+                                                                {hasCustom && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleDeleteCustomPrice(p.id)}
+                                                                        disabled={savingPriceProductId === p.id}
+                                                                        className="px-2 py-1 bg-red-100 hover:bg-red-500 text-red-600 hover:text-white rounded text-[10px] font-bold active:scale-95 transition-all"
+                                                                    >
+                                                                        移除
+                                                                    </button>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                            </>
                         )}
 
                         {/* URL Generation display */}

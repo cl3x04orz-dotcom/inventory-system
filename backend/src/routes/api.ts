@@ -61,6 +61,9 @@ const actionPermissions: Record<string, string> = {
   getCommunities: 'sales_pending',
   saveCommunityArea: 'sales_pending',
   deleteCommunityArea: 'sales_pending',
+  getCommunityCustomPrices: 'sales_pending',
+  saveCommunityCustomPrice: 'sales_pending',
+  deleteCommunityCustomPrice: 'sales_pending',
 
   getUsers: 'system_config',
   addUser: 'system_config',

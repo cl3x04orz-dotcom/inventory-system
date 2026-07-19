@@ -43,6 +43,7 @@ model Product {
   bundleSize            Int           @default(1)
   inventories           Inventory[]
   salesDetails          SalesDetail[]
+  customPrices          CommunityProductPrice[]
 }
 
 model Customer {
@@ -202,6 +203,7 @@ model GroupBuyCommunity {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
   deletedAt             DateTime?
+  customPrices          CommunityProductPrice[]
 }
 
 model GroupBuyOrder {
@@ -427,4 +429,16 @@ model Subscription {
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
   note           String?
+}
+
+model CommunityProductPrice {
+  communityId  String
+  productId    String
+  customPrice  Decimal
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  community    GroupBuyCommunity @relation(fields: [communityId], references: [communityId], onDelete: Cascade)
+  product      Product           @relation(fields: [productId], references: [productId], onDelete: Cascade)
+
+  @@id([communityId, productId])
 }

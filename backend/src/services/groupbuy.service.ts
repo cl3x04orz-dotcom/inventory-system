@@ -360,7 +360,7 @@ export const GroupBuyService = {
     });
     // 一次查出所有社區的運費設定（依名稱匹配）
     const allComms = await prisma.groupBuyCommunity.findMany({
-      select: { communityName: true, defaultFreeShipping: true, freeShippingMin: true, shippingFee: true }
+      select: { communityId: true, communityName: true, defaultFreeShipping: true, freeShippingMin: true, shippingFee: true }
     });
     const commMap = new Map(allComms.map((c: any) => [c.communityName, c]));
 
@@ -368,6 +368,7 @@ export const GroupBuyService = {
       const comm = commMap.get(s.building);
       return {
         building: s.building,
+        community_id: comm?.communityId || null,
         start_time: s.startTime || '',
         end_time: s.endTime || '',
         sort_order: s.sortOrder !== undefined && s.sortOrder !== null ? s.sortOrder : 0,
@@ -641,7 +642,21 @@ export const GroupBuyService = {
     }
 
     // 商品列表
-    const products = await ProductService.getProducts({});
+    const rawProducts = await ProductService.getProducts({});
+    const customPrices = await prisma.communityProductPrice.findMany({
+      where: { communityId: targetComm.communityId }
+    });
+    const customPriceMap = new Map(customPrices.map((cp: any) => [cp.productId, Number(cp.customPrice)]));
+
+    const products = rawProducts.map((p: any) => {
+      if (customPriceMap.has(p.id)) {
+        return {
+          ...p,
+          single_price: customPriceMap.get(p.id)
+        };
+      }
+      return p;
+    });
 
     const community = {
       CommunityId: targetComm.communityId,
@@ -1395,6 +1410,75 @@ export const GroupBuyService = {
         status: 'DELETED'
       }
     });
+    return { success: true };
+  },
+
+  // 20. 取得特定社區的專屬商品價格對照表
+  async getCommunityCustomPrices(payload: any, user: any) {
+    const { communityId } = payload;
+    if (!communityId) throw new Error('缺少 communityId');
+
+    const customPrices = await prisma.communityProductPrice.findMany({
+      where: { communityId }
+    });
+
+    return customPrices.map((cp: any) => ({
+      productId: cp.productId,
+      customPrice: Number(cp.customPrice)
+    }));
+  },
+
+  // 21. 儲存/更新社區商品價格
+  async saveCommunityCustomPrice(payload: any, user: any) {
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
+    const { communityId, productId, customPrice } = payload;
+    if (!communityId || !productId) throw new Error('缺少必要參數');
+    if (customPrice === undefined || customPrice === null || customPrice === '') {
+      throw new Error('價格不可為空');
+    }
+
+    const price = Number(customPrice);
+    if (isNaN(price) || price < 0) throw new Error('價格必須為正數');
+
+    await prisma.communityProductPrice.upsert({
+      where: {
+        communityId_productId: {
+          communityId,
+          productId
+        }
+      },
+      update: {
+        customPrice: price
+      },
+      create: {
+        communityId,
+        productId,
+        customPrice: price
+      }
+    });
+
+    return { success: true };
+  },
+
+  // 22. 刪除社區商品客製價（復原為預設原價）
+  async deleteCommunityCustomPrice(payload: any, user: any) {
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
+    const { communityId, productId } = payload;
+    if (!communityId || !productId) throw new Error('缺少必要參數');
+
+    try {
+      await prisma.communityProductPrice.delete({
+        where: {
+          communityId_productId: {
+            communityId,
+            productId
+          }
+        }
+      });
+    } catch (e: any) {
+      // 找不到要刪除的就 ignore
+    }
+
     return { success: true };
   }
 };
