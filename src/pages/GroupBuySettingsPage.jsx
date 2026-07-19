@@ -457,14 +457,16 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                 : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:text-slate-900'
                                         }`}
                                     >
-                                        <div className="flex items-center gap-2 min-w-0">
+                                        <div className="flex items-center gap-2 min-w-0 flex-1">
                                             <span className="text-base flex-shrink-0">🏢</span>
-                                            <span className="text-base font-bold tracking-wide truncate">{s.building}</span>
-                                            {s.admin_note && (
-                                                <span title={s.admin_note} className="flex-shrink-0 text-amber-500">
-                                                    <StickyNote size={13} />
-                                                </span>
-                                            )}
+                                            <div className="flex flex-col min-w-0">
+                                                <span className="text-base font-bold tracking-wide truncate">{s.building}</span>
+                                                {s.admin_note && (
+                                                    <span className="text-xs text-amber-600 font-medium truncate leading-tight mt-0.5">
+                                                        {s.admin_note}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                         {isSelected ? (
                                             <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
