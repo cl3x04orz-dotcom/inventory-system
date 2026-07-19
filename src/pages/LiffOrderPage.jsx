@@ -1822,7 +1822,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 className="w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 text-white shadow-md shadow-emerald-500/20 hover:opacity-95 active:scale-95 transition-all flex-shrink-0"
                 style={{ background: "#06C755" }}
               >
-                前往官方 LINE 付款 ➔
+                前往 聯繫米立微小編付款 ➔
               </button>
             )}
 
