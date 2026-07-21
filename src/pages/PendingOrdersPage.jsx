@@ -756,15 +756,21 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             return false;
         }
 
-        // 一般文字搜尋（編號、姓名、電話、地址、群組）
+        // 一般文字與金額搜尋（編號、姓名、電話、地址、群組、轉帳金額、對帳後五碼）
         if (searchTerm) {
-            const search = searchTerm.toLowerCase();
+            const search = searchTerm.toLowerCase().trim();
+            const cleanNumberSearch = search.replace(/[$$,,元]/g, '').trim();
+            const totals = computeOrderTotals(order, buildingSettingsList, groupBindings);
+            const orderTotalStr = String(totals.totalAmount ?? order.totalAmount ?? '');
             const matchesGeneral = (
                 String(order.orderId || '').toLowerCase().includes(search) ||
                 String(order.customerName || '').toLowerCase().includes(search) ||
                 String(order.customerPhone || '').toLowerCase().includes(search) ||
                 String(order.deliveryAddress || '').toLowerCase().includes(search) ||
-                String(order.sourceGroup || '').toLowerCase().includes(search)
+                String(order.sourceGroup || '').toLowerCase().includes(search) ||
+                String(order.transferLastFive || '').toLowerCase().includes(search) ||
+                orderTotalStr.includes(search) ||
+                (cleanNumberSearch !== '' && orderTotalStr.includes(cleanNumberSearch))
             );
             if (!matchesGeneral) return false;
         }
@@ -1325,7 +1331,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
                         <input
                             type="text"
-                            placeholder="搜尋編號、姓名、電話..."
+                            placeholder="搜尋編號、姓名、電話、金額..."
                             className="input-field pl-10 w-full md:w-60"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
