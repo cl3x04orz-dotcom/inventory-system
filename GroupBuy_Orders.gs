@@ -256,7 +256,7 @@ function getPendingOrdersService(payload, user) {
  * [Service] 管理員修改待確認訂單（商品、數量、收件資訊全可改）
  */
 function updatePendingOrderService(payload, user) {
-    if (user.role !== 'BOSS') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
 
     const { orderId, customerName, customerPhone, deliveryAddress, sourceGroup, note, items, paymentMethod, transferLastFive, paymentStatus } = payload;
     if (!orderId) throw new Error('缺少 orderId');

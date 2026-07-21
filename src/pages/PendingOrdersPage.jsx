@@ -1642,8 +1642,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                         {buildings.map(b => (
                                             <option key={b} value={b} />
                                         ))}
-                                        {Object.keys(groupBindings).map(g => (
-                                            <option key={g} value={g} />
+                                        {Object.entries(groupBindings).map(([gId, gName]) => (
+                                            <option key={gId} value={gName} />
                                         ))}
                                     </datalist>
                                 </div>
