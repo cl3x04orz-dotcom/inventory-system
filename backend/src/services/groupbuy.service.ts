@@ -148,40 +148,9 @@ export const GroupBuyService = {
         sum + (Number(item.unitPrice) * Number(item.qty)), 0);
     }
 
-    // 判斷是否為「一般散客 / 線上下單」
-    const targetGroup = sourceGroup !== undefined ? sourceGroup : '';
-    const isGeneralUser = !targetGroup || targetGroup === '一般散客' || targetGroup === '線上下單';
-
-    let finalShippingFee = 0;
-    if (isGeneralUser) {
-      // 尋找「一般散客」的社區/運費規則
-      const generalComm = await prisma.groupBuyCommunity.findFirst({
-        where: {
-          OR: [
-            { communityName: '一般散客' },
-            { communityName: '線上下單' },
-            { isDefault: true }
-          ]
-        }
-      });
-      if (generalComm && !generalComm.defaultFreeShipping) {
-        const min = Number(generalComm.freeShippingMin) || 0;
-        const fee = Number(generalComm.shippingFee) || 0;
-        if (min > 0 && productTotal >= min) {
-          finalShippingFee = 0;
-        } else {
-          finalShippingFee = fee;
-        }
-      } else if (shippingFee !== undefined) {
-        finalShippingFee = Number(shippingFee) || 0;
-      }
-    } else {
-      // 團購社群一律免運 (0 元)
-      finalShippingFee = 0;
-    }
-
-    updateData.shippingFee = finalShippingFee;
-    updateData.totalAmount = productTotal + finalShippingFee;
+    const appliedShippingFee = shippingFee !== undefined ? (Number(shippingFee) || 0) : 0;
+    updateData.shippingFee = appliedShippingFee;
+    updateData.totalAmount = productTotal + appliedShippingFee;
 
     await prisma.$transaction(async (tx) => {
       // 1. 更新主訂單

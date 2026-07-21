@@ -486,31 +486,12 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         });
     };
 
-    const computeOrderTotals = useCallback((order, settingsList = []) => {
+    const computeOrderTotals = useCallback((order) => {
         if (!order || !order.items) return { productTotal: 0, shippingFee: 0, totalAmount: 0 };
         const productTotal = order.items.reduce((sum, item) =>
             sum + (Number(item.unitPrice || 0) * Number(item.qty || 0)), 0);
 
-        const group = order.sourceGroup || '';
-        const isGeneralUser = !group || group === '一般散客' || group === '線上下單';
-
-        let fee = 0;
-        if (isGeneralUser) {
-            const generalSetting = settingsList.find(s => s.building === '一般散客' || s.building === '線上下單');
-            if (generalSetting && !generalSetting.default_free_shipping) {
-                const min = Number(generalSetting.free_shipping_min) || 0;
-                const settingFee = Number(generalSetting.shipping_fee) || 0;
-                if (min > 0 && productTotal >= min) {
-                    fee = 0;
-                } else {
-                    fee = settingFee;
-                }
-            } else if (order.shippingFee !== undefined) {
-                fee = Number(order.shippingFee) || 0;
-            }
-        } else {
-            fee = 0; // 團購/社區訂單一律免運
-        }
+        const fee = Number(order.shippingFee) || 0;
 
         return {
             productTotal,
@@ -544,8 +525,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 }
             }
 
-            // 2. 自動計算最新運費標準 (若切換為一般散客則計算滿額免運，若切換為團購社區則一律免運 0 元)
-            const calculatedTotals = computeOrderTotals(editingOrder, buildingSettingsList);
+            // 2. 計算最新運費與總額
+            const calculatedTotals = computeOrderTotals(editingOrder);
 
             // 3. 更新訂單內容
             const res = await callGAS(apiUrl, 'updatePendingOrder', {
@@ -579,16 +560,37 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         }
     };
 
+    // 自動聚合所有出現過的大樓/社區（包含大樓設定、群組綁定與訂單地址開頭，如「柳營奇美」）
+    const allAvailableBuildings = React.useMemo(() => {
+        const set = new Set();
+        buildings.forEach(b => b && set.add(b));
+        Object.values(groupBindings).forEach(b => b && set.add(b));
+        orders.forEach(o => {
+            if (o.sourceGroup && o.sourceGroup !== '一般散客') {
+                const mapped = groupBindings[o.sourceGroup] || o.sourceGroup;
+                set.add(mapped);
+            }
+            if (o.deliveryAddress) {
+                const knownNames = Array.from(set);
+                const matched = knownNames.find(n => n && o.deliveryAddress.startsWith(n));
+                if (matched) {
+                    set.add(matched);
+                } else {
+                    const parts = o.deliveryAddress.split(/\s*-\s*/);
+                    if (parts.length > 1 && parts[0].length < 20) {
+                        set.add(parts[0].trim());
+                    }
+                }
+            }
+        });
+        return Array.from(set).filter(Boolean);
+    }, [buildings, groupBindings, orders]);
+
     const filteredOrders = orders.filter(order => {
         // 大樓篩選
         if (selectedBuilding !== '全部') {
             const addr = String(order.deliveryAddress || '').trim();
             const boundBuildingName = groupBindings[order.sourceGroup] || order.sourceGroup || '';
-            
-            // 若訂單有指定的群組，且群組名稱與當前選擇的大樓不同，代表已移至其他群組
-            if (boundBuildingName && boundBuildingName !== '一般散客' && boundBuildingName !== selectedBuilding) {
-                return false;
-            }
 
             const matchesAddress = addr.startsWith(selectedBuilding);
             const matchesGroup = boundBuildingName === selectedBuilding;
@@ -1140,7 +1142,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         onChange={(e) => setSelectedBuilding(e.target.value)}
                     >
                         <option value="全部">全部社區大樓</option>
-                        {buildings.map(bname => (
+                        {allAvailableBuildings.map(bname => (
                             <option key={bname} value={bname}>{bname}</option>
                         ))}
                     </select>
