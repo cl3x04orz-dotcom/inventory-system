@@ -171,9 +171,11 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     };
 
     const handleOpenEdit = (order) => {
+        const displayGroup = groupBindings[order.sourceGroup] || order.sourceGroup || '';
         // 深拷貝 order 的 items 和 recipients，以免直接污染狀態
         setEditingOrder({
             ...order,
+            sourceGroup: displayGroup,
             items: order.items.map(item => ({ ...item })),
             recipients: order.recipients ? order.recipients.map(r => ({
                 ...r,
@@ -184,10 +186,17 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     };
 
     const handleEditFieldChange = (field, value) => {
-        setEditingOrder(prev => ({
-            ...prev,
-            [field]: value
-        }));
+        setEditingOrder(prev => {
+            const updated = { ...prev, [field]: value };
+            if (field === 'sourceGroup') {
+                const oldGroup = prev.sourceGroup || '';
+                const newGroup = value || '';
+                if (oldGroup && newGroup && prev.deliveryAddress && prev.deliveryAddress.startsWith(oldGroup)) {
+                    updated.deliveryAddress = prev.deliveryAddress.replace(oldGroup, newGroup);
+                }
+            }
+            return updated;
+        });
     };
 
     // 💡 團員分配雙軌狀態同步邏輯
@@ -469,7 +478,13 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         // 大樓篩選
         if (selectedBuilding !== '全部') {
             const addr = String(order.deliveryAddress || '').trim();
-            const boundBuildingName = groupBindings[order.sourceGroup];
+            const boundBuildingName = groupBindings[order.sourceGroup] || order.sourceGroup || '';
+            
+            // 若訂單有指定的群組，且群組名稱與當前選擇的大樓不同，代表已移至其他群組
+            if (boundBuildingName && boundBuildingName !== '一般散客' && boundBuildingName !== selectedBuilding) {
+                return false;
+            }
+
             const matchesAddress = addr.startsWith(selectedBuilding);
             const matchesGroup = boundBuildingName === selectedBuilding;
             if (!matchesAddress && !matchesGroup) {
