@@ -170,7 +170,7 @@ export const PurchaseService = {
               productName: itemName,
               category: 'General',
               defaultPrice: itemPrice,
-              isActive: true
+              isActive: false
             }
           });
         }
