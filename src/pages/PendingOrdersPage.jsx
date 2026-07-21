@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Package, ClipboardList, Eye, Edit, Trash2, CheckCircle, RefreshCw, X, User, Users, Phone, MapPin, FileText, Plus, Minus, Save, Calendar, Check, Search, Copy } from 'lucide-react';
+import { Package, ClipboardList, Eye, Edit, Trash2, CheckCircle, RefreshCw, X, User, Users, Phone, MapPin, FileText, Plus, Minus, Save, Calendar, Check, Search, Copy, PackageSearch, ChevronDown, ChevronUp } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
 export default function PendingOrdersPage({ user, apiUrl }) {
@@ -22,6 +22,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
     // 搜尋與篩選
     const [searchTerm, setSearchTerm] = useState('');
+    const [productSearchTerm, setProductSearchTerm] = useState('');
+    const [expandedOrderIds, setExpandedOrderIds] = useState(new Set());
 
     // 批次與大樓功能狀態
     const [selectedOrderIds, setSelectedOrderIds] = useState([]);
@@ -474,14 +476,38 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             }
         }
 
-        const search = searchTerm.toLowerCase();
-        return (
-            String(order.orderId || '').toLowerCase().includes(search) ||
-            String(order.customerName || '').toLowerCase().includes(search) ||
-            String(order.customerPhone || '').toLowerCase().includes(search) ||
-            String(order.deliveryAddress || '').toLowerCase().includes(search) ||
-            String(order.sourceGroup || '').toLowerCase().includes(search)
-        );
+        // 一般文字搜尋（編號、姓名、電話、地址、群組）
+        if (searchTerm) {
+            const search = searchTerm.toLowerCase();
+            const matchesGeneral = (
+                String(order.orderId || '').toLowerCase().includes(search) ||
+                String(order.customerName || '').toLowerCase().includes(search) ||
+                String(order.customerPhone || '').toLowerCase().includes(search) ||
+                String(order.deliveryAddress || '').toLowerCase().includes(search) ||
+                String(order.sourceGroup || '').toLowerCase().includes(search)
+            );
+            if (!matchesGeneral) return false;
+        }
+
+        // 商品名稱特化搜尋
+        if (productSearchTerm) {
+            const pSearch = productSearchTerm.toLowerCase().trim();
+            const hasMatchingProductInItems = order.items?.some(item =>
+                String(item.productName || '').toLowerCase().includes(pSearch) ||
+                String(item.productId || '').toLowerCase().includes(pSearch)
+            );
+            const hasMatchingProductInRecipients = order.recipients?.some(r =>
+                r.items?.some(ri =>
+                    String(ri.productName || '').toLowerCase().includes(pSearch) ||
+                    String(ri.productId || '').toLowerCase().includes(pSearch)
+                )
+            );
+            if (!hasMatchingProductInItems && !hasMatchingProductInRecipients) {
+                return false;
+            }
+        }
+
+        return true;
     });
 
     // 排序：同大樓排在一起，大樓相同則依時間新到舊排序
@@ -502,6 +528,73 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
         });
     }, [filteredOrders, groupBindings]);
+
+    // 商品特化搜尋小卡片統計數據
+    const productSearchSummary = React.useMemo(() => {
+        if (!productSearchTerm.trim()) return null;
+        const pSearch = productSearchTerm.toLowerCase().trim();
+        let totalMatchQty = 0;
+        let matchingOrdersCount = 0;
+
+        sortedFilteredOrders.forEach(order => {
+            let orderMatchingQty = 0;
+
+            if (order.items && order.items.length > 0) {
+                order.items.forEach(item => {
+                    if (
+                        String(item.productName || '').toLowerCase().includes(pSearch) ||
+                        String(item.productId || '').toLowerCase().includes(pSearch)
+                    ) {
+                        orderMatchingQty += (Number(item.qty) || 0);
+                    }
+                });
+            } else if (order.recipients && order.recipients.length > 0) {
+                order.recipients.forEach(r => {
+                    r.items?.forEach(ri => {
+                        if (
+                            String(ri.productName || '').toLowerCase().includes(pSearch) ||
+                            String(ri.productId || '').toLowerCase().includes(pSearch)
+                        ) {
+                            orderMatchingQty += (Number(ri.qty) || 0);
+                        }
+                    });
+                });
+            }
+
+            if (orderMatchingQty > 0) {
+                matchingOrdersCount++;
+                totalMatchQty += orderMatchingQty;
+            }
+        });
+
+        return {
+            keyword: productSearchTerm.trim(),
+            matchingOrdersCount,
+            totalMatchQty
+        };
+    }, [sortedFilteredOrders, productSearchTerm]);
+
+    // 折疊與展開操作
+    const toggleExpandOrder = (orderId) => {
+        setExpandedOrderIds(prev => {
+            const next = new Set(prev);
+            if (next.has(orderId)) {
+                next.delete(orderId);
+            } else {
+                next.add(orderId);
+            }
+            return next;
+        });
+    };
+
+    const handleExpandAll = () => {
+        const allIds = new Set(sortedFilteredOrders.map(o => o.orderId));
+        setExpandedOrderIds(allIds);
+    };
+
+    const handleCollapseAll = () => {
+        setExpandedOrderIds(new Set());
+    };
 
     // 數據加總統計 (Summary Panel)
     const summaryStats = React.useMemo(() => {
@@ -935,11 +1028,33 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
                         <input
                             type="text"
-                            placeholder="搜尋編號、姓名、電話、地址、群組..."
-                            className="input-field pl-10 w-full md:w-80"
+                            placeholder="搜尋編號、姓名、電話..."
+                            className="input-field pl-10 w-full md:w-60"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
+                    </div>
+
+                    {/* 商品名稱特化查詢 */}
+                    <div className="relative flex-1 md:flex-none">
+                        <PackageSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500" size={18} />
+                        <input
+                            type="text"
+                            placeholder="🔍 查詢商品 (如: 崙背1L)..."
+                            className="input-field pl-10 pr-8 w-full md:w-64 border-emerald-500/40 focus:border-emerald-500"
+                            value={productSearchTerm}
+                            onChange={(e) => setProductSearchTerm(e.target.value)}
+                        />
+                        {productSearchTerm && (
+                            <button
+                                type="button"
+                                onClick={() => setProductSearchTerm('')}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                                title="清空商品搜尋"
+                            >
+                                <X size={14} />
+                            </button>
+                        )}
                     </div>
                     <button onClick={fetchOrders} className="btn-secondary p-2 whitespace-nowrap" title="重新整理">
                         <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
@@ -979,6 +1094,31 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl p-3.5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
                         <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">待出貨總金額</span>
                         <span className="text-xl font-extrabold text-emerald-600 mt-1">${summaryStats.totalAmount.toLocaleString()}</span>
+                    </div>
+                </div>
+            )}
+
+            {/* 商品專屬查詢統計小卡片 */}
+            {productSearchSummary && (
+                <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-700/50 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm animate-in fade-in duration-200">
+                    <div className="flex items-center gap-3">
+                        <div className="p-3 bg-emerald-600 text-white rounded-xl shadow-sm">
+                            <PackageSearch size={24} />
+                        </div>
+                        <div>
+                            <div className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                                📦 商品查詢統計：「<span className="font-extrabold underline">{productSearchSummary.keyword}</span>」
+                            </div>
+                            <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 mt-0.5">
+                                含有此商品的訂單共 <span className="font-extrabold font-mono text-base">{productSearchSummary.matchingOrdersCount}</span> 筆
+                            </div>
+                        </div>
+                    </div>
+                    <div className="text-right bg-white dark:bg-slate-900 px-5 py-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800 shadow-sm flex items-center justify-between sm:block">
+                        <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 block">該商品訂購數量總計</span>
+                        <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                            {productSearchSummary.totalMatchQty} <span className="text-xs font-normal">瓶/件</span>
+                        </span>
                     </div>
                 </div>
             )}
@@ -1055,6 +1195,22 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 <div className="flex gap-2 flex-wrap sm:flex-nowrap">
                     <button
                         type="button"
+                        onClick={handleExpandAll}
+                        className="py-1.5 px-3 text-xs font-bold rounded-lg flex items-center gap-1 shadow-sm active:scale-95 transition-all duration-200 border bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)] whitespace-nowrap"
+                        title="展開所有訂單詳情"
+                    >
+                        <ChevronDown size={14} /> <span>全部展開</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleCollapseAll}
+                        className="py-1.5 px-3 text-xs font-bold rounded-lg flex items-center gap-1 shadow-sm active:scale-95 transition-all duration-200 border bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)] whitespace-nowrap"
+                        title="折疊所有訂單"
+                    >
+                        <ChevronUp size={14} /> <span>全部折疊</span>
+                    </button>
+                    <button
+                        type="button"
                         onClick={handleCopyShipmentSummary}
                         className={`py-1.5 px-3 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-200 border whitespace-nowrap ${copied 
                             ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent' 
@@ -1100,243 +1256,299 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         沒有找到任何訂單。
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                        {filteredOrders.map(order => (
-                            <div key={order.orderId} className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] shadow-md p-6 flex flex-col justify-between hover:border-blue-500/30 hover:shadow-lg transition-all duration-200">
-                                {/* Order Header */}
-                                <div>
-                                    <div className="flex justify-between items-center mb-4 pb-3 border-b border-[var(--border-primary)]">
-                                        <div className="flex items-center gap-2">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                        {sortedFilteredOrders.map(order => {
+                            const isExpanded = expandedOrderIds.has(order.orderId);
+                            return (
+                                <div key={order.orderId} className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] shadow-sm hover:border-blue-500/40 hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col">
+                                    {/* 頂部 Summary 列 (標頭) - 點擊可折疊/展開 */}
+                                    <div 
+                                        onClick={() => toggleExpandOrder(order.orderId)}
+                                        className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors select-none"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0 flex-1">
                                             {activeTab === 'PENDING' && (
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedOrderIds.includes(order.orderId)}
-                                                    onChange={() => handleToggleSelectOrder(order.orderId)}
-                                                    className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                                                    onChange={(e) => {
+                                                        e.stopPropagation();
+                                                        handleToggleSelectOrder(order.orderId);
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer flex-shrink-0"
                                                 />
                                             )}
-                                            <div className="flex flex-col">
-                                                <span className="font-mono font-bold text-lg md:text-xl text-[var(--text-primary)]">{order.orderId}</span>
-                                                {order.createdAt && (
-                                                    <span className="text-[11px] text-slate-400 font-medium mt-0.5">
-                                                        ⏱️ {new Date(order.createdAt).toLocaleString('zh-TW', {
-                                                            year: 'numeric',
-                                                            month: '2-digit',
-                                                            day: '2-digit',
-                                                            hour: '2-digit',
-                                                            minute: '2-digit',
-                                                            hour12: false
-                                                        })}
+                                            <div className="flex flex-col min-w-0 flex-1">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="font-mono font-bold text-base md:text-lg text-[var(--text-primary)]">{order.orderId}</span>
+                                                    <span className="font-extrabold text-[var(--text-primary)] text-sm md:text-base flex items-center gap-1">
+                                                        <User size={15} className="text-[var(--text-tertiary)]" />
+                                                        {order.customerName}
                                                     </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            {order.paymentStatus !== 'off' && order.paymentStatus !== '已付款' && order.paymentStatus !== '已入帳' ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleQuickConfirmPayment(order)}
-                                                    className="text-xs px-2.5 py-1 font-bold rounded bg-white hover:bg-emerald-50 text-emerald-600 border border-emerald-200 hover:border-emerald-300 active:scale-95 transition-all shadow-sm flex items-center gap-0.5"
-                                                    title="一鍵標記為已付款"
-                                                >
-                                                    <Check size={12} /> 確認收款
-                                                </button>
-                                            ) : (
-                                                order.status === 'PENDING' ? (
-                                                    <span className="inline-block text-xs px-2.5 py-1 rounded font-extrabold border bg-white text-blue-600 border-blue-200 uppercase tracking-wider">
-                                                        待出貨
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-block text-xs px-2.5 py-1 rounded font-extrabold border bg-white text-emerald-600 border-emerald-200 uppercase tracking-wider">
-                                                        已出貨
-                                                    </span>
-                                                )
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Client Details */}
-                                    <div className="space-y-2.5 text-base mb-4">
-                                        <div className="flex flex-wrap items-center gap-2.5 text-[var(--text-primary)] text-base md:text-lg">
-                                            <User size={18} className="text-[var(--text-tertiary)] flex-shrink-0" />
-                                            <span className="font-extrabold">{order.customerName}</span>
-                                            {order.lineDisplayName && (
-                                                <span className="text-xs text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded font-medium">
-                                                    LINE: {order.lineDisplayName}
-                                                </span>
-                                            )}
-                                            {order.sourceGroup && (
-                                                <span className="bg-white text-slate-600 text-xs px-2 py-0.5 rounded flex items-center gap-1 font-bold border border-slate-200">
-                                                    {groupBindings[order.sourceGroup] || order.sourceGroup}
-                                                    {groupBindings[order.sourceGroup] && (
-                                                        <span className="opacity-60 text-[10px] font-mono font-medium">({order.sourceGroup})</span>
+                                                    {order.sourceGroup && (
+                                                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs px-2 py-0.5 rounded font-bold border border-slate-200 dark:border-slate-700">
+                                                            {groupBindings[order.sourceGroup] || order.sourceGroup}
+                                                        </span>
                                                     )}
-                                                </span>
-                                            )}
-                                        </div>
-                                        
-                                        {/* 付款方式與狀態標籤 */}
-                                        {order.paymentMethod && (
-                                            <div className="flex flex-wrap items-center gap-2 py-1">
-                                                <span className={`inline-block text-xs px-2.5 py-0.5 rounded font-extrabold border uppercase tracking-wider ${
-                                                    order.paymentMethod === '轉帳' 
-                                                        ? 'bg-indigo-50 text-indigo-600 border-indigo-200' 
-                                                        : order.paymentMethod === 'LINE Pay'
-                                                        ? 'bg-blue-50 text-blue-600 border-blue-200'
-                                                        : order.paymentMethod === '現金'
-                                                        ? 'bg-sky-50 text-sky-700 border-sky-200'
-                                                        : 'bg-white text-slate-700 border-slate-200'
-                                                }`}>
-                                                    💳 {order.paymentMethod}
-                                                </span>
-                                                {order.transferLastFive && (
-                                                    <span className="text-xs text-slate-500 dark:text-slate-400 font-mono bg-transparent px-1">
-                                                        (末五碼：{order.transferLastFive})
+                                                </div>
+                                                
+                                                {/* 簡化版商品與地址預覽 */}
+                                                <div className="text-xs text-[var(--text-secondary)] mt-1.5 flex items-center gap-2 flex-wrap">
+                                                    <span className="text-blue-600 dark:text-blue-400 font-bold truncate max-w-md">
+                                                        📦 {order.items?.map(it => `${it.productName} x${it.qty}`).join('、 ') || '無商品'}
                                                     </span>
-                                                )}
-                                                {order.paymentStatus && (
-                                                    <span className={`inline-block text-xs px-2 py-0.5 rounded font-black border ${
-                                                        order.paymentStatus === '已付款' || order.paymentStatus === '已入帳'
-                                                            ? 'bg-white text-emerald-600 border-emerald-200'
-                                                            : 'bg-white text-rose-600 border-rose-200'
+                                                    {order.deliveryAddress && (
+                                                        <span className="text-[var(--text-tertiary)] truncate max-w-xs">
+                                                            📍 {order.deliveryAddress}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-3 flex-shrink-0 justify-between md:justify-end">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-mono font-extrabold text-base md:text-lg text-emerald-600 dark:text-emerald-400">
+                                                    ${order.totalAmount}
+                                                </span>
+                                                {order.paymentStatus !== 'off' && order.paymentStatus !== '已付款' && order.paymentStatus !== '已入帳' ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleQuickConfirmPayment(order);
+                                                        }}
+                                                        className="text-xs px-2.5 py-1 font-bold rounded bg-white hover:bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-sm flex items-center gap-0.5"
+                                                        title="一鍵標記為已付款"
+                                                    >
+                                                        <Check size={12} /> 確認收款
+                                                    </button>
+                                                ) : (
+                                                    <span className={`inline-block text-xs px-2 py-0.5 rounded font-extrabold border ${
+                                                        order.status === 'PENDING' ? 'bg-white text-blue-600 border-blue-200' : 'bg-white text-emerald-600 border-emerald-200'
                                                     }`}>
-                                                        {order.paymentStatus}
+                                                        {order.status === 'PENDING' ? '待出貨' : '已出貨'}
                                                     </span>
                                                 )}
                                             </div>
-                                        )}
 
-                                        <div className="flex items-center gap-2 text-[var(--text-secondary)] text-base md:text-lg">
-                                            <Phone size={18} className="text-[var(--text-tertiary)]" />
-                                            <span className="font-semibold">{order.customerPhone}</span>
                                             <button
                                                 type="button"
-                                                onClick={() => handleCopyText(order.customerPhone, '電話')}
-                                                className="p-1 hover:bg-[var(--bg-hover)] rounded text-[var(--text-tertiary)] hover:text-blue-500 transition-colors"
-                                                title="複製電話"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleExpandOrder(order.orderId);
+                                                }}
+                                                className={`py-1 px-3 text-xs font-bold rounded-lg border transition-all flex items-center gap-1 ${
+                                                    isExpanded 
+                                                        ? 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/40 dark:border-blue-800' 
+                                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:bg-[var(--bg-hover)]'
+                                                }`}
                                             >
-                                                <Copy size={13} />
+                                                {isExpanded ? (
+                                                    <>
+                                                        <span>折疊</span>
+                                                        <ChevronUp size={14} />
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <span>展開</span>
+                                                        <ChevronDown size={14} />
+                                                    </>
+                                                )}
                                             </button>
                                         </div>
-                                        {order.deliveryAddress && (
-                                            <div className="flex items-center gap-2 text-[var(--text-secondary)] text-base md:text-lg">
-                                                <MapPin size={18} className="text-[var(--text-tertiary)] animate-pulse" />
-                                                <span className="break-all font-semibold">{order.deliveryAddress}</span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleCopyText(order.deliveryAddress, '地址')}
-                                                    className="p-1 hover:bg-[var(--bg-hover)] rounded text-[var(--text-tertiary)] hover:text-blue-500 transition-colors"
-                                                    title="複製地址"
-                                                >
-                                                    <Copy size={13} />
-                                                </button>
-                                            </div>
-                                        )}
-                                        {order.note && (
-                                            <div className="flex items-start gap-2 bg-[var(--bg-tertiary)] p-3 rounded-lg border border-[var(--border-primary)] text-sm md:text-base text-[var(--text-secondary)]">
-                                                <FileText size={16} className="text-[var(--text-tertiary)] mt-0.5 flex-shrink-0" />
-                                                <span className="italic font-medium">"{order.note}"</span>
-                                            </div>
-                                        )}
                                     </div>
 
-                                    {/* Items List */}
-                                    <div className="bg-[var(--bg-tertiary)] rounded-lg p-4 border border-[var(--border-primary)] mb-4 shadow-inner">
-                                        <div className="text-xs md:text-sm uppercase font-bold text-[var(--text-tertiary)] mb-2.5 tracking-wider">訂單商品明細</div>
-                                        <div className="divide-y divide-[var(--border-primary)] divide-dashed space-y-3">
-                                            {order.items.map((item, idx) => (
-                                                <div key={idx} className="flex flex-col pt-2.5 first:pt-0">
-                                                    {(() => {
-                                                        const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
-                                                        const isBundle = prod ? prod.isBundle : false;
-                                                        const bundleSize = prod ? prod.bundleSize : 1;
-                                                        return (
-                                                            <div className="flex justify-between items-center text-base md:text-lg">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="font-extrabold text-[var(--text-primary)]">
-                                                                        {item.productName}
-                                                                        {isBundle && <span className="text-[10px] font-extrabold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md ml-1.5">捆裝 {bundleSize}入</span>}
-                                                                    </span>
-                                                                    <span className="text-sm md:text-base text-blue-600 dark:text-blue-400 font-black">
-                                                                        x {item.qty} {isBundle ? '組' : '瓶'}
-                                                                    </span>
-                                                                </div>
-                                                                <span className="font-mono font-bold text-[var(--text-secondary)]">${item.subtotal}</span>
-                                                            </div>
-                                                        );
-                                                    })()}
-                                                    {item.remark && (
-                                                        <div className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-bold mt-1 ml-1">
-                                                            {item.remark}
+                                    {/* 展開後的詳細內容區塊 */}
+                                    {isExpanded && (
+                                        <div className="p-6 pt-3 border-t border-[var(--border-primary)] bg-[var(--bg-secondary)] flex flex-col justify-between flex-1 animate-in fade-in duration-150">
+                                            <div>
+                                                {/* Client Details */}
+                                                <div className="space-y-2.5 text-base mb-4">
+                                                    <div className="flex flex-wrap items-center gap-2.5 text-[var(--text-primary)] text-base md:text-lg">
+                                                        <User size={18} className="text-[var(--text-tertiary)] flex-shrink-0" />
+                                                        <span className="font-extrabold">{order.customerName}</span>
+                                                        {order.lineDisplayName && (
+                                                            <span className="text-xs text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded font-medium">
+                                                                LINE: {order.lineDisplayName}
+                                                            </span>
+                                                        )}
+                                                        {order.sourceGroup && (
+                                                            <span className="bg-white text-slate-600 text-xs px-2 py-0.5 rounded flex items-center gap-1 font-bold border border-slate-200">
+                                                                {groupBindings[order.sourceGroup] || order.sourceGroup}
+                                                                {groupBindings[order.sourceGroup] && (
+                                                                    <span className="opacity-60 text-[10px] font-mono font-medium">({order.sourceGroup})</span>
+                                                                )}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    {/* 付款方式與狀態標籤 */}
+                                                    {order.paymentMethod && (
+                                                        <div className="flex flex-wrap items-center gap-2 py-1">
+                                                            <span className={`inline-block text-xs px-2.5 py-0.5 rounded font-extrabold border uppercase tracking-wider ${
+                                                                order.paymentMethod === '轉帳' 
+                                                                    ? 'bg-indigo-50 text-indigo-600 border-indigo-200' 
+                                                                    : order.paymentMethod === 'LINE Pay'
+                                                                    ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                                                    : order.paymentMethod === '現金'
+                                                                    ? 'bg-sky-50 text-sky-700 border-sky-200'
+                                                                    : 'bg-white text-slate-700 border-slate-200'
+                                                            }`}>
+                                                                💳 {order.paymentMethod}
+                                                            </span>
+                                                            {order.transferLastFive && (
+                                                                <span className="text-xs text-slate-500 dark:text-slate-400 font-mono bg-transparent px-1">
+                                                                    (末五碼：{order.transferLastFive})
+                                                                </span>
+                                                            )}
+                                                            {order.paymentStatus && (
+                                                                <span className={`inline-block text-xs px-2 py-0.5 rounded font-black border ${
+                                                                    order.paymentStatus === '已付款' || order.paymentStatus === '已入帳'
+                                                                        ? 'bg-white text-emerald-600 border-emerald-200'
+                                                                        : 'bg-white text-rose-600 border-rose-200'
+                                                                }`}>
+                                                                    {order.paymentStatus}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    <div className="flex items-center gap-2 text-[var(--text-secondary)] text-base md:text-lg">
+                                                        <Phone size={18} className="text-[var(--text-tertiary)]" />
+                                                        <span className="font-semibold">{order.customerPhone}</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleCopyText(order.customerPhone, '電話')}
+                                                            className="p-1 hover:bg-[var(--bg-hover)] rounded text-[var(--text-tertiary)] hover:text-blue-500 transition-colors"
+                                                            title="複製電話"
+                                                        >
+                                                            <Copy size={13} />
+                                                        </button>
+                                                    </div>
+                                                    {order.deliveryAddress && (
+                                                        <div className="flex items-center gap-2 text-[var(--text-secondary)] text-base md:text-lg">
+                                                            <MapPin size={18} className="text-[var(--text-tertiary)] animate-pulse" />
+                                                            <span className="break-all font-semibold">{order.deliveryAddress}</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleCopyText(order.deliveryAddress, '地址')}
+                                                                className="p-1 hover:bg-[var(--bg-hover)] rounded text-[var(--text-tertiary)] hover:text-blue-500 transition-colors"
+                                                                title="複製地址"
+                                                            >
+                                                                <Copy size={13} />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                    {order.note && (
+                                                        <div className="flex items-start gap-2 bg-[var(--bg-tertiary)] p-3 rounded-lg border border-[var(--border-primary)] text-sm md:text-base text-[var(--text-secondary)]">
+                                                            <FileText size={16} className="text-[var(--text-tertiary)] mt-0.5 flex-shrink-0" />
+                                                            <span className="italic font-medium">"{order.note}"</span>
                                                         </div>
                                                     )}
                                                 </div>
-                                            ))}
-                                        </div>
-                                        <div className="flex justify-between items-center border-t border-[var(--border-primary)] mt-3.5 pt-2.5 font-bold text-lg md:text-xl">
-                                            <span className="text-[var(--text-primary)]">金額合計</span>
-                                            <span className="text-blue-600 dark:text-blue-400 font-mono font-extrabold">${order.totalAmount}</span>
-                                        </div>
-                                        {order.recipients && order.recipients.length > 0 && (
-                                            <div className="border-t border-[var(--border-primary)] mt-3.5 pt-3.5 space-y-2">
-                                                <div className="text-xs uppercase font-extrabold text-[var(--text-tertiary)] tracking-wider">👤 團員代訂分配明細</div>
-                                                <div className="space-y-2">
-                                                    {order.recipients.map((r, rIdx) => {
-                                                        const recipientTotal = r.items.reduce((sum, ri) => sum + (Number(ri.qty) * Number(ri.price)), 0);
-                                                        return (
-                                                            <div key={rIdx} className="bg-[var(--bg-secondary)] p-3 rounded-lg border border-[var(--border-primary)]">
-                                                                <div className="flex justify-between items-center text-sm font-bold text-[var(--text-primary)]">
-                                                                    <span>👤 {r.recipientName}</span>
-                                                                    <span className="text-blue-600 font-mono">${recipientTotal} 元</span>
-                                                                </div>
-                                                                <div className="pl-3 mt-1.5 space-y-0.5 text-xs text-[var(--text-secondary)]">
-                                                                    {r.items.map((ri, riIdx) => (
-                                                                        <div key={riIdx} className="flex justify-between items-center font-mono">
-                                                                            <span>{ri.productName} x{ri.qty}</span>
-                                                                            <span>${ri.qty * ri.price}</span>
+
+                                                {/* Items List */}
+                                                <div className="bg-[var(--bg-tertiary)] rounded-lg p-4 border border-[var(--border-primary)] mb-4 shadow-inner">
+                                                    <div className="text-xs md:text-sm uppercase font-bold text-[var(--text-tertiary)] mb-2.5 tracking-wider">訂單商品明細</div>
+                                                    <div className="divide-y divide-[var(--border-primary)] divide-dashed space-y-3">
+                                                        {order.items.map((item, idx) => (
+                                                            <div key={idx} className="flex flex-col pt-2.5 first:pt-0">
+                                                                {(() => {
+                                                                    const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
+                                                                    const isBundle = prod ? prod.isBundle : false;
+                                                                    const bundleSize = prod ? prod.bundleSize : 1;
+                                                                    return (
+                                                                        <div className="flex justify-between items-center text-base md:text-lg">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="font-extrabold text-[var(--text-primary)]">
+                                                                                    {item.productName}
+                                                                                    {isBundle && <span className="text-[10px] font-extrabold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md ml-1.5">捆裝 {bundleSize}入</span>}
+                                                                                </span>
+                                                                                <span className="text-sm md:text-base text-blue-600 dark:text-blue-400 font-black">
+                                                                                    x {item.qty} {isBundle ? '組' : '瓶'}
+                                                                                </span>
+                                                                            </div>
+                                                                            <span className="font-mono font-bold text-[var(--text-secondary)]">${item.subtotal}</span>
                                                                         </div>
-                                                                    ))}
-                                                                </div>
+                                                                    );
+                                                                })()}
+                                                                {item.remark && (
+                                                                    <div className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-bold mt-1 ml-1">
+                                                                        {item.remark}
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                        );
-                                                    })}
+                                                        ))}
+                                                    </div>
+                                                    <div className="flex justify-between items-center border-t border-[var(--border-primary)] mt-3.5 pt-2.5 font-bold text-lg md:text-xl">
+                                                        <span className="text-[var(--text-primary)]">金額合計</span>
+                                                        <span className="text-blue-600 dark:text-blue-400 font-mono font-extrabold">${order.totalAmount}</span>
+                                                    </div>
+                                                    {order.recipients && order.recipients.length > 0 && (
+                                                        <div className="border-t border-[var(--border-primary)] mt-3.5 pt-3.5 space-y-2">
+                                                            <div className="text-xs uppercase font-extrabold text-[var(--text-tertiary)] tracking-wider">👤 團員代訂分配明細</div>
+                                                            <div className="space-y-2">
+                                                                {order.recipients.map((r, rIdx) => {
+                                                                    const recipientTotal = r.items.reduce((sum, ri) => sum + (Number(ri.qty) * Number(ri.price)), 0);
+                                                                    return (
+                                                                        <div key={rIdx} className="bg-[var(--bg-secondary)] p-3 rounded-lg border border-[var(--border-primary)]">
+                                                                            <div className="flex justify-between items-center text-sm font-bold text-[var(--text-primary)]">
+                                                                                <span>👤 {r.recipientName}</span>
+                                                                                <span className="text-blue-600 font-mono">${recipientTotal} 元</span>
+                                                                            </div>
+                                                                            <div className="pl-3 mt-1.5 space-y-0.5 text-xs text-[var(--text-secondary)]">
+                                                                                {r.items.map((ri, riIdx) => (
+                                                                                    <div key={riIdx} className="flex justify-between items-center font-mono">
+                                                                                        <span>{ri.productName} x{ri.qty}</span>
+                                                                                        <span>${ri.qty * ri.price}</span>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
-                                        )}
-                                    </div>
-                                </div>
 
-                                {/* Actions */}
-                                {order.status === 'PENDING' && (
-                                    <div className="grid grid-cols-3 gap-3 border-t border-[var(--border-primary)] pt-4 mt-auto">
-                                        <button
-                                            onClick={() => handleDeleteOrder(order.orderId)}
-                                            className="col-span-1 py-3.5 text-sm flex items-center justify-center gap-1.5 rounded-lg border border-red-200 dark:border-red-800/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all font-bold active:scale-95"
-                                        >
-                                            <Trash2 size={16} /> 刪除
-                                        </button>
-                                        <button
-                                            onClick={() => handleOpenEdit(order)}
-                                            className="btn-secondary py-3.5 text-sm flex items-center justify-center gap-1.5"
-                                        >
-                                            <Edit size={16} /> 修改
-                                        </button>
-                                        <button
-                                            onClick={() => handleConfirmOrder(order.orderId)}
-                                            className="btn-primary py-3.5 text-sm flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 border-none"
-                                        >
-                                            <CheckCircle size={16} /> 出貨
-                                        </button>
-                                    </div>
-                                )}
-                                {order.status === 'CONFIRMED' && (
-                                    <div className="border-t border-[var(--border-primary)] pt-4 mt-auto flex items-center gap-2 justify-center text-sm text-[var(--text-secondary)] font-bold">
-                                        <Check className="text-emerald-500" size={18} />
-                                        <span>已於 {formatDate(order.confirmedAt)} 由 {order.confirmedBy} 確認出貨</span>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                                            {/* Actions */}
+                                            {order.status === 'PENDING' && (
+                                                <div className="grid grid-cols-3 gap-3 border-t border-[var(--border-primary)] pt-4 mt-auto">
+                                                    <button
+                                                        onClick={() => handleDeleteOrder(order.orderId)}
+                                                        className="col-span-1 py-3.5 text-sm flex items-center justify-center gap-1.5 rounded-lg border border-red-200 dark:border-red-800/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all font-bold active:scale-95"
+                                                    >
+                                                        <Trash2 size={16} /> 刪除
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleOpenEdit(order)}
+                                                        className="btn-secondary py-3.5 text-sm flex items-center justify-center gap-1.5"
+                                                    >
+                                                        <Edit size={16} /> 修改
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleConfirmOrder(order.orderId)}
+                                                        className="btn-primary py-3.5 text-sm flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 border-none"
+                                                    >
+                                                        <CheckCircle size={16} /> 出貨
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {order.status === 'CONFIRMED' && (
+                                                <div className="border-t border-[var(--border-primary)] pt-4 mt-auto flex items-center gap-2 justify-center text-sm text-[var(--text-secondary)] font-bold">
+                                                    <Check className="text-emerald-500" size={18} />
+                                                    <span>已於 {formatDate(order.confirmedAt)} 由 {order.confirmedBy} 確認出貨</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
