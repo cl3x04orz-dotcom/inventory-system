@@ -171,7 +171,11 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     };
 
     const handleOpenEdit = (order) => {
-        const displayGroup = groupBindings[order.sourceGroup] || order.sourceGroup || '';
+        const knownNames = Array.from(new Set([...buildings, ...Object.values(groupBindings)])).filter(Boolean);
+        const addr = order.deliveryAddress || '';
+        const matchedAddrBuilding = knownNames.find(name => name && addr.startsWith(name));
+
+        const displayGroup = matchedAddrBuilding || groupBindings[order.sourceGroup] || order.sourceGroup || '';
         // 深拷貝 order 的 items 和 recipients，以免直接污染狀態
         setEditingOrder({
             ...order,
@@ -190,6 +194,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     const handleEditFieldChange = (field, value) => {
         setEditingOrder(prev => {
             const updated = { ...prev, [field]: value };
+            const knownNames = Array.from(new Set([...buildings, ...Object.values(groupBindings)])).filter(Boolean);
+
             if (field === 'sourceGroup') {
                 const newGroup = value || '';
                 const currentAddr = prev.deliveryAddress || '';
@@ -202,13 +208,20 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     } else if (prev.sourceGroup && currentAddr.startsWith(prev.sourceGroup)) {
                         matchPrefix = prev.sourceGroup;
                     } else {
-                        const knownNames = [...buildings, ...Object.values(groupBindings)];
                         const matched = knownNames.find(name => name && currentAddr.startsWith(name));
                         if (matched) matchPrefix = matched;
                     }
 
                     if (matchPrefix) {
                         updated.deliveryAddress = currentAddr.replace(matchPrefix, newGroup);
+                    }
+                }
+            } else if (field === 'deliveryAddress') {
+                const newAddr = value || '';
+                if (newAddr) {
+                    const matchedBuilding = knownNames.find(name => name && newAddr.startsWith(name));
+                    if (matchedBuilding) {
+                        updated.sourceGroup = matchedBuilding;
                     }
                 }
             }
