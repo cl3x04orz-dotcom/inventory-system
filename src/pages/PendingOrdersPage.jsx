@@ -176,6 +176,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         setEditingOrder({
             ...order,
             sourceGroup: displayGroup,
+            initialSourceGroup: displayGroup,
             items: order.items.map(item => ({ ...item })),
             recipients: order.recipients ? order.recipients.map(r => ({
                 ...r,
@@ -189,10 +190,25 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         setEditingOrder(prev => {
             const updated = { ...prev, [field]: value };
             if (field === 'sourceGroup') {
-                const oldGroup = prev.sourceGroup || '';
                 const newGroup = value || '';
-                if (oldGroup && newGroup && prev.deliveryAddress && prev.deliveryAddress.startsWith(oldGroup)) {
-                    updated.deliveryAddress = prev.deliveryAddress.replace(oldGroup, newGroup);
+                const currentAddr = prev.deliveryAddress || '';
+                const origGroup = prev.initialSourceGroup || prev.sourceGroup || '';
+                
+                if (currentAddr && newGroup) {
+                    let matchPrefix = '';
+                    if (origGroup && currentAddr.startsWith(origGroup)) {
+                        matchPrefix = origGroup;
+                    } else if (prev.sourceGroup && currentAddr.startsWith(prev.sourceGroup)) {
+                        matchPrefix = prev.sourceGroup;
+                    } else {
+                        const knownNames = [...buildings, ...Object.values(groupBindings)];
+                        const matched = knownNames.find(name => name && currentAddr.startsWith(name));
+                        if (matched) matchPrefix = matched;
+                    }
+
+                    if (matchPrefix) {
+                        updated.deliveryAddress = currentAddr.replace(matchPrefix, newGroup);
+                    }
                 }
             }
             return updated;
