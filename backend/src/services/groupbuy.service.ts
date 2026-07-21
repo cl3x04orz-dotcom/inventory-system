@@ -124,7 +124,7 @@ export const GroupBuyService = {
   async updatePendingOrder(payload: any, user: any) {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { orderId, customerName, customerPhone, deliveryAddress, sourceGroup, note,
-            items, paymentMethod, transferLastFive, paymentStatus, recipients } = payload;
+            items, paymentMethod, transferLastFive, paymentStatus, recipients, shippingFee } = payload;
     if (!orderId) throw new Error('缺少 orderId');
 
     const updateData: any = { updatedAt: new Date() };
@@ -137,11 +137,51 @@ export const GroupBuyService = {
     if (transferLastFive !== undefined) updateData.transferLastFive = transferLastFive;
     if (paymentStatus !== undefined) updateData.paymentStatus = paymentStatus;
 
+    // 計算商品總額
+    let productTotal = 0;
     if (Array.isArray(items) && items.length > 0) {
-      const totalAmount = items.reduce((sum: number, item: any) =>
+      productTotal = items.reduce((sum: number, item: any) =>
         sum + (Number(item.unitPrice) * Number(item.qty)), 0);
-      updateData.totalAmount = totalAmount;
+    } else {
+      const details = await prisma.groupBuyOrderDetail.findMany({ where: { orderId } });
+      productTotal = details.reduce((sum: number, item: any) =>
+        sum + (Number(item.unitPrice) * Number(item.qty)), 0);
     }
+
+    // 判斷是否為「一般散客 / 線上下單」
+    const targetGroup = sourceGroup !== undefined ? sourceGroup : '';
+    const isGeneralUser = !targetGroup || targetGroup === '一般散客' || targetGroup === '線上下單';
+
+    let finalShippingFee = 0;
+    if (isGeneralUser) {
+      // 尋找「一般散客」的社區/運費規則
+      const generalComm = await prisma.groupBuyCommunity.findFirst({
+        where: {
+          OR: [
+            { communityName: '一般散客' },
+            { communityName: '線上下單' },
+            { isDefault: true }
+          ]
+        }
+      });
+      if (generalComm && !generalComm.defaultFreeShipping) {
+        const min = Number(generalComm.freeShippingMin) || 0;
+        const fee = Number(generalComm.shippingFee) || 0;
+        if (min > 0 && productTotal >= min) {
+          finalShippingFee = 0;
+        } else {
+          finalShippingFee = fee;
+        }
+      } else if (shippingFee !== undefined) {
+        finalShippingFee = Number(shippingFee) || 0;
+      }
+    } else {
+      // 團購社群一律免運 (0 元)
+      finalShippingFee = 0;
+    }
+
+    updateData.shippingFee = finalShippingFee;
+    updateData.totalAmount = productTotal + finalShippingFee;
 
     await prisma.$transaction(async (tx) => {
       // 1. 更新主訂單

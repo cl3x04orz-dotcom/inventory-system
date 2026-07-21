@@ -30,6 +30,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     const [isBatchProcessing, setIsBatchProcessing] = useState(false);
     const [batchMessage, setBatchMessage] = useState('');
     const [buildings, setBuildings] = useState([]);
+    const [buildingSettingsList, setBuildingSettingsList] = useState([]);
 
     const fetchOrders = useCallback(async () => {
         setLoading(true);
@@ -72,6 +73,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         try {
             const data = await callGAS(apiUrl, 'getBuildingSettings', {}, user.token);
             if (Array.isArray(data)) {
+                setBuildingSettingsList(data);
                 const names = data.map(b => b.building).filter(Boolean);
                 // 去重
                 setBuildings(Array.from(new Set(names)));
@@ -484,6 +486,39 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         });
     };
 
+    const computeOrderTotals = useCallback((order, settingsList = []) => {
+        if (!order || !order.items) return { productTotal: 0, shippingFee: 0, totalAmount: 0 };
+        const productTotal = order.items.reduce((sum, item) =>
+            sum + (Number(item.unitPrice || 0) * Number(item.qty || 0)), 0);
+
+        const group = order.sourceGroup || '';
+        const isGeneralUser = !group || group === '一般散客' || group === '線上下單';
+
+        let fee = 0;
+        if (isGeneralUser) {
+            const generalSetting = settingsList.find(s => s.building === '一般散客' || s.building === '線上下單');
+            if (generalSetting && !generalSetting.default_free_shipping) {
+                const min = Number(generalSetting.free_shipping_min) || 0;
+                const settingFee = Number(generalSetting.shipping_fee) || 0;
+                if (min > 0 && productTotal >= min) {
+                    fee = 0;
+                } else {
+                    fee = settingFee;
+                }
+            } else if (order.shippingFee !== undefined) {
+                fee = Number(order.shippingFee) || 0;
+            }
+        } else {
+            fee = 0; // 團購/社區訂單一律免運
+        }
+
+        return {
+            productTotal,
+            shippingFee: fee,
+            totalAmount: productTotal + fee
+        };
+    }, []);
+
     const handleSaveOrderEdit = async (e) => {
         e.preventDefault();
         if (editingOrder.items.length === 0) {
@@ -509,7 +544,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 }
             }
 
-            // 2. 更新訂單內容
+            // 2. 自動計算最新運費標準 (若切換為一般散客則計算滿額免運，若切換為團購社區則一律免運 0 元)
+            const calculatedTotals = computeOrderTotals(editingOrder, buildingSettingsList);
+
+            // 3. 更新訂單內容
             const res = await callGAS(apiUrl, 'updatePendingOrder', {
                 orderId: editingOrder.orderId,
                 customerName: editingOrder.customerName,
@@ -521,7 +559,9 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 paymentMethod: editingOrder.paymentMethod,
                 transferLastFive: editingOrder.transferLastFive,
                 paymentStatus: editingOrder.paymentStatus,
-                recipients: editingOrder.recipients
+                recipients: editingOrder.recipients,
+                shippingFee: calculatedTotals.shippingFee,
+                totalAmount: calculatedTotals.totalAmount
             }, user.token);
 
             if (res && res.error) {
@@ -2009,10 +2049,20 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                         )}
                                     </div>
 
-                                    <div className="flex justify-between items-center mt-4 p-3 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-xl font-bold text-lg">
-                                        <span className="text-[var(--text-primary)]">金額合計</span>
-                                        <span className="text-blue-600 font-mono">${editingOrder.totalAmount}</span>
-                                    </div>
+                                    {(() => {
+                                        const totals = computeOrderTotals(editingOrder, buildingSettingsList);
+                                        return (
+                                            <div className="flex justify-between items-center mt-4 p-3 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-xl font-bold text-base">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[var(--text-primary)] font-bold">訂單合計</span>
+                                                    <span className="text-xs text-[var(--text-secondary)] font-normal">
+                                                        商品 ${totals.productTotal} + 運費 ${totals.shippingFee} {totals.shippingFee === 0 ? '(免運)' : ''}
+                                                    </span>
+                                                </div>
+                                                <span className="text-blue-600 font-mono text-xl">${totals.totalAmount}</span>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             )}
                         </div>
