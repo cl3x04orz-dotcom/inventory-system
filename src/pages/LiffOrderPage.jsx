@@ -128,8 +128,24 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [tempFlavorQty, setTempFlavorQty] = useState({});
 
   // ── 步驟機制 ─────────────────────────────────────────────────
-  // 'shop' | 'form' | 'confirm' | 'success'
-  const [step, setStep] = useState("shop");
+  // 'shop' | 'form' | 'confirm' | 'success' | 'orders' | 'cart' | 'member'
+  const [step, setStep] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const liffState = params.get("liff.state") || "";
+      const stepParam = params.get("step") || params.get("page_step") || (window.GAS_PARAMETERS && window.GAS_PARAMETERS.step);
+      if (stepParam === "orders" || liffState.includes("step=orders") || liffState.includes("/orders") || window.location.hash.includes("orders") || params.has("orders")) {
+        return "orders";
+      }
+      if (stepParam === "cart" || liffState.includes("step=cart") || window.location.hash.includes("cart") || params.has("cart")) {
+        return "cart";
+      }
+      if (stepParam === "member" || liffState.includes("step=member") || window.location.hash.includes("member") || params.has("member")) {
+        return "member";
+      }
+    } catch (_) {}
+    return "shop";
+  });
 
   // ── 表單 state ───────────────────────────────────────────────
   const [customerName, setCustomerName] = useState("");
@@ -208,6 +224,38 @@ export default function LiffOrderPage({ user, apiUrl }) {
     });
     setCart(newCart);
   }, [groupCart, isGroupOrder]);
+
+  // 監聽網址參數與 Hash 變化（支援官方 LINE 圖文選單直接連動到指定分頁：訂單、購物車、會員等）
+  useEffect(() => {
+    const handleUrlCheck = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const liffState = params.get("liff.state") || "";
+        const stepParam = params.get("step") || params.get("page_step");
+        if (stepParam === "orders" || liffState.includes("step=orders") || liffState.includes("/orders") || window.location.hash.includes("orders") || params.has("orders")) {
+          setStep("orders");
+        } else if (stepParam === "cart" || liffState.includes("step=cart") || window.location.hash.includes("cart") || params.has("cart")) {
+          setStep("cart");
+        } else if (stepParam === "member" || liffState.includes("step=member") || window.location.hash.includes("member") || params.has("member")) {
+          setStep("member");
+        }
+      } catch (_) {}
+    };
+    handleUrlCheck();
+    window.addEventListener("hashchange", handleUrlCheck);
+    return () => window.removeEventListener("hashchange", handleUrlCheck);
+  }, []);
+
+  // 當進入「訂單」步驟且已取得 lineUserId 時，自動載入我的訂單列表
+  useEffect(() => {
+    if (step === "orders" && lineUserId) {
+      setIsMemberLoading(true);
+      memberApi.getOrders(apiUrl, { userId: lineUserId }).then(res => {
+        if (res && res.success) setOrders(res.orders || []);
+        setIsMemberLoading(false);
+      }).catch(err => setIsMemberLoading(false));
+    }
+  }, [step, lineUserId, apiUrl]);
 
   // 會員中心狀態
   const [memberProfile, setMemberProfile] = useState(null);

@@ -312,6 +312,10 @@ function AppContent() {
             const params = new URLSearchParams(window.location.search);
             const isInLineBrowser = /Line/i.test(navigator.userAgent);
             const hasLiffParams = params.get('page') === 'liffOrder' ||
+                params.get('step') === 'orders' ||
+                params.has('step') ||
+                params.has('orders') ||
+                window.location.hash.includes('orders') ||
                 params.has('building') ||
                 params.has('grp') ||
                 params.has('liff.state') ||
