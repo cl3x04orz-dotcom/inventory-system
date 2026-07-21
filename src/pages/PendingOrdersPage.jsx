@@ -1530,7 +1530,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                         <div className="flex items-center gap-3 flex-shrink-0 justify-between md:justify-end">
                                             <div className="flex items-center gap-2">
                                                 <span className="font-mono font-extrabold text-base md:text-lg text-emerald-600 dark:text-emerald-400">
-                                                    ${order.totalAmount}
+                                                    ${computeOrderTotals(order, buildingSettingsList).totalAmount}
                                                 </span>
                                                 {order.paymentStatus !== 'off' && order.paymentStatus !== '已付款' && order.paymentStatus !== '已入帳' ? (
                                                     <button
@@ -1711,7 +1711,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                     </div>
                                                     <div className="flex justify-between items-center border-t border-[var(--border-primary)] mt-3.5 pt-2.5 font-bold text-lg md:text-xl">
                                                         <span className="text-[var(--text-primary)]">金額合計</span>
-                                                        <span className="text-blue-600 dark:text-blue-400 font-mono font-extrabold">${order.totalAmount}</span>
+                                                        <span className="text-blue-600 dark:text-blue-400 font-mono font-extrabold">${computeOrderTotals(order, buildingSettingsList).totalAmount}</span>
                                                     </div>
                                                     {order.recipients && order.recipients.length > 0 && (
                                                         <div className="border-t border-[var(--border-primary)] mt-3.5 pt-3.5 space-y-2">
