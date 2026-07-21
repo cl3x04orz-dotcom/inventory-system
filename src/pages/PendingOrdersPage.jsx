@@ -529,13 +529,16 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         { name: '高雄市路竹區', fee: 200, min: 1000 }
     ];
 
-    const computeOrderTotals = useCallback((order, settingsList = []) => {
+    const computeOrderTotals = useCallback((order, settingsList = [], groupBindingsMap = {}) => {
         if (!order || !order.items) return { productTotal: 0, shippingFee: 0, totalAmount: 0 };
         const productTotal = order.items.reduce((sum, item) =>
             sum + (Number(item.unitPrice || 0) * Number(item.qty || 0)), 0);
 
-        const group = order.sourceGroup || '';
-        const isGeneralUser = !group || group === '一般散客' || group === '線上下單';
+        const addrRaw = String(order.deliveryAddress || '').trim();
+        const knownNames = Array.from(new Set([...settingsList.map(s => s.building), ...Object.values(groupBindingsMap)])).filter(Boolean);
+        const matchedAddrBuilding = knownNames.find(name => name && addrRaw.startsWith(name));
+        const displayGroup = matchedAddrBuilding || groupBindingsMap[order.sourceGroup] || order.sourceGroup || '';
+        const isGeneralUser = !displayGroup || displayGroup === '一般散客' || displayGroup === '線上下單';
 
         let fee = 0;
         if (!isGeneralUser) {
@@ -635,7 +638,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             }
 
             // 2. 計算最新運費與總額 (傳入 buildingSettingsList 以精確比對行政區外送規則，如「台南市永康區」)
-            const calculatedTotals = computeOrderTotals(editingOrder, buildingSettingsList);
+            const calculatedTotals = computeOrderTotals(editingOrder, buildingSettingsList, groupBindings);
 
             // 3. 更新訂單內容
             const res = await callGAS(apiUrl, 'updatePendingOrder', {
@@ -1554,7 +1557,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                         <div className="flex items-center gap-3 flex-shrink-0 justify-between md:justify-end">
                                             <div className="flex items-center gap-2">
                                                 <span className="font-mono font-extrabold text-base md:text-lg text-emerald-600 dark:text-emerald-400">
-                                                    ${computeOrderTotals(order, buildingSettingsList).totalAmount}
+                                                    ${computeOrderTotals(order, buildingSettingsList, groupBindings).totalAmount}
                                                 </span>
                                                 {order.paymentStatus !== 'off' && order.paymentStatus !== '已付款' && order.paymentStatus !== '已入帳' ? (
                                                     <button
@@ -1739,9 +1742,19 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                             </div>
                                                         ))}
                                                     </div>
+                                                    {(() => {
+                                                        const totals = computeOrderTotals(order, buildingSettingsList, groupBindings);
+                                                        if (totals.shippingFee <= 0) return null;
+                                                        return (
+                                                            <div className="flex justify-between items-center text-sm pt-2 border-t border-dashed border-[var(--border-primary)] text-amber-600 dark:text-amber-400 font-bold">
+                                                                <span>🚚 外送運費</span>
+                                                                <span className="font-mono">+${totals.shippingFee}</span>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                     <div className="flex justify-between items-center border-t border-[var(--border-primary)] mt-3.5 pt-2.5 font-bold text-lg md:text-xl">
                                                         <span className="text-[var(--text-primary)]">金額合計</span>
-                                                        <span className="text-blue-600 dark:text-blue-400 font-mono font-extrabold">${computeOrderTotals(order, buildingSettingsList).totalAmount}</span>
+                                                        <span className="text-blue-600 dark:text-blue-400 font-mono font-extrabold">${computeOrderTotals(order, buildingSettingsList, groupBindings).totalAmount}</span>
                                                     </div>
                                                     {order.recipients && order.recipients.length > 0 && (
                                                         <div className="border-t border-[var(--border-primary)] mt-3.5 pt-3.5 space-y-2">
@@ -2172,7 +2185,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                     </div>
 
                                     {(() => {
-                                        const totals = computeOrderTotals(editingOrder, buildingSettingsList);
+                                        const totals = computeOrderTotals(editingOrder, buildingSettingsList, groupBindings);
                                         return (
                                             <div className="flex justify-between items-center mt-4 p-3 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-xl font-bold text-base">
                                                 <div className="flex flex-col">
