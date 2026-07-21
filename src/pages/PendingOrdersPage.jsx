@@ -177,6 +177,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             ...order,
             sourceGroup: displayGroup,
             initialSourceGroup: displayGroup,
+            rawSourceGroup: order.sourceGroup,
             items: order.items.map(item => ({ ...item })),
             recipients: order.recipients ? order.recipients.map(r => ({
                 ...r,
@@ -462,6 +463,23 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
         setIsSaving(true);
         try {
+            // 1. 若該訂單原始為 LINE 群組 ID，同步將最新社區名稱寫回群組對照表 (groupBindings)
+            const rawGrp = editingOrder.rawSourceGroup;
+            if (rawGrp && editingOrder.sourceGroup) {
+                const isBoundKey = groupBindings[rawGrp] !== undefined || rawGrp.startsWith('c') || rawGrp.includes('-');
+                if (isBoundKey && editingOrder.sourceGroup !== groupBindings[rawGrp]) {
+                    try {
+                        await callGAS(apiUrl, 'saveGroupBinding', {
+                            groupId: rawGrp,
+                            groupName: editingOrder.sourceGroup
+                        }, user.token);
+                    } catch (gErr) {
+                        console.warn('Failed to update group binding mapping:', gErr);
+                    }
+                }
+            }
+
+            // 2. 更新訂單內容
             const res = await callGAS(apiUrl, 'updatePendingOrder', {
                 orderId: editingOrder.orderId,
                 customerName: editingOrder.customerName,
@@ -482,7 +500,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
             alert('訂單修改成功');
             setShowEditModal(false);
-            fetchOrders();
+            await fetchGroupBindings();
+            await fetchOrders();
         } catch (error) {
             alert('修改失敗: ' + error.message);
         } finally {
