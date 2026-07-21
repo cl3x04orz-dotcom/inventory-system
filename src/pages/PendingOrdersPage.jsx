@@ -24,6 +24,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [productSearchTerm, setProductSearchTerm] = useState('');
     const [expandedOrderIds, setExpandedOrderIds] = useState(new Set());
+    const [dateFilter, setDateFilter] = useState(''); // 出貨日期篩選
+    const [dateModalOrder, setDateModalOrder] = useState(null); // 設定出貨日期的目標訂單
+    const [dateModalValue, setDateModalValue] = useState('');
+    const [isSavingDate, setIsSavingDate] = useState(false);
 
     // 批次與大樓功能狀態
     const [selectedOrderIds, setSelectedOrderIds] = useState([]);
@@ -672,6 +676,34 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         }
     };
 
+    const handleOpenDateModal = (order, e) => {
+        if (e) e.stopPropagation();
+        setDateModalOrder(order);
+        setDateModalValue(order.expectedDeliveryDate || '');
+    };
+
+    const handleSaveDateModal = async () => {
+        if (!dateModalOrder) return;
+        setIsSavingDate(true);
+        try {
+            const res = await callGAS(apiUrl, 'updatePendingOrder', {
+                orderId: dateModalOrder.orderId,
+                expectedDeliveryDate: dateModalValue
+            }, user.token);
+            if (res.success) {
+                setOrders(prev => prev.map(o => o.orderId === dateModalOrder.orderId ? { ...o, expectedDeliveryDate: dateModalValue } : o));
+                setDateModalOrder(null);
+            } else {
+                alert('設定出貨日期失敗: ' + (res.message || '未知錯誤'));
+            }
+        } catch (error) {
+            console.error('Save expected delivery date failed:', error);
+            alert('設定出貨日期失敗: ' + error.message);
+        } finally {
+            setIsSavingDate(false);
+        }
+    };
+
     // 自動聚合所有出現過的大樓/社區（包含大樓設定、群組綁定與訂單地址開頭，如「柳營奇美」）
     const allAvailableBuildings = React.useMemo(() => {
         const set = new Set();
@@ -709,6 +741,11 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             if (!matchesAddress && !matchesGroup) {
                 return false;
             }
+        }
+
+        // 預計出貨/配送日篩選
+        if (dateFilter && String(order.expectedDeliveryDate || '') !== dateFilter) {
+            return false;
         }
 
         // 一般文字搜尋（編號、姓名、電話、地址、群組）
@@ -1291,6 +1328,29 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             </button>
                         )}
                     </div>
+
+                    {/* 預計出貨日篩選 */}
+                    <div className="relative flex-1 md:flex-none flex items-center">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400" size={18} />
+                        <input
+                            type="date"
+                            className="input-field pl-10 pr-8 w-full md:w-48 text-sm font-bold border-emerald-500/40 focus:border-emerald-500"
+                            value={dateFilter}
+                            onChange={(e) => setDateFilter(e.target.value)}
+                            title="篩選預計出貨日"
+                        />
+                        {dateFilter && (
+                            <button
+                                type="button"
+                                onClick={() => setDateFilter('')}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                                title="清空出貨日篩選"
+                            >
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
+
                     <button onClick={fetchOrders} className="btn-secondary p-2 whitespace-nowrap" title="重新整理">
                         <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
                     </button>
@@ -1550,6 +1610,16 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                             🕒 {new Date(order.createdAt).toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                                                         </span>
                                                     )}
+                                                    {order.expectedDeliveryDate && (
+                                                        <span
+                                                            onClick={(e) => handleOpenDateModal(order, e)}
+                                                            className="bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-md flex items-center gap-1 cursor-pointer hover:bg-emerald-200 border border-emerald-300 dark:border-emerald-700 transition-colors"
+                                                            title="點擊修改預計配送日"
+                                                        >
+                                                            <Calendar size={13} />
+                                                            出貨日: {order.expectedDeliveryDate}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -1578,6 +1648,19 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                         {order.status === 'PENDING' ? '待出貨' : '已出貨'}
                                                     </span>
                                                 )}
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleOpenDateModal(order, e)}
+                                                    className={`text-xs px-2.5 py-1 font-bold rounded shadow-sm flex items-center gap-1 transition-all ${
+                                                        order.expectedDeliveryDate
+                                                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700'
+                                                            : 'bg-amber-500 hover:bg-amber-600 text-white border border-amber-600'
+                                                    }`}
+                                                    title="設定/修改預計出貨與配送日期"
+                                                >
+                                                    <Calendar size={13} />
+                                                    {order.expectedDeliveryDate ? `${order.expectedDeliveryDate} 配送` : '預定出貨日'}
+                                                </button>
                                             </div>
 
                                             <button
@@ -1701,6 +1784,26 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                             <span className="font-semibold">下單時間：<span className="font-mono text-blue-600 dark:text-blue-400">{new Date(order.createdAt).toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span></span>
                                                         </div>
                                                     )}
+                                                    <div className="flex items-center gap-2 text-[var(--text-secondary)] text-base md:text-lg">
+                                                        <Calendar size={18} className="text-emerald-600 dark:text-emerald-400" />
+                                                        <span className="font-semibold">
+                                                            預計出貨/配送：
+                                                            {order.expectedDeliveryDate ? (
+                                                                <span className="font-mono font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 rounded border border-emerald-300 dark:border-emerald-700 ml-1">
+                                                                    {order.expectedDeliveryDate}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[var(--text-tertiary)] italic ml-1">尚未設定</span>
+                                                            )}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => handleOpenDateModal(order, e)}
+                                                            className="text-xs px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded shadow-sm ml-2 transition-transform active:scale-95"
+                                                        >
+                                                            修改日期
+                                                        </button>
+                                                    </div>
                                                     {order.note && (
                                                         <div className="flex items-start gap-2 bg-[var(--bg-tertiary)] p-3 rounded-lg border border-[var(--border-primary)] text-sm md:text-base text-[var(--text-secondary)]">
                                                             <FileText size={16} className="text-[var(--text-tertiary)] mt-0.5 flex-shrink-0" />
@@ -2222,6 +2325,83 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             </button>
                         </div>
                     </form>
+                </div>
+            )}
+
+            {/* 設定出貨/配送日期 Modal */}
+            {dateModalOrder && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+                        <div className="p-4 bg-emerald-600 text-white flex justify-between items-center font-bold">
+                            <span className="flex items-center gap-2">
+                                <Calendar size={18} />
+                                設定預計出貨/配送日
+                            </span>
+                            <button type="button" onClick={() => setDateModalOrder(null)} className="hover:bg-emerald-700 p-1 rounded-lg">
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="p-5 space-y-4">
+                            <div className="text-sm font-semibold text-[var(--text-secondary)]">
+                                訂單：<span className="font-mono text-[var(--text-primary)] font-extrabold">{dateModalOrder.orderId}</span> ({dateModalOrder.customerName})
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
+                                    選擇預計出貨日期
+                                </label>
+                                <input
+                                    type="date"
+                                    className="input-field w-full text-base font-bold py-2.5 px-3 border-emerald-500 focus:ring-emerald-500"
+                                    value={dateModalValue}
+                                    onChange={(e) => setDateModalValue(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <span className="block text-xs font-bold text-[var(--text-tertiary)] mb-1.5">快速選擇：</span>
+                                <div className="flex flex-wrap gap-2">
+                                    {[
+                                        { label: '今天', date: new Date().toISOString().split('T')[0] },
+                                        { label: '明天', date: new Date(Date.now() + 86400000).toISOString().split('T')[0] },
+                                        { label: '後天', date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0] },
+                                        { label: '大後天', date: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0] },
+                                        { label: '清除日期', date: '' }
+                                    ].map(btn => (
+                                        <button
+                                            key={btn.label}
+                                            type="button"
+                                            onClick={() => setDateModalValue(btn.date)}
+                                            className={`text-xs px-3 py-1.5 rounded-lg font-bold border transition-colors ${
+                                                dateModalValue === btn.date
+                                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                                                    : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)]'
+                                            }`}
+                                        >
+                                            {btn.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setDateModalOrder(null)}
+                                className="btn-secondary px-4 py-2 text-xs font-bold"
+                                disabled={isSavingDate}
+                            >
+                                取消
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSaveDateModal}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2 text-xs rounded-xl shadow flex items-center gap-1.5"
+                                disabled={isSavingDate}
+                            >
+                                <Save size={14} />
+                                {isSavingDate ? '儲存中...' : '確定儲存'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

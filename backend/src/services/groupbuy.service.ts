@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma, runInTransaction } from '../database/context.js';
 import { ProductService } from './product.service.js';
 import { deductInventory } from './sales.service.js';
@@ -48,6 +49,7 @@ export const GroupBuyService = {
       updatedAt: o.updatedAt?.toISOString() || '',
       confirmedAt: o.confirmedAt?.toISOString() || '',
       confirmedBy: o.confirmedBy || '',
+      expectedDeliveryDate: o.expectedDeliveryDate || '',
       recipients: (o.recipients || []).map((r: any) => ({
         recipientId: r.recipientId,
         recipientName: r.recipientName,
@@ -104,6 +106,7 @@ export const GroupBuyService = {
         paymentStatus,
         lineDisplayName: lineDisplayName || '',
         source: source || 'NORMAL',
+        expectedDeliveryDate: payload.expectedDeliveryDate || '',
         details: {
           create: items.map((item: any) => ({
             productId: item.productId || '',
@@ -136,6 +139,7 @@ export const GroupBuyService = {
     if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod;
     if (transferLastFive !== undefined) updateData.transferLastFive = transferLastFive;
     if (paymentStatus !== undefined) updateData.paymentStatus = paymentStatus;
+    if (payload.expectedDeliveryDate !== undefined) updateData.expectedDeliveryDate = payload.expectedDeliveryDate;
 
     // 計算商品總額
     let productTotal = 0;
@@ -741,8 +745,8 @@ export const GroupBuyService = {
         const cp = customPriceMap.get(p.id);
         return {
           ...p,
-          single_price: cp.customPrice,
-          promotions: cp.promotions
+          single_price: cp?.customPrice,
+          promotions: cp?.promotions
         };
       }
       return p;
@@ -941,6 +945,7 @@ export const GroupBuyService = {
         lineDisplayName: lineDisplayName || '',
         source: 'LIFF_V2',
         confirmedAt: deductionApplied === totalAmount ? now : null, // 全額扣抵直接標記確認
+        expectedDeliveryDate: payload.expectedDeliveryDate || '',
         details: {
           create: items.map((item: any) => ({
             productId: item.productId || '',
@@ -1050,6 +1055,7 @@ export const GroupBuyService = {
         PaymentMethodSnapshot: o.paymentMethod,
         PaymentStatus: o.paymentStatus || '',
         Source: o.source,
+        ExpectedDeliveryDate: o.expectedDeliveryDate || '',
         CreatedAt: o.createdAt,
         UpdatedAt: o.updatedAt,
         LineDisplayName: o.lineDisplayName,
@@ -1555,13 +1561,13 @@ export const GroupBuyService = {
       },
       update: {
         customPrice: priceVal,
-        promotions: validPromos.length > 0 ? validPromos : null
+        promotions: validPromos.length > 0 ? validPromos : Prisma.JsonNull
       },
       create: {
         communityId,
         productId,
         customPrice: priceVal,
-        promotions: validPromos.length > 0 ? validPromos : null
+        promotions: validPromos.length > 0 ? validPromos : Prisma.JsonNull
       }
     });
 

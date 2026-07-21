@@ -21,6 +21,7 @@ import {
   RotateCcw,
   Home,
   Wallet,
+  Calendar,
 } from "lucide-react";
 import { callGAS, memberApi } from "../utils/api";
 import logoImg from "../assets/logo.png";
@@ -2945,6 +2946,12 @@ ${freeNote(newFee, newMin)}
                   </div>
                   <div className="p-4 flex flex-col gap-2 text-sm text-[var(--text-secondary)]">
                     <div className="flex gap-2"><Clock size={16} className="mt-0.5 opacity-70 flex-shrink-0"/> <span>{new Date(o.CreatedAt).toLocaleString()}</span></div>
+                    {o.ExpectedDeliveryDate && (
+                      <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/60">
+                        <Calendar size={16} className="flex-shrink-0"/>
+                        <span>預計出貨/配送日：{o.ExpectedDeliveryDate}</span>
+                      </div>
+                    )}
                     <div className="flex gap-2"><MapPin size={16} className="mt-0.5 opacity-70 flex-shrink-0"/> <span className="line-clamp-2">{o.DeliveryAddress}</span></div>
                     <div className="flex gap-2"><CreditCard size={16} className="mt-0.5 opacity-70 flex-shrink-0"/> <span>{o.PaymentMethod} ({o.PaymentStatus || '未付款'})</span></div>
                     {o.Note && <div className="flex gap-2"><FileText size={16} className="mt-0.5 opacity-70 flex-shrink-0"/> <span>{o.Note}</span></div>}
