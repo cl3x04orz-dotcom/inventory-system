@@ -312,7 +312,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     productId,
                     productName: prod.name,
                     qty: 1,
-                    price: prod.price
+                    price: Number(prod.single_price) || Number(prod.price)
                 };
                 return {
                     ...r,
@@ -1606,7 +1606,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                 <option value="" disabled>-- 新增商品到訂單 --</option>
                                                 {products.map(p => (
                                                     <option key={p.id} value={p.id}>
-                                                        {p.name} (${p.price})
+                                                        {p.name} (${p.single_price || p.price})
                                                     </option>
                                                 ))}
                                             </select>
