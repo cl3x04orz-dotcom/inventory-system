@@ -201,7 +201,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 const currentAddr = prev.deliveryAddress || '';
                 const origGroup = prev.initialSourceGroup || prev.sourceGroup || '';
                 
-                if (currentAddr && newGroup) {
+                if (currentAddr !== undefined) {
                     let matchPrefix = '';
                     if (origGroup && currentAddr.startsWith(origGroup)) {
                         matchPrefix = origGroup;
@@ -1350,11 +1350,18 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                         <User size={15} className="text-[var(--text-tertiary)]" />
                                                         {order.customerName}
                                                     </span>
-                                                    {order.sourceGroup && (
-                                                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs px-2 py-0.5 rounded font-bold border border-slate-200 dark:border-slate-700">
-                                                            {groupBindings[order.sourceGroup] || order.sourceGroup}
-                                                        </span>
-                                                    )}
+                                                    {(() => {
+                                                        const knownNames = Array.from(new Set([...buildings, ...Object.values(groupBindings)])).filter(Boolean);
+                                                        const addr = String(order.deliveryAddress || '').trim();
+                                                        const matchedAddrBuilding = knownNames.find(name => name && addr.startsWith(name));
+                                                        const displayGroup = matchedAddrBuilding || groupBindings[order.sourceGroup] || order.sourceGroup;
+                                                        if (!displayGroup) return null;
+                                                        return (
+                                                            <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs px-2 py-0.5 rounded font-bold border border-slate-200 dark:border-slate-700">
+                                                                {displayGroup}
+                                                            </span>
+                                                        );
+                                                    })()}
                                                 </div>
                                                 
                                                 {/* 簡化版商品與地址預覽 */}
@@ -1438,14 +1445,21 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                                 LINE: {order.lineDisplayName}
                                                             </span>
                                                         )}
-                                                        {order.sourceGroup && (
-                                                            <span className="bg-white text-slate-600 text-xs px-2 py-0.5 rounded flex items-center gap-1 font-bold border border-slate-200">
-                                                                {groupBindings[order.sourceGroup] || order.sourceGroup}
-                                                                {groupBindings[order.sourceGroup] && (
-                                                                    <span className="opacity-60 text-[10px] font-mono font-medium">({order.sourceGroup})</span>
-                                                                )}
-                                                            </span>
-                                                        )}
+                                                        {(() => {
+                                                            const knownNames = Array.from(new Set([...buildings, ...Object.values(groupBindings)])).filter(Boolean);
+                                                            const addr = String(order.deliveryAddress || '').trim();
+                                                            const matchedAddrBuilding = knownNames.find(name => name && addr.startsWith(name));
+                                                            const displayGroup = matchedAddrBuilding || groupBindings[order.sourceGroup] || order.sourceGroup;
+                                                            if (!displayGroup) return null;
+                                                            return (
+                                                                <span className="bg-white text-slate-600 text-xs px-2 py-0.5 rounded flex items-center gap-1 font-bold border border-slate-200">
+                                                                    {displayGroup}
+                                                                    {groupBindings[order.sourceGroup] && groupBindings[order.sourceGroup] !== displayGroup && (
+                                                                        <span className="opacity-60 text-[10px] font-mono font-medium">({order.sourceGroup})</span>
+                                                                    )}
+                                                                </span>
+                                                            );
+                                                        })()}
                                                     </div>
                                                     
                                                     {/* 付款方式與狀態標籤 */}
