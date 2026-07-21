@@ -201,7 +201,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 const currentAddr = prev.deliveryAddress || '';
                 const origGroup = prev.initialSourceGroup || prev.sourceGroup || '';
                 
-                if (currentAddr !== undefined) {
+                if (newGroup) {
                     let matchPrefix = '';
                     if (origGroup && currentAddr.startsWith(origGroup)) {
                         matchPrefix = origGroup;
@@ -214,6 +214,23 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
                     if (matchPrefix) {
                         updated.deliveryAddress = currentAddr.replace(matchPrefix, newGroup);
+                    } else if (!currentAddr) {
+                        updated.deliveryAddress = newGroup;
+                    } else if (currentAddr.startsWith(' - ')) {
+                        updated.deliveryAddress = `${newGroup}${currentAddr}`;
+                    } else if (!currentAddr.startsWith(newGroup)) {
+                        updated.deliveryAddress = `${newGroup} - ${currentAddr}`;
+                    }
+                } else {
+                    let matchPrefix = '';
+                    if (origGroup && currentAddr.startsWith(origGroup)) matchPrefix = origGroup;
+                    else if (prev.sourceGroup && currentAddr.startsWith(prev.sourceGroup)) matchPrefix = prev.sourceGroup;
+                    else {
+                        const matched = knownNames.find(name => name && currentAddr.startsWith(name));
+                        if (matched) matchPrefix = matched;
+                    }
+                    if (matchPrefix) {
+                        updated.deliveryAddress = currentAddr.replace(matchPrefix, '').replace(/^(\s*-\s*)/, '').trim();
                     }
                 }
             } else if (field === 'deliveryAddress') {
