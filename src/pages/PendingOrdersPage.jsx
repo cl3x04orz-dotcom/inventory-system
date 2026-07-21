@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Package, ClipboardList, Eye, Edit, Trash2, CheckCircle, RefreshCw, X, User, Users, Phone, MapPin, FileText, Plus, Minus, Save, Calendar, Check, Search, Copy, PackageSearch, ChevronDown, ChevronUp } from 'lucide-react';
+import { Package, ClipboardList, Eye, Edit, Trash2, CheckCircle, RefreshCw, X, User, Users, Phone, MapPin, FileText, Plus, Minus, Save, Calendar, Clock, Check, Search, Copy, PackageSearch, ChevronDown, ChevronUp } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
 export default function PendingOrdersPage({ user, apiUrl }) {
@@ -564,12 +564,23 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 return addrClean.includes(bClean) || bClean.includes(addrClean);
             });
 
+            const defaultMatch = DEFAULT_DELIVERY_AREAS.find(a => {
+                if (!a.name) return false;
+                const bClean = getCleanName(a.name);
+                return bClean && (addrClean.includes(bClean) || bClean.includes(addrClean));
+            });
+
             if (matchedSetting) {
                 if (matchedSetting.default_free_shipping) {
                     fee = 0;
                 } else {
-                    const min = Number(matchedSetting.free_shipping_min) || 0;
-                    const settingFee = Number(matchedSetting.shipping_fee) || 0;
+                    let min = Number(matchedSetting.free_shipping_min) || 0;
+                    let settingFee = Number(matchedSetting.shipping_fee) || 0;
+                    // 若資料庫設定中的運費與門檻皆未設定 (為 0)，且預設 37 個行政區表有明確規範 (如台南市永康區 300元免運/80元運費) 時，優先採用行政區標準
+                    if (min === 0 && settingFee === 0 && defaultMatch) {
+                        min = defaultMatch.min;
+                        settingFee = defaultMatch.fee;
+                    }
                     if (min > 0 && productTotal >= min) {
                         fee = 0;
                     } else {
@@ -578,6 +589,14 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 }
             } else if (order.shippingFee !== undefined && Number(order.shippingFee) > 0) {
                 fee = Number(order.shippingFee);
+            } else if (defaultMatch) {
+                const min = defaultMatch.min;
+                const settingFee = defaultMatch.fee;
+                if (min > 0 && productTotal >= min) {
+                    fee = 0;
+                } else {
+                    fee = settingFee;
+                }
             } else {
                 fee = 150; // 線上下單未比對到已知行政區時預設運費 (絕非 0 元免運)
             }
@@ -1523,6 +1542,11 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                             📍 {order.deliveryAddress}
                                                         </span>
                                                     )}
+                                                    {order.createdAt && (
+                                                        <span className="text-[var(--text-tertiary)] flex items-center gap-1 font-mono">
+                                                            🕒 {new Date(order.createdAt).toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -1666,6 +1690,12 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                             >
                                                                 <Copy size={13} />
                                                             </button>
+                                                        </div>
+                                                    )}
+                                                    {order.createdAt && (
+                                                        <div className="flex items-center gap-2 text-[var(--text-secondary)] text-base md:text-lg">
+                                                            <Clock size={18} className="text-[var(--text-tertiary)]" />
+                                                            <span className="font-semibold">下單時間：<span className="font-mono text-blue-600 dark:text-blue-400">{new Date(order.createdAt).toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span></span>
                                                         </div>
                                                     )}
                                                     {order.note && (
