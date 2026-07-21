@@ -1408,11 +1408,11 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         <span className="text-xl font-extrabold text-[var(--text-primary)] mt-1">{summaryStats.ordersCount} <span className="text-xs font-medium text-[var(--text-tertiary)]">筆</span></span>
                     </div>
                     <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl p-3.5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-                        <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">待出貨數量</span>
+                        <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{activeTab === 'UNPAID' ? '未付款商品數量' : '待出貨數量'}</span>
                         <span className="text-xl font-extrabold text-blue-600 mt-1">{summaryStats.totalQty} <span className="text-xs font-medium text-[var(--text-tertiary)]">瓶/件</span></span>
                     </div>
                     <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl p-3.5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-                        <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">待出貨總金額</span>
+                        <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{activeTab === 'UNPAID' ? '未付款總金額' : '待出貨總金額'}</span>
                         <span className="text-xl font-extrabold text-emerald-600 mt-1">${summaryStats.totalAmount.toLocaleString()}</span>
                     </div>
                 </div>
