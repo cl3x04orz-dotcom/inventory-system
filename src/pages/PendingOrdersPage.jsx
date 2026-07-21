@@ -442,6 +442,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 customerName: editingOrder.customerName,
                 customerPhone: editingOrder.customerPhone,
                 deliveryAddress: editingOrder.deliveryAddress,
+                sourceGroup: editingOrder.sourceGroup,
                 note: editingOrder.note,
                 items: editingOrder.items,
                 paymentMethod: editingOrder.paymentMethod,
@@ -1598,16 +1599,39 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                 </div>
                             </div>
 
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
-                                    <MapPin size={13} /> 地址 / 自取
-                                </label>
-                                <input
-                                    type="text"
-                                    className="input-field w-full p-2 text-sm"
-                                    value={editingOrder.deliveryAddress}
-                                    onChange={(e) => handleEditFieldChange('deliveryAddress', e.target.value)}
-                                />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                                        <MapPin size={13} /> 地址 / 自取
+                                    </label>
+                                    <input
+                                        type="text"
+                                        className="input-field w-full p-2 text-sm"
+                                        value={editingOrder.deliveryAddress}
+                                        onChange={(e) => handleEditFieldChange('deliveryAddress', e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                                        <Users size={13} /> 來源群組 / 團購社群
+                                    </label>
+                                    <input
+                                        type="text"
+                                        list="source-group-options"
+                                        className="input-field w-full p-2 text-sm font-bold text-blue-600 dark:text-blue-400"
+                                        placeholder="例如：新營分局POLICE..."
+                                        value={editingOrder.sourceGroup || ''}
+                                        onChange={(e) => handleEditFieldChange('sourceGroup', e.target.value)}
+                                    />
+                                    <datalist id="source-group-options">
+                                        {buildings.map(b => (
+                                            <option key={b} value={b} />
+                                        ))}
+                                        {Object.keys(groupBindings).map(g => (
+                                            <option key={g} value={g} />
+                                        ))}
+                                    </datalist>
+                                </div>
                             </div>
 
                             <div className="space-y-1">

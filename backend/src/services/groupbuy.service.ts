@@ -123,7 +123,7 @@ export const GroupBuyService = {
   // 3. 管理員修改訂單
   async updatePendingOrder(payload: any, user: any) {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
-    const { orderId, customerName, customerPhone, deliveryAddress, note,
+    const { orderId, customerName, customerPhone, deliveryAddress, sourceGroup, note,
             items, paymentMethod, transferLastFive, paymentStatus, recipients } = payload;
     if (!orderId) throw new Error('缺少 orderId');
 
@@ -131,6 +131,7 @@ export const GroupBuyService = {
     if (customerName !== undefined) updateData.customerName = customerName;
     if (customerPhone !== undefined) updateData.customerPhone = customerPhone;
     if (deliveryAddress !== undefined) updateData.deliveryAddress = deliveryAddress;
+    if (sourceGroup !== undefined) updateData.sourceGroup = sourceGroup;
     if (note !== undefined) updateData.note = note;
     if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod;
     if (transferLastFive !== undefined) updateData.transferLastFive = transferLastFive;

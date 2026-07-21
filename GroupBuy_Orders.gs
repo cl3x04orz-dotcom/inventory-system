@@ -258,7 +258,7 @@ function getPendingOrdersService(payload, user) {
 function updatePendingOrderService(payload, user) {
     if (user.role !== 'BOSS') throw new Error('權限不足');
 
-    const { orderId, customerName, customerPhone, deliveryAddress, note, items, paymentMethod, transferLastFive, paymentStatus } = payload;
+    const { orderId, customerName, customerPhone, deliveryAddress, sourceGroup, note, items, paymentMethod, transferLastFive, paymentStatus } = payload;
     if (!orderId) throw new Error('缺少 orderId');
 
     const { orderSheet, detailSheet } = initGroupBuySheets_();
@@ -294,6 +294,7 @@ function updatePendingOrderService(payload, user) {
     if (customerName !== undefined) setVal('CustomerName', customerName);
     if (customerPhone !== undefined) setVal('CustomerPhone', customerPhone);
     if (deliveryAddress !== undefined) setVal('DeliveryAddress', deliveryAddress);
+    if (sourceGroup !== undefined) setVal('SourceGroup', sourceGroup);
     if (note !== undefined) setVal('Note', note);
 
     if (items !== undefined && Array.isArray(items)) {
