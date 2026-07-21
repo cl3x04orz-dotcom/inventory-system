@@ -486,12 +486,41 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         });
     };
 
-    const computeOrderTotals = useCallback((order) => {
+    const computeOrderTotals = useCallback((order, settingsList = []) => {
         if (!order || !order.items) return { productTotal: 0, shippingFee: 0, totalAmount: 0 };
         const productTotal = order.items.reduce((sum, item) =>
             sum + (Number(item.unitPrice || 0) * Number(item.qty || 0)), 0);
 
-        const fee = Number(order.shippingFee) || 0;
+        const group = order.sourceGroup || '';
+        const isGeneralUser = !group || group === '一般散客' || group === '線上下單';
+
+        let fee = 0;
+        if (!isGeneralUser) {
+            fee = 0; // 團購社區訂單一律免運
+        } else {
+            const addr = String(order.deliveryAddress || '').trim();
+            // 排序運費設定列表（區域名稱較長者優先匹配，如「台南市永康區」優先於「永康區」）
+            const sortedSettings = [...settingsList].sort((a, b) => (b.building?.length || 0) - (a.building?.length || 0));
+            const matchedSetting = sortedSettings.find(s =>
+                s.building && (addr.includes(s.building) || s.building.includes(addr.replace(/線上下單\s*-\s*/, '')))
+            );
+
+            if (matchedSetting) {
+                if (matchedSetting.default_free_shipping) {
+                    fee = 0;
+                } else {
+                    const min = Number(matchedSetting.free_shipping_min) || 0;
+                    const settingFee = Number(matchedSetting.shipping_fee) || 0;
+                    if (min > 0 && productTotal >= min) {
+                        fee = 0;
+                    } else {
+                        fee = settingFee;
+                    }
+                }
+            } else {
+                fee = Number(order.shippingFee) || 0;
+            }
+        }
 
         return {
             productTotal,
@@ -525,8 +554,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 }
             }
 
-            // 2. 計算最新運費與總額
-            const calculatedTotals = computeOrderTotals(editingOrder);
+            // 2. 計算最新運費與總額 (傳入 buildingSettingsList 以精確比對行政區外送規則，如「台南市永康區」)
+            const calculatedTotals = computeOrderTotals(editingOrder, buildingSettingsList);
 
             // 3. 更新訂單內容
             const res = await callGAS(apiUrl, 'updatePendingOrder', {

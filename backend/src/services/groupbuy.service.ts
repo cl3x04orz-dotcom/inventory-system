@@ -148,9 +148,47 @@ export const GroupBuyService = {
         sum + (Number(item.unitPrice) * Number(item.qty)), 0);
     }
 
-    const appliedShippingFee = shippingFee !== undefined ? (Number(shippingFee) || 0) : 0;
-    updateData.shippingFee = appliedShippingFee;
-    updateData.totalAmount = productTotal + appliedShippingFee;
+    // 判斷來源群組
+    const targetGroup = sourceGroup !== undefined ? sourceGroup : '';
+    const isGeneralUser = !targetGroup || targetGroup === '一般散客' || targetGroup === '線上下單';
+
+    let finalShippingFee = 0;
+
+    if (!isGeneralUser) {
+      // 團購社區訂單一律免運 (0 元)
+      finalShippingFee = 0;
+    } else {
+      // 線上下單 / 一般散客：依據地址包含的行政區/外送區域自動比對運費標準 (如「台南市永康區」或「永康區」)
+      const addr = String(deliveryAddress || '').trim();
+      const allComms = await prisma.groupBuyCommunity.findMany({
+        where: { status: 'ACTIVE' }
+      });
+
+      // 依區域名稱長度降序排序，優先匹配最精確的區域名稱 (如 "台南市永康區" 優於 "永康區")
+      const sortedComms = allComms.sort((a, b) => (b.communityName?.length || 0) - (a.communityName?.length || 0));
+      const matchedComm = sortedComms.find(c =>
+        c.communityName && (addr.includes(c.communityName) || c.communityName.includes(addr.replace(/線上下單\s*-\s*/, '')))
+      );
+
+      if (matchedComm) {
+        if (matchedComm.defaultFreeShipping) {
+          finalShippingFee = 0;
+        } else {
+          const min = Number(matchedComm.freeShippingMin) || 0;
+          const fee = Number(matchedComm.shippingFee) || 0;
+          if (min > 0 && productTotal >= min) {
+            finalShippingFee = 0;
+          } else {
+            finalShippingFee = fee;
+          }
+        }
+      } else if (shippingFee !== undefined) {
+        finalShippingFee = Number(shippingFee) || 0;
+      }
+    }
+
+    updateData.shippingFee = finalShippingFee;
+    updateData.totalAmount = productTotal + finalShippingFee;
 
     await prisma.$transaction(async (tx) => {
       // 1. 更新主訂單
@@ -374,7 +412,7 @@ export const GroupBuyService = {
     });
     const commMap = new Map(allComms.map((c: any) => [c.communityName, c]));
 
-    return settings.map((s: any) => {
+    const result = settings.map((s: any) => {
       const comm = commMap.get(s.building);
       return {
         building: s.building,
@@ -394,6 +432,31 @@ export const GroupBuyService = {
         shipping_fee: Number(comm?.shippingFee) || 0,
       };
     });
+
+    // 補上所有在 GroupBuyCommunity 但尚未在 BuildingSetting 中的區域 (如台南市永康區等)
+    const existingBuildings = new Set(result.map((r: any) => r.building));
+    allComms.forEach((c: any) => {
+      if (c.communityName && !existingBuildings.has(c.communityName)) {
+        result.push({
+          building: c.communityName,
+          community_id: c.communityId,
+          start_time: '',
+          end_time: '',
+          sort_order: 999,
+          admin_note: '',
+          is_auto: false,
+          auto_open_day: '',
+          auto_open_time: '',
+          auto_close_day: '',
+          auto_close_time: '',
+          default_free_shipping: c.defaultFreeShipping || false,
+          free_shipping_min: Number(c.freeShippingMin) || 0,
+          shipping_fee: Number(c.shippingFee) || 0
+        });
+      }
+    });
+
+    return result;
   },
 
   // 8. 儲存/更新大樓設定
