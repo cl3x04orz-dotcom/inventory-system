@@ -1041,13 +1041,18 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     };
 
     const handleCopyShipmentSummary = () => {
-        if (filteredOrders.length === 0) {
+        const targetOrders = selectedOrderIds.length > 0
+            ? sortedFilteredOrders.filter(o => selectedOrderIds.includes(o.orderId))
+            : sortedFilteredOrders;
+        const finalOrders = targetOrders.length > 0 ? targetOrders : sortedFilteredOrders;
+
+        if (finalOrders.length === 0) {
             alert('目前沒有訂單可彙整');
             return;
         }
 
         const summary = {};
-        filteredOrders.forEach(order => {
+        finalOrders.forEach(order => {
             order.items.forEach(item => {
                 if (!summary[item.productId]) {
                     summary[item.productId] = {
@@ -1106,18 +1111,24 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     };
 
     const handleCopyDetailSummary = () => {
-        if (filteredOrders.length === 0) {
+        const targetOrders = selectedOrderIds.length > 0
+            ? sortedFilteredOrders.filter(o => selectedOrderIds.includes(o.orderId))
+            : sortedFilteredOrders;
+        const finalOrders = targetOrders.length > 0 ? targetOrders : sortedFilteredOrders;
+
+        if (finalOrders.length === 0) {
             alert('目前沒有訂單可彙整');
             return;
         }
 
         const lines = [];
-        lines.push(`📋 物流分貨明細 (${selectedBuilding === '全部' ? '全部大樓' : selectedBuilding})`);
+        const isSelectedStr = selectedOrderIds.length > 0 && finalOrders.length === targetOrders.length ? ` (已選取 ${finalOrders.length} 筆)` : '';
+        lines.push(`📋 物流分貨明細 (${selectedBuilding === '全部' ? '全部大樓' : selectedBuilding})${isSelectedStr}`);
         lines.push(`彙整時間：${new Date().toLocaleString('zh-TW')}`);
-        lines.push(`訂單總數：${filteredOrders.length} 筆`);
+        lines.push(`訂單總數：${finalOrders.length} 筆`);
         lines.push('----------------------------------------');
 
-        filteredOrders.forEach((order, idx) => {
+        finalOrders.forEach((order, idx) => {
             const groupName = groupBindings[order.sourceGroup] || order.sourceGroup || '未知群組';
             const lineNameStr = order.lineDisplayName ? ` [LINE: ${order.lineDisplayName}]` : '';
             lines.push(`${idx + 1}. ${order.customerName}${lineNameStr} (${order.customerPhone})`);
@@ -1170,18 +1181,24 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     };
 
     const handleCopyClientDetailSummary = () => {
-        if (filteredOrders.length === 0) {
+        const targetOrders = selectedOrderIds.length > 0
+            ? sortedFilteredOrders.filter(o => selectedOrderIds.includes(o.orderId))
+            : sortedFilteredOrders;
+        const finalOrders = targetOrders.length > 0 ? targetOrders : sortedFilteredOrders;
+
+        if (finalOrders.length === 0) {
             alert('目前沒有訂單可彙整');
             return;
         }
 
         const lines = [];
-        lines.push(`📋 物流分貨明細 (客戶) (${selectedBuilding === '全部' ? '全部大樓' : selectedBuilding})`);
+        const isSelectedStr = selectedOrderIds.length > 0 && finalOrders.length === targetOrders.length ? ` (已選取 ${finalOrders.length} 筆)` : '';
+        lines.push(`📋 物流分貨明細 (客戶) (${selectedBuilding === '全部' ? '全部大樓' : selectedBuilding})${isSelectedStr}`);
         lines.push(`彙整時間：${new Date().toLocaleString('zh-TW')}`);
-        lines.push(`訂單總數：${filteredOrders.length} 筆`);
+        lines.push(`訂單總數：${finalOrders.length} 筆`);
         lines.push('----------------------------------------');
 
-        filteredOrders.forEach((order, idx) => {
+        finalOrders.forEach((order, idx) => {
             const groupName = groupBindings[order.sourceGroup] || order.sourceGroup || '未知群組';
             const lineNameStr = order.lineDisplayName ? ` [LINE: ${order.lineDisplayName}]` : '';
             lines.push(`${idx + 1}. ${order.customerName}${lineNameStr}`);
@@ -1511,8 +1528,9 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent' 
                             : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)]'
                         }`}
+                        title={selectedOrderIds.length > 0 ? `複製選取的 ${selectedOrderIds.length} 筆訂單點貨總量` : "複製目前篩選的所有訂單點貨總量"}
                     >
-                        <span>{copied ? '✅ 已複製點貨總量！' : '📦 複製點貨總量'}</span>
+                        <span>{copied ? '✅ 已複製點貨總量！' : selectedOrderIds.length > 0 ? `📦 複製點貨總量 (${selectedOrderIds.length})` : '📦 複製點貨總量'}</span>
                     </button>
 
                     <button
@@ -1522,8 +1540,9 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent' 
                             : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)]'
                         }`}
+                        title={selectedOrderIds.length > 0 ? `複製選取的 ${selectedOrderIds.length} 筆業務分貨明細` : "複製目前篩選的所有業務分貨明細"}
                     >
-                        <span>{detailCopied ? '✅ 已複製分貨明細(業務)！' : '📋 複製分貨明細(業務)'}</span>
+                        <span>{detailCopied ? '✅ 已複製分貨明細(業務)！' : selectedOrderIds.length > 0 ? `📋 複製分貨明細(業務) (${selectedOrderIds.length})` : '📋 複製分貨明細(業務)'}</span>
                     </button>
 
                     <button
@@ -1533,8 +1552,9 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent' 
                             : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)]'
                         }`}
+                        title={selectedOrderIds.length > 0 ? `複製選取的 ${selectedOrderIds.length} 筆客戶分貨明細` : "複製目前篩選的所有客戶分貨明細"}
                     >
-                        <span>{clientDetailCopied ? '✅ 已複製分貨明細(客戶)！' : '📋 複製分貨明細(客戶)'}</span>
+                        <span>{clientDetailCopied ? '✅ 已複製分貨明細(客戶)！' : selectedOrderIds.length > 0 ? `📋 複製分貨明細(客戶) (${selectedOrderIds.length})` : '📋 複製分貨明細(客戶)'}</span>
                     </button>
                 </div>
             </div>
