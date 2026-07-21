@@ -158,17 +158,23 @@ export const GroupBuyService = {
       // 團購社區訂單一律免運 (0 元)
       finalShippingFee = 0;
     } else {
-      // 線上下單 / 一般散客：依據地址包含的行政區/外送區域自動比對運費標準 (如「台南市永康區」或「永康區」)
+      // 線上下單 / 一般散客：依據地址包含的行政區/外送區域自動比對運費標準 (如「台南市玉井區」、「永康區」)
       const addr = String(deliveryAddress || '').trim();
+      const getCleanName = (str: string) => String(str || '').replace(/^(台南市|高雄市|台灣|臺灣)/, '').replace(/^線上下單\s*-\s*/, '').trim();
+      const addrClean = getCleanName(addr);
+
       const allComms = await prisma.groupBuyCommunity.findMany({
         where: { status: 'ACTIVE' }
       });
 
-      // 依區域名稱長度降序排序，優先匹配最精確的區域名稱 (如 "台南市永康區" 優於 "永康區")
+      // 依區域名稱長度降序排序，優先比對最精確的行政區名稱
       const sortedComms = allComms.sort((a, b) => (b.communityName?.length || 0) - (a.communityName?.length || 0));
-      const matchedComm = sortedComms.find(c =>
-        c.communityName && (addr.includes(c.communityName) || c.communityName.includes(addr.replace(/線上下單\s*-\s*/, '')))
-      );
+      const matchedComm = sortedComms.find(c => {
+        if (!c.communityName) return false;
+        const commClean = getCleanName(c.communityName);
+        if (!commClean) return false;
+        return addrClean.includes(commClean) || commClean.includes(addrClean);
+      });
 
       if (matchedComm) {
         if (matchedComm.defaultFreeShipping) {
@@ -182,8 +188,10 @@ export const GroupBuyService = {
             finalShippingFee = fee;
           }
         }
-      } else if (shippingFee !== undefined) {
-        finalShippingFee = Number(shippingFee) || 0;
+      } else if (shippingFee !== undefined && Number(shippingFee) > 0) {
+        finalShippingFee = Number(shippingFee);
+      } else {
+        finalShippingFee = 150; // 線上下單若未比對到已知區域，絕不預設 0 元免運
       }
     }
 

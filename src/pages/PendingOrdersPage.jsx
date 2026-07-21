@@ -486,6 +486,49 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         });
     };
 
+    const DEFAULT_DELIVERY_AREAS = [
+        { name: '台南市永康區', fee: 80, min: 300 },
+        { name: '台南市東區', fee: 80, min: 300 },
+        { name: '台南市北區', fee: 80, min: 300 },
+        { name: '台南市中西區', fee: 80, min: 300 },
+        { name: '台南市安平區', fee: 80, min: 300 },
+        { name: '台南市南區', fee: 80, min: 300 },
+        { name: '台南市安南區', fee: 80, min: 300 },
+        { name: '台南市仁德區', fee: 80, min: 400 },
+        { name: '台南市歸仁區', fee: 80, min: 400 },
+        { name: '台南市新化區', fee: 80, min: 400 },
+        { name: '台南市新市區', fee: 80, min: 400 },
+        { name: '台南市善化區', fee: 150, min: 500 },
+        { name: '台南市安定區', fee: 150, min: 500 },
+        { name: '台南市麻豆區', fee: 150, min: 800 },
+        { name: '台南市佳里區', fee: 150, min: 800 },
+        { name: '台南市西港區', fee: 150, min: 800 },
+        { name: '台南市下營區', fee: 150, min: 800 },
+        { name: '台南市六甲區', fee: 150, min: 800 },
+        { name: '台南市官田區', fee: 150, min: 800 },
+        { name: '台南市七股區', fee: 150, min: 800 },
+        { name: '台南市新營區', fee: 200, min: 1000 },
+        { name: '台南市鹽水區', fee: 200, min: 1000 },
+        { name: '台南市柳營區', fee: 200, min: 1000 },
+        { name: '台南市後壁區', fee: 200, min: 1000 },
+        { name: '台南市學甲區', fee: 200, min: 1000 },
+        { name: '台南市將軍區', fee: 200, min: 1000 },
+        { name: '台南市北門區', fee: 200, min: 1000 },
+        { name: '台南市大內區', fee: 200, min: 1000 },
+        { name: '台南市山上區', fee: 200, min: 1000 },
+        { name: '台南市龍崎區', fee: 200, min: 1000 },
+        { name: '台南市關廟區', fee: 200, min: 1000 },
+        { name: '台南市玉井區', fee: 250, min: 1200 },
+        { name: '台南市楠西區', fee: 250, min: 1200 },
+        { name: '台南市左鎮區', fee: 250, min: 1200 },
+        { name: '台南市南化區', fee: 250, min: 1200 },
+        { name: '台南市白河區', fee: 250, min: 1200 },
+        { name: '台南市東山區', fee: 250, min: 1200 },
+        { name: '高雄市茄萣區', fee: 150, min: 800 },
+        { name: '高雄市湖內區', fee: 150, min: 800 },
+        { name: '高雄市路竹區', fee: 200, min: 1000 }
+    ];
+
     const computeOrderTotals = useCallback((order, settingsList = []) => {
         if (!order || !order.items) return { productTotal: 0, shippingFee: 0, totalAmount: 0 };
         const productTotal = order.items.reduce((sum, item) =>
@@ -499,11 +542,27 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             fee = 0; // 團購社區訂單一律免運
         } else {
             const addr = String(order.deliveryAddress || '').trim();
-            // 排序運費設定列表（區域名稱較長者優先匹配，如「台南市永康區」優先於「永康區」）
-            const sortedSettings = [...settingsList].sort((a, b) => (b.building?.length || 0) - (a.building?.length || 0));
-            const matchedSetting = sortedSettings.find(s =>
-                s.building && (addr.includes(s.building) || s.building.includes(addr.replace(/線上下單\s*-\s*/, '')))
-            );
+            const getCleanName = (str) => String(str || '').replace(/^(台南市|高雄市|台灣|臺灣)/, '').replace(/^線上下單\s*-\s*/, '').trim();
+            const addrClean = getCleanName(addr);
+
+            // 合併後端設定與預設 37 個行政區運費規則
+            const combinedSettings = [
+                ...settingsList,
+                ...DEFAULT_DELIVERY_AREAS.map(a => ({
+                    building: a.name,
+                    default_free_shipping: false,
+                    free_shipping_min: a.min,
+                    shipping_fee: a.fee
+                }))
+            ];
+
+            const sortedSettings = combinedSettings.sort((a, b) => (b.building?.length || 0) - (a.building?.length || 0));
+            const matchedSetting = sortedSettings.find(s => {
+                if (!s.building) return false;
+                const bClean = getCleanName(s.building);
+                if (!bClean) return false;
+                return addrClean.includes(bClean) || bClean.includes(addrClean);
+            });
 
             if (matchedSetting) {
                 if (matchedSetting.default_free_shipping) {
@@ -517,8 +576,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         fee = settingFee;
                     }
                 }
+            } else if (order.shippingFee !== undefined && Number(order.shippingFee) > 0) {
+                fee = Number(order.shippingFee);
             } else {
-                fee = Number(order.shippingFee) || 0;
+                fee = 150; // 線上下單未比對到已知行政區時預設運費 (絕非 0 元免運)
             }
         }
 
