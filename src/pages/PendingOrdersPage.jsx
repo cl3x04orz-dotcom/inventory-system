@@ -731,6 +731,14 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     }, [buildings, groupBindings, orders]);
 
     const filteredOrders = orders.filter(order => {
+        // 未付款分頁雙重防護過濾
+        if (activeTab === 'UNPAID') {
+            const ps = String(order.paymentStatus || '').trim();
+            if (ps === '已付款' || ps === '已入帳' || ps.includes('已付款') || ps.includes('已入帳')) {
+                return false;
+            }
+        }
+
         // 大樓篩選
         if (selectedBuilding !== '全部') {
             const addr = String(order.deliveryAddress || '').trim();
@@ -1435,8 +1443,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 </div>
             )}
 
-            {/* 批次操作列 (限待確認 tab 下) */}
-            {activeTab === 'PENDING' && sortedFilteredOrders.length > 0 && (
+            {/* 批次操作列 (限待確認與未付款 tab 下) */}
+            {(activeTab === 'PENDING' || activeTab === 'UNPAID') && sortedFilteredOrders.length > 0 && (
                 <div className="bg-slate-50 dark:bg-slate-900/10 border border-[var(--border-primary)] rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-inner">
                     <div className="flex items-center gap-2">
                         <input
@@ -1447,7 +1455,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             id="selectAllCheckbox"
                         />
                         <label htmlFor="selectAllCheckbox" className="text-sm font-bold text-[var(--text-secondary)] cursor-pointer select-none">
-                            全選本頁面待審核訂單
+                            全選本頁面{activeTab === 'UNPAID' ? '未付款' : '待審核'}訂單
                         </label>
                         <span className="text-xs text-[var(--text-tertiary)] ml-1">
                             (已選取 {selectedOrderIds.length} 筆)
@@ -1501,6 +1509,15 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             }`}
                     >
                         已出貨/確認訂單 (CONFIRMED)
+                    </button>
+                    <button
+                        onClick={() => { setActiveTab('UNPAID'); }}
+                        className={`px-5 py-2.5 font-bold text-sm transition-colors border-b-2 ${activeTab === 'UNPAID'
+                                ? 'border-amber-500 text-amber-600'
+                                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                            }`}
+                    >
+                        未付款訂單 (UNPAID)
                     </button>
                 </div>
 
@@ -1582,7 +1599,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                         className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors select-none"
                                     >
                                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                                            {activeTab === 'PENDING' && (
+                                            {(activeTab === 'PENDING' || activeTab === 'UNPAID') && (
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedOrderIds.includes(order.orderId)}

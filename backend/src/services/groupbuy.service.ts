@@ -17,7 +17,20 @@ export const GroupBuyService = {
     const { status } = payload || {};
 
     const where: any = {};
-    if (status) where.status = status;
+    if (status === 'UNPAID') {
+      where.OR = [
+        { paymentStatus: null },
+        { paymentStatus: '' },
+        {
+          AND: [
+            { NOT: { paymentStatus: { contains: '已付款' } } },
+            { NOT: { paymentStatus: { contains: '已入帳' } } }
+          ]
+        }
+      ];
+    } else if (status) {
+      where.status = status;
+    }
 
     const orders = await prisma.groupBuyOrder.findMany({
       where,

@@ -225,7 +225,12 @@ function getPendingOrdersService(payload, user) {
         const orderId = oIdIdx >= 0 ? String(row[oIdIdx] || '').trim() : '';
         const rowStatus = statusIdx >= 0 ? String(row[statusIdx] || '').trim() : '';
         if (!orderId) continue;
-        if (status && rowStatus !== status) continue;
+        if (status === 'UNPAID') {
+            const rowPs = psIdx >= 0 ? String(row[psIdx] || '').trim() : '';
+            if (rowPs === '已付款' || rowPs === '已入帳' || rowPs.includes('已付款') || rowPs.includes('已入帳')) continue;
+        } else if (status && rowStatus !== status) {
+            continue;
+        }
 
         orders.push({
             orderId,
