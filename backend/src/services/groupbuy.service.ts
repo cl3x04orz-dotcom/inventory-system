@@ -154,7 +154,10 @@ export const GroupBuyService = {
 
     let finalShippingFee = 0;
 
-    if (!isGeneralUser) {
+    if (shippingFee !== undefined) {
+      // 若前端/管理員傳入了明確的運費金額 (如 $80)，直接採用
+      finalShippingFee = Number(shippingFee) || 0;
+    } else if (!isGeneralUser) {
       // 團購社區訂單一律免運 (0 元)
       finalShippingFee = 0;
     } else {
@@ -188,10 +191,8 @@ export const GroupBuyService = {
             finalShippingFee = fee;
           }
         }
-      } else if (shippingFee !== undefined && Number(shippingFee) > 0) {
-        finalShippingFee = Number(shippingFee);
       } else {
-        finalShippingFee = 150; // 線上下單若未比對到已知區域，絕不預設 0 元免運
+        finalShippingFee = 150; // 線上下單若未比對到已知區域，預設外送運費
       }
     }
 
