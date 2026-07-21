@@ -204,6 +204,22 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [isReorder, setIsReorder] = useState(false);
   const [isMsgSentAuto, setIsMsgSentAuto] = useState(false);
 
+  // 會員中心狀態
+  const [memberProfile, setMemberProfile] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [isMemberLoading, setIsMemberLoading] = useState(false);
+  const [lineUserId, setLineUserId] = useState("");
+  const [linePictureUrl, setLinePictureUrl] = useState("");
+
+  // V2 架構狀態
+  const [currentCommunity, setCurrentCommunity] = useState(null);
+  const [allCommunities, setAllCommunities] = useState([]);
+  const [selectedCity, setSelectedCity] = useState("");
+  const [selectedCommunityId, setSelectedCommunityId] = useState("");
+  const [showAreaModal, setShowAreaModal] = useState(false);
+  const [activeCampaign, setActiveCampaign] = useState(null);
+  const [nextOpenTime, setNextOpenTime] = useState(null);
+
   useEffect(() => {
     const timer = setInterval(() => {
       setTick((t) => t + 1);
@@ -257,13 +273,6 @@ export default function LiffOrderPage({ user, apiUrl }) {
     }
   }, [step, lineUserId, apiUrl]);
 
-  // 會員中心狀態
-  const [memberProfile, setMemberProfile] = useState(null);
-  const [orders, setOrders] = useState([]);
-  const [isMemberLoading, setIsMemberLoading] = useState(false);
-  const [lineUserId, setLineUserId] = useState("");
-  const [linePictureUrl, setLinePictureUrl] = useState("");
-
   const renderBottomNav = () => {
     if (step === "success") return null;
     return (
@@ -309,15 +318,6 @@ export default function LiffOrderPage({ user, apiUrl }) {
       </div>
     );
   };
-
-  // ── 新增：V2 架構狀態 ─────────────────────────────────────────
-  const [currentCommunity, setCurrentCommunity] = useState(null);
-  const [allCommunities, setAllCommunities] = useState([]);
-  const [selectedCity, setSelectedCity] = useState("");
-  const [selectedCommunityId, setSelectedCommunityId] = useState("");
-  const [showAreaModal, setShowAreaModal] = useState(false);
-  const [activeCampaign, setActiveCampaign] = useState(null);
-  const [nextOpenTime, setNextOpenTime] = useState(null);
 
   // ── 載入商品與初始化資料（單次 API，後端已過濾） ─────────────────────────────────────────
   const loadAllData = async (overrideBuilding = '') => {
