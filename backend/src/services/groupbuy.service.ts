@@ -71,7 +71,9 @@ export const GroupBuyService = {
           productId: ri.productId,
           productName: ri.productName,
           qty: Number(ri.qty),
-          price: Number(ri.price)
+          price: Number(ri.price),
+          subtotal: ri.subtotal !== null && ri.subtotal !== undefined ? Number(ri.subtotal) : (Number(ri.price) * Number(ri.qty)),
+          remark: ri.remark || ''
         }))
       })),
       items: (o.details || []).map((d: any) => ({
@@ -96,7 +98,7 @@ export const GroupBuyService = {
 
     const orderId = generateOrderId();
     const totalAmount = items.reduce((sum: number, item: any) =>
-      sum + (Number(item.unitPrice) * Number(item.qty)), 0);
+      sum + (item.subtotal !== undefined && item.subtotal !== null ? Number(item.subtotal) : (Number(item.unitPrice) * Number(item.qty))), 0);
 
     let paymentStatus = '';
     if (paymentMethod === '現金') paymentStatus = '貨到付款';
@@ -126,7 +128,7 @@ export const GroupBuyService = {
             productName: item.productName || '',
             unitPrice: Number(item.unitPrice) || 0,
             qty: Number(item.qty) || 0,
-            subtotal: Number(item.unitPrice) * Number(item.qty),
+            subtotal: Math.round(Number(item.subtotal !== undefined && item.subtotal !== null ? item.subtotal : (Number(item.unitPrice) * Number(item.qty)))) || 0,
             remark: item.remark || ''
           }))
         }
@@ -158,11 +160,11 @@ export const GroupBuyService = {
     let productTotal = 0;
     if (Array.isArray(items) && items.length > 0) {
       productTotal = items.reduce((sum: number, item: any) =>
-        sum + (Number(item.unitPrice) * Number(item.qty)), 0);
+        sum + (item.subtotal !== undefined && item.subtotal !== null ? Number(item.subtotal) : (Number(item.unitPrice) * Number(item.qty))), 0);
     } else {
       const details = await prisma.groupBuyOrderDetail.findMany({ where: { orderId } });
       productTotal = details.reduce((sum: number, item: any) =>
-        sum + (Number(item.unitPrice) * Number(item.qty)), 0);
+        sum + (item.subtotal !== undefined && item.subtotal !== null ? Number(item.subtotal) : (Number(item.unitPrice) * Number(item.qty))), 0);
     }
 
     // 判斷來源群組
@@ -230,7 +232,7 @@ export const GroupBuyService = {
             productName: item.productName || '',
             unitPrice: Number(item.unitPrice) || 0,
             qty: Number(item.qty) || 0,
-            subtotal: Number(item.unitPrice) * Number(item.qty),
+            subtotal: Math.round(Number(item.subtotal !== undefined && item.subtotal !== null ? item.subtotal : (Number(item.unitPrice) * Number(item.qty)))) || 0,
             remark: item.remark || ''
           }))
         });
@@ -867,7 +869,7 @@ export const GroupBuyService = {
     }
 
     const productTotal = items.reduce((sum: number, item: any) =>
-      sum + (Number(item.unitPrice) * Number(item.qty)), 0);
+      sum + (item.subtotal !== undefined && item.subtotal !== null ? Number(item.subtotal) : (Number(item.unitPrice) * Number(item.qty))), 0);
     const appliedShippingFee = Number(shippingFee) || 0;
     const totalAmount = productTotal + appliedShippingFee;
 
@@ -998,7 +1000,7 @@ export const GroupBuyService = {
             productName: item.productName + (item.remark ? ` (${item.remark})` : ''),
             unitPrice: Number(item.unitPrice) || 0,
             qty: Number(item.qty) || 0,
-            subtotal: Number(item.unitPrice) * Number(item.qty),
+            subtotal: Math.round(Number(item.subtotal !== undefined && item.subtotal !== null ? item.subtotal : (Number(item.unitPrice) * Number(item.qty)))) || 0,
             remark: item.remark || ''
           }))
         },

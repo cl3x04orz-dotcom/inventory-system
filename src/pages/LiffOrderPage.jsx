@@ -1611,6 +1611,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
             productName: i.name,
             unitPrice: i.price,
             qty: i.qty,
+            subtotal: i.subtotal,
             remark: i.remark,
           })),
         },

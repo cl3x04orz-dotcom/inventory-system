@@ -80,7 +80,7 @@ function v2_createOrderService(payload) {
         }
     }
     const orderNo = `GB${dateStr}${String(seq).padStart(4, '0')}`;
-    const totalAmount = items.reduce((sum, item) => sum + (item.unitPrice * item.qty), 0);
+    const totalAmount = items.reduce((sum, item) => sum + (item.subtotal !== undefined && item.subtotal !== null ? Number(item.subtotal) : (item.unitPrice * item.qty)), 0);
     const combinedNote = [note, transferLastFive ? `後五碼:${transferLastFive}` : ""].filter(Boolean).join(" | ");
 
     const newOrderRow = new Array(GB_HEADERS.length).fill("");
@@ -121,7 +121,7 @@ function v2_createOrderService(payload) {
         row[GB_DETAIL_HEADERS.indexOf('ProductName')] = item.productName + (item.remark ? ` (${item.remark})` : '');
         row[GB_DETAIL_HEADERS.indexOf('UnitPrice')] = item.unitPrice;
         row[GB_DETAIL_HEADERS.indexOf('Qty')] = item.qty;
-        row[GB_DETAIL_HEADERS.indexOf('Subtotal')] = item.unitPrice * item.qty;
+        row[GB_DETAIL_HEADERS.indexOf('Subtotal')] = item.subtotal !== undefined && item.subtotal !== null ? Number(item.subtotal) : (item.unitPrice * item.qty);
         return row;
     });
 

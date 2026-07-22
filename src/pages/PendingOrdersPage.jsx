@@ -83,12 +83,134 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     const [buildings, setBuildings] = useState([]);
     const [buildingSettingsList, setBuildingSettingsList] = useState([]);
 
+    const calculateItemSubtotal = useCallback((productId, qty, fallbackPrice = 0) => {
+        const prod = products.find(p => p.id === productId || p.name === productId);
+        if (!prod) {
+            return (Number(fallbackPrice) || 0) * (Number(qty) || 0);
+        }
+        const singlePrice = Number(prod.single_price) || Number(prod.price) || Number(fallbackPrice) || 0;
+        // 多組促銷：買X送Y
+        if (Array.isArray(prod.promotions) && prod.promotions.length > 0) {
+            let bestFree = 0;
+            for (const promo of prod.promotions) {
+                const bx = Number(promo.buyX);
+                const gy = Number(promo.getY);
+                if (bx > 0 && gy > 0) {
+                    const free = Math.floor(qty / (bx + gy)) * gy;
+                    if (free > bestFree) bestFree = free;
+                }
+            }
+            return singlePrice * (qty - bestFree);
+        }
+        // 多件優惠 (階梯組合價)
+        if (prod.has_volume_pricing && prod.volume_pricing_settings) {
+            let settings = prod.volume_pricing_settings;
+            if (typeof settings === 'string') {
+                try { settings = JSON.parse(settings); } catch (e) {}
+            }
+            const targetQty = Number(settings?.target_quantity);
+            const packagePrice = Number(settings?.package_price);
+            if (targetQty > 0 && packagePrice >= 0) {
+                const groupCount = Math.floor(qty / targetQty);
+                const remainderCount = qty % targetQty;
+                return (groupCount * packagePrice) + (remainderCount * singlePrice);
+            }
+        }
+        return singlePrice * qty;
+    }, [products]);
+
+    const normalizeOrder = useCallback((order) => {
+        if (!order || !order.items) return order;
+        const hasRecipients = order.recipients && Array.isArray(order.recipients) && order.recipients.length > 0;
+        
+        const normalizedRecipients = hasRecipients ? order.recipients.map(r => ({
+            ...r,
+            items: (r.items || []).map(ri => {
+                const prod = products.find(p => p.id === ri.productId || p.name === ri.productName || p.name === ri.productId);
+                let sub = ri.subtotal;
+                if (prod && (prod.has_volume_pricing || (Array.isArray(prod.promotions) && prod.promotions.length > 0))) {
+                    sub = calculateItemSubtotal(ri.productId, ri.qty, ri.price);
+                } else if (sub == null || isNaN(Number(sub)) || Number(sub) <= 0) {
+                    sub = calculateItemSubtotal(ri.productId, ri.qty, ri.price);
+                }
+                return {
+                    ...ri,
+                    subtotal: Number(sub)
+                };
+            })
+        })) : order.recipients;
+
+        const normalizedItems = order.items.map(item => {
+            const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
+            let sub = item.subtotal;
+            if (prod && (prod.has_volume_pricing || (Array.isArray(prod.promotions) && prod.promotions.length > 0))) {
+                sub = calculateItemSubtotal(item.productId, item.qty, item.unitPrice);
+            } else if (hasRecipients && prod && prod.has_volume_pricing) {
+                const totalRecipQty = normalizedRecipients.reduce((sum, r) => {
+                    return sum + (r.items || []).reduce((s, ri) => (ri.productId === item.productId || ri.productName === item.productName) ? s + Number(ri.qty) : s, 0);
+                }, 0);
+                if (totalRecipQty === item.qty) {
+                    sub = calculateItemSubtotal(item.productId, item.qty, item.unitPrice);
+                }
+            }
+            if (sub == null || isNaN(Number(sub)) || Number(sub) <= 0) {
+                sub = calculateItemSubtotal(item.productId, item.qty, item.unitPrice);
+            }
+
+            let finalRemark = item.remark || '';
+            if (hasRecipients && prod && prod.has_flavor_attributes) {
+                const flavorMap = {};
+                const rawRemarks = [];
+                normalizedRecipients.forEach(r => {
+                    (r.items || []).forEach(ri => {
+                        if (ri.productId === item.productId || ri.productName === item.productName) {
+                            const remStr = ri.remark || '';
+                            if (remStr) {
+                                const cleanRemark = remStr.replace(/【口味備註：(.*?)】/, '$1');
+                                cleanRemark.split(/[,，\s+]/).forEach(part => {
+                                    const match = part.trim().match(/^\(?([^\s*x:：)]+)\)?\s*[*xX:：]\s*(\d+)$/);
+                                    if (match) {
+                                        const fName = match[1];
+                                        const fQty = Number(match[2]);
+                                        if (fName && fQty > 0) {
+                                            flavorMap[fName] = (flavorMap[fName] || 0) + fQty;
+                                        }
+                                    } else if (part.trim() && !part.trim().includes('口味備註')) {
+                                        if (!rawRemarks.includes(part.trim())) rawRemarks.push(part.trim());
+                                    }
+                                });
+                            }
+                        }
+                    });
+                });
+                if (Object.keys(flavorMap).length > 0) {
+                    const fParts = Object.entries(flavorMap).map(([k, v]) => `${k}x${v}`);
+                    if (rawRemarks.length > 0) fParts.push(...rawRemarks);
+                    finalRemark = `【口味備註：${fParts.join(', ')}】`;
+                }
+            }
+
+            return {
+                ...item,
+                subtotal: Number(sub),
+                remark: finalRemark
+            };
+        });
+
+        return {
+            ...order,
+            recipients: normalizedRecipients,
+            items: normalizedItems,
+            totalAmount: normalizedItems.reduce((s, it) => s + (Number(it.subtotal) || 0), 0) + Number(order.shippingFee || 0)
+        };
+    }, [products, calculateItemSubtotal]);
+
     const fetchOrders = useCallback(async () => {
         setLoading(true);
         try {
             const data = await callGAS(apiUrl, 'getPendingOrders', { status: activeTab }, user.token);
             if (Array.isArray(data)) {
-                setOrders(data);
+                setOrders(data.map(order => normalizeOrder(order)));
             }
         } catch (error) {
             console.error('Failed to fetch orders:', error);
@@ -489,41 +611,6 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         updateRecipientsState(nextRecipients);
     };
 
-    const calculateItemSubtotal = (productId, qty, fallbackPrice = 0) => {
-        const prod = products.find(p => p.id === productId);
-        if (!prod) {
-            return (Number(fallbackPrice) || 0) * (Number(qty) || 0);
-        }
-        const singlePrice = Number(prod.single_price) || Number(prod.price) || Number(fallbackPrice) || 0;
-        // 多組促銷：買X送Y (相容 LiffOrderPage)
-        if (Array.isArray(prod.promotions) && prod.promotions.length > 0) {
-            let bestFree = 0;
-            for (const promo of prod.promotions) {
-                const bx = Number(promo.buyX);
-                const gy = Number(promo.getY);
-                if (bx > 0 && gy > 0) {
-                    const free = Math.floor(qty / (bx + gy)) * gy;
-                    if (free > bestFree) bestFree = free;
-                }
-            }
-            return singlePrice * (qty - bestFree);
-        }
-        // 多件優惠 (階梯組合價)
-        if (prod.has_volume_pricing && prod.volume_pricing_settings) {
-            let settings = prod.volume_pricing_settings;
-            if (typeof settings === 'string') {
-                try { settings = JSON.parse(settings); } catch (e) {}
-            }
-            const targetQty = Number(settings?.target_quantity);
-            const packagePrice = Number(settings?.package_price);
-            if (targetQty > 0 && packagePrice >= 0) {
-                const groupCount = Math.floor(qty / targetQty);
-                const remainderCount = qty % targetQty;
-                return (groupCount * packagePrice) + (remainderCount * singlePrice);
-            }
-        }
-        return singlePrice * qty;
-    };
 
     const handleUpdateModalFlavorQty = (flavor, delta) => {
         if (!adminFlavorModal) return;
@@ -747,14 +834,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         { name: '高雄市路竹區', fee: 200, min: 1000 }
     ];
 
-    const computeOrderTotals = useCallback((order, settingsList = [], groupBindingsMap = {}) => {
-        if (!order || !order.items) return { productTotal: 0, shippingFee: 0, totalAmount: 0 };
-        const productTotal = order.items.reduce((sum, item) => {
-            if (item.subtotal != null && !isNaN(Number(item.subtotal))) {
-                return sum + Number(item.subtotal);
-            }
-            return sum + calculateItemSubtotal(item.productId, item.qty, item.unitPrice);
-        }, 0);
+    const computeOrderTotals = useCallback((rawOrder, settingsList = [], groupBindingsMap = {}) => {
+        if (!rawOrder || !rawOrder.items) return { productTotal: 0, shippingFee: 0, totalAmount: 0 };
+        const order = normalizeOrder(rawOrder);
+        const productTotal = order.items.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
 
         const addrRaw = String(order.deliveryAddress || '').trim();
         const knownNames = Array.from(new Set([...settingsList.map(s => s.building), ...Object.values(groupBindingsMap)])).filter(Boolean);
@@ -1016,7 +1099,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
     // 排序：同大樓排在一起，大樓相同則依時間新到舊排序
     const sortedFilteredOrders = React.useMemo(() => {
-        return [...filteredOrders].sort((a, b) => {
+        return filteredOrders.map(order => normalizeOrder(order)).sort((a, b) => {
             const getBuildingName = (order) => {
                 const boundName = groupBindings[order.sourceGroup];
                 if (boundName) return boundName;
@@ -1031,7 +1114,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             // 相同大樓則依時間新到舊
             return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
         });
-    }, [filteredOrders, groupBindings]);
+    }, [filteredOrders, groupBindings, normalizeOrder]);
 
     // 商品特化搜尋小卡片統計數據
     const productSearchSummary = React.useMemo(() => {
