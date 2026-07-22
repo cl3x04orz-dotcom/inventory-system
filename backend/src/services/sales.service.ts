@@ -771,7 +771,7 @@ export const SalesService = {
       },
       create: {
         customerName: String(customerName).trim(),
-        isAiEnabled: isAiEnabled !== undefined ? Boolean(isAiEnabled) : true,
+        isAiEnabled: isAiEnabled !== undefined ? Boolean(isAiEnabled) : false,
         schedule: schedule !== undefined ? schedule : [],
         category: category !== undefined ? String(category) : '市場'
       }
@@ -1167,7 +1167,7 @@ export const SalesService = {
         await prisma.customer.create({
           data: {
             customerName: name,
-            isAiEnabled: true,
+            isAiEnabled: false,
             schedule: schedule,
             category: '市場'
           }
@@ -1175,7 +1175,7 @@ export const SalesService = {
 
         systemCustomers.push({
           name,
-          isAiEnabled: true,
+          isAiEnabled: false,
           schedule,
           category: '市場'
         });

@@ -8,6 +8,7 @@ import { BillService } from '../services/bill.service.js';
 import { AnalyticsService } from '../services/analytics.service.js';
 import { PayrollService } from '../services/payroll.service.js';
 import { GroupBuyService } from '../services/groupbuy.service.js';
+import { callGASFromNode } from '../utils/gasClient.js';
 
 export async function apiRouter(action: string, payload: any, user: any): Promise<any> {
   switch (action) {
@@ -63,19 +64,7 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       if (!gasUrl) {
         throw new Error('未在後端 .env 中設定 GAS_API_URL');
       }
-      const response = await fetch(gasUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'generatePdf',
-          token: user?.gasToken || payload.rawToken,
-          payload: payload
-        })
-      });
-      if (!response.ok) {
-        throw new Error(`GAS 服務回應錯誤: ${response.statusText}`);
-      }
-      return await response.json();
+      return await callGASFromNode(gasUrl, 'generatePdf', payload, user?.gasToken || payload.rawToken);
     }
 
     // 4. 進貨作業與管理 (Purchases)

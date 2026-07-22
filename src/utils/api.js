@@ -2,10 +2,13 @@ import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 /**
  * Unified API Caller for Google Apps Script (GAS)
  */
-export const callGAS = async (apiUrl, action, payload, token = null) => {
+export const callGAS = async (apiUrl, action, payload, token = null, customTimeoutMs = null) => {
     try {
+        const isLongRunningAction = action === 'generatePdf' || action === 'getSmartPickSuggestion' || action === 'getSalesByDateRange' || action === 'importHistoryData';
+        const timeoutDuration = customTimeoutMs || (isLongRunningAction ? 180000 : 60000);
+
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+        const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
 
         const response = await fetch(apiUrl, {
             method: 'POST',
@@ -50,7 +53,7 @@ export const callGAS = async (apiUrl, action, payload, token = null) => {
                         }
 
                         // 使用新 Token 重試原始請求
-                        return await callGAS(apiUrl, action, payload, renewRes.token);
+                        return await callGAS(apiUrl, action, payload, renewRes.token, customTimeoutMs);
                     }
                 } catch (renewError) {
                     console.error('[API] 自動續約失敗:', renewError);
@@ -72,7 +75,7 @@ export const callGAS = async (apiUrl, action, payload, token = null) => {
         console.error(`API Error [${action}]:`, error);
 
         if (error.name === 'AbortError') {
-            throw new Error('請求超時，請檢查網路連線或 GAS 伺服器狀態。');
+            throw new Error('處理時間超過了瀏覽器連線上限（超時）。由於 Google 雲端處理合併列印較耗時，系統已自動放寬等待時間，若仍超時建議分段列印或檢查網路狀態。');
         }
 
         if (error.message.includes('Load failed') || error.message.includes('Failed to fetch')) {

@@ -48,7 +48,7 @@ model Product {
 
 model Customer {
   customerName String  @id
-  isAiEnabled  Boolean @default(true)
+  isAiEnabled  Boolean @default(false)
   schedule     Json    @default("[]")
   category     String  @default("市場")
 }

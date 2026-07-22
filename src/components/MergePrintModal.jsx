@@ -110,11 +110,11 @@ export default function MergePrintModal({
         }
         const orig = systemCustomers.find(c => (typeof c === 'string' ? c : c.name) === custName);
         let origSchedule = [0,1,2,3,4,5,6];
-        let origAiEnabled = true;
+        let origAiEnabled = false;
         let origCategory = '市場';
         if (orig && typeof orig === 'object') {
             origSchedule = orig.schedule || [0,1,2,3,4,5,6];
-            origAiEnabled = orig.isAiEnabled !== false;
+            origAiEnabled = orig.isAiEnabled === true;
             origCategory = orig.category || '市場';
         }
         return {
@@ -135,6 +135,44 @@ export default function MergePrintModal({
         }));
     };
 
+    const handleEditCustAndAutoSave = async (custName, field, value) => {
+        const current = getCustSetting(custName);
+        const next = { ...current, [field]: value };
+        setEditingCustomers(prev => ({
+            ...prev,
+            [custName]: { ...next, isSaving: true }
+        }));
+        if (onUpdateCustomerSettings) {
+            const success = await onUpdateCustomerSettings({
+                customerName: custName,
+                isAiEnabled: next.isAiEnabled,
+                schedule: next.schedule,
+                category: next.category
+            });
+            if (success) {
+                const targetObj = systemCustomers.find(c => (typeof c === 'string' ? c : c.name) === custName);
+                if (targetObj && typeof targetObj === 'object') {
+                    targetObj[field] = value;
+                }
+                setEditingCustomers(prev => {
+                    const copy = { ...prev };
+                    delete copy[custName];
+                    return copy;
+                });
+            } else {
+                setEditingCustomers(prev => ({
+                    ...prev,
+                    [custName]: { ...next, isSaving: false }
+                }));
+            }
+        } else {
+            setEditingCustomers(prev => ({
+                ...prev,
+                [custName]: { ...next, isSaving: false }
+            }));
+        }
+    };
+
     const handleSaveCust = async (custName) => {
         const setting = getCustSetting(custName);
         setEditingCustomers(prev => ({
@@ -149,6 +187,12 @@ export default function MergePrintModal({
                 category: setting.category
             });
             if (success) {
+                const targetObj = systemCustomers.find(c => (typeof c === 'string' ? c : c.name) === custName);
+                if (targetObj && typeof targetObj === 'object') {
+                    targetObj.isAiEnabled = setting.isAiEnabled;
+                    targetObj.schedule = setting.schedule;
+                    targetObj.category = setting.category;
+                }
                 setEditingCustomers(prev => {
                     const copy = { ...prev };
                     delete copy[custName];
@@ -645,14 +689,31 @@ export default function MergePrintModal({
                         </div>
 
                         {/* Search & Filter bar */}
-                        <div className="p-4 border-b border-gray-100 flex gap-4 shrink-0">
+                        <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row items-center gap-3 shrink-0">
                             <input
                                 type="text"
                                 placeholder="🔍 輸入關鍵字搜尋地點名稱..."
                                 value={searchCustQuery}
                                 onChange={(e) => setSearchCustQuery(e.target.value)}
-                                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 placeholder-gray-400 outline-none focus:border-blue-400 focus:bg-white transition-all"
+                                className="w-full flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 placeholder-gray-400 outline-none focus:border-blue-400 focus:bg-white transition-all"
                             />
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    if (!window.confirm('確定要把全部地點的「AI 預測開關」立刻設為「不啟動 (OFF)」嗎？\n(會即時自動儲存到資料庫)')) return;
+                                    for (const c of systemCustomers) {
+                                        const name = typeof c === 'string' ? c : c.name;
+                                        const setting = getCustSetting(name);
+                                        if (setting.isAiEnabled) {
+                                            await handleEditCustAndAutoSave(name, 'isAiEnabled', false);
+                                        }
+                                    }
+                                    alert('✅ 已成功將全部地點的 AI 預測開關設為不啟動 (OFF)！');
+                                }}
+                                className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-black text-xs rounded-xl shadow transition-all whitespace-nowrap flex items-center justify-center gap-1.5 active:scale-95"
+                            >
+                                <span>⚡ 一鍵全部設為不啟動 (OFF)</span>
+                            </button>
                         </div>
 
                         {/* Table / List area */}
@@ -675,7 +736,7 @@ export default function MergePrintModal({
                                     
                                     const orig = systemCustomers.find(sc => (typeof sc === 'string' ? sc : sc.name) === name) || {};
                                     const origSchedule = orig.schedule || [0,1,2,3,4,5,6];
-                                    const origAiEnabled = orig.isAiEnabled !== false;
+                                    const origAiEnabled = orig.isAiEnabled === true;
                                     
                                     const isModified = 
                                         setting.isAiEnabled !== origAiEnabled ||
@@ -692,8 +753,8 @@ export default function MergePrintModal({
                                             <div className="col-span-2 flex justify-center">
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleEditCust(name, 'isAiEnabled', !setting.isAiEnabled)}
-                                                    className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all ${setting.isAiEnabled ? 'bg-emerald-500 text-white shadow-sm' : 'bg-gray-100 text-gray-400'}`}
+                                                    onClick={() => handleEditCustAndAutoSave(name, 'isAiEnabled', !setting.isAiEnabled)}
+                                                    className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all active:scale-95 ${setting.isAiEnabled ? 'bg-emerald-500 text-white shadow-sm' : 'bg-gray-100 text-gray-400'}`}
                                                 >
                                                     {setting.isAiEnabled ? 'ON 啟用' : 'OFF 關閉'}
                                                 </button>
@@ -711,9 +772,9 @@ export default function MergePrintModal({
                                                                 const newSchedule = isChecked
                                                                     ? setting.schedule.filter(d => d !== idx)
                                                                     : [...setting.schedule, idx];
-                                                                handleEditCust(name, 'schedule', newSchedule);
+                                                                handleEditCustAndAutoSave(name, 'schedule', newSchedule);
                                                             }}
-                                                            className={`w-7 h-7 rounded-lg font-black text-xs transition-all ${isChecked ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-50 text-gray-300 hover:text-gray-500'}`}
+                                                            className={`w-7 h-7 rounded-lg font-black text-xs transition-all active:scale-90 ${isChecked ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-50 text-gray-300 hover:text-gray-500'}`}
                                                         >
                                                             {day}
                                                         </button>
@@ -721,20 +782,26 @@ export default function MergePrintModal({
                                                 })}
                                             </div>
 
-                                            {/* Save Button */}
+                                            {/* Save Button / Status Indicator */}
                                             <div className="col-span-2 flex justify-center">
-                                                <button
-                                                    type="button"
-                                                    disabled={!isModified || setting.isSaving}
-                                                    onClick={() => handleSaveCust(name)}
-                                                    className={`w-full py-2 rounded-xl font-black text-xs flex items-center justify-center gap-1 transition-all ${setting.isSaving ? 'bg-gray-100 text-gray-300' : isModified ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-100 active:scale-95' : 'bg-gray-50 text-gray-300 pointer-events-none'}`}
-                                                >
-                                                    {setting.isSaving ? (
-                                                        <span className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                                                    ) : (
-                                                        <span>儲存設定</span>
-                                                    )}
-                                                </button>
+                                                {setting.isSaving ? (
+                                                    <div className="w-full py-2 rounded-xl bg-blue-50 text-blue-600 font-black text-[11px] flex items-center justify-center gap-1.5 animate-pulse">
+                                                        <span className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                                        <span>自動儲存中</span>
+                                                    </div>
+                                                ) : isModified ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSaveCust(name)}
+                                                        className="w-full py-2 rounded-xl bg-blue-600 text-white font-black text-xs hover:bg-blue-700 shadow-md shadow-blue-100 transition-all active:scale-95"
+                                                    >
+                                                        手動儲存
+                                                    </button>
+                                                ) : (
+                                                    <div className="w-full py-2 rounded-xl bg-gray-50 text-emerald-600 font-black text-[11px] flex items-center justify-center gap-1 border border-emerald-100/60">
+                                                        <span>✅ 已變更即存</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     );

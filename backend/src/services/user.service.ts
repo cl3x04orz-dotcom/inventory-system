@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../database/context.js';
+import { callGASFromNode } from '../utils/gasClient.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-jwt-secret';
 
@@ -58,24 +59,12 @@ export const UserService = {
     if (gasUrl) {
       try {
         console.log(`[Proxy] Logging in to GAS Web App to fetch dynamic gasToken for user: ${username}`);
-        const response = await fetch(gasUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'login',
-            payload: { username, password }
-          })
-        });
-        if (response.ok) {
-          const resJson: any = await response.json();
-          if (resJson && resJson.success && resJson.token) {
-            gasToken = resJson.token;
-            console.log('[Proxy] Successfully obtained gasToken from GAS!');
-          } else {
-            console.warn('[Proxy] GAS login responded without success/token:', resJson);
-          }
+        const resJson: any = await callGASFromNode(gasUrl, 'login', { username, password });
+        if (resJson && resJson.success && resJson.token) {
+          gasToken = resJson.token;
+          console.log('[Proxy] Successfully obtained gasToken from GAS!');
         } else {
-          console.warn('[Proxy] GAS login responded with status:', response.status);
+          console.warn('[Proxy] GAS login responded without success/token:', resJson);
         }
       } catch (err) {
         console.error('[Proxy] Failed to forward login to GAS:', err);
