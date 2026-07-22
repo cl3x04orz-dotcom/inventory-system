@@ -1882,6 +1882,49 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 isPrinting={isMergePrinting}
                 isSearchLoading={isMergeSearchLoading}
                 systemCustomers={systemCustomers}
+                onUpdateCustomerSettings={async (payload) => {
+                    try {
+                        const res = await callGAS(apiUrl, 'updateCustomerSettings', payload, user?.token);
+                        if (res && res.success) {
+                            setSystemCustomers(prev => {
+                                if (!Array.isArray(prev)) return prev;
+                                const copy = [...prev];
+                                const idx = copy.findIndex(c => (typeof c === 'string' ? c : c.name) === payload.customerName);
+                                if (idx >= 0) {
+                                    if (typeof copy[idx] === 'string') {
+                                        copy[idx] = {
+                                            name: payload.customerName,
+                                            isAiEnabled: payload.isAiEnabled,
+                                            schedule: payload.schedule,
+                                            category: payload.category || '市場'
+                                        };
+                                    } else {
+                                        copy[idx] = {
+                                            ...copy[idx],
+                                            isAiEnabled: payload.isAiEnabled,
+                                            schedule: payload.schedule,
+                                            category: payload.category || copy[idx].category || '市場'
+                                        };
+                                    }
+                                } else {
+                                    copy.push({
+                                        name: payload.customerName,
+                                        isAiEnabled: payload.isAiEnabled,
+                                        schedule: payload.schedule,
+                                        category: payload.category || '市場'
+                                    });
+                                }
+                                return copy;
+                            });
+                            return true;
+                        }
+                        return false;
+                    } catch (err) {
+                        console.error('儲存地點排程設定失敗:', err);
+                        alert('儲存地點排程設定失敗: ' + (err.message || err));
+                        return false;
+                    }
+                }}
             />
 
             {/* [New] 銷售對象自動完成清單 (僅在有輸入時顯示建議) */}

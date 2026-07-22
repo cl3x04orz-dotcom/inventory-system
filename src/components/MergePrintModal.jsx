@@ -204,6 +204,11 @@ export default function MergePrintModal({
                     [custName]: { ...setting, isSaving: false }
                 }));
             }
+        } else {
+            setEditingCustomers(prev => ({
+                ...prev,
+                [custName]: { ...setting, isSaving: false }
+            }));
         }
     };
 
