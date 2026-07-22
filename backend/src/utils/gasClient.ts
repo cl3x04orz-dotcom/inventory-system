@@ -9,32 +9,30 @@ export async function callGASFromNode(gasUrl: string, action: string, payload: a
     payload
   });
 
-  // 1. 先設定 redirect: 'manual' 取得 302/307 導向網址，確保以 POST 與 text/plain 送到最後端點
-  let currentUrl = gasUrl;
-  let response = await fetch(currentUrl, {
+  // 1. 先設定 redirect: 'manual'，以 POST 與 text/plain 傳送 RequestBody 至 Google Apps Script 執行端點
+  let response = await fetch(gasUrl, {
     method: 'POST',
     redirect: 'manual',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: bodyStr
   });
 
-  // 如果遇到 301, 302, 303, 307, 308 轉向，手動跟隨但強制維持 POST 請求與 Body
+  // 2. 當 GAS 執行 doPost 完畢後，會回傳 302 導向至 script.googleusercontent.com/macros/echo 暫存網址下載 JSON 結果
+  // 由於該 echo 下載網址僅接受 GET 請求，如果強行用 POST 會引發 405 Method Not Allowed
   let redirects = 0;
   while ([301, 302, 303, 307, 308].includes(response.status) && redirects < 5) {
     const location = response.headers.get('location');
     if (!location) break;
-    currentUrl = location;
     redirects++;
-    response = await fetch(currentUrl, {
-      method: 'POST',
-      redirect: 'manual',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: bodyStr
+    response = await fetch(location, {
+      method: 'GET',
+      redirect: 'manual'
     });
   }
 
   if (!response.ok) {
-    throw new Error(`GAS 服務回應錯誤 (${response.status}): ${response.statusText}`);
+    const errText = await response.text().catch(() => '');
+    throw new Error(`GAS 服務回應錯誤 (${response.status}): ${response.statusText} ${errText}`);
   }
 
   const text = await response.text();
