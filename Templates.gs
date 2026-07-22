@@ -240,92 +240,137 @@ function generatePdfService(payload) {
             rightProducts = secondHalf;
         }
 
-        // --- 直接填入,不做空間計算 ---
-        const maxRows = Math.max(leftProducts.length, rightProducts.length);
-
-
-
-        // Prepare Data Grid
-        const templateRowValues = range.getValues()[templateRowIndex];
-        // 直接逐行逐格寫入,不建立 outputGrid
-        for (let i = 0; i < maxRows; i++) {
-            const rowNum = templateRowIndex + 1 + i;
-            const targetRowIndex = templateRowIndex + i; // 0-based for values array
-            
-            const leftItem = leftProducts[i] || null;
-            const rightItem = rightProducts[i] || null;
-
-            for (let c = 0; c < rangeWidth; c++) {
-                // Check if target cell has existing content (Footer/Fixed)
-                let originalCellValue = '';
-                if (targetRowIndex < values.length) {
-                    originalCellValue = String(values[targetRowIndex][c]);
-                }
-                
+        // 算出第一頁左、右兩欄各自有多少個「可寫入商品」的行數容量 (遇到頁尾固定欄位如預備金就止步)
+        let leftCapacityPerPage = 0;
+        let rightCapacityPerPage = 0;
+        if (colLeftIndex !== -1) {
+            for (let r = templateRowIndex; r < rangeHeight; r++) {
+                const originalCellValue = String(values[r][colLeftIndex] || '');
                 const isWritable = originalCellValue.trim() === '' || 
                                    originalCellValue.includes('{{') || 
                                    originalCellValue.toLowerCase().includes('product');
+                if (isWritable) leftCapacityPerPage++;
+                else break;
+            }
+        }
+        if (colRightIndex !== -1) {
+            for (let r = templateRowIndex; r < rangeHeight; r++) {
+                const originalCellValue = String(values[r][colRightIndex] || '');
+                const isWritable = originalCellValue.trim() === '' || 
+                                   originalCellValue.includes('{{') || 
+                                   originalCellValue.toLowerCase().includes('product');
+                if (isWritable) rightCapacityPerPage++;
+                else break;
+            }
+        }
+        if (leftCapacityPerPage <= 0) leftCapacityPerPage = 38;
+        if (rightCapacityPerPage <= 0) rightCapacityPerPage = 25;
 
-                if (!isWritable) {
-                    continue; // Skip writing, preserve footer content
-                }
+        // --- 自動分頁迴圈：如果商品數多出單頁容量，自動往下一頁(第2頁、第3頁...)填充 ---
+        let pageNum = 0;
+        const pageHeight = rangeHeight; // 原始單頁總行數
+        const templateRange = templateSheet.getDataRange();
+        const templateRowValues = values[templateRowIndex];
 
-                const cellTemplate = String(templateRowValues[c] || '');
-                const cleanTemplate = cleanTag(cellTemplate);
-                
-                let activeItem = null;
-                if (colRightIndex !== -1 && c >= colRightIndex) {
-                    activeItem = rightItem;
-                } else if (colLeftIndex !== -1 && c >= colLeftIndex) {
-                     activeItem = leftItem;
+        while (leftProducts.length > 0 || rightProducts.length > 0) {
+            const pageLeftItems = colLeftIndex !== -1 ? leftProducts.splice(0, leftCapacityPerPage) : [];
+            const pageRightItems = colRightIndex !== -1 ? rightProducts.splice(0, rightCapacityPerPage) : [];
+
+            const maxRows = Math.max(
+                pageLeftItems.length, 
+                pageRightItems.length, 
+                colLeftIndex !== -1 ? leftCapacityPerPage : 0, 
+                colRightIndex !== -1 ? rightCapacityPerPage : 0
+            );
+
+            // 如果是第 2 頁或之後 (pageNum > 0)，先將第一頁的完整樣板(含表頭/表尾/排版)複製到新分頁位置
+            if (pageNum > 0) {
+                const startRowOffset = pageNum * pageHeight;
+                templateRange.copyTo(tempSheet.getRange(startRowOffset + 1, 1), SpreadsheetApp.CopyPasteType.PASTE_NORMAL, false);
+                for (let r = 1; r <= pageHeight; r++) {
+                    const h = templateSheet.getRowHeight(r);
+                    if (h) tempSheet.setRowHeight(startRowOffset + r, h);
                 }
+                try { tempSheet.setRowBreak(startRowOffset); } catch(ex) {}
+            }
+
+            const pageStartRowIndex = pageNum * pageHeight + templateRowIndex;
+
+            // 針對當前頁面的商品區塊逐格填充
+            for (let i = 0; i < maxRows; i++) {
+                const rowNum = pageStartRowIndex + 1 + i;
+                const originalRowIndex = templateRowIndex + i; // 對應到樣板的列索引，用來檢查 isWritable
                 
-                let cellVal = null; // null 表示不寫入
-                
-                if (activeItem) {
-                     if (cleanTemplate.includes('products_until:') || cleanTemplate.includes('product_until:') || cleanTemplate.includes('{{products_left}}') ||
-                         cleanTemplate.includes('products_after:') || cleanTemplate.includes('product_after:') || cleanTemplate.includes('{{products_right}}')) {
-                        cellVal = activeItem.name;
-                     } else if (cellTemplate.includes('{{stock}}')) {
-                         cellVal = `${activeItem.stock}/${activeItem.originalStock || 0}`;
-                     } else if (cellTemplate.includes('{{picked}}')) {
-                         cellVal = activeItem.picked || '';
-                     } else if (cellTemplate.includes('{{original}}')) {
-                         cellVal = activeItem.original || '';
-                     } else if (cellTemplate.includes('{{returns}}')) {
-                         cellVal = activeItem.returns || '';
-                     } else if (cellTemplate.includes('{{sold}}')) {
-                         cellVal = activeItem.sold || '';
-                     } else if (cellTemplate.includes('{{price}}')) {
-                         const p = parseFloat(activeItem.price);
-                         cellVal = isNaN(p) ? (activeItem.price || '') : String(p);
-                     } else if (cellTemplate.includes('{{subtotal}}')) {
-                         cellVal = typeof activeItem.subtotal === 'number' ? activeItem.subtotal.toLocaleString() : (activeItem.subtotal || '');
-                     }
-                } else {
-                    // Empty slot logic: 清空產品相關標記
-                    if (cleanTemplate.includes('products_until:') || cleanTemplate.includes('product_until:') || 
-                        cleanTemplate.includes('products_after:') || cleanTemplate.includes('product_after:') ||
-                        cleanTemplate.includes('{{products_left}}') || cleanTemplate.includes('{{products_right}}') ||
-                        cleanTemplate.includes('{{stock}}') || cleanTemplate.includes('{{picked}}') ||
-                        cleanTemplate.includes('{{original}}') || cleanTemplate.includes('{{returns}}') ||
-                        cleanTemplate.includes('{{sold}}') || cleanTemplate.includes('{{price}}') ||
-                        cleanTemplate.includes('{{subtotal}}')) {
-                        cellVal = '';
+                const leftItem = i < pageLeftItems.length ? pageLeftItems[i] : null;
+                const rightItem = i < pageRightItems.length ? pageRightItems[i] : null;
+
+                for (let c = 0; c < rangeWidth; c++) {
+                    let originalCellValue = '';
+                    if (originalRowIndex < values.length) {
+                        originalCellValue = String(values[originalRowIndex][c] || '');
                     }
-                }
-                
-                // 只寫入有值的欄位
-                if (cellVal !== null) {
-                    const cell = tempSheet.getRange(rowNum, c + 1);
-                    cell.setValue(cellVal);
-                    // [Fix] 強制覆蓋單價欄位的數字格式，避免模板預設的 0.00
-                    // 設定為 0.## (最多兩位小數，整數不顯示小數點)
-                    if (cleanTemplate.includes('{{price}}')) {
-                        cell.setNumberFormat('0.##'); 
+                    const isWritable = originalCellValue.trim() === '' || 
+                                       originalCellValue.includes('{{') || 
+                                       originalCellValue.toLowerCase().includes('product');
+
+                    if (!isWritable) continue;
+
+                    const cellTemplate = String(templateRowValues[c] || '');
+                    const cleanTemplate = cleanTag(cellTemplate);
+                    
+                    let activeItem = null;
+                    if (colRightIndex !== -1 && c >= colRightIndex) {
+                        activeItem = rightItem;
+                    } else if (colLeftIndex !== -1 && c >= colLeftIndex) {
+                         activeItem = leftItem;
+                    }
+                    
+                    let cellVal = null;
+                    
+                    if (activeItem) {
+                         if (cleanTemplate.includes('products_until:') || cleanTemplate.includes('product_until:') || cleanTemplate.includes('{{products_left}}') ||
+                             cleanTemplate.includes('products_after:') || cleanTemplate.includes('product_after:') || cleanTemplate.includes('{{products_right}}')) {
+                            cellVal = activeItem.name;
+                         } else if (cellTemplate.includes('{{stock}}')) {
+                             cellVal = `${activeItem.stock}/${activeItem.originalStock || 0}`;
+                         } else if (cellTemplate.includes('{{picked}}')) {
+                             cellVal = activeItem.picked || '';
+                         } else if (cellTemplate.includes('{{original}}')) {
+                             cellVal = activeItem.original || '';
+                         } else if (cellTemplate.includes('{{returns}}')) {
+                             cellVal = activeItem.returns || '';
+                         } else if (cellTemplate.includes('{{sold}}')) {
+                             cellVal = activeItem.sold || '';
+                         } else if (cellTemplate.includes('{{price}}')) {
+                             const p = parseFloat(activeItem.price);
+                             cellVal = isNaN(p) ? (activeItem.price || '') : String(p);
+                         } else if (cellTemplate.includes('{{subtotal}}')) {
+                             cellVal = typeof activeItem.subtotal === 'number' ? activeItem.subtotal.toLocaleString() : (activeItem.subtotal || '');
+                         }
+                    } else {
+                        if (cleanTemplate.includes('products_until:') || cleanTemplate.includes('product_until:') || 
+                            cleanTemplate.includes('products_after:') || cleanTemplate.includes('product_after:') ||
+                            cleanTemplate.includes('{{products_left}}') || cleanTemplate.includes('{{products_right}}') ||
+                            cleanTemplate.includes('{{stock}}') || cleanTemplate.includes('{{picked}}') ||
+                            cleanTemplate.includes('{{original}}') || cleanTemplate.includes('{{returns}}') ||
+                            cleanTemplate.includes('{{sold}}') || cleanTemplate.includes('{{price}}') ||
+                            cleanTemplate.includes('{{subtotal}}')) {
+                            cellVal = '';
+                        }
+                    }
+                    
+                    if (cellVal !== null) {
+                        const cell = tempSheet.getRange(rowNum, c + 1);
+                        cell.setValue(cellVal);
+                        if (cleanTemplate.includes('{{price}}')) {
+                            cell.setNumberFormat('0.##'); 
+                        }
                     }
                 }
             }
+
+            pageNum++;
+            if (pageNum >= 10) break; // 最多保護 10 頁
         }
     }
 
