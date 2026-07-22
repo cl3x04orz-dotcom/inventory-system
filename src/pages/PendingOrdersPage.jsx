@@ -1,6 +1,50 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Package, ClipboardList, Eye, Edit, Trash2, CheckCircle, RefreshCw, X, User, Users, Phone, MapPin, FileText, Plus, Minus, Save, Calendar, Clock, Check, Search, Copy, PackageSearch, ChevronDown, ChevronUp } from 'lucide-react';
-import { callGAS } from '../utils/api';
+// --- 🎨 口味備註解析與格式化輔助函數 ---
+const parseRemarkToFlavorMap = (remarkStr, flavorChoices = [], currentTotalQty = 0) => {
+    const map = {};
+    if (!remarkStr) {
+        if (flavorChoices.length > 0 && currentTotalQty > 0) {
+            map[flavorChoices[0]] = currentTotalQty;
+        }
+        return map;
+    }
+    const clean = String(remarkStr).replace(/【口味備註：(.*?)】/, '$1').trim();
+    if (!clean) {
+        if (flavorChoices.length > 0 && currentTotalQty > 0) {
+            map[flavorChoices[0]] = currentTotalQty;
+        }
+        return map;
+    }
+    const parts = clean.split(/[,，;；]/).map(s => s.trim()).filter(Boolean);
+    parts.forEach(part => {
+        const m = part.match(/^(.+?)[xX*](\d+)$/);
+        if (m) {
+            const f = m[1].trim();
+            const q = parseInt(m[2], 10) || 0;
+            if (f && q > 0) {
+                map[f] = (map[f] || 0) + q;
+            }
+        } else if (flavorChoices.includes(part)) {
+            map[part] = (map[part] || 0) + 1;
+        }
+    });
+    if (Object.keys(map).length === 0 && flavorChoices.length > 0 && currentTotalQty > 0) {
+        map[flavorChoices[0]] = currentTotalQty;
+    }
+    return map;
+};
+
+const formatFlavorMapToRemark = (flavorMap = {}) => {
+    const entries = Object.entries(flavorMap).filter(([_, qty]) => Number(qty) > 0);
+    if (entries.length === 0) return '';
+    const str = entries.map(([flavor, qty]) => `${flavor}x${qty}`).join(', ');
+    return `【口味備註：${str}】`;
+};
+
+const calculateTotalQtyFromFlavorMap = (flavorMap = {}) => {
+    return Object.values(flavorMap).reduce((sum, q) => sum + (Number(q) || 0), 0);
+};
 
 export default function PendingOrdersPage({ user, apiUrl }) {
     const [orders, setOrders] = useState([]);
@@ -19,6 +63,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     const [showEditModal, setShowEditModal] = useState(false);
     const [editingOrder, setEditingOrder] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [adminFlavorModal, setAdminFlavorModal] = useState(null); // { type: 'ORDER_ITEM' | 'RECIPIENT_ITEM', itemIdx?, recipientId?, productId, productName, flavorChoices, tempFlavors: { [flavor]: qty } }
 
     // 搜尋與篩選
     const [searchTerm, setSearchTerm] = useState('');
@@ -261,13 +306,18 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 r.items.forEach(ri => {
                     const pid = ri.productId;
                     if (!productTotals[pid]) {
+                        const origItem = editingOrder?.items?.find(it => it.productId === pid);
                         productTotals[pid] = {
                             productId: pid,
                             productName: ri.productName,
                             unitPrice: Number(ri.price),
                             qty: 0,
-                            remark: ""
+                            remark: ri.remark || origItem?.remark || ""
                         };
+                    } else if (ri.remark) {
+                        const currentRemarks = productTotals[pid].remark ? productTotals[pid].remark.split('; ').filter(Boolean) : [];
+                        if (!currentRemarks.includes(ri.remark)) currentRemarks.push(ri.remark);
+                        productTotals[pid].remark = currentRemarks.join('; ');
                     }
                     productTotals[pid].qty += Number(ri.qty) || 0;
                 });
@@ -342,42 +392,70 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         updateRecipientsState(nextRecipients);
     };
 
-    const handleAddRecipientInModal = (name) => {
-        const trimmed = name?.trim();
+    const handleAddRecipientInModal = (newRecipientName) => {
+        const trimmed = newRecipientName.trim();
         if (!trimmed) return;
-        
         if (editingOrder.recipients.some(r => r.recipientName === trimmed)) {
-            alert("該成員已在此訂單中");
+            alert('此姓名已被新增！');
             return;
         }
 
         const newRecipient = {
+            id: 'temp-' + Math.random().toString(36).substring(2, 9),
             recipientId: 'temp-' + Math.random().toString(36).substring(2, 9),
             recipientName: trimmed,
-            note: "",
+            note: '',
             items: []
         };
 
         updateRecipientsState([...editingOrder.recipients, newRecipient]);
     };
+    const handleAddRecipient = handleAddRecipientInModal;
 
     const handleAddRecipientItemInModal = (recipientId, productId) => {
         const prod = products.find(p => p.id === productId);
         if (!prod) return;
 
+        const hasFlavors = prod.has_flavor_attributes && Array.isArray(prod.flavor_choices) && prod.flavor_choices.length > 0;
+
         const nextRecipients = editingOrder.recipients.map(r => {
             if (r.recipientId === recipientId) {
-                if (r.items.some(ri => ri.productId === productId)) {
+                const existingRi = r.items.find(ri => ri.productId === productId);
+                if (existingRi) {
+                    if (hasFlavors) {
+                        setAdminFlavorModal({
+                            type: 'RECIPIENT_ITEM',
+                            recipientId,
+                            productId: prod.id,
+                            productName: prod.name,
+                            flavorChoices: prod.flavor_choices,
+                            tempFlavors: parseRemarkToFlavorMap(existingRi.remark, prod.flavor_choices, existingRi.qty)
+                        });
+                    }
                     return r;
                 }
+                const initialRemark = hasFlavors ? formatFlavorMapToRemark({ [prod.flavor_choices[0]]: 1 }) : '';
                 const newItem = {
                     id: 'temp-item-' + Math.random().toString(36).substring(2, 9),
                     recipientId,
                     productId,
                     productName: prod.name,
                     qty: 1,
-                    price: Number(prod.single_price) || Number(prod.price)
+                    price: Number(prod.single_price) || Number(prod.price),
+                    remark: initialRemark
                 };
+                if (hasFlavors) {
+                    setTimeout(() => {
+                        setAdminFlavorModal({
+                            type: 'RECIPIENT_ITEM',
+                            recipientId,
+                            productId: prod.id,
+                            productName: prod.name,
+                            flavorChoices: prod.flavor_choices,
+                            tempFlavors: { [prod.flavor_choices[0]]: 1 }
+                        });
+                    }, 50);
+                }
                 return {
                     ...r,
                     items: [...r.items, newItem]
@@ -404,6 +482,77 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         } else {
             return singlePrice * qty;
         }
+    };
+
+    const handleUpdateModalFlavorQty = (flavor, delta) => {
+        if (!adminFlavorModal) return;
+        const current = adminFlavorModal.tempFlavors[flavor] || 0;
+        const nextVal = Math.max(0, current + delta);
+        setAdminFlavorModal(prev => ({
+            ...prev,
+            tempFlavors: { ...prev.tempFlavors, [flavor]: nextVal }
+        }));
+    };
+
+    const handleSetModalFlavorQty = (flavor, valStr) => {
+        if (!adminFlavorModal) return;
+        const nextVal = Math.max(0, parseInt(valStr, 10) || 0);
+        setAdminFlavorModal(prev => ({
+            ...prev,
+            tempFlavors: { ...prev.tempFlavors, [flavor]: nextVal }
+        }));
+    };
+
+    const handleConfirmAdminFlavor = () => {
+        if (!adminFlavorModal) return;
+        const newTotalQty = calculateTotalQtyFromFlavorMap(adminFlavorModal.tempFlavors);
+        if (newTotalQty === 0 && !window.confirm('數量計算為 0，確定將此商品數量歸零 / 刪除嗎？')) {
+            return;
+        }
+        const newRemark = formatFlavorMapToRemark(adminFlavorModal.tempFlavors);
+
+        if (adminFlavorModal.type === 'ORDER_ITEM') {
+            setEditingOrder(prev => {
+                const newItems = prev.items.map((item, idx) => {
+                    if ((adminFlavorModal.itemIdx !== undefined && idx === adminFlavorModal.itemIdx) || item.productId === adminFlavorModal.productId) {
+                        const subtotal = calculateItemSubtotal(item.productId, newTotalQty);
+                        const avgPrice = newTotalQty > 0 ? (subtotal / newTotalQty) : item.unitPrice;
+                        return {
+                            ...item,
+                            qty: newTotalQty,
+                            unitPrice: avgPrice,
+                            subtotal: subtotal,
+                            remark: newRemark
+                        };
+                    }
+                    return item;
+                }).filter(it => it.qty > 0);
+                return {
+                    ...prev,
+                    items: newItems,
+                    totalAmount: newItems.reduce((sum, it) => sum + it.subtotal, 0)
+                };
+            });
+        } else if (adminFlavorModal.type === 'RECIPIENT_ITEM') {
+            const nextRecipients = editingOrder.recipients.map(r => {
+                if (r.recipientId === adminFlavorModal.recipientId) {
+                    const nextItems = r.items.map(ri => {
+                        if (ri.productId === adminFlavorModal.productId) {
+                            return {
+                                ...ri,
+                                qty: newTotalQty,
+                                remark: newRemark
+                            };
+                        }
+                        return ri;
+                    }).filter(ri => ri.qty > 0);
+                    return { ...r, items: nextItems };
+                }
+                return r;
+            });
+            updateRecipientsState(nextRecipients);
+        }
+        setAdminFlavorModal(null);
     };
 
     const handleItemQtyChange = (productId, qty) => {
@@ -448,10 +597,22 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         const prod = products.find(p => p.id === productId);
         if (!prod) return;
 
+        const hasFlavors = prod.has_flavor_attributes && Array.isArray(prod.flavor_choices) && prod.flavor_choices.length > 0;
+
         setEditingOrder(prev => {
             const existing = prev.items.find(item => item.productId === productId);
             let newItems = [];
             if (existing) {
+                if (hasFlavors) {
+                    setAdminFlavorModal({
+                        type: 'ORDER_ITEM',
+                        productId: prod.id,
+                        productName: prod.name,
+                        flavorChoices: prod.flavor_choices,
+                        tempFlavors: parseRemarkToFlavorMap(existing.remark, prod.flavor_choices, existing.qty)
+                    });
+                    return prev;
+                }
                 newItems = prev.items.map(item => {
                     if (item.productId === productId) {
                         const newQty = item.qty + 1;
@@ -468,6 +629,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 });
             } else {
                 const subtotal = calculateItemSubtotal(productId, 1);
+                const initialRemark = hasFlavors ? formatFlavorMapToRemark({ [prod.flavor_choices[0]]: 1 }) : '';
                 newItems = [
                     ...prev.items,
                     {
@@ -476,9 +638,20 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         unitPrice: subtotal,
                         qty: 1,
                         subtotal: subtotal,
-                        remark: ''
+                        remark: initialRemark
                     }
                 ];
+                if (hasFlavors) {
+                    setTimeout(() => {
+                        setAdminFlavorModal({
+                            type: 'ORDER_ITEM',
+                            productId: prod.id,
+                            productName: prod.name,
+                            flavorChoices: prod.flavor_choices,
+                            tempFlavors: { [prod.flavor_choices[0]]: 1 }
+                        });
+                    }, 50);
+                }
             }
 
             const total = newItems.reduce((sum, item) => sum + item.subtotal, 0);
@@ -2185,8 +2358,32 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                             <div className="text-[11px] text-[var(--text-tertiary)] italic pl-2">尚未分配任何商品</div>
                                                         ) : (
                                                             r.items.map((ri, riIdx) => (
-                                                                <div key={ri.id || riIdx} className="flex justify-between items-center pl-2 text-xs">
-                                                                    <span className="text-[var(--text-secondary)] font-medium">{ri.productName}</span>
+                                                                <div key={ri.id || riIdx} className="flex justify-between items-center pl-2 text-xs py-1">
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-[var(--text-secondary)] font-medium">{ri.productName}</span>
+                                                                        {(() => {
+                                                                            const pInfo = products.find(p => p.id === ri.productId);
+                                                                            const hasFlavors = pInfo?.has_flavor_attributes && Array.isArray(pInfo.flavor_choices) && pInfo.flavor_choices.length > 0;
+                                                                            if (!hasFlavors && !ri.remark?.includes('【口味備註：')) return null;
+                                                                            return (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => setAdminFlavorModal({
+                                                                                        type: 'RECIPIENT_ITEM',
+                                                                                        recipientId: r.recipientId,
+                                                                                        productId: ri.productId,
+                                                                                        productName: ri.productName,
+                                                                                        flavorChoices: pInfo?.flavor_choices || [],
+                                                                                        tempFlavors: parseRemarkToFlavorMap(ri.remark, pInfo?.flavor_choices || [], ri.qty)
+                                                                                    })}
+                                                                                    className="mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 hover:bg-amber-200 w-fit cursor-pointer shadow-xs"
+                                                                                    title="點擊配置口味與規格"
+                                                                                >
+                                                                                    <span>🎨 口味: {ri.remark ? ri.remark.replace(/【口味備註：(.*?)】/, '$1') : '點選設定'}</span>
+                                                                                </button>
+                                                                            );
+                                                                        })()}
+                                                                    </div>
                                                                     <div className="flex items-center gap-3">
                                                                         <div className="flex items-center gap-0.5 bg-[var(--bg-primary)] rounded-md p-0.5 border border-[var(--border-primary)]">
                                                                             <button
@@ -2271,7 +2468,31 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                             editingOrder.items.map((item, idx) => (
                                                 <div key={idx} className="flex justify-between items-center p-3 text-sm hover:bg-[var(--bg-hover)]">
                                                     <div className="flex-1 mr-4">
-                                                        <div className="font-bold text-[var(--text-primary)]">{item.productName}</div>
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="font-bold text-[var(--text-primary)]">{item.productName}</span>
+                                                            {(() => {
+                                                                const pInfo = products.find(p => p.id === item.productId);
+                                                                const hasFlavors = pInfo?.has_flavor_attributes && Array.isArray(pInfo.flavor_choices) && pInfo.flavor_choices.length > 0;
+                                                                if (!hasFlavors && !item.remark?.includes('【口味備註：')) return null;
+                                                                return (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setAdminFlavorModal({
+                                                                            type: 'ORDER_ITEM',
+                                                                            itemIdx: idx,
+                                                                            productId: item.productId,
+                                                                            productName: item.productName,
+                                                                            flavorChoices: pInfo?.flavor_choices || [],
+                                                                            tempFlavors: parseRemarkToFlavorMap(item.remark, pInfo?.flavor_choices || [], item.qty)
+                                                                        })}
+                                                                        className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold rounded-md bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 hover:bg-amber-200 transition-colors cursor-pointer shadow-xs"
+                                                                        title="點擊配置口味與規格"
+                                                                    >
+                                                                        <span>🎨 口味規格: {item.remark ? item.remark.replace(/【口味備註：(.*?)】/, '$1') : '點選設定'}</span>
+                                                                    </button>
+                                                                );
+                                                            })()}
+                                                        </div>
                                                         <div className="text-[10px] text-[var(--text-tertiary)] font-semibold mt-0.5">單價: ${item.unitPrice}</div>
                                                         <input
                                                             type="text"
@@ -2442,6 +2663,114 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             >
                                 <Save size={14} />
                                 {isSavingDate ? '儲存中...' : '確定儲存'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 🎨 後台專用：選擇與調整口味規格 Modal */}
+            {adminFlavorModal && (
+                <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-primary)] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-5 py-3.5 text-white flex justify-between items-center shadow-sm">
+                            <span className="flex items-center gap-2 font-extrabold text-base">
+                                <span>🎨 配置商品口味規格</span>
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setAdminFlavorModal(null)}
+                                className="hover:bg-black/20 p-1 rounded-lg transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+                            <div className="bg-[var(--bg-secondary)] p-3 rounded-xl border border-[var(--border-primary)]">
+                                <div className="text-sm font-extrabold text-[var(--text-primary)] mb-1">
+                                    📦 {adminFlavorModal.productName}
+                                </div>
+                                <div className="text-xs text-[var(--text-tertiary)]">
+                                    請針對客戶追加或修改的規格，分配對應的口味數量：
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                {adminFlavorModal.flavorChoices.map((flavor) => {
+                                    const count = adminFlavorModal.tempFlavors[flavor] || 0;
+                                    return (
+                                        <div
+                                            key={flavor}
+                                            className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                                                count > 0
+                                                    ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-300 dark:border-amber-700/60 shadow-xs'
+                                                    : 'bg-[var(--bg-secondary)] border-[var(--border-primary)] opacity-85 hover:opacity-100'
+                                            }`}
+                                        >
+                                            <span className={`text-sm font-bold ${count > 0 ? 'text-amber-900 dark:text-amber-200' : 'text-[var(--text-primary)]'}`}>
+                                                {flavor}
+                                            </span>
+                                            <div className="flex items-center gap-1.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpdateModalFlavorQty(flavor, -1)}
+                                                    className="w-8 h-8 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-primary)] flex items-center justify-center font-bold text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] active:scale-95 transition-transform shadow-xs"
+                                                >
+                                                    <Minus size={14} />
+                                                </button>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="99"
+                                                    className="w-12 text-center font-mono font-extrabold text-sm py-1 rounded-lg border-[var(--border-primary)] bg-[var(--bg-primary)] text-[var(--text-primary)] focus:ring-amber-500"
+                                                    value={count}
+                                                    onChange={(e) => handleSetModalFlavorQty(flavor, e.target.value)}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpdateModalFlavorQty(flavor, 1)}
+                                                    className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold text-sm hover:bg-amber-600 active:scale-95 transition-transform shadow-xs"
+                                                >
+                                                    <Plus size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {(() => {
+                                const totalQty = calculateTotalQtyFromFlavorMap(adminFlavorModal.tempFlavors);
+                                const totalSubtotal = calculateItemSubtotal(adminFlavorModal.productId, totalQty);
+                                return (
+                                    <div className="p-3.5 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] flex justify-between items-center text-sm font-extrabold">
+                                        <div className="text-[var(--text-primary)] flex items-center gap-1.5">
+                                            <span>選擇總計：</span>
+                                            <span className="text-amber-600 dark:text-amber-400 font-mono text-base">{totalQty}</span>
+                                            <span className="text-xs text-[var(--text-tertiary)] font-normal">件</span>
+                                        </div>
+                                        <div className="text-emerald-600 dark:text-emerald-400 font-mono text-base">
+                                            ${totalSubtotal.toLocaleString()} 元
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                        <div className="p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setAdminFlavorModal(null)}
+                                className="btn-secondary px-4 py-2 text-xs font-bold"
+                            >
+                                取消
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmAdminFlavor}
+                                className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold px-5 py-2 text-xs rounded-xl shadow flex items-center gap-1.5 transition-all active:scale-95"
+                            >
+                                <Save size={14} />
+                                確認儲存口味配置
                             </button>
                         </div>
                     </div>
