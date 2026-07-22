@@ -131,13 +131,19 @@ function generatePdfService(payload) {
     throw new Error('找不到模板: ' + templateId);
   }
 
-  // 1. Create Temp Sheet
-  const tempSheet = templateSheet.copyTo(ss);
+  // 1. 記錄當前所有可見的工作表，確保轉檔後能 100% 復原顯示狀態
   const timestamp = new Date().getTime();
-  tempSheet.setName("Temp_Print_" + timestamp);
+  const originallyVisibleSheets = [];
+  const allSheets = ss.getSheets();
+  for (const s of allSheets) {
+    if (!s.isSheetHidden()) {
+      originallyVisibleSheets.push(s);
+    }
+  }
+
+  const createdPageSheets = [];
 
   try {
-    // 2. Write Basic Data (Headers/Footers)
     const replacements = {
       '{{date}}': data.date ? new Date(data.date).toLocaleDateString('zh-TW') : new Date().toLocaleDateString('zh-TW'),
       '{{location}}': data.location || '',
@@ -152,7 +158,7 @@ function generatePdfService(payload) {
       '{{exp_others}}': data.expenses?.others || ''
     };
 
-    const range = tempSheet.getDataRange();
+    const range = templateSheet.getDataRange();
     const values = range.getValues(); // raw values
     const rangeHeight = values.length;
     const rangeWidth = values[0].length;
@@ -198,38 +204,32 @@ function generatePdfService(payload) {
     }
 
     // --- Product List Processing ---
-    if (templateRowIndex !== -1 && data.rows && data.rows.length > 0) {
-        
-        let leftProducts = [];
-        let rightProducts = [];
+    let leftProducts = [];
+    let rightProducts = [];
 
+    if (templateRowIndex !== -1 && data.rows && data.rows.length > 0) {
         if (splitKey) {
-            // 檢查是否為數字索引
             const splitIndex = parseInt(splitKey, 10);
-            
             if (!isNaN(splitIndex)) {
-                // 方案 1: 使用索引分割
                 leftProducts = data.rows.slice(0, splitIndex);
                 rightProducts = data.rows.slice(splitIndex);
             } else {
-                // 備用方案: 使用名稱分割(嚴格匹配)
                 const normKey = normalizeStr(splitKey).replace(/\s+/g, '');
                 let didSplit = false;
-                
                 for (const p of data.rows) {
                     if (didSplit) {
                         rightProducts.push(p);
                     } else {
                         leftProducts.push(p);
                         const pName = normalizeStr(p.name).replace(/\s+/g, '');
-                        if (pName === normKey) {  // 改用嚴格匹配
+                        if (pName === normKey) {
                             didSplit = true;
                         }
                     }
                 }
             }
         } else {
-             leftProducts = data.rows;
+             leftProducts = data.rows.slice();
         }
 
         // --- Auto-Balance Fallback ---
@@ -239,96 +239,77 @@ function generatePdfService(payload) {
             const secondHalf = leftProducts.splice(mid); 
             rightProducts = secondHalf;
         }
+    }
 
-        // 算出第一頁左、右兩欄各自有多少個「可寫入商品」的行數容量 (遇到頁尾固定欄位如預備金就止步)
-        let leftCapacityPerPage = 0;
-        let rightCapacityPerPage = 0;
-        if (colLeftIndex !== -1) {
-            for (let r = templateRowIndex; r < rangeHeight; r++) {
-                const originalCellValue = String(values[r][colLeftIndex] || '');
-                const isWritable = originalCellValue.trim() === '' || 
-                                   originalCellValue.includes('{{') || 
-                                   originalCellValue.toLowerCase().includes('product');
-                if (isWritable) leftCapacityPerPage++;
-                else break;
-            }
+    // 算出單頁左、右兩欄各自有多少個「可寫入商品」的行數容量
+    let leftCapacityPerPage = 0;
+    let rightCapacityPerPage = 0;
+    if (colLeftIndex !== -1) {
+        for (let r = templateRowIndex; r < rangeHeight; r++) {
+            const originalCellValue = String(values[r][colLeftIndex] || '');
+            const isWritable = originalCellValue.trim() === '' || 
+                               originalCellValue.includes('{{') || 
+                               originalCellValue.toLowerCase().includes('product');
+            if (isWritable) leftCapacityPerPage++;
+            else break;
         }
-        if (colRightIndex !== -1) {
-            for (let r = templateRowIndex; r < rangeHeight; r++) {
-                const originalCellValue = String(values[r][colRightIndex] || '');
-                const isWritable = originalCellValue.trim() === '' || 
-                                   originalCellValue.includes('{{') || 
-                                   originalCellValue.toLowerCase().includes('product');
-                if (isWritable) rightCapacityPerPage++;
-                else break;
-            }
+    }
+    if (colRightIndex !== -1) {
+        for (let r = templateRowIndex; r < rangeHeight; r++) {
+            const originalCellValue = String(values[r][colRightIndex] || '');
+            const isWritable = originalCellValue.trim() === '' || 
+                               originalCellValue.includes('{{') || 
+                               originalCellValue.toLowerCase().includes('product');
+            if (isWritable) rightCapacityPerPage++;
+            else break;
         }
-        if (leftCapacityPerPage <= 0) leftCapacityPerPage = 38;
-        if (rightCapacityPerPage <= 0) rightCapacityPerPage = 25;
+    }
+    if (leftCapacityPerPage <= 0) leftCapacityPerPage = 38;
+    if (rightCapacityPerPage <= 0) rightCapacityPerPage = 25;
 
-        // --- 自動分頁迴圈：如果商品數多出單頁容量，自動往下一頁(第2頁、第3頁...)填充 ---
-        let pageNum = 0;
-        const pageHeight = rangeHeight; // 原始單頁總行數
-        const templateRange = templateSheet.getDataRange();
-        const templateRowValues = values[templateRowIndex];
+    // --- 方案 B (同一個模組複製成多個獨立 Sheet 分頁) ---
+    let pageNum = 0;
+    const templateRowValues = templateRowIndex !== -1 ? values[templateRowIndex] : [];
 
-        while (leftProducts.length > 0 || rightProducts.length > 0) {
-            let pageLeftItems = [];
-            let pageRightItems = [];
+    // 至少執行一頁（就算沒有商品也能印出報表表頭與底稿）
+    do {
+        let pageLeftItems = [];
+        let pageRightItems = [];
 
-            if (pageNum === 0) {
-                // 第一頁維持原本左右分欄設定 (由 splitKey 切分的 leftProducts 與 rightProducts)
-                pageLeftItems = colLeftIndex !== -1 ? leftProducts.splice(0, leftCapacityPerPage) : [];
-                pageRightItems = colRightIndex !== -1 ? rightProducts.splice(0, rightCapacityPerPage) : [];
-            } else {
-                // 第 2 頁及之後，將剩餘的所有商品合併，一律「先填入左欄，若左欄滿了再填入右欄」
-                const overflowPool = [...leftProducts, ...rightProducts];
-                leftProducts = [];
-                rightProducts = [];
-                pageLeftItems = colLeftIndex !== -1 ? overflowPool.splice(0, leftCapacityPerPage) : [];
-                pageRightItems = colRightIndex !== -1 ? overflowPool.splice(0, rightCapacityPerPage) : [];
-                if (overflowPool.length > 0) leftProducts = overflowPool;
-            }
+        if (pageNum === 0) {
+            pageLeftItems = colLeftIndex !== -1 ? leftProducts.splice(0, leftCapacityPerPage) : [];
+            pageRightItems = colRightIndex !== -1 ? rightProducts.splice(0, rightCapacityPerPage) : [];
+        } else {
+            // 第 2 頁及之後，將剩餘的所有商品合併，一律「先填入左欄，若左欄滿了再填入右欄」
+            const overflowPool = [...leftProducts, ...rightProducts];
+            leftProducts = [];
+            rightProducts = [];
+            pageLeftItems = colLeftIndex !== -1 ? overflowPool.splice(0, leftCapacityPerPage) : [];
+            pageRightItems = colRightIndex !== -1 ? overflowPool.splice(0, rightCapacityPerPage) : [];
+            if (overflowPool.length > 0) leftProducts = overflowPool;
+        }
 
-            const maxRows = Math.max(
-                pageLeftItems.length, 
-                pageRightItems.length, 
-                colLeftIndex !== -1 ? leftCapacityPerPage : 0, 
-                colRightIndex !== -1 ? rightCapacityPerPage : 0
-            );
+        const maxRows = Math.max(
+            pageLeftItems.length, 
+            pageRightItems.length, 
+            colLeftIndex !== -1 ? leftCapacityPerPage : 0, 
+            colRightIndex !== -1 ? rightCapacityPerPage : 0
+        );
 
-            // 如果是第 2 頁或之後 (pageNum > 0)，先將第一頁的完整樣板複製到新分頁位置
-            if (pageNum > 0) {
-                const startRowOffset = pageNum * pageHeight;
-                // [完整複製] 不帶 PASTE_NORMAL，直接 copyTo 使儲存格合併、框線與格式 100% 複製，消除簽名欄小框框
-                templateRange.copyTo(tempSheet.getRange(startRowOffset + 1, 1));
-                // 再次確保所有合併儲存格一致化
-                const mergedRanges = templateRange.getMergedRanges();
-                for (const mr of mergedRanges) {
-                    try {
-                        tempSheet.getRange(startRowOffset + mr.getRow(), mr.getColumn(), mr.getNumRows(), mr.getNumCols()).merge();
-                    } catch(ex) {}
-                }
-                for (let r = 1; r <= pageHeight; r++) {
-                    const h = templateSheet.getRowHeight(r);
-                    if (h) tempSheet.setRowHeight(startRowOffset + r, h);
-                }
-                try { tempSheet.setRowBreak(startRowOffset); } catch(ex) {}
-            }
+        // [方案 B 核心] 每一頁都是由 templateSheet 完整複製出來的獨立 Sheet！這樣最上面的領貨人簽名等排版完全 identical！
+        const pageSheet = templateSheet.copyTo(ss);
+        pageSheet.setName(`Print_P${pageNum + 1}_${timestamp}`);
+        createdPageSheets.push(pageSheet);
 
-            const pageStartRowIndex = pageNum * pageHeight + templateRowIndex;
-
-            // [極速優化] 讀取當前頁面商品區塊的記憶體陣列，避免逐格 setValue 造成網路傳輸嚴重卡頓
-            const targetBlockRange = tempSheet.getRange(pageStartRowIndex + 1, 1, maxRows, rangeWidth);
+        if (templateRowIndex !== -1 && maxRows > 0) {
+            const targetBlockRange = pageSheet.getRange(templateRowIndex + 1, 1, maxRows, rangeWidth);
             const targetValues = targetBlockRange.getValues();
             const targetFormats = targetBlockRange.getNumberFormats();
             let hasChanges = false;
             let hasFormatChanges = false;
 
-            // 針對當前頁面的商品區塊逐格填充 (記憶體操作)
             for (let i = 0; i < maxRows; i++) {
-                const originalRowIndex = templateRowIndex + i; // 對應到樣板的列索引，用來檢查 isWritable
-                
+                const originalRowIndex = templateRowIndex + i;
                 const leftItem = i < pageLeftItems.length ? pageLeftItems[i] : null;
                 const rightItem = i < pageRightItems.length ? pageRightItems[i] : null;
 
@@ -354,7 +335,6 @@ function generatePdfService(payload) {
                     }
                     
                     let cellVal = null;
-                    
                     if (activeItem) {
                          if (cleanTemplate.includes('products_until:') || cleanTemplate.includes('product_until:') || cleanTemplate.includes('{{products_left}}') ||
                              cleanTemplate.includes('products_after:') || cleanTemplate.includes('product_after:') || cleanTemplate.includes('{{products_right}}')) {
@@ -398,56 +378,48 @@ function generatePdfService(payload) {
                 }
             }
 
-            // 批次寫入當前頁面資料
-            if (hasChanges) {
-                targetBlockRange.setValues(targetValues);
-            }
-            if (hasFormatChanges) {
-                targetBlockRange.setNumberFormats(targetFormats);
-            }
-
-            pageNum++;
-            if (pageNum >= 10) break; // 最多保護 10 頁
+            if (hasChanges) targetBlockRange.setValues(targetValues);
+            if (hasFormatChanges) targetBlockRange.setNumberFormats(targetFormats);
         }
-    }
 
-    // --- Global Replacement (批次極速優化) ---
-    const finalRange = tempSheet.getDataRange();
-    const finalValues = finalRange.getValues();
-    let globalChanged = false;
-    
-    for(let r=0; r<finalValues.length; r++) {
-      for(let c=0; c<finalValues[r].length; c++) {
-        let val = String(finalValues[r][c]);
-        if (!val.includes('{{')) continue;
+        // --- Global Replacement for this specific Page Sheet ---
+        const finalRange = pageSheet.getDataRange();
+        const finalValues = finalRange.getValues();
+        let globalChanged = false;
         
-        let changed = false;
-        Object.keys(replacements).forEach(tag => {
-           if (val.includes(tag)) {
-             val = val.replace(new RegExp(tag, 'g'), replacements[tag]);
-             changed = true;
-           }
-        });
-        if (changed) {
-           finalValues[r][c] = val;
-           globalChanged = true;
+        for(let r=0; r<finalValues.length; r++) {
+          for(let c=0; c<finalValues[r].length; c++) {
+            let val = String(finalValues[r][c]);
+            if (!val.includes('{{')) continue;
+            
+            let changed = false;
+            Object.keys(replacements).forEach(tag => {
+               if (val.includes(tag)) {
+                 val = val.replace(new RegExp(tag, 'g'), replacements[tag]);
+                 changed = true;
+               }
+            });
+            if (changed) {
+               finalValues[r][c] = val;
+               globalChanged = true;
+            }
+          }
         }
-      }
-    }
-    if (globalChanged) {
-        finalRange.setValues(finalValues);
-    }
+        if (globalChanged) finalRange.setValues(finalValues);
+
+        pageNum++;
+        if (pageNum >= 10) break; // 最多保護 10 頁
+    } while (leftProducts.length > 0 || rightProducts.length > 0);
 
     SpreadsheetApp.flush(); 
 
-    // 3. Export to PDF
+    // 3. Export to PDF (隱藏原有 Sheets，只保留新產生的 Page Sheets 以便轉成一份多頁 PDF)
+    for (const s of originallyVisibleSheets) {
+        try { s.hideSheet(); } catch(ex) {}
+    }
+
     const ssId = ss.getId();
-    const sheetId = tempSheet.getSheetId();
-    // Export URL Construction
-    // Margins converted to inches: 
-    // Top 0.473cm ~ 0.186in
-    // Left/Right 0.43cm ~ 0.169in
-    // Bottom 1.524cm ~ 0.600in
+    // 不傳 gid 參數，Google 會自動把目前可見的所有 sheets (也就是我們的 createdPageSheets) 依序輸出到一份 PDF
     const url = 'https://docs.google.com/spreadsheets/d/' + ssId + '/export?' +
       'exportFormat=pdf&format=pdf' +
       '&size=7' + // A4
@@ -457,8 +429,7 @@ function generatePdfService(payload) {
       '&top_margin=0.186' + 
       '&bottom_margin=0.5' + 
       '&left_margin=0.169' + 
-      '&right_margin=0.169' +
-      '&gid=' + sheetId;
+      '&right_margin=0.169';
 
     const params = {
       method: 'GET',
@@ -474,8 +445,6 @@ function generatePdfService(payload) {
     const blob = response.getBlob();
     const base64 = Utilities.base64Encode(blob.getBytes());
 
-    ss.deleteSheet(tempSheet);
-
     return { 
       success: true, 
       pdfBase64: base64, 
@@ -483,7 +452,14 @@ function generatePdfService(payload) {
     };
 
   } catch (e) {
-    try { ss.deleteSheet(tempSheet); } catch(ex) {}
     throw new Error('PDF Error: ' + e.message);
+  } finally {
+    // 確保無論成功或失敗，都把原本的工作表恢復顯示，並刪除這次產生的多頁臨時工作表
+    for (const s of originallyVisibleSheets) {
+        try { s.showSheet(); } catch(ex) {}
+    }
+    for (const ps of createdPageSheets) {
+        try { ss.deleteSheet(ps); } catch(ex) {}
+    }
   }
 }
