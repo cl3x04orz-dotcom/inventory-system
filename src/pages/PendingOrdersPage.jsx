@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Package, ClipboardList, Eye, Edit, Trash2, CheckCircle, RefreshCw, X, User, Users, Phone, MapPin, FileText, Plus, Minus, Save, Calendar, Clock, Check, Search, Copy, PackageSearch, ChevronDown, ChevronUp } from 'lucide-react';
+import { callGAS } from '../utils/api';
+
 // --- 🎨 口味備註解析與格式化輔助函數 ---
 const parseRemarkToFlavorMap = (remarkStr, flavorChoices = [], currentTotalQty = 0) => {
     const map = {};
