@@ -469,21 +469,40 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         updateRecipientsState(nextRecipients);
     };
 
-    const calculateItemSubtotal = (productId, qty) => {
+    const calculateItemSubtotal = (productId, qty, fallbackPrice = 0) => {
         const prod = products.find(p => p.id === productId);
-        if (!prod) return 0;
-        
-        const singlePrice = Number(prod.single_price) || Number(prod.price);
-        if (prod.has_volume_pricing && prod.volume_pricing_settings) {
-            const targetQty = Number(prod.volume_pricing_settings.target_quantity);
-            const packagePrice = Number(prod.volume_pricing_settings.package_price);
-            
-            const groupCount = Math.floor(qty / targetQty);
-            const remainderCount = qty % targetQty;
-            return (groupCount * packagePrice) + (remainderCount * singlePrice);
-        } else {
-            return singlePrice * qty;
+        if (!prod) {
+            return (Number(fallbackPrice) || 0) * (Number(qty) || 0);
         }
+        const singlePrice = Number(prod.single_price) || Number(prod.price) || Number(fallbackPrice) || 0;
+        // 多組促銷：買X送Y (相容 LiffOrderPage)
+        if (Array.isArray(prod.promotions) && prod.promotions.length > 0) {
+            let bestFree = 0;
+            for (const promo of prod.promotions) {
+                const bx = Number(promo.buyX);
+                const gy = Number(promo.getY);
+                if (bx > 0 && gy > 0) {
+                    const free = Math.floor(qty / (bx + gy)) * gy;
+                    if (free > bestFree) bestFree = free;
+                }
+            }
+            return singlePrice * (qty - bestFree);
+        }
+        // 多件優惠 (階梯組合價)
+        if (prod.has_volume_pricing && prod.volume_pricing_settings) {
+            let settings = prod.volume_pricing_settings;
+            if (typeof settings === 'string') {
+                try { settings = JSON.parse(settings); } catch (e) {}
+            }
+            const targetQty = Number(settings?.target_quantity);
+            const packagePrice = Number(settings?.package_price);
+            if (targetQty > 0 && packagePrice >= 0) {
+                const groupCount = Math.floor(qty / targetQty);
+                const remainderCount = qty % targetQty;
+                return (groupCount * packagePrice) + (remainderCount * singlePrice);
+            }
+        }
+        return singlePrice * qty;
     };
 
     const handleUpdateModalFlavorQty = (flavor, delta) => {
@@ -710,8 +729,12 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
     const computeOrderTotals = useCallback((order, settingsList = [], groupBindingsMap = {}) => {
         if (!order || !order.items) return { productTotal: 0, shippingFee: 0, totalAmount: 0 };
-        const productTotal = order.items.reduce((sum, item) =>
-            sum + (Number(item.unitPrice || 0) * Number(item.qty || 0)), 0);
+        const productTotal = order.items.reduce((sum, item) => {
+            if (item.subtotal != null && !isNaN(Number(item.subtotal))) {
+                return sum + Number(item.subtotal);
+            }
+            return sum + calculateItemSubtotal(item.productId, item.qty, item.unitPrice);
+        }, 0);
 
         const addrRaw = String(order.deliveryAddress || '').trim();
         const knownNames = Array.from(new Set([...settingsList.map(s => s.building), ...Object.values(groupBindingsMap)])).filter(Boolean);
@@ -2082,7 +2105,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                             <div className="text-xs uppercase font-extrabold text-[var(--text-tertiary)] tracking-wider">👤 團員代訂分配明細</div>
                                                             <div className="space-y-2">
                                                                 {order.recipients.map((r, rIdx) => {
-                                                                    const recipientTotal = r.items.reduce((sum, ri) => sum + (Number(ri.qty) * Number(ri.price)), 0);
+                                                                    const recipientTotal = r.items.reduce((sum, ri) => sum + calculateItemSubtotal(ri.productId, ri.qty, ri.price), 0);
                                                                     return (
                                                                         <div key={rIdx} className="bg-[var(--bg-secondary)] p-3 rounded-lg border border-[var(--border-primary)]">
                                                                             <div className="flex justify-between items-center text-sm font-bold text-[var(--text-primary)]">
@@ -2093,7 +2116,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                                                 {r.items.map((ri, riIdx) => (
                                                                                     <div key={riIdx} className="flex justify-between items-center font-mono">
                                                                                         <span>{ri.productName} x{ri.qty}</span>
-                                                                                        <span>${ri.qty * ri.price}</span>
+                                                                                        <span>${calculateItemSubtotal(ri.productId, ri.qty, ri.price)}</span>
                                                                                     </div>
                                                                                 ))}
                                                                             </div>
@@ -2318,7 +2341,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
                                     <div className="space-y-4">
                                         {editingOrder.recipients.map((r, rIdx) => {
-                                            const rTotal = r.items ? r.items.reduce((sum, ri) => sum + (ri.qty * ri.price), 0) : 0;
+                                            const rTotal = r.items ? r.items.reduce((sum, ri) => sum + calculateItemSubtotal(ri.productId, ri.qty, ri.price), 0) : 0;
                                             return (
                                                 <div key={r.recipientId || rIdx} className="bg-[var(--bg-tertiary)] rounded-xl border border-[var(--border-primary)] p-4 space-y-3">
                                                     <div className="flex justify-between items-center border-b border-[var(--border-primary)] pb-2">
@@ -2410,7 +2433,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                                                 <Plus size={10} />
                                                                             </button>
                                                                         </div>
-                                                                        <span className="w-12 text-right font-mono text-[var(--text-secondary)]">${ri.qty * ri.price}</span>
+                                                                        <span className="w-12 text-right font-mono text-[var(--text-secondary)]">${calculateItemSubtotal(ri.productId, ri.qty, ri.price)}</span>
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => handleRemoveRecipientItem(r.recipientId, ri.productId)}
