@@ -314,12 +314,25 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             productName: ri.productName,
                             unitPrice: Number(ri.price),
                             qty: 0,
-                            remark: ri.remark || origItem?.remark || ""
+                            remark: ri.remark || origItem?.remark || "",
+                            flavorMap: {},
+                            rawRemarks: []
                         };
-                    } else if (ri.remark) {
-                        const currentRemarks = productTotals[pid].remark ? productTotals[pid].remark.split('; ').filter(Boolean) : [];
-                        if (!currentRemarks.includes(ri.remark)) currentRemarks.push(ri.remark);
-                        productTotals[pid].remark = currentRemarks.join('; ');
+                    }
+                    if (ri.remark) {
+                        const cleanRemark = ri.remark.replace(/【口味備註：(.*?)】/, '$1');
+                        cleanRemark.split(/[,，\s+]/).forEach(part => {
+                            const match = part.trim().match(/^\(?([^\s*x:：)]+)\)?\s*[*xX:：]\s*(\d+)$/);
+                            if (match) {
+                                const fName = match[1];
+                                const fQty = Number(match[2]);
+                                if (fName && fQty > 0) {
+                                    productTotals[pid].flavorMap[fName] = (productTotals[pid].flavorMap[fName] || 0) + fQty;
+                                }
+                            } else if (part.trim() && !part.trim().includes('口味備註')) {
+                                if (!productTotals[pid].rawRemarks.includes(part.trim())) productTotals[pid].rawRemarks.push(part.trim());
+                            }
+                        });
                     }
                     productTotals[pid].qty += Number(ri.qty) || 0;
                 });
@@ -331,13 +344,20 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             const prod = products.find(p => p.id === item.productId);
             const displayPrice = prod ? (Number(prod.single_price) || Number(prod.price)) : item.unitPrice;
             
+            let finalRemark = item.remark || "";
+            if (item.flavorMap && Object.keys(item.flavorMap).length > 0) {
+                const fParts = Object.entries(item.flavorMap).map(([k, v]) => `${k}x${v}`);
+                if (item.rawRemarks && item.rawRemarks.length > 0) fParts.push(...item.rawRemarks);
+                finalRemark = `【口味備註：${fParts.join(', ')}】`;
+            }
+
             return {
                 productId: item.productId,
                 productName: item.productName,
                 unitPrice: displayPrice,
                 qty: item.qty,
                 subtotal: subtotal,
-                remark: item.remark || ""
+                remark: finalRemark
             };
         }).filter(it => it.qty > 0);
 
@@ -2105,7 +2125,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                             <div className="text-xs uppercase font-extrabold text-[var(--text-tertiary)] tracking-wider">👤 團員代訂分配明細</div>
                                                             <div className="space-y-2">
                                                                 {order.recipients.map((r, rIdx) => {
-                                                                    const recipientTotal = r.items.reduce((sum, ri) => sum + calculateItemSubtotal(ri.productId, ri.qty, ri.price), 0);
+                                                                    const recipientTotal = r.items.reduce((sum, ri) => sum + (ri.subtotal != null && Number(ri.subtotal) > 0 ? Number(ri.subtotal) : calculateItemSubtotal(ri.productId, ri.qty, ri.price)), 0);
                                                                     return (
                                                                         <div key={rIdx} className="bg-[var(--bg-secondary)] p-3 rounded-lg border border-[var(--border-primary)]">
                                                                             <div className="flex justify-between items-center text-sm font-bold text-[var(--text-primary)]">
@@ -2113,12 +2133,16 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                                                 <span className="text-blue-600 font-mono">${recipientTotal} 元</span>
                                                                             </div>
                                                                             <div className="pl-3 mt-1.5 space-y-0.5 text-xs text-[var(--text-secondary)]">
-                                                                                {r.items.map((ri, riIdx) => (
-                                                                                    <div key={riIdx} className="flex justify-between items-center font-mono">
-                                                                                        <span>{ri.productName} x{ri.qty}</span>
-                                                                                        <span>${calculateItemSubtotal(ri.productId, ri.qty, ri.price)}</span>
-                                                                                    </div>
-                                                                                ))}
+                                                                                {r.items.map((ri, riIdx) => {
+                                                                                    const sub = ri.subtotal != null && Number(ri.subtotal) > 0 ? Number(ri.subtotal) : calculateItemSubtotal(ri.productId, ri.qty, ri.price);
+                                                                                    const pNameDisplay = ri.productName + (ri.remark && !String(ri.productName || '').includes(ri.remark) ? ` (${ri.remark})` : '');
+                                                                                    return (
+                                                                                        <div key={riIdx} className="flex justify-between items-center font-mono">
+                                                                                            <span className="truncate pr-2">{pNameDisplay} x{ri.qty}</span>
+                                                                                            <span className="flex-shrink-0 font-bold text-[var(--text-primary)]">${sub}</span>
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
                                                                             </div>
                                                                         </div>
                                                                     );

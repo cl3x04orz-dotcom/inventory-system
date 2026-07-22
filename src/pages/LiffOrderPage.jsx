@@ -124,6 +124,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   // ── 口味規格 state ─────────────────────────────────────────────
   const [flavorSelections, setFlavorSelections] = useState({}); // { [productId]: { [flavor]: qty } }
+  const [groupFlavorSelections, setGroupFlavorSelections] = useState({}); // { [recipientName]: { [productId]: { [flavor]: qty } } }
   const [flavorModalProduct, setFlavorModalProduct] = useState(null);
   const [tempFlavorQty, setTempFlavorQty] = useState({});
 
@@ -1106,7 +1107,9 @@ export default function LiffOrderPage({ user, apiUrl }) {
         return;
       }
       setFlavorModalProduct(product);
-      const currentFlavors = flavorSelections[product.id] || {};
+      const currentFlavors = (isGroupOrder && activeRecipient)
+        ? (groupFlavorSelections[activeRecipient]?.[product.id] || {})
+        : (flavorSelections[product.id] || {});
       const initialTemp = {};
       product.flavor_choices.forEach((f) => {
         initialTemp[f] = currentFlavors[f] || 0;
@@ -1143,7 +1146,26 @@ export default function LiffOrderPage({ user, apiUrl }) {
     setTempFlavorQty((prev) => ({ ...prev, [flavor]: val }));
   };
 
-  const getFlavorRemark = (productId, pFlavorSelections) => {
+  const getFlavorRemark = (productId, pFlavorSelections, pGroupFlavorSelections = null, pIsGroupOrder = false) => {
+    if (pIsGroupOrder && pGroupFlavorSelections && typeof pGroupFlavorSelections === "object") {
+      const combinedMap = {};
+      Object.values(pGroupFlavorSelections).forEach((recipientMap) => {
+        if (recipientMap && recipientMap[productId]) {
+          Object.entries(recipientMap[productId]).forEach(([flavor, qty]) => {
+            const num = Number(qty) || 0;
+            if (num > 0) {
+              combinedMap[flavor] = (combinedMap[flavor] || 0) + num;
+            }
+          });
+        }
+      });
+      const items = Object.entries(combinedMap)
+        .filter(([_, qty]) => qty > 0)
+        .map(([flavor, qty]) => `${flavor}x${qty}`);
+      if (items.length === 0) return "";
+      return `【口味備註：${items.join(", ")}】`;
+    }
+
     const selections = pFlavorSelections[productId];
     if (!selections) return "";
     const items = Object.entries(selections)
@@ -1189,6 +1211,19 @@ export default function LiffOrderPage({ user, apiUrl }) {
           [activeRecipient]: nextItems,
         };
       });
+      setGroupFlavorSelections((prev) => {
+        const recipientFlavors = prev[activeRecipient] || {};
+        const nextFlavors = { ...recipientFlavors };
+        if (total === 0) {
+          delete nextFlavors[pid];
+        } else {
+          nextFlavors[pid] = cleanedTempFlavorQty;
+        }
+        return {
+          ...prev,
+          [activeRecipient]: nextFlavors,
+        };
+      });
     } else {
       setCart((prev) => {
         const next = { ...prev };
@@ -1199,17 +1234,16 @@ export default function LiffOrderPage({ user, apiUrl }) {
         }
         return next;
       });
+      setFlavorSelections((prev) => {
+        const next = { ...prev };
+        if (total === 0) {
+          delete next[pid];
+        } else {
+          next[pid] = cleanedTempFlavorQty;
+        }
+        return next;
+      });
     }
-
-    setFlavorSelections((prev) => {
-      const next = { ...prev };
-      if (total === 0) {
-        delete next[pid];
-      } else {
-        next[pid] = cleanedTempFlavorQty;
-      }
-      return next;
-    });
 
     setFlavorModalProduct(null);
   };
@@ -1291,7 +1325,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
         }
 
         const remark = p?.has_flavor_attributes
-          ? getFlavorRemark(pid, flavorSelections)
+          ? getFlavorRemark(pid, flavorSelections, groupFlavorSelections, isGroupOrder)
           : "";
         return {
           id: pid,
@@ -1303,7 +1337,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
           imageUrl: p?.imageUrl ?? "",
         };
       }),
-    [cart, products, flavorSelections],
+    [cart, products, flavorSelections, groupFlavorSelections, isGroupOrder],
   );
 
   // (已移至元件頂部)
@@ -1545,6 +1579,33 @@ export default function LiffOrderPage({ user, apiUrl }) {
           shippingFee,
           isGroupOrder,
           groupCart: isGroupOrder ? groupCart : undefined,
+          groupDetails: isGroupOrder ? (() => {
+            const details = {};
+            if (groupCart && typeof groupCart === "object") {
+              Object.entries(groupCart).forEach(([name, recipientItems]) => {
+                if (recipientItems && typeof recipientItems === "object") {
+                  const validEntries = Object.entries(recipientItems).filter(([_, qty]) => Number(qty) > 0);
+                  if (validEntries.length > 0) {
+                    details[name] = validEntries.map(([pid, qty]) => {
+                      const prod = products.find(p => p.id === pid);
+                      const sub = prod ? calcProductSubtotal(prod, qty) : 0;
+                      const price = qty > 0 ? Math.round(sub / qty) : (prod ? (Number(prod.single_price) || Number(prod.price)) : 0);
+                      const rem = prod?.has_flavor_attributes ? getFlavorRemark(pid, {}, { [name]: groupFlavorSelections[name] }, true) : "";
+                      return {
+                        productId: pid,
+                        productName: prod?.name || pid,
+                        qty: Number(qty),
+                        price: price,
+                        subtotal: sub,
+                        remark: rem
+                      };
+                    });
+                  }
+                }
+              });
+            }
+            return details;
+          })() : undefined,
           items: cartItems.map((i) => ({
             productId: i.id,
             productName: i.name,
@@ -1639,22 +1700,13 @@ export default function LiffOrderPage({ user, apiUrl }) {
         let recipientSubtotal = 0;
         validItems.forEach(([productId, qty]) => {
           const product = products.find((p) => p.id === productId);
-          const singlePrice = product ? (Number(product.single_price) || Number(product.price)) : 0;
-          
-          let subtotal = 0;
-          if (product && product.has_volume_pricing && product.volume_pricing_settings) {
-            const targetQty = Number(product.volume_pricing_settings.target_quantity);
-            const packagePrice = Number(product.volume_pricing_settings.package_price);
-            const groupCount = Math.floor(qty / targetQty);
-            const remainderCount = qty % targetQty;
-            subtotal = groupCount * packagePrice + remainderCount * singlePrice;
-          } else {
-            subtotal = singlePrice * qty;
-          }
+          const subtotal = product ? calcProductSubtotal(product, qty) : 0;
+          const rem = product?.has_flavor_attributes ? getFlavorRemark(productId, {}, { [name]: groupFlavorSelections[name] }, true) : "";
+          const remDisplay = rem ? ` ${rem}` : "";
 
           recipientSubtotal += subtotal;
           grandTotalQty += qty;
-          text += `   - ${product ? product.name : productId} x ${qty} ($${subtotal})\n`;
+          text += `   - ${product ? product.name : productId}${remDisplay} x ${qty} ($${subtotal})\n`;
         });
         text += `   💰 小計：$${recipientSubtotal}\n`;
         text += `----------------------------------\n`;
@@ -3032,7 +3084,7 @@ ${freeNote(newFee, newMin)}
                         </div>
                         <div className="space-y-2">
                           {o.recipients.map((r, ri) => {
-                            const rTotal = (r.items || []).reduce((sum, item) => sum + (Number(item.price) * Number(item.qty)), 0);
+                            const rTotal = (r.items || []).reduce((sum, item) => sum + (item.subtotal != null && Number(item.subtotal) > 0 ? Number(item.subtotal) : (Number(item.price) * Number(item.qty))), 0);
                             return (
                               <div key={ri} className="bg-[var(--bg-tertiary)] p-2.5 rounded-xl border border-[var(--border-primary)]/50">
                                 <div className="font-bold text-xs text-[var(--text-primary)] mb-1.5 flex justify-between items-center">
@@ -3040,12 +3092,16 @@ ${freeNote(newFee, newMin)}
                                   <span className="text-blue-600 font-mono font-bold">${rTotal}</span>
                                 </div>
                                 <div className="space-y-1 pl-3.5 border-l-2 border-slate-200 dark:border-slate-700">
-                                  {(r.items || []).map((item, ii) => (
-                                    <div key={ii} className="flex justify-between text-[11px] text-[var(--text-secondary)]">
-                                      <span className="truncate flex-1">{item.productName}</span>
-                                      <span className="flex-shrink-0 ml-2 font-mono">x {item.qty}</span>
-                                    </div>
-                                  ))}
+                                  {(r.items || []).map((item, ii) => {
+                                    const itemSub = item.subtotal != null && Number(item.subtotal) > 0 ? Number(item.subtotal) : (Number(item.price) * Number(item.qty));
+                                    const pNameDisplay = item.productName + (item.remark && !String(item.productName || '').includes(item.remark) ? ` (${item.remark})` : '');
+                                    return (
+                                      <div key={ii} className="flex justify-between text-[11px] text-[var(--text-secondary)]">
+                                        <span className="truncate flex-1 pr-2">{pNameDisplay}</span>
+                                        <span className="flex-shrink-0 font-mono">x {item.qty} (${itemSub})</span>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             );
@@ -3105,6 +3161,43 @@ ${freeNote(newFee, newMin)}
                             const finalCart = Object.keys(newCart).length > 0 ? newCart : (res.cart || {});
                             setCart(finalCart);
                             setFlavorSelections(newFlavorSelections);
+                            
+                            if (o.recipients && o.recipients.length > 0) {
+                              const nextGroupCart = {};
+                              const nextGroupFlavors = {};
+                              o.recipients.forEach(r => {
+                                if (!r.recipientName) return;
+                                nextGroupCart[r.recipientName] = {};
+                                (r.items || []).forEach(ri => {
+                                  const pid = ri.productId || ri.ProductId;
+                                  if (!pid) return;
+                                  nextGroupCart[r.recipientName][pid] = Number(ri.qty || ri.Qty || 0);
+                                  const remStr = ri.remark || ri.Remark || '';
+                                  if (remStr) {
+                                    const cleanRemark = remStr.replace(/【口味備註：(.*?)】/, '$1');
+                                    const parts = cleanRemark.split(/[,，\s+]/);
+                                    const flavorMap = {};
+                                    parts.forEach(part => {
+                                      const match = part.trim().match(/^\(?([^\s*x:：)]+)\)?\s*[*xX:：]\s*(\d+)$/);
+                                      if (match) {
+                                        const flavor = match[1];
+                                        const fQty = Number(match[2]);
+                                        if (flavor && fQty > 0) {
+                                          flavorMap[flavor] = (flavorMap[flavor] || 0) + fQty;
+                                        }
+                                      }
+                                    });
+                                    if (Object.keys(flavorMap).length > 0) {
+                                      if (!nextGroupFlavors[r.recipientName]) nextGroupFlavors[r.recipientName] = {};
+                                      nextGroupFlavors[r.recipientName][pid] = flavorMap;
+                                    }
+                                  }
+                                });
+                              });
+                              setGroupCart(nextGroupCart);
+                              setGroupFlavorSelections(nextGroupFlavors);
+                              setIsGroupOrder(true);
+                            }
 
                             if (res.delivery) {
                               setSelectedBuilding(res.delivery.community || "");
@@ -3718,6 +3811,8 @@ ${freeNote(newFee, newMin)}
                                   {getFlavorRemark(
                                     product.id,
                                     flavorSelections,
+                                    isGroupOrder ? groupFlavorSelections : null,
+                                    isGroupOrder
                                   )}
                                 </div>
                               )}

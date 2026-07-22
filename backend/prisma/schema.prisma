@@ -262,6 +262,8 @@ model GroupBuyOrderRecipientItem {
   productName String
   qty         Int
   price       Int                    // 商品單價
+  subtotal    Int?                   @default(0) // 商品小計 (精準多件優惠與促銷價)
+  remark      String?                // 口味備註
   recipient   GroupBuyOrderRecipient @relation(fields: [recipientId], references: [recipientId], onDelete: Cascade)
 
   @@index([recipientId])

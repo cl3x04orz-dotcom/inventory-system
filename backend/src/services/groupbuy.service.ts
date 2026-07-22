@@ -248,12 +248,19 @@ export const GroupBuyService = {
                 recipientName: r.recipientName,
                 note: r.note || '',
                 items: {
-                  create: (r.items || []).map((ri: any) => ({
-                    productId: ri.productId,
-                    productName: ri.productName,
-                    qty: Number(ri.qty) || 0,
-                    price: Math.round(Number(ri.price)) || 0
-                  }))
+                  create: (r.items || []).map((ri: any) => {
+                    const sub = Math.round(Number(ri.subtotal !== undefined ? ri.subtotal : Number(ri.price) * Number(ri.qty))) || 0;
+                    const rem = ri.remark || '';
+                    const pName = (ri.productName || '') + (rem && !String(ri.productName || '').includes(rem) ? ` (${rem})` : '');
+                    return {
+                      productId: ri.productId,
+                      productName: pName,
+                      qty: Number(ri.qty) || 0,
+                      price: Math.round(Number(ri.price)) || 0,
+                      subtotal: sub,
+                      remark: rem
+                    };
+                  })
                 }
               }
             });
@@ -916,7 +923,31 @@ export const GroupBuyService = {
     }
 
     let recipientsInput: any = undefined;
-    if (isGroupOrder && groupCart && typeof groupCart === 'object') {
+    if (isGroupOrder && payload.groupDetails && typeof payload.groupDetails === 'object') {
+      recipientsInput = {
+        create: Object.entries(payload.groupDetails).map(([name, recipientItems]: [string, any]) => {
+          return {
+            recipientName: name,
+            note: payload.groupNotes?.[name] || '',
+            items: {
+              create: (recipientItems || []).map((ri: any) => {
+                const sub = Math.round(Number(ri.subtotal !== undefined ? ri.subtotal : Number(ri.price) * Number(ri.qty))) || 0;
+                const rem = ri.remark || '';
+                const pName = (ri.productName || ri.productId || '') + (rem && !String(ri.productName || '').includes(rem) ? ` (${rem})` : '');
+                return {
+                  productId: ri.productId || '',
+                  productName: pName,
+                  qty: Number(ri.qty) || 0,
+                  price: Math.round(Number(ri.price)) || 0,
+                  subtotal: sub,
+                  remark: rem
+                };
+              })
+            }
+          };
+        })
+      };
+    } else if (isGroupOrder && groupCart && typeof groupCart === 'object') {
       recipientsInput = {
         create: Object.entries(groupCart).map(([name, recipientItems]: [string, any]) => {
           return {
@@ -931,7 +962,9 @@ export const GroupBuyService = {
                   productId,
                   productName: pName,
                   qty: Number(qty) || 0,
-                  price: price
+                  price: price,
+                  subtotal: Math.round(price * (Number(qty) || 0)),
+                  remark: matchedItem?.remark || ''
                 };
               })
             }
@@ -1039,14 +1072,18 @@ export const GroupBuyService = {
         const names = member ? [member.receiverName, member.displayName].filter(Boolean) as string[] : [];
         const myRecipient = o.recipients?.find((r: any) => names.includes(r.recipientName));
         if (myRecipient) {
-          items = (myRecipient.items || []).map((ri: any) => ({
-            OrderId: o.orderId,
-            ProductId: ri.productId,
-            ProductName: ri.productName,
-            UnitPrice: Number(ri.price),
-            Qty: Number(ri.qty),
-            Subtotal: Number(ri.price) * Number(ri.qty)
-          }));
+          items = (myRecipient.items || []).map((ri: any) => {
+            const sub = ri.subtotal !== null && ri.subtotal !== undefined && Number(ri.subtotal) > 0 ? Number(ri.subtotal) : Number(ri.price) * Number(ri.qty);
+            return {
+              OrderId: o.orderId,
+              ProductId: ri.productId,
+              ProductName: ri.productName,
+              UnitPrice: Number(ri.price),
+              Qty: Number(ri.qty),
+              Subtotal: sub,
+              Remark: ri.remark || ''
+            };
+          });
           totalAmount = items.reduce((sum, it) => sum + it.Subtotal, 0);
         }
       }
@@ -1080,7 +1117,9 @@ export const GroupBuyService = {
             productId: ri.productId,
             productName: ri.productName,
             qty: Number(ri.qty),
-            price: Number(ri.price)
+            price: Number(ri.price),
+            subtotal: Number(ri.subtotal !== null && ri.subtotal !== undefined ? ri.subtotal : (Number(ri.price) * Number(ri.qty))),
+            remark: ri.remark || ''
           }))
         }))
       };
