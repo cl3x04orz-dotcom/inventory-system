@@ -4274,7 +4274,7 @@ ${freeNote(newFee, newMin)}
                   <div key={pId} className="w-full px-4 py-2 bg-amber-500/10 border-b border-amber-200/50 flex justify-between items-center text-xs font-bold text-amber-800 select-none">
                     <span className="flex items-center gap-1 truncate mr-2">
                       <span className="text-sm">🎉</span>
-                      <span className="truncate">已符合「{credit.promoName || '促銷優惠'}」，請選擇 {credit.earned} 件贈品<span className="text-[10px] opacity-80 font-normal ml-1">(可稍後於購物車選擇)</span></span>
+                      <span className="truncate">已符合「{credit.promoName || '促銷優惠'}」，請選擇 {credit.earned} 件贈品</span>
                     </span>
                     <button
                       onClick={() => setShowGiftModal(pId)}
@@ -4299,24 +4299,8 @@ ${freeNote(newFee, newMin)}
                     <div className="text-[10px] text-[var(--text-secondary)] font-semibold">
                       已選 {totalQty} 件
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl font-black text-blue-600 font-mono">
-                        ${cartTotal}
-                      </span>
-                      {/* 金額右邊提示按鈕 */}
-                      {Object.entries(availableGiftCredits).map(([pId, credit]) => {
-                        if (credit.earned <= 0) return null;
-                        const isComplete = credit.selected >= credit.earned;
-                        return (
-                          <button
-                            key={pId}
-                            onClick={() => setShowGiftModal(pId)}
-                            className={`text-[10px] px-2.5 py-1 rounded-lg font-extrabold border transition-all flex items-center gap-1 shrink-0 active:scale-95 ${isComplete ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-amber-100 text-amber-900 border-amber-400 animate-pulse shadow-sm'}`}
-                          >
-                            🎁 {isComplete ? `贈品已選 (${credit.selected}/${credit.earned})` : `選擇贈品 (${credit.selected}/${credit.earned})`}
-                          </button>
-                        );
-                      })}
+                    <div className="text-2xl font-black text-blue-600 font-mono">
+                      ${cartTotal}
                     </div>
                   </div>
                 </div>
