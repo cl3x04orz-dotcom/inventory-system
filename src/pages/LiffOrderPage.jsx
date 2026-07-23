@@ -1709,7 +1709,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
       });
     }
 
-    setStep("confirm");
+    setStep("form");
   };
 
   // ── 送出訂單 ─────────────────────────────────────────────────
