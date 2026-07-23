@@ -1496,6 +1496,23 @@ export default function LiffOrderPage({ user, apiUrl }) {
     return { cartItems: finalCartItems, cartTotal: totalAmount, discountDetails: discounts, availableGiftCredits };
   }, [cart, giftSelections, products, flavorSelections, groupFlavorSelections, isGroupOrder]);
 
+  const shippingFee = useMemo(() => {
+    if (!isGeneralUser) return 0;
+    let activeComm = currentCommunity;
+    if (selectedCommunityId && allCommunities.length > 0) {
+      const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+      if (match) activeComm = match;
+    }
+    if (!activeComm || activeComm.DefaultFreeShipping) return 0;
+    const fee = Number(activeComm.ShippingFee) || 0;
+    if (fee <= 0) return 0;
+    const freeMin = Number(activeComm.FreeShippingMin) || 0;
+    if (freeMin > 0 && cartTotal >= freeMin) return 0;
+    return fee;
+  }, [isGeneralUser, currentCommunity, selectedCommunityId, allCommunities, cartTotal]);
+
+  const orderTotal = cartTotal + shippingFee;
+
   // (已移至元件頂部)
 
   const getFullAddress = () => {
