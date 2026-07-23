@@ -3956,7 +3956,7 @@ ${freeNote(newFee, newMin)}
                                     捆裝 {product.bundleSize}入
                                   </span>
                                 )}
-                                {product.buy_x && product.get_y && (
+                                {(!Array.isArray(product.promotions) || product.promotions.length === 0) && product.buy_x > 0 && product.get_y > 0 && (
                                   <span className="text-[9px] text-emerald-800 bg-emerald-500/10 border border-emerald-200/30 px-1 py-0.5 rounded font-bold shrink-0">
                                     🔥買{product.buy_x}送{product.get_y}
                                   </span>
