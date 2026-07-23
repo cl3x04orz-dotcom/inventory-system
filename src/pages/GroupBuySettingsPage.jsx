@@ -986,27 +986,35 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                             const name = prompt('請輸入促銷名稱 (例：燕麥任選買3送2)');
                                             if (!name) return;
                                             const type = prompt('請選擇促銷類型 (輸入 1 買X送Y，輸入 2 任選組合價)', '1');
-                                            if (type === '1') {
-                                                const buyX = prompt('請輸入買多少件 (例：3)');
-                                                const getY = prompt('請輸入送多少件 (例：2)');
-                                                if (!buyX || !getY) return;
-                                                const modeStr = prompt('請選擇贈品模式：\n1. 客人自選贈品 (CUSTOMER_SELECT)\n2. 自動折抵最低價 (AUTO_LOWEST_PRICE)\n3. 送同品項 (SAME_PRODUCT)', '1');
-                                                let rewardSelectionMode = 'CUSTOMER_SELECT';
-                                                if (modeStr === '2') rewardSelectionMode = 'AUTO_LOWEST_PRICE';
-                                                if (modeStr === '3') rewardSelectionMode = 'SAME_PRODUCT';
+                                            
+                                            try {
+                                                if (type === '1') {
+                                                    const buyX = prompt('請輸入買多少件 (例：3)');
+                                                    const getY = prompt('請輸入送多少件 (例：2)');
+                                                    if (!buyX || !getY) return;
+                                                    const modeStr = prompt('請選擇贈品模式：\n1. 客人自選贈品 (CUSTOMER_SELECT)\n2. 自動折抵最低價 (AUTO_LOWEST_PRICE)\n3. 送同品項 (SAME_PRODUCT)', '1');
+                                                    let rewardSelectionMode = 'CUSTOMER_SELECT';
+                                                    if (modeStr === '2') rewardSelectionMode = 'AUTO_LOWEST_PRICE';
+                                                    if (modeStr === '3') rewardSelectionMode = 'SAME_PRODUCT';
 
-                                                await callGAS(apiUrl, 'createPromotion', {
-                                                    name, promoType: 'BUY_X_GET_Y', buyQty: buyX, freeQty: getY, communityId: selectedCommunityId, rewardSelectionMode
-                                                }, user.token);
-                                            } else if (type === '2') {
-                                                const buyX = prompt('請輸入任選幾件 (例：3)');
-                                                const bundlePrice = prompt('請輸入組合價 (例：100)');
-                                                if (!buyX || !bundlePrice) return;
-                                                await callGAS(apiUrl, 'createPromotion', {
-                                                    name, promoType: 'BUNDLE_PRICE', buyQty: buyX, bundlePrice, communityId: selectedCommunityId
-                                                }, user.token);
+                                                    await callGAS(apiUrl, 'createPromotion', {
+                                                        name, promoType: 'BUY_X_GET_Y', buyQty: buyX, freeQty: getY, communityId: selectedCommunityId, rewardSelectionMode
+                                                    }, user.token);
+                                                    alert('✅ 促銷活動已成功新增！');
+                                                } else if (type === '2') {
+                                                    const buyX = prompt('請輸入任選幾件 (例：3)');
+                                                    const bundlePrice = prompt('請輸入組合價 (例：100)');
+                                                    if (!buyX || !bundlePrice) return;
+                                                    await callGAS(apiUrl, 'createPromotion', {
+                                                        name, promoType: 'BUNDLE_PRICE', buyQty: buyX, bundlePrice, communityId: selectedCommunityId
+                                                    }, user.token);
+                                                    alert('✅ 促銷活動已成功新增！');
+                                                }
+                                                fetchAllProducts();
+                                            } catch (error) {
+                                                console.error(error);
+                                                alert('❌ 新增失敗：' + error.message);
                                             }
-                                            fetchAllProducts();
                                         }}
                                         className="text-[10px] text-emerald-600 hover:text-emerald-800 font-bold flex items-center gap-1 transition-colors"
                                     >
