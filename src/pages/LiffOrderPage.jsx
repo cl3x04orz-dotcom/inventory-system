@@ -1576,6 +1576,14 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   // ── 進入填寫步驟：從 LocalStorage 自動帶入舊資料 ─────────────
   const handleProceedToForm = async () => {
+    // 🛡️ 檢查是否有未完成之贈品額度，若有則阻止前往填寫資料並立刻開出 Bottom Sheet
+    for (const [pId, credit] of Object.entries(availableGiftCredits)) {
+      if (credit.earned > 0 && credit.selected < credit.earned) {
+        setShowGiftModal(pId);
+        alert(`⚠️ 請先完成贈品選擇！還有 ${credit.earned - credit.selected} 件贈品尚未選擇。`);
+        return;
+      }
+    }
     try {
       const saved = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
       if (saved.name) {
@@ -2534,12 +2542,13 @@ export default function LiffOrderPage({ user, apiUrl }) {
             返回修改商品
           </button>
           <button
-            onClick={() => setStep("form")}
+            onClick={handleProceedToForm}
             className="btn-primary py-3 rounded-xl font-bold flex items-center justify-center gap-1 shadow-md shadow-blue-500/20"
           >
             前往填寫資料 <ArrowRight size={16} />
           </button>
         </div>
+        {renderGiftModal()}
       </div>
     );
   }
@@ -2585,10 +2594,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
       userEnteredStreet !== ""
     );
 
-    const hasUnselectedGifts = Object.values(availableGiftCredits).some(c => c.earned > 0 && c.selected < c.earned);
-
     const canProceed =
-      !hasUnselectedGifts &&
       safeName.trim() &&
       isPhoneValid &&
       isBuildingValid &&
@@ -2645,34 +2651,6 @@ export default function LiffOrderPage({ user, apiUrl }) {
         </div>
 
         <div key="page-info" className="flex-1 overflow-y-auto p-5 space-y-6">
-          {/* ⚠️ 未選完贈品強性提醒卡片 */}
-          {Object.entries(availableGiftCredits).map(([pId, credit]) => {
-            if (credit.earned <= 0 || credit.selected >= credit.earned) return null;
-            const unselectedCount = credit.earned - credit.selected;
-            return (
-              <div key={pId} className="p-3.5 bg-amber-500/10 border border-amber-300 dark:border-amber-700/60 rounded-2xl flex items-center justify-between shadow-sm animate-pulse">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-xl">⚠️</span>
-                  <div>
-                    <div className="font-extrabold text-xs text-amber-900 dark:text-amber-300">
-                      還有 {unselectedCount} 件贈品尚未選擇
-                    </div>
-                    <div className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold mt-0.5">
-                      活動：{credit.promoName || '促銷優惠'}
-                    </div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowGiftModal(pId)}
-                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black rounded-xl shadow-sm active:scale-95 transition-all shrink-0"
-                >
-                  立即選擇
-                </button>
-              </div>
-            );
-          })}
-
           {/* 收件資訊 */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
@@ -3134,26 +3112,14 @@ ${freeNote(newFee, newMin)}
         >
           <button
             onClick={() => {
-              if (hasUnselectedGifts) {
-                const firstUnselectedEntry = Object.entries(availableGiftCredits).find(([_, c]) => c.earned > 0 && c.selected < c.earned);
-                if (firstUnselectedEntry) {
-                  setShowGiftModal(firstUnselectedEntry[0]);
-                }
-                alert("⚠️ 請先完成贈品選擇！還有未選擇之贈品。");
-                return;
-              }
               if (canProceed && !isSubmitting) {
                 syncMemberToCloud();
                 handleSubmitOrder();
               }
             }}
-            disabled={(!canProceed && !hasUnselectedGifts) || isSubmitting}
-            className={`w-full py-3.5 rounded-xl font-extrabold flex items-center justify-center gap-2 transition-all ${
-              isSubmitting
-                ? "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed"
-                : hasUnselectedGifts
-                ? "bg-amber-500 hover:bg-amber-600 text-white shadow-lg animate-pulse cursor-pointer"
-                : canProceed
+            disabled={!canProceed || isSubmitting}
+            className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
+              canProceed && !isSubmitting
                 ? "btn-primary shadow-md shadow-blue-500/20 active:scale-98"
                 : "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed"
             }`}
@@ -3161,10 +3127,6 @@ ${freeNote(newFee, newMin)}
             {isSubmitting ? (
               <>
                 <RefreshCw className="animate-spin" size={16} /> 送出中...
-              </>
-            ) : hasUnselectedGifts ? (
-              <>
-                ⚠️ 請先完成贈品選擇 (點擊選擇)
               </>
             ) : (
               <>
