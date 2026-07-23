@@ -3764,9 +3764,16 @@ ${freeNote(newFee, newMin)}
                             <div className="flex flex-col mt-1.5">
                               <div className="flex justify-between items-center">
                                 <div className="flex flex-col">
-                                  <span className="text-sm font-bold text-blue-600 font-mono">
-                                    $
-                                    {product.single_price || product.price}
+                                  <span className="text-sm font-bold text-blue-600 font-mono flex items-center gap-1.5">
+                                    <span>
+                                      $
+                                      {product.single_price || product.price}
+                                    </span>
+                                    {qty > 0 && freeQty > 0 && (
+                                      <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 border border-emerald-100 px-1 py-0.5 rounded leading-none flex items-center">
+                                        贈{freeQty},共{qty + freeQty}件
+                                      </span>
+                                    )}
                                   </span>
                                   {product.has_volume_pricing &&
                                     product.volume_pricing_settings && (
@@ -3832,16 +3839,7 @@ ${freeNote(newFee, newMin)}
                                   </button>
                                 </div>
                               </div>
-                              {qty > 0 && freeQty > 0 && (
-                                <div className="mt-2 flex flex-col gap-1 border-t border-[var(--border-primary)] pt-2 mb-1">
-                                  <span className="text-[12px] text-emerald-600 font-bold flex items-center gap-1 bg-emerald-50 w-fit px-1.5 py-0.5 rounded">
-                                    🎁 贈送 {freeQty}
-                                  </span>
-                                  <span className="text-[13px] font-extrabold text-[var(--text-primary)]">
-                                    出貨共 {qty + freeQty} 件
-                                  </span>
-                                </div>
-                              )}
+
                               {qty > 0 && product.has_flavor_attributes && (
                                 <div
                                   className="text-[10px] text-blue-600 font-medium mt-1.5 select-none cursor-pointer"
