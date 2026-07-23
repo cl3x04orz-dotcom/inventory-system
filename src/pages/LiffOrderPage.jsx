@@ -4208,6 +4208,26 @@ ${freeNote(newFee, newMin)}
                 </div>
               )}
 
+              {/* 🎁 促銷達標不打斷提示 Banner */}
+              {Object.entries(availableGiftCredits).map(([pId, credit]) => {
+                if (credit.earned <= 0) return null;
+                const isComplete = credit.selected >= credit.earned;
+                return (
+                  <div key={pId} className="w-full px-4 py-1.5 bg-amber-500/10 border-b border-amber-200/50 flex justify-between items-center text-xs font-bold text-amber-800 select-none">
+                    <span className="flex items-center gap-1 truncate mr-2">
+                      <span>🎉</span>
+                      <span className="truncate">已符合「{credit.promoName || '促銷優惠'}」，可享 {credit.earned} 件贈品！</span>
+                    </span>
+                    <button
+                      onClick={() => setShowGiftModal(pId)}
+                      className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-extrabold flex items-center gap-1 transition-all ${isComplete ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white animate-pulse'}`}
+                    >
+                      🎁 {isComplete ? `已選 ${credit.selected}/${credit.earned}` : `選擇贈品 (${credit.selected}/${credit.earned})`}
+                    </button>
+                  </div>
+                );
+              })}
+
               {/* 購物車核心按鈕列 */}
               <div className="px-4 py-3 flex justify-between items-center">
                 <div className="flex items-center gap-3">
@@ -4221,8 +4241,24 @@ ${freeNote(newFee, newMin)}
                     <div className="text-[10px] text-[var(--text-secondary)] font-semibold">
                       已選 {totalQty} 件
                     </div>
-                    <div className="text-2xl font-black text-blue-600 font-mono">
-                      ${cartTotal}
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl font-black text-blue-600 font-mono">
+                        ${cartTotal}
+                      </span>
+                      {/* 金額右邊提示 */}
+                      {Object.entries(availableGiftCredits).map(([pId, credit]) => {
+                        if (credit.earned <= 0) return null;
+                        const isComplete = credit.selected >= credit.earned;
+                        return (
+                          <button
+                            key={pId}
+                            onClick={() => setShowGiftModal(pId)}
+                            className={`text-[10px] px-2 py-0.5 rounded-lg font-bold border transition-colors flex items-center gap-1 shrink-0 ${isComplete ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-800 border-amber-300 animate-pulse'}`}
+                          >
+                            🎁 贈品 {credit.selected}/{credit.earned}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
