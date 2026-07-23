@@ -990,8 +990,13 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                 const buyX = prompt('請輸入買多少件 (例：3)');
                                                 const getY = prompt('請輸入送多少件 (例：2)');
                                                 if (!buyX || !getY) return;
+                                                const modeStr = prompt('請選擇贈品模式：\n1. 客人自選贈品 (CUSTOMER_SELECT)\n2. 自動折抵最低價 (AUTO_LOWEST_PRICE)\n3. 送同品項 (SAME_PRODUCT)', '1');
+                                                let rewardSelectionMode = 'CUSTOMER_SELECT';
+                                                if (modeStr === '2') rewardSelectionMode = 'AUTO_LOWEST_PRICE';
+                                                if (modeStr === '3') rewardSelectionMode = 'SAME_PRODUCT';
+
                                                 await callGAS(apiUrl, 'createPromotion', {
-                                                    name, promoType: 'BUY_X_GET_Y', buyQty: buyX, freeQty: getY, communityId: selectedCommunityId
+                                                    name, promoType: 'BUY_X_GET_Y', buyQty: buyX, freeQty: getY, communityId: selectedCommunityId, rewardSelectionMode
                                                 }, user.token);
                                             } else if (type === '2') {
                                                 const buyX = prompt('請輸入任選幾件 (例：3)');
@@ -1022,6 +1027,9 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                         <div className="text-xs text-[var(--text-secondary)] mt-0.5">
                                                             {promo.promoType === 'BUY_X_GET_Y' && `規則：買 ${promo.buyQty} 送 ${promo.freeQty}`}
                                                             {promo.promoType === 'BUNDLE_PRICE' && `規則：任選 ${promo.buyQty} 件 $${promo.bundlePrice}`}
+                                                            {promo.promoType === 'BUY_X_GET_Y' && promo.rewardSelectionMode === 'CUSTOMER_SELECT' && <span className="ml-2 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">自選贈品</span>}
+                                                            {promo.promoType === 'BUY_X_GET_Y' && promo.rewardSelectionMode === 'AUTO_LOWEST_PRICE' && <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">折抵最低價</span>}
+                                                            {promo.promoType === 'BUY_X_GET_Y' && promo.rewardSelectionMode === 'SAME_PRODUCT' && <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">送同品項</span>}
                                                             {!promo.communityId && <span className="ml-2 text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">全域可用</span>}
                                                         </div>
                                                     </div>

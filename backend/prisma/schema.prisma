@@ -451,16 +451,17 @@ model CommunityProductPrice {
 }
 
 model Promotion {
-  promoId     String   @id @default(uuid())
-  name        String
-  promoType   String   @default("BUY_X_GET_Y") // e.g. BUY_X_GET_Y, BUNDLE_PRICE
-  buyQty      Int      @default(0)
-  freeQty     Int      @default(0)
-  bundlePrice Decimal?
-  isActive    Boolean  @default(true)
-  communityId String? // null means global promotion
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  promoId             String   @id @default(uuid())
+  name                String
+  promoType           String   @default("BUY_X_GET_Y") // e.g. BUY_X_GET_Y, BUNDLE_PRICE
+  buyQty              Int      @default(0)
+  freeQty             Int      @default(0)
+  bundlePrice         Decimal?
+  isActive            Boolean  @default(true)
+  communityId         String? // null means global promotion
+  rewardSelectionMode String   @default("AUTO_LOWEST_PRICE")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   community GroupBuyCommunity?      @relation(fields: [communityId], references: [communityId], onDelete: Cascade)
   prices    CommunityProductPrice[]

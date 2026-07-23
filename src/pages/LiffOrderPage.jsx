@@ -125,6 +125,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
   // ── 口味規格 state ─────────────────────────────────────────────
   const [flavorSelections, setFlavorSelections] = useState({}); // { [productId]: { [flavor]: qty } }
   const [groupFlavorSelections, setGroupFlavorSelections] = useState({}); // { [recipientName]: { [productId]: { [flavor]: qty } } }
+  const [giftSelections, setGiftSelections] = useState({}); // { [promoId]: { [productId]: qty } }
+  const [showGiftModal, setShowGiftModal] = useState(null); // promoId
   const [flavorModalProduct, setFlavorModalProduct] = useState(null);
   const [tempFlavorQty, setTempFlavorQty] = useState({});
 
@@ -1250,7 +1252,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   const totalQty = Object.values(cart).reduce((s, q) => s + q, 0);
 
-  const { cartItems, cartTotal, discountDetails } = useMemo(() => {
+  const { cartItems, cartTotal, discountDetails, availableGiftCredits } = useMemo(() => {
     let tempItems = Object.entries(cart).map(([pid, qty]) => {
       const p = products.find((x) => x.id === pid);
       return {
@@ -1263,11 +1265,14 @@ export default function LiffOrderPage({ user, apiUrl }) {
         product: p,
         remark: p?.has_flavor_attributes ? getFlavorRemark(pid, flavorSelections, groupFlavorSelections, isGroupOrder) : "",
         imageUrl: p?.imageUrl ?? "",
+        isGift: false
       };
     }).filter(item => item.product);
 
     let totalAmount = 0;
     const discounts = [];
+    const availableGiftCredits = {}; // { [promoId]: { earned: number, selected: number } }
+    const finalCartItems = [];
 
     // 分組
     const promoGroups = {}; // promoId -> items
@@ -1287,46 +1292,110 @@ export default function LiffOrderPage({ user, apiUrl }) {
     for (const pId in promoGroups) {
       const group = promoGroups[pId];
       const promo = group.promotion;
-      let groupTotalAmount = 0;
 
       if (promo.promoType === 'BUY_X_GET_Y') {
         const bx = Number(promo.buyQty);
         const gy = Number(promo.freeQty);
-        const groupSize = bx + gy;
+        const mode = promo.rewardSelectionMode || 'AUTO_LOWEST_PRICE';
         
-        const totalQtyInGroup = group.items.reduce((sum, item) => sum + item.qty, 0);
-        let totalFreeAllowed = 0;
-        if (groupSize > 0) {
-           const sets = Math.floor(totalQtyInGroup / groupSize);
-           totalFreeAllowed = sets * gy;
-        }
+        let totalQtyInGroup = group.items.reduce((sum, item) => sum + item.qty, 0);
 
-        let expandedUnits = [];
-        for (const item of group.items) {
-          for (let i = 0; i < item.qty; i++) {
-            expandedUnits.push({ ...item, unitPrice: item.price });
-          }
+        if (mode === 'AUTO_LOWEST_PRICE') {
+           const groupSize = bx + gy;
+           let totalFreeAllowed = 0;
+           if (groupSize > 0) {
+              const sets = Math.floor(totalQtyInGroup / groupSize);
+              totalFreeAllowed = sets * gy;
+           }
+
+           let expandedUnits = [];
+           for (const item of group.items) {
+             for (let i = 0; i < item.qty; i++) {
+               expandedUnits.push({ ...item, unitPrice: item.price });
+             }
+           }
+           expandedUnits.sort((a, b) => a.unitPrice - b.unitPrice);
+           
+           for (let i = 0; i < expandedUnits.length; i++) {
+              expandedUnits[i].isFree = i < totalFreeAllowed;
+           }
+           
+           for (const item of group.items) {
+              const unitsOfThisItem = expandedUnits.filter(u => u.id === item.id);
+              const freeCount = unitsOfThisItem.filter(u => u.isFree).length;
+              const paidCount = unitsOfThisItem.filter(u => !u.isFree).length;
+              
+              if (paidCount > 0) {
+                  finalCartItems.push({ ...item, qty: paidCount, subtotal: paidCount * item.price, isGift: false });
+                  totalAmount += paidCount * item.price;
+              }
+              if (freeCount > 0) {
+                  finalCartItems.push({ ...item, qty: freeCount, subtotal: 0, price: 0, isGift: true, remark: item.remark ? `${item.remark} (贈品)` : "贈品" });
+              }
+           }
+           
+           if (totalFreeAllowed > 0) {
+              const savedAmount = expandedUnits.filter(u => u.isFree).reduce((sum, u) => sum + u.unitPrice, 0);
+              discounts.push(`✨ [${promo.name}] 已自動折抵 ${totalFreeAllowed} 件最低價商品 (省 $${savedAmount})`);
+           }
+
+        } else if (mode === 'CUSTOMER_SELECT') {
+           let sets = 0;
+           if (bx > 0) {
+               sets = Math.floor(totalQtyInGroup / bx);
+           }
+           const earnedGifts = sets * gy;
+           
+           for (const item of group.items) {
+               finalCartItems.push({ ...item, qty: item.qty, subtotal: item.qty * item.price, isGift: false });
+               totalAmount += item.qty * item.price;
+           }
+           
+           let selectedGiftsCount = 0;
+           const selections = giftSelections[pId] || {};
+           for (const [gPid, gQty] of Object.entries(selections)) {
+               if (gQty > 0) {
+                   selectedGiftsCount += gQty;
+                   const gProd = products.find(p => p.id === gPid);
+                   if (gProd) {
+                       finalCartItems.push({
+                           id: gPid,
+                           name: gProd.name,
+                           price: 0,
+                           qty: gQty,
+                           freeQty: 0,
+                           subtotal: 0,
+                           product: gProd,
+                           remark: "贈品",
+                           imageUrl: gProd.imageUrl || "",
+                           isGift: true
+                       });
+                   }
+               }
+           }
+           
+           availableGiftCredits[pId] = { earned: earnedGifts, selected: selectedGiftsCount };
+           if (earnedGifts > 0) {
+               discounts.push(`✨ [${promo.name}] 獲得 ${earnedGifts} 件贈品額度 (已選 ${selectedGiftsCount} 件)`);
+           }
+
+        } else if (mode === 'SAME_PRODUCT') {
+           for (const item of group.items) {
+               let itemSets = 0;
+               if (bx > 0) {
+                   itemSets = Math.floor(item.qty / bx);
+               }
+               const itemFree = itemSets * gy;
+               
+               finalCartItems.push({ ...item, qty: item.qty, subtotal: item.qty * item.price, isGift: false });
+               totalAmount += item.qty * item.price;
+               
+               if (itemFree > 0) {
+                   finalCartItems.push({ ...item, qty: itemFree, subtotal: 0, price: 0, isGift: true, remark: item.remark ? `${item.remark} (贈品)` : "贈品" });
+                   discounts.push(`✨ [${promo.name}] ${item.name} 買 ${itemSets * bx} 送 ${itemFree}`);
+               }
+           }
         }
-        // 價格由低到高排序，最低價的當作贈品
-        expandedUnits.sort((a, b) => a.unitPrice - b.unitPrice);
-        
-        for (let i = 0; i < expandedUnits.length; i++) {
-           expandedUnits[i].isFree = i < totalFreeAllowed;
-        }
-        
-        for (const item of group.items) {
-           const unitsOfThisItem = expandedUnits.filter(u => u.id === item.id);
-           item.freeQty = unitsOfThisItem.filter(u => u.isFree).length;
-           const paidCount = unitsOfThisItem.filter(u => !u.isFree).length;
-           item.subtotal = paidCount * item.price;
-           groupTotalAmount += item.subtotal;
-        }
-        
-        if (totalFreeAllowed > 0) {
-           const savedAmount = expandedUnits.filter(u => u.isFree).reduce((sum, u) => sum + u.unitPrice, 0);
-           discounts.push(`✨ [${promo.name}] 已折抵 ${totalFreeAllowed} 件 (省 $${savedAmount})`);
-        }
-        totalAmount += groupTotalAmount;
 
       } else if (promo.promoType === 'BUNDLE_PRICE') {
          const targetQty = Number(promo.buyQty);
@@ -1341,7 +1410,6 @@ export default function LiffOrderPage({ user, apiUrl }) {
              expandedUnits.push({ ...item, unitPrice: item.price });
            }
          }
-         // 價格由高到低排序，最高價的先納入組合價
          expandedUnits.sort((a, b) => b.unitPrice - a.unitPrice);
          
          for (let i = 0; i < expandedUnits.length; i++) {
@@ -1355,7 +1423,6 @@ export default function LiffOrderPage({ user, apiUrl }) {
            const bundleCount = unitsOfThisItem.filter(u => u.isPartOfBundle).length;
            const remainCount = unitsOfThisItem.filter(u => !u.isPartOfBundle).length;
            
-           // 組合價按比例分配到單品
            let itemSub = remainCount * item.price;
            if (bundleCount > 0 && sets * targetQty > 0) {
              itemSub += (bundleCount / (sets * targetQty)) * groupSubtotal;
@@ -1363,7 +1430,6 @@ export default function LiffOrderPage({ user, apiUrl }) {
            item.subtotal = Math.round(itemSub);
          }
          
-         // 修正四捨五入誤差
          let sumOfItemSubtotals = group.items.reduce((sum, item) => sum + item.subtotal, 0);
          const expectedTotal = groupSubtotal + expandedUnits.filter(u => !u.isPartOfBundle).reduce((sum, u) => sum + u.unitPrice, 0);
          
@@ -1373,6 +1439,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
          
          totalAmount += expectedTotal;
          
+         for (const item of group.items) {
+             finalCartItems.push({ ...item, isGift: false });
+         }
+
          if (sets > 0) {
             const originalPriceForBundled = expandedUnits.filter(u => u.isPartOfBundle).reduce((sum, u) => sum + u.unitPrice, 0);
             const savedAmount = originalPriceForBundled - groupSubtotal;
@@ -1410,10 +1480,21 @@ export default function LiffOrderPage({ user, apiUrl }) {
         item.subtotal = singlePrice * item.qty;
       }
       totalAmount += item.subtotal;
+      
+      if (legacyFreeQty > 0) {
+          // split legacy free items as well
+          const paidQty = item.qty - legacyFreeQty;
+          if (paidQty > 0) {
+              finalCartItems.push({ ...item, qty: paidQty, isGift: false });
+          }
+          finalCartItems.push({ ...item, qty: legacyFreeQty, subtotal: 0, price: 0, isGift: true, remark: item.remark ? `${item.remark} (贈品)` : "贈品" });
+      } else {
+          finalCartItems.push({ ...item, isGift: false });
+      }
     }
 
-    return { cartItems: tempItems, cartTotal: totalAmount, discountDetails: discounts };
-  }, [cart, products, flavorSelections, groupFlavorSelections, isGroupOrder]);
+    return { cartItems: finalCartItems, cartTotal: totalAmount, discountDetails: discounts, availableGiftCredits };
+  }, [cart, giftSelections, products, flavorSelections, groupFlavorSelections, isGroupOrder]);
 
   // (已移至元件頂部)
 
@@ -2160,15 +2241,20 @@ export default function LiffOrderPage({ user, apiUrl }) {
                   <div className="flex justify-between items-center mt-1 text-xs text-[var(--text-secondary)]">
                     <div className="flex flex-col gap-1">
                       <span>單價 ${item.price}</span>
-                      {item.freeQty > 0 && (
+                      {item.isGift && (
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-emerald-600 font-bold">🎁 贈送 {item.freeQty}</span>
-                          <span className="text-red-500 font-bold">✨ 已折抵 {item.freeQty} 件金額 (${item.freeQty * item.price})</span>
-                          <span className="text-[var(--text-primary)] font-bold bg-[var(--bg-tertiary)] px-2 py-0.5 rounded w-fit">出貨共: {item.qty + item.freeQty}</span>
+                          <span className="text-amber-600 font-bold bg-amber-100 px-2 py-0.5 rounded w-fit">🎁 免費贈品</span>
                         </div>
                       )}
                     </div>
                     {(() => {
+                      if (item.isGift) {
+                        return (
+                          <span className="w-8 text-center font-extrabold font-mono text-sm text-[var(--text-primary)] mr-2">
+                             x{item.qty}
+                          </span>
+                        );
+                      }
                       const product = products.find(p => p.id === item.id);
                       if (!product) return null;
                       return (
@@ -2234,6 +2320,31 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 </div>
               </div>
             ))}
+            
+            {/* 贈品挑選區塊 */}
+            {Object.entries(availableGiftCredits || {}).map(([pId, credits]) => {
+              if (credits.earned > 0) {
+                const promo = products.find(p => p.promoId === pId)?.promotion;
+                const remaining = credits.earned - credits.selected;
+                return (
+                  <div key={pId} className="px-4 py-3 bg-blue-50 border-t border-[var(--border-primary)]">
+                    <div className="flex justify-between items-center">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-blue-800 text-sm">🎉 {promo?.name || '促銷活動'} 贈品</span>
+                        <span className="text-xs text-blue-600 mt-0.5">已獲得 {credits.earned} 件，尚未挑選 {remaining} 件</span>
+                      </div>
+                      <button 
+                        onClick={() => setShowGiftModal(pId)}
+                        className={`px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm transition-all ${remaining > 0 ? 'bg-blue-600 text-white hover:bg-blue-700 animate-pulse' : 'bg-blue-200 text-blue-700'}`}
+                      >
+                        {remaining > 0 ? '🎁 點此挑選贈品' : '✅ 重新挑選'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })}
             {/* 運費進度條與費用明細 */}
             {(() => {
               let activeComm = currentCommunity;
@@ -4045,6 +4156,95 @@ ${freeNote(newFee, newMin)}
           )}
         </>
       )}
+
+      {/* 🎁 贈品選擇彈窗 */}
+      {showGiftModal && (() => {
+        const pId = showGiftModal;
+        const credits = availableGiftCredits[pId] || { earned: 0, selected: 0 };
+        const promoItems = products.filter(p => p.promoId === pId);
+        const promo = promoItems[0]?.promotion;
+        const selections = giftSelections[pId] || {};
+        const remaining = credits.earned - credits.selected;
+
+        const handleSetGift = (prodId, num) => {
+           const current = selections[prodId] || 0;
+           const diff = num - current;
+           if (num < 0) return;
+           if (diff > 0 && remaining < diff) return;
+           
+           setGiftSelections(prev => ({
+               ...prev,
+               [pId]: {
+                   ...(prev[pId] || {}),
+                   [prodId]: num
+               }
+           }));
+        };
+
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-primary)] shadow-2xl w-full max-w-sm flex flex-col overflow-hidden glass-panel">
+              <div className="p-4 border-b border-[var(--border-primary)] flex justify-between items-center bg-[var(--bg-tertiary)]">
+                <div>
+                  <h3 className="text-base font-bold text-blue-700">
+                    🎉 挑選贈品: {promo?.name}
+                  </h3>
+                  <p className="text-xs text-blue-600 mt-0.5 font-bold">
+                    已獲額度: {credits.earned} 件 / 剩餘: {remaining} 件
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowGiftModal(null)}
+                  className="text-[var(--text-secondary)] hover:text-red-500 p-1.5 rounded-lg hover:bg-[var(--bg-hover)]"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              </div>
+
+              <div className="p-4 max-h-[60vh] overflow-y-auto space-y-3 bg-[var(--bg-secondary)]">
+                {promoItems.map((prod) => {
+                  const qty = selections[prod.id] || 0;
+                  return (
+                    <div key={prod.id} className="flex items-center justify-between p-3 border border-[var(--border-primary)] rounded-xl hover:border-blue-200 hover:bg-blue-50/30 transition-all">
+                      <div className="font-bold text-sm text-[var(--text-primary)] pr-2 line-clamp-2">
+                        {prod.name}
+                      </div>
+                      <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] rounded-xl p-1 border border-[var(--border-primary)] shadow-sm shrink-0">
+                        <button
+                          onClick={() => handleSetGift(prod.id, qty - 1)}
+                          disabled={qty === 0}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200 disabled:opacity-30 transition-all"
+                        >
+                          <Minus size={12} />
+                        </button>
+                        <span className="w-6 text-center font-extrabold font-mono text-sm text-[var(--text-primary)]">
+                          {qty}
+                        </span>
+                        <button
+                          onClick={() => handleSetGift(prod.id, qty + 1)}
+                          disabled={remaining === 0}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200 disabled:opacity-30 transition-all"
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="p-4 border-t border-[var(--border-primary)] bg-[var(--bg-tertiary)] flex gap-3">
+                <button
+                  onClick={() => setShowGiftModal(null)}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-sm transition-colors shadow-md active:scale-95"
+                >
+                  確認挑選 {remaining > 0 ? `(尚餘 ${remaining})` : ''}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 多規格口味選擇彈窗 */}
       {flavorModalProduct && (

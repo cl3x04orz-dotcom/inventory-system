@@ -16,7 +16,7 @@ export class PromotionService {
   }
 
   static async createPromotion(payload: any, user: any) {
-    const { name, promoType, buyQty, freeQty, bundlePrice, communityId } = payload;
+    const { name, promoType, buyQty, freeQty, bundlePrice, communityId, rewardSelectionMode } = payload;
     return await prisma.promotion.create({
       data: {
         name,
@@ -24,13 +24,14 @@ export class PromotionService {
         buyQty: Number(buyQty) || 0,
         freeQty: Number(freeQty) || 0,
         bundlePrice: bundlePrice ? Number(bundlePrice) : null,
-        communityId: communityId || null
+        communityId: communityId || null,
+        rewardSelectionMode: rewardSelectionMode || 'AUTO_LOWEST_PRICE'
       }
     });
   }
 
   static async updatePromotion(payload: any, user: any) {
-    const { promoId, name, promoType, buyQty, freeQty, bundlePrice, communityId, isActive } = payload;
+    const { promoId, name, promoType, buyQty, freeQty, bundlePrice, communityId, isActive, rewardSelectionMode } = payload;
     return await prisma.promotion.update({
       where: { promoId },
       data: {
@@ -40,7 +41,8 @@ export class PromotionService {
         freeQty: Number(freeQty) || 0,
         bundlePrice: bundlePrice ? Number(bundlePrice) : null,
         communityId: communityId || null,
-        isActive: isActive !== undefined ? isActive : undefined
+        isActive: isActive !== undefined ? isActive : undefined,
+        rewardSelectionMode: rewardSelectionMode !== undefined ? rewardSelectionMode : undefined
       }
     });
   }
