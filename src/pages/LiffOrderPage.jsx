@@ -1706,6 +1706,16 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   // ── 送出訂單 ─────────────────────────────────────────────────
   const handleSubmitOrder = async () => {
+    // 🛡️ 強制贈品未完成檢查
+    for (const [pId, credit] of Object.entries(availableGiftCredits)) {
+      if (credit.earned > 0 && credit.selected < credit.earned) {
+        setIsSubmitting(false);
+        setShowGiftModal(pId);
+        alert(`⚠️ 請先完成贈品選擇！還有 ${credit.earned - credit.selected} 件贈品尚未選擇。`);
+        return;
+      }
+    }
+
     const successItemsSnap = [...cartItems];
     setIsSubmitting(true);
     try {
@@ -2575,7 +2585,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
       userEnteredStreet !== ""
     );
 
+    const hasUnselectedGifts = Object.values(availableGiftCredits).some(c => c.earned > 0 && c.selected < c.earned);
+
     const canProceed =
+      !hasUnselectedGifts &&
       safeName.trim() &&
       isPhoneValid &&
       isBuildingValid &&
@@ -2632,6 +2645,34 @@ export default function LiffOrderPage({ user, apiUrl }) {
         </div>
 
         <div key="page-info" className="flex-1 overflow-y-auto p-5 space-y-6">
+          {/* ⚠️ 未選完贈品強性提醒卡片 */}
+          {Object.entries(availableGiftCredits).map(([pId, credit]) => {
+            if (credit.earned <= 0 || credit.selected >= credit.earned) return null;
+            const unselectedCount = credit.earned - credit.selected;
+            return (
+              <div key={pId} className="p-3.5 bg-amber-500/10 border border-amber-300 dark:border-amber-700/60 rounded-2xl flex items-center justify-between shadow-sm animate-pulse">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">⚠️</span>
+                  <div>
+                    <div className="font-extrabold text-xs text-amber-900 dark:text-amber-300">
+                      還有 {unselectedCount} 件贈品尚未選擇
+                    </div>
+                    <div className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold mt-0.5">
+                      活動：{credit.promoName || '促銷優惠'}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowGiftModal(pId)}
+                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black rounded-xl shadow-sm active:scale-95 transition-all shrink-0"
+                >
+                  立即選擇
+                </button>
+              </div>
+            );
+          })}
+
           {/* 收件資訊 */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
@@ -3093,20 +3134,37 @@ ${freeNote(newFee, newMin)}
         >
           <button
             onClick={() => {
+              if (hasUnselectedGifts) {
+                const firstUnselectedEntry = Object.entries(availableGiftCredits).find(([_, c]) => c.earned > 0 && c.selected < c.earned);
+                if (firstUnselectedEntry) {
+                  setShowGiftModal(firstUnselectedEntry[0]);
+                }
+                alert("⚠️ 請先完成贈品選擇！還有未選擇之贈品。");
+                return;
+              }
               if (canProceed && !isSubmitting) {
                 syncMemberToCloud();
                 handleSubmitOrder();
               }
             }}
-            disabled={!canProceed || isSubmitting}
-            className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${canProceed && !isSubmitting
-                ? "btn-primary shadow-md shadow-blue-500/20"
+            disabled={(!canProceed && !hasUnselectedGifts) || isSubmitting}
+            className={`w-full py-3.5 rounded-xl font-extrabold flex items-center justify-center gap-2 transition-all ${
+              isSubmitting
+                ? "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed"
+                : hasUnselectedGifts
+                ? "bg-amber-500 hover:bg-amber-600 text-white shadow-lg animate-pulse cursor-pointer"
+                : canProceed
+                ? "btn-primary shadow-md shadow-blue-500/20 active:scale-98"
                 : "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed"
-              }`}
+            }`}
           >
             {isSubmitting ? (
               <>
                 <RefreshCw className="animate-spin" size={16} /> 送出中...
+              </>
+            ) : hasUnselectedGifts ? (
+              <>
+                ⚠️ 請先完成贈品選擇 (點擊選擇)
               </>
             ) : (
               <>
@@ -4213,16 +4271,16 @@ ${freeNote(newFee, newMin)}
                 if (credit.earned <= 0) return null;
                 const isComplete = credit.selected >= credit.earned;
                 return (
-                  <div key={pId} className="w-full px-4 py-1.5 bg-amber-500/10 border-b border-amber-200/50 flex justify-between items-center text-xs font-bold text-amber-800 select-none">
+                  <div key={pId} className="w-full px-4 py-2 bg-amber-500/10 border-b border-amber-200/50 flex justify-between items-center text-xs font-bold text-amber-800 select-none">
                     <span className="flex items-center gap-1 truncate mr-2">
-                      <span>🎉</span>
-                      <span className="truncate">已符合「{credit.promoName || '促銷優惠'}」，可享 {credit.earned} 件贈品！</span>
+                      <span className="text-sm">🎉</span>
+                      <span className="truncate">已符合「{credit.promoName || '促銷優惠'}」，請選擇 {credit.earned} 件贈品<span className="text-[10px] opacity-80 font-normal ml-1">(可稍後於購物車選擇)</span></span>
                     </span>
                     <button
                       onClick={() => setShowGiftModal(pId)}
-                      className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-extrabold flex items-center gap-1 transition-all ${isComplete ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white animate-pulse'}`}
+                      className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-extrabold flex items-center gap-1 transition-all ${isComplete ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white animate-pulse'}`}
                     >
-                      🎁 {isComplete ? `已選 ${credit.selected}/${credit.earned}` : `選擇贈品 (${credit.selected}/${credit.earned})`}
+                      🎁 {isComplete ? `贈品已選 (${credit.selected}/${credit.earned})` : `選擇贈品 (${credit.selected}/${credit.earned})`}
                     </button>
                   </div>
                 );
@@ -4245,7 +4303,7 @@ ${freeNote(newFee, newMin)}
                       <span className="text-2xl font-black text-blue-600 font-mono">
                         ${cartTotal}
                       </span>
-                      {/* 金額右邊提示 */}
+                      {/* 金額右邊提示按鈕 */}
                       {Object.entries(availableGiftCredits).map(([pId, credit]) => {
                         if (credit.earned <= 0) return null;
                         const isComplete = credit.selected >= credit.earned;
@@ -4253,9 +4311,9 @@ ${freeNote(newFee, newMin)}
                           <button
                             key={pId}
                             onClick={() => setShowGiftModal(pId)}
-                            className={`text-[10px] px-2 py-0.5 rounded-lg font-bold border transition-colors flex items-center gap-1 shrink-0 ${isComplete ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-800 border-amber-300 animate-pulse'}`}
+                            className={`text-[10px] px-2.5 py-1 rounded-lg font-extrabold border transition-all flex items-center gap-1 shrink-0 active:scale-95 ${isComplete ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-amber-100 text-amber-900 border-amber-400 animate-pulse shadow-sm'}`}
                           >
-                            🎁 贈品 {credit.selected}/{credit.earned}
+                            🎁 {isComplete ? `贈品已選 (${credit.selected}/${credit.earned})` : `選擇贈品 (${credit.selected}/${credit.earned})`}
                           </button>
                         );
                       })}
@@ -4274,7 +4332,7 @@ ${freeNote(newFee, newMin)}
         </>
       )}
 
-      {/* 🎁 贈品選擇彈窗 */}
+      {/* 🎁 贈品選擇 Bottom Sheet 抽屜選單 */}
       {showGiftModal && (() => {
         const pId = showGiftModal;
         const credits = availableGiftCredits[pId] || { earned: 0, selected: 0 };
@@ -4299,30 +4357,42 @@ ${freeNote(newFee, newMin)}
         };
 
         return (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-primary)] shadow-2xl w-full max-w-sm flex flex-col overflow-hidden glass-panel">
-              <div className="p-4 border-b border-[var(--border-primary)] flex justify-between items-center bg-[var(--bg-tertiary)]">
-                <div>
-                  <h3 className="text-base font-bold text-blue-700">
-                    🎉 挑選贈品: {promo?.name}
-                  </h3>
-                  <p className="text-xs text-blue-600 mt-0.5 font-bold">
-                    已獲額度: {credits.earned} 件 / 剩餘: {remaining} 件
-                  </p>
+          <div className="fixed inset-0 z-50 flex flex-col justify-end">
+            {/* 遮罩背景 */}
+            <div 
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-fadeIn"
+              onClick={() => setShowGiftModal(null)}
+            />
+
+            {/* Bottom Sheet 抽屜卡片 */}
+            <div className="relative z-50 bg-[var(--bg-secondary)] rounded-t-3xl border-t border-[var(--border-primary)] shadow-2xl w-full max-w-md mx-auto flex flex-col overflow-hidden max-h-[85vh] animate-slideUp">
+              {/* 頂部拖拽條與 Header */}
+              <div className="pt-3 pb-3 px-4 border-b border-[var(--border-primary)] bg-[var(--bg-tertiary)] flex flex-col items-center relative">
+                <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mb-3 cursor-pointer" onClick={() => setShowGiftModal(null)} />
+                <div className="w-full flex justify-between items-center">
+                  <div>
+                    <h3 className="text-base font-extrabold text-blue-700 dark:text-blue-400">
+                      🎉 請選擇贈品: {promo?.name}
+                    </h3>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 font-bold mt-0.5">
+                      已獲額度: {credits.earned} 件 / 已選: {credits.selected} 件 {remaining > 0 ? `(尚餘 ${remaining} 件)` : '✅ 已選完'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowGiftModal(null)}
+                    className="text-[var(--text-secondary)] hover:text-red-500 p-1.5 rounded-lg hover:bg-[var(--bg-hover)]"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                  </button>
                 </div>
-                <button
-                  onClick={() => setShowGiftModal(null)}
-                  className="text-[var(--text-secondary)] hover:text-red-500 p-1.5 rounded-lg hover:bg-[var(--bg-hover)]"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
               </div>
 
-              <div className="p-4 max-h-[60vh] overflow-y-auto space-y-3 bg-[var(--bg-secondary)]">
+              {/* 贈品品項列表 */}
+              <div className="p-4 overflow-y-auto space-y-3 bg-[var(--bg-secondary)] min-h-[160px]">
                 {promoItems.map((prod) => {
                   const qty = selections[prod.id] || 0;
                   return (
-                    <div key={prod.id} className="flex items-center justify-between p-3 border border-[var(--border-primary)] rounded-xl hover:border-blue-200 hover:bg-blue-50/30 transition-all">
+                    <div key={prod.id} className="flex items-center justify-between p-3.5 border border-[var(--border-primary)] rounded-2xl hover:border-blue-200 hover:bg-blue-50/30 transition-all">
                       <div className="font-bold text-sm text-[var(--text-primary)] pr-2 line-clamp-2">
                         {prod.name}
                       </div>
@@ -4330,19 +4400,19 @@ ${freeNote(newFee, newMin)}
                         <button
                           onClick={() => handleSetGift(prod.id, qty - 1)}
                           disabled={qty === 0}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200 disabled:opacity-30 transition-all"
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200 active:scale-95 disabled:opacity-30 transition-all font-extrabold"
                         >
-                          <Minus size={12} />
+                          <Minus size={14} />
                         </button>
-                        <span className="w-6 text-center font-extrabold font-mono text-sm text-[var(--text-primary)]">
+                        <span className="w-6 text-center font-extrabold font-mono text-base text-[var(--text-primary)]">
                           {qty}
                         </span>
                         <button
                           onClick={() => handleSetGift(prod.id, qty + 1)}
                           disabled={remaining === 0}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200 disabled:opacity-30 transition-all"
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200 active:scale-95 disabled:opacity-30 transition-all font-extrabold"
                         >
-                          <Plus size={12} />
+                          <Plus size={14} />
                         </button>
                       </div>
                     </div>
@@ -4350,12 +4420,13 @@ ${freeNote(newFee, newMin)}
                 })}
               </div>
 
-              <div className="p-4 border-t border-[var(--border-primary)] bg-[var(--bg-tertiary)] flex gap-3">
+              {/* 底部完成按鈕 */}
+              <div className="p-4 border-t border-[var(--border-primary)] bg-[var(--bg-tertiary)]">
                 <button
                   onClick={() => setShowGiftModal(null)}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-sm transition-colors shadow-md active:scale-95"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-extrabold text-sm transition-all shadow-md active:scale-95 flex items-center justify-center gap-1"
                 >
-                  確認挑選 {remaining > 0 ? `(尚餘 ${remaining})` : ''}
+                  完成選取 {remaining > 0 ? `(尚有 ${remaining} 件未選)` : '✅'}
                 </button>
               </div>
             </div>
