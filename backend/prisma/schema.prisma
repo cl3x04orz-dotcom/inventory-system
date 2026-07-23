@@ -460,6 +460,7 @@ model Promotion {
   isActive            Boolean  @default(true)
   communityId         String? // null means global promotion
   rewardSelectionMode String   @default("AUTO_LOWEST_PRICE")
+  tiers               Json?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

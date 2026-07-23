@@ -989,16 +989,36 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                             
                                             try {
                                                 if (type === '1') {
-                                                    const buyX = prompt('請輸入買多少件 (例：3)');
-                                                    const getY = prompt('請輸入送多少件 (例：2)');
-                                                    if (!buyX || !getY) return;
+                                                    const inputRule = prompt('請輸入優惠門檻 (格式：買:送，多階梯請用逗號分隔，例 "3:2, 5:4")', '3:2');
+                                                    if (!inputRule) return;
+
+                                                    const tierPairs = inputRule.split(',').map(s => s.trim()).filter(Boolean);
+                                                    const tiers = [];
+                                                    for (const pair of tierPairs) {
+                                                        const parts = pair.split(':').map(n => Number(n.trim()));
+                                                        if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) {
+                                                            tiers.push({ buyQty: parts[0], freeQty: parts[1] });
+                                                        }
+                                                    }
+
+                                                    if (tiers.length === 0) {
+                                                        alert('❌ 格式錯誤！請依據 "買:送" 格式輸入，例如 "3:2" 或 "3:2, 5:4"');
+                                                        return;
+                                                    }
+
                                                     const modeStr = prompt('請選擇贈品模式：\n1. 客人自選贈品 (CUSTOMER_SELECT)\n2. 自動折抵最低價 (AUTO_LOWEST_PRICE)\n3. 送同品項 (SAME_PRODUCT)', '1');
                                                     let rewardSelectionMode = 'CUSTOMER_SELECT';
                                                     if (modeStr === '2') rewardSelectionMode = 'AUTO_LOWEST_PRICE';
                                                     if (modeStr === '3') rewardSelectionMode = 'SAME_PRODUCT';
 
                                                     await callGAS(apiUrl, 'createPromotion', {
-                                                        name, promoType: 'BUY_X_GET_Y', buyQty: buyX, freeQty: getY, communityId: selectedCommunityId, rewardSelectionMode
+                                                        name,
+                                                        promoType: 'BUY_X_GET_Y',
+                                                        buyQty: tiers[0].buyQty,
+                                                        freeQty: tiers[0].freeQty,
+                                                        tiers,
+                                                        communityId: selectedCommunityId,
+                                                        rewardSelectionMode
                                                     }, user.token);
                                                     alert('✅ 促銷活動已成功新增！');
                                                 } else if (type === '2') {
@@ -1033,7 +1053,13 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                     <div>
                                                         <div className="font-bold text-sm text-[var(--text-primary)]">{promo.name}</div>
                                                         <div className="text-xs text-[var(--text-secondary)] mt-0.5">
-                                                            {promo.promoType === 'BUY_X_GET_Y' && `規則：買 ${promo.buyQty} 送 ${promo.freeQty}`}
+                                                            {promo.promoType === 'BUY_X_GET_Y' && (() => {
+                                                                if (Array.isArray(promo.tiers) && promo.tiers.length > 0) {
+                                                                    const tierText = promo.tiers.map(t => `買 ${t.buyQty} 送 ${t.freeQty}`).join(' 🔥 ');
+                                                                    return `規則：${tierText}`;
+                                                                }
+                                                                return `規則：買 ${promo.buyQty} 送 ${promo.freeQty}`;
+                                                            })()}
                                                             {promo.promoType === 'BUNDLE_PRICE' && `規則：任選 ${promo.buyQty} 件 $${promo.bundlePrice}`}
                                                             {promo.promoType === 'BUY_X_GET_Y' && promo.rewardSelectionMode === 'CUSTOMER_SELECT' && <span className="ml-2 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">自選贈品</span>}
                                                             {promo.promoType === 'BUY_X_GET_Y' && promo.rewardSelectionMode === 'AUTO_LOWEST_PRICE' && <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">折抵最低價</span>}

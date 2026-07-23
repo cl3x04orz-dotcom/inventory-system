@@ -1294,18 +1294,28 @@ export default function LiffOrderPage({ user, apiUrl }) {
       const promo = group.promotion;
 
       if (promo.promoType === 'BUY_X_GET_Y') {
-        const bx = Number(promo.buyQty);
-        const gy = Number(promo.freeQty);
         const mode = promo.rewardSelectionMode || 'AUTO_LOWEST_PRICE';
-        
+        const rawTiers = Array.isArray(promo.tiers) && promo.tiers.length > 0
+          ? promo.tiers
+          : [{ buyQty: Number(promo.buyQty), freeQty: Number(promo.freeQty) }];
+        const sortedTiers = [...rawTiers]
+          .map(t => ({ buyQty: Number(t.buyQty) || 0, freeQty: Number(t.freeQty) || 0 }))
+          .filter(t => t.buyQty > 0)
+          .sort((a, b) => b.buyQty - a.buyQty);
+
         let totalQtyInGroup = group.items.reduce((sum, item) => sum + item.qty, 0);
 
         if (mode === 'AUTO_LOWEST_PRICE') {
-           const groupSize = bx + gy;
+           let remainingQty = totalQtyInGroup;
            let totalFreeAllowed = 0;
-           if (groupSize > 0) {
-              const sets = Math.floor(totalQtyInGroup / groupSize);
-              totalFreeAllowed = sets * gy;
+
+           for (const tier of sortedTiers) {
+             const groupSize = tier.buyQty + tier.freeQty;
+             if (groupSize > 0 && remainingQty >= groupSize) {
+               const sets = Math.floor(remainingQty / groupSize);
+               totalFreeAllowed += sets * tier.freeQty;
+               remainingQty -= sets * groupSize;
+             }
            }
 
            let expandedUnits = [];
@@ -1340,11 +1350,16 @@ export default function LiffOrderPage({ user, apiUrl }) {
            }
 
         } else if (mode === 'CUSTOMER_SELECT') {
-           let sets = 0;
-           if (bx > 0) {
-               sets = Math.floor(totalQtyInGroup / bx);
+           let remaining = totalQtyInGroup;
+           let earnedGifts = 0;
+
+           for (const tier of sortedTiers) {
+             if (tier.buyQty > 0 && remaining >= tier.buyQty) {
+               const sets = Math.floor(remaining / tier.buyQty);
+               earnedGifts += sets * tier.freeQty;
+               remaining -= sets * tier.buyQty;
+             }
            }
-           const earnedGifts = sets * gy;
            
            for (const item of group.items) {
                finalCartItems.push({ ...item, qty: item.qty, subtotal: item.qty * item.price, isGift: false });
@@ -1381,18 +1396,23 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
         } else if (mode === 'SAME_PRODUCT') {
            for (const item of group.items) {
-               let itemSets = 0;
-               if (bx > 0) {
-                   itemSets = Math.floor(item.qty / bx);
+               let remaining = item.qty;
+               let itemFree = 0;
+
+               for (const tier of sortedTiers) {
+                 if (tier.buyQty > 0 && remaining >= tier.buyQty) {
+                   const sets = Math.floor(remaining / tier.buyQty);
+                   itemFree += sets * tier.freeQty;
+                   remaining -= sets * tier.buyQty;
+                 }
                }
-               const itemFree = itemSets * gy;
                
                finalCartItems.push({ ...item, qty: item.qty, subtotal: item.qty * item.price, isGift: false });
                totalAmount += item.qty * item.price;
                
                if (itemFree > 0) {
                    finalCartItems.push({ ...item, qty: itemFree, subtotal: 0, price: 0, isGift: true, remark: item.remark ? `${item.remark} (贈品)` : "贈品" });
-                   discounts.push(`✨ [${promo.name}] ${item.name} 買 ${itemSets * bx} 送 ${itemFree}`);
+                   discounts.push(`✨ [${promo.name}] ${item.name} 滿贈獲得 ${itemFree} 件贈品`);
                }
            }
         }
@@ -3941,13 +3961,20 @@ ${freeNote(newFee, newMin)}
                                     🔥買{product.buy_x}送{product.get_y}
                                   </span>
                                 )}
-                                {Array.isArray(product.promotions) && product.promotions.map((promo, idx) => (
-                                  promo.buyX > 0 && promo.getY > 0 ? (
-                                    <span key={idx} className="text-[9px] text-emerald-800 bg-emerald-500/10 border border-emerald-200/30 px-1 py-0.5 rounded font-bold shrink-0">
-                                      🔥買{promo.buyX}送{promo.getY}
-                                    </span>
-                                  ) : null
-                                ))}
+                                {Array.isArray(product.promotions) && product.promotions.map((promo, idx) => {
+                                  if (promo.promoType === 'BUY_X_GET_Y' || (promo.buyX > 0 && promo.getY > 0)) {
+                                    let text = `🔥買${promo.buyX || promo.buy_x}送${promo.getY || promo.get_y}`;
+                                    if (Array.isArray(promo.tiers) && promo.tiers.length > 0) {
+                                      text = '🔥' + promo.tiers.map(t => `買${t.buyQty}送${t.freeQty}`).join(' 🔥');
+                                    }
+                                    return (
+                                      <span key={idx} className="text-[9px] text-emerald-800 bg-emerald-500/10 border border-emerald-200/30 px-1 py-0.5 rounded font-bold shrink-0">
+                                        {text}
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })}
                               </div>
                               {product.expiryDate && (
                                 <span className="inline-block text-[10px] text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded mt-1">
