@@ -2234,6 +2234,109 @@ export default function LiffOrderPage({ user, apiUrl }) {
     );
   }
 
+  // ── 🎁 贈品選擇 Bottom Sheet 抽屜組件 ─────────────────────────────
+  const renderGiftModal = () => {
+    if (!showGiftModal) return null;
+    const pId = showGiftModal;
+    const credits = availableGiftCredits[pId] || { earned: 0, selected: 0 };
+    const promoItems = products.filter(p => p.promoId === pId);
+    const promo = promoItems[0]?.promotion;
+    const selections = giftSelections[pId] || {};
+    const remaining = credits.earned - credits.selected;
+
+    const handleSetGift = (prodId, num) => {
+       const current = selections[prodId] || 0;
+       const diff = num - current;
+       if (num < 0) return;
+       if (diff > 0 && remaining < diff) return;
+       
+       setGiftSelections(prev => ({
+           ...prev,
+           [pId]: {
+               ...(prev[pId] || {}),
+               [prodId]: num
+           }
+       }));
+    };
+
+    return (
+      <div className="fixed inset-0 z-[9999] flex flex-col justify-end p-3 pb-[75px]">
+        {/* 遮罩背景 */}
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-fadeIn"
+          onClick={() => setShowGiftModal(null)}
+        />
+
+        {/* Bottom Sheet 抽屜卡片 */}
+        <div className="relative z-50 bg-[var(--bg-secondary)] rounded-[28px] border border-[var(--border-primary)] shadow-2xl w-full max-w-md mx-auto flex flex-col overflow-hidden max-h-[75vh] animate-slideUp">
+          {/* 頂部拖拽條與 Header */}
+          <div className="pt-3 pb-3 px-4 border-b border-[var(--border-primary)] bg-[var(--bg-tertiary)] flex flex-col items-center relative">
+            <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mb-3 cursor-pointer" onClick={() => setShowGiftModal(null)} />
+            <div className="w-full flex justify-between items-center">
+              <div>
+                <h3 className="text-base font-extrabold text-blue-700 dark:text-blue-400">
+                  🎉 請選擇贈品: {promo?.name}
+                </h3>
+                <p className="text-xs text-amber-600 dark:text-amber-400 font-bold mt-0.5">
+                  已獲額度: {credits.earned} 件 / 已選: {credits.selected} 件 {remaining > 0 ? `(尚餘 ${remaining} 件)` : '✅ 已選完'}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowGiftModal(null)}
+                className="text-[var(--text-secondary)] hover:text-red-500 p-1.5 rounded-lg hover:bg-[var(--bg-hover)]"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+          </div>
+
+          {/* 贈品品項列表 */}
+          <div className="p-4 overflow-y-auto space-y-3 bg-[var(--bg-secondary)] min-h-[140px] max-h-[45vh]">
+            {promoItems.map((prod) => {
+              const qty = selections[prod.id] || 0;
+              return (
+                <div key={prod.id} className="flex items-center justify-between p-3.5 border border-[var(--border-primary)] rounded-2xl hover:border-blue-200 hover:bg-blue-50/30 transition-all">
+                  <div className="font-bold text-sm text-[var(--text-primary)] pr-2 line-clamp-2">
+                    {prod.name}
+                  </div>
+                  <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] rounded-xl p-1 border border-[var(--border-primary)] shadow-sm shrink-0">
+                    <button
+                      onClick={() => handleSetGift(prod.id, qty - 1)}
+                      disabled={qty === 0}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200 active:scale-95 disabled:opacity-30 transition-all font-extrabold"
+                    >
+                      <Minus size={14} />
+                    </button>
+                    <span className="w-6 text-center font-extrabold font-mono text-base text-[var(--text-primary)]">
+                      {qty}
+                    </span>
+                    <button
+                      onClick={() => handleSetGift(prod.id, qty + 1)}
+                      disabled={remaining === 0}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200 active:scale-95 disabled:opacity-30 transition-all font-extrabold"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 底部完成按鈕 */}
+          <div className="p-4 border-t border-[var(--border-primary)] bg-[var(--bg-tertiary)]">
+            <button
+              onClick={() => setShowGiftModal(null)}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-extrabold text-sm transition-all shadow-md active:scale-95 flex items-center justify-center gap-1"
+            >
+              確認選取 {remaining > 0 ? `(尚有 ${remaining} 件未選)` : '✅'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ════════════════════════════════════════════════════════════
   // 訂單確認頁
   // ════════════════════════════════════════════════════════════
@@ -4279,106 +4382,7 @@ ${freeNote(newFee, newMin)}
       )}
 
       {/* 🎁 贈品選擇 Bottom Sheet 抽屜選單 */}
-      {showGiftModal && (() => {
-        const pId = showGiftModal;
-        const credits = availableGiftCredits[pId] || { earned: 0, selected: 0 };
-        const promoItems = products.filter(p => p.promoId === pId);
-        const promo = promoItems[0]?.promotion;
-        const selections = giftSelections[pId] || {};
-        const remaining = credits.earned - credits.selected;
-
-        const handleSetGift = (prodId, num) => {
-           const current = selections[prodId] || 0;
-           const diff = num - current;
-           if (num < 0) return;
-           if (diff > 0 && remaining < diff) return;
-           
-           setGiftSelections(prev => ({
-               ...prev,
-               [pId]: {
-                   ...(prev[pId] || {}),
-                   [prodId]: num
-               }
-           }));
-        };
-
-        return (
-          <div className="fixed inset-0 z-50 flex flex-col justify-end">
-            {/* 遮罩背景 */}
-            <div 
-              className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-fadeIn"
-              onClick={() => setShowGiftModal(null)}
-            />
-
-            {/* Bottom Sheet 抽屜卡片 */}
-            <div className="relative z-50 bg-[var(--bg-secondary)] rounded-t-3xl border-t border-[var(--border-primary)] shadow-2xl w-full max-w-md mx-auto flex flex-col overflow-hidden max-h-[85vh] animate-slideUp">
-              {/* 頂部拖拽條與 Header */}
-              <div className="pt-3 pb-3 px-4 border-b border-[var(--border-primary)] bg-[var(--bg-tertiary)] flex flex-col items-center relative">
-                <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mb-3 cursor-pointer" onClick={() => setShowGiftModal(null)} />
-                <div className="w-full flex justify-between items-center">
-                  <div>
-                    <h3 className="text-base font-extrabold text-blue-700 dark:text-blue-400">
-                      🎉 請選擇贈品: {promo?.name}
-                    </h3>
-                    <p className="text-xs text-amber-600 dark:text-amber-400 font-bold mt-0.5">
-                      已獲額度: {credits.earned} 件 / 已選: {credits.selected} 件 {remaining > 0 ? `(尚餘 ${remaining} 件)` : '✅ 已選完'}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setShowGiftModal(null)}
-                    className="text-[var(--text-secondary)] hover:text-red-500 p-1.5 rounded-lg hover:bg-[var(--bg-hover)]"
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                  </button>
-                </div>
-              </div>
-
-              {/* 贈品品項列表 */}
-              <div className="p-4 overflow-y-auto space-y-3 bg-[var(--bg-secondary)] min-h-[160px]">
-                {promoItems.map((prod) => {
-                  const qty = selections[prod.id] || 0;
-                  return (
-                    <div key={prod.id} className="flex items-center justify-between p-3.5 border border-[var(--border-primary)] rounded-2xl hover:border-blue-200 hover:bg-blue-50/30 transition-all">
-                      <div className="font-bold text-sm text-[var(--text-primary)] pr-2 line-clamp-2">
-                        {prod.name}
-                      </div>
-                      <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] rounded-xl p-1 border border-[var(--border-primary)] shadow-sm shrink-0">
-                        <button
-                          onClick={() => handleSetGift(prod.id, qty - 1)}
-                          disabled={qty === 0}
-                          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200 active:scale-95 disabled:opacity-30 transition-all font-extrabold"
-                        >
-                          <Minus size={14} />
-                        </button>
-                        <span className="w-6 text-center font-extrabold font-mono text-base text-[var(--text-primary)]">
-                          {qty}
-                        </span>
-                        <button
-                          onClick={() => handleSetGift(prod.id, qty + 1)}
-                          disabled={remaining === 0}
-                          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200 active:scale-95 disabled:opacity-30 transition-all font-extrabold"
-                        >
-                          <Plus size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* 底部完成按鈕 */}
-              <div className="p-4 border-t border-[var(--border-primary)] bg-[var(--bg-tertiary)]">
-                <button
-                  onClick={() => setShowGiftModal(null)}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-extrabold text-sm transition-all shadow-md active:scale-95 flex items-center justify-center gap-1"
-                >
-                  完成選取 {remaining > 0 ? `(尚有 ${remaining} 件未選)` : '✅'}
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {renderGiftModal()}
 
       {/* 多規格口味選擇彈窗 */}
       {flavorModalProduct && (
