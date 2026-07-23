@@ -3,14 +3,18 @@ const prisma = new PrismaClient();
 
 export class PromotionService {
   static async getPromotions(payload: any) {
-    const { communityId } = payload;
+    const { communityId } = payload || {};
+    const whereClause = communityId
+      ? {
+          OR: [
+            { communityId: null },
+            { communityId }
+          ]
+        }
+      : {};
+
     return await prisma.promotion.findMany({
-      where: {
-        OR: [
-          { communityId: null },
-          ...(communityId ? [{ communityId }] : [])
-        ]
-      },
+      where: whereClause,
       orderBy: { createdAt: 'desc' }
     });
   }
