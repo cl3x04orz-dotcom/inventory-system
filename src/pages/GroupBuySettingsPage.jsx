@@ -46,8 +46,9 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
     
     // 專屬價格相關 state
     const [allProducts, setAllProducts] = useState([]);
+    const [allPromotions, setAllPromotions] = useState([]);
     const [selectedCommunityId, setSelectedCommunityId] = useState('');
-    const [customPrices, setCustomPrices] = useState({}); // { [productId]: { price, promotions: [{buyX, getY}] } }
+    const [customPrices, setCustomPrices] = useState({}); // { [productId]: { price, promotions: [{buyX, getY}], promoId } }
     const [loadingCustomPrices, setLoadingCustomPrices] = useState(false);
     const [savingPriceProductId, setSavingPriceProductId] = useState('');
 
@@ -61,10 +62,11 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
             const data = await callGAS(apiUrl, 'getCommunityCustomPrices', { communityId: commId }, user.token);
             if (Array.isArray(data)) {
                 const priceMap = {};
-                data.forEach(item => {
-                    priceMap[item.productId] = {
-                        price: item.customPrice !== undefined && item.customPrice !== null ? Number(item.customPrice) : '',
-                        promotions: Array.isArray(item.promotions) ? item.promotions : []
+                data.forEach(cp => {
+                    priceMap[cp.productId] = {
+                        price: cp.customPrice,
+                        promotions: cp.promotions || [],
+                        promoId: cp.promoId || ''
                     };
                 });
                 setCustomPrices(priceMap);
@@ -78,12 +80,19 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
 
     const fetchAllProducts = useCallback(async () => {
         try {
-            const data = await callGAS(apiUrl, 'getProducts', {}, user.token);
-            if (Array.isArray(data)) {
-                setAllProducts(data);
+            const [productsData, promotionsData] = await Promise.all([
+                callGAS(apiUrl, 'getProducts', {}, user.token),
+                callGAS(apiUrl, 'getPromotions', {}, user.token).catch(() => [])
+            ]);
+            
+            if (Array.isArray(productsData)) {
+                setAllProducts(productsData);
+            }
+            if (Array.isArray(promotionsData)) {
+                setAllPromotions(promotionsData);
             }
         } catch (error) {
-            console.error('載入商品清單失敗:', error);
+            console.error('載入商品與促銷清單失敗:', error);
         }
     }, [apiUrl, user.token]);
 
@@ -93,13 +102,15 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
 
         const price = itemData?.price;
         const promotions = itemData?.promotions || [];
+        const promoId = itemData?.promoId || '';
 
         try {
             const res = await callGAS(apiUrl, 'saveCommunityCustomPrice', {
                 communityId: selectedCommunityId,
                 productId,
                 customPrice: (price !== undefined && price !== '') ? Number(price) : '',
-                promotions
+                promotions,
+                promoId
             }, user.token);
             if (res && res.error) throw new Error(res.error);
             
@@ -114,7 +125,8 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                     ...prev,
                     [productId]: {
                         price: (price !== undefined && price !== '') ? Number(price) : '',
-                        promotions
+                        promotions,
+                        promoId
                     }
                 }));
             }
@@ -962,6 +974,74 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                 </div>
                             </div>
 
+                            {/* 促銷活動引擎設定區塊 */}
+                            <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
+                                <h3 className="font-extrabold text-base text-[var(--text-primary)] pb-2.5 border-b border-[var(--border-primary)] flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-base flex-shrink-0">🎉</span>
+                                        促銷活動引擎管理
+                                    </div>
+                                    <button
+                                        onClick={async () => {
+                                            const name = prompt('請輸入促銷名稱 (例：燕麥任選買3送2)');
+                                            if (!name) return;
+                                            const type = prompt('請選擇促銷類型 (輸入 1 買X送Y，輸入 2 任選組合價)', '1');
+                                            if (type === '1') {
+                                                const buyX = prompt('請輸入買多少件 (例：3)');
+                                                const getY = prompt('請輸入送多少件 (例：2)');
+                                                if (!buyX || !getY) return;
+                                                await callGAS(apiUrl, 'createPromotion', {
+                                                    name, promoType: 'BUY_X_GET_Y', buyQty: buyX, freeQty: getY, communityId: selectedCommunityId
+                                                }, user.token);
+                                            } else if (type === '2') {
+                                                const buyX = prompt('請輸入任選幾件 (例：3)');
+                                                const bundlePrice = prompt('請輸入組合價 (例：100)');
+                                                if (!buyX || !bundlePrice) return;
+                                                await callGAS(apiUrl, 'createPromotion', {
+                                                    name, promoType: 'BUNDLE_PRICE', buyQty: buyX, bundlePrice, communityId: selectedCommunityId
+                                                }, user.token);
+                                            }
+                                            fetchAllProducts();
+                                        }}
+                                        className="text-[10px] text-emerald-600 hover:text-emerald-800 font-bold flex items-center gap-1 transition-colors"
+                                    >
+                                        <span className="text-base leading-none">＋</span> 新增促銷活動
+                                    </button>
+                                </h3>
+                                
+                                {allPromotions.filter(p => p.communityId === selectedCommunityId || !p.communityId).length === 0 ? (
+                                    <div className="text-center py-6 text-xs text-[var(--text-secondary)]">目前尚無設定促銷活動</div>
+                                ) : (
+                                    <div className="flex flex-col gap-2">
+                                        {allPromotions
+                                            .filter(p => p.communityId === selectedCommunityId || !p.communityId)
+                                            .map(promo => (
+                                                <div key={promo.promoId} className="flex items-center justify-between p-3 border border-[var(--border-primary)] rounded-xl bg-[var(--bg-tertiary)]">
+                                                    <div>
+                                                        <div className="font-bold text-sm text-[var(--text-primary)]">{promo.name}</div>
+                                                        <div className="text-xs text-[var(--text-secondary)] mt-0.5">
+                                                            {promo.promoType === 'BUY_X_GET_Y' && `規則：買 ${promo.buyQty} 送 ${promo.freeQty}`}
+                                                            {promo.promoType === 'BUNDLE_PRICE' && `規則：任選 ${promo.buyQty} 件 $${promo.bundlePrice}`}
+                                                            {!promo.communityId && <span className="ml-2 text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">全域可用</span>}
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (!window.confirm(`確定刪除促銷活動 [${promo.name}]？(若有綁定商品可能受影響)`)) return;
+                                                            await callGAS(apiUrl, 'deletePromotion', { promoId: promo.promoId }, user.token);
+                                                            fetchAllProducts();
+                                                        }}
+                                                        className="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors"
+                                                        title="刪除"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
                             {/* 社區專屬定價管理區塊 */}
                             <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
                                 <h3 className="font-extrabold text-base text-[var(--text-primary)] pb-2.5 border-b border-[var(--border-primary)] flex items-center gap-1.5">
@@ -969,7 +1049,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                     群組/大樓專屬商品定價設定
                                 </h3>
                                 <p className="text-xs text-[var(--text-tertiary)]">
-                                    在此針對特定商品設定專屬售價（如：調高或調低）。若無設定或點選「移除」則預設採用商品的原始原價。
+                                    在此設定專屬售價並綁定促銷活動引擎。若無設定則採用預設原價。
                                 </p>
 
                                 {loadingCustomPrices ? (
@@ -982,7 +1062,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                     <th className="p-3 w-40">商品名稱</th>
                                                     <th className="p-3 text-right w-24">預設原價</th>
                                                     <th className="p-3 w-28">專屬定價</th>
-                                                    <th className="p-3">買 X 送 Y 促銷組合</th>
+                                                    <th className="p-3 w-40">綁定促銷活動引擎</th>
                                                     <th className="p-3 text-center w-20">操作</th>
                                                 </tr>
                                             </thead>
@@ -1059,43 +1139,26 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                             </td>
                                                             <td className="p-3 pt-4">
                                                                 <div className="flex flex-col gap-1.5">
-                                                                    {promos.map((promo, idx) => (
-                                                                        <div key={idx} className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200/60 rounded-lg px-2 py-1">
-                                                                            <span className="text-[10px] text-emerald-700 font-bold shrink-0">買</span>
-                                                                            <input
-                                                                                type="number"
-                                                                                min="1"
-                                                                                placeholder="X"
-                                                                                className="input-field p-1 w-10 text-center text-xs font-bold text-slate-800 bg-white"
-                                                                                value={promo.buyX !== undefined ? promo.buyX : ''}
-                                                                                onChange={(e) => handlePromoChange(idx, 'buyX', e.target.value)}
-                                                                                onBlur={handlePromoBlur}
-                                                                            />
-                                                                            <span className="text-[10px] text-emerald-700 font-bold shrink-0">送</span>
-                                                                            <input
-                                                                                type="number"
-                                                                                min="1"
-                                                                                placeholder="Y"
-                                                                                className="input-field p-1 w-10 text-center text-xs font-bold text-slate-800 bg-white"
-                                                                                value={promo.getY !== undefined ? promo.getY : ''}
-                                                                                onChange={(e) => handlePromoChange(idx, 'getY', e.target.value)}
-                                                                                onBlur={handlePromoBlur}
-                                                                            />
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => removePromo(idx)}
-                                                                                className="ml-auto text-red-400 hover:text-red-600 transition-colors text-[11px] font-bold px-1"
-                                                                                title="刪除此組"
-                                                                            >✕</button>
-                                                                        </div>
-                                                                    ))}
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={addPromo}
-                                                                        className="text-[10px] text-emerald-600 hover:text-emerald-800 font-bold flex items-center gap-1 w-fit transition-colors"
+                                                                    <select
+                                                                        className="input-field p-1.5 w-full text-xs font-bold text-slate-800 bg-white"
+                                                                        value={customData.promoId || ''}
+                                                                        onChange={(e) => {
+                                                                            const val = e.target.value;
+                                                                            setCustomPrices(prev => {
+                                                                                const current = prev[p.id] || { price: '', promotions: [], promoId: '' };
+                                                                                const newData = { ...current, promoId: val };
+                                                                                handleSaveCustomPrice(p.id, newData);
+                                                                                return { ...prev, [p.id]: newData };
+                                                                            });
+                                                                        }}
                                                                     >
-                                                                        <span className="text-base leading-none">＋</span> 新增促銷組合
-                                                                    </button>
+                                                                        <option value="">無促銷活動</option>
+                                                                        {allPromotions.map(promo => (
+                                                                            <option key={promo.promoId} value={promo.promoId}>
+                                                                                {promo.name} ({promo.promoType === 'BUY_X_GET_Y' ? `買${promo.buyQty}送${promo.freeQty}` : `任${promo.buyQty}件$${promo.bundlePrice}`})
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
                                                                 </div>
                                                             </td>
                                                             <td className="p-3 text-center pt-4">

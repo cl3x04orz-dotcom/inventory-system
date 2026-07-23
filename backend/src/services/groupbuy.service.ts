@@ -752,13 +752,16 @@ export const GroupBuyService = {
     // 商品列表
     const rawProducts = await ProductService.getProducts({});
     const customPrices = await prisma.communityProductPrice.findMany({
-      where: { communityId: targetComm.communityId }
+      where: { communityId: targetComm.communityId },
+      include: { promotion: true }
     });
     const customPriceMap = new Map(customPrices.map((cp: any) => [
       cp.productId, 
       {
         customPrice: Number(cp.customPrice),
-        promotions: Array.isArray(cp.promotions) ? cp.promotions : (cp.promotions ? cp.promotions : [])
+        promotions: Array.isArray(cp.promotions) ? cp.promotions : (cp.promotions ? cp.promotions : []),
+        promoId: cp.promoId,
+        promotion: cp.promotion
       }
     ]));
 
@@ -768,7 +771,9 @@ export const GroupBuyService = {
         return {
           ...p,
           single_price: cp?.customPrice,
-          promotions: cp?.promotions
+          promotions: cp?.promotions,
+          promoId: cp?.promoId,
+          promotion: cp?.promotion
         };
       }
       return p;
@@ -1569,13 +1574,16 @@ export const GroupBuyService = {
     if (!communityId) throw new Error('缺少 communityId');
 
     const customPrices = await prisma.communityProductPrice.findMany({
-      where: { communityId }
+      where: { communityId },
+      include: { promotion: true }
     });
 
     return customPrices.map((cp: any) => ({
       productId: cp.productId,
       customPrice: Number(cp.customPrice),
-      promotions: Array.isArray(cp.promotions) ? cp.promotions : (cp.promotions ? cp.promotions : [])
+      promotions: Array.isArray(cp.promotions) ? cp.promotions : (cp.promotions ? cp.promotions : []),
+      promoId: cp.promoId,
+      promotion: cp.promotion
     }));
   },
 
@@ -1606,6 +1614,8 @@ export const GroupBuyService = {
     const priceVal = hasPrice ? Number(customPrice) : 0;
     if (isNaN(priceVal) || priceVal < 0) throw new Error('價格必須為正數');
 
+    const { promoId } = payload;
+
     await prisma.communityProductPrice.upsert({
       where: {
         communityId_productId: {
@@ -1615,13 +1625,15 @@ export const GroupBuyService = {
       },
       update: {
         customPrice: priceVal,
-        promotions: validPromos.length > 0 ? validPromos : Prisma.JsonNull
+        promotions: validPromos.length > 0 ? validPromos : Prisma.JsonNull,
+        promoId: promoId || null
       },
       create: {
         communityId,
         productId,
         customPrice: priceVal,
-        promotions: validPromos.length > 0 ? validPromos : Prisma.JsonNull
+        promotions: validPromos.length > 0 ? validPromos : Prisma.JsonNull,
+        promoId: promoId || null
       }
     });
 

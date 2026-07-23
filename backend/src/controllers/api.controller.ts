@@ -8,6 +8,7 @@ import { BillService } from '../services/bill.service.js';
 import { AnalyticsService } from '../services/analytics.service.js';
 import { PayrollService } from '../services/payroll.service.js';
 import { GroupBuyService } from '../services/groupbuy.service.js';
+import { PromotionService } from '../services/promotion.service.js';
 import { callGASFromNode } from '../utils/gasClient.js';
 
 export async function apiRouter(action: string, payload: any, user: any): Promise<any> {
@@ -188,6 +189,7 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       return GroupBuyService.reorderBuildings(payload, user);
     case 'saveCommunityShipping':
       return GroupBuyService.saveCommunityShipping(payload, user);
+    // 8. 訂閱與預購 (Subscriptions)
     case 'getSubscriptions':
       return GroupBuyService.getSubscriptions(payload, user);
     case 'saveSubscription':
@@ -198,6 +200,16 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       return GroupBuyService.generateSubscriptionOrders(payload, user);
     case 'getGroupBindings':
       return GroupBuyService.getGroupBindings(payload, user);
+
+    // 9. 促銷活動 (Promotions)
+    case 'getPromotions':
+      return PromotionService.getPromotions(payload);
+    case 'createPromotion':
+      return PromotionService.createPromotion(payload, user);
+    case 'updatePromotion':
+      return PromotionService.updatePromotion(payload, user);
+    case 'deletePromotion':
+      return PromotionService.deletePromotion(payload, user);
     case 'saveGroupBinding':
       return GroupBuyService.saveGroupBinding(payload, user);
     case 'v2_getLiffInitData':

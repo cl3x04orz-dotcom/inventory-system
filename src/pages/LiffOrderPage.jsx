@@ -1250,105 +1250,170 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   const totalQty = Object.values(cart).reduce((s, q) => s + q, 0);
 
-  // 工具：計算某商品在 qty 件時的實際應收金額（含促銷折扣）
-  const calcFreeQty = (p, paidQty) => {
-    if (Array.isArray(p.promotions) && p.promotions.length > 0) {
-      let bestFree = 0;
-      for (const promo of p.promotions) {
-        const bx = Number(promo.buyX);
-        const gy = Number(promo.getY);
-        if (bx > 0 && gy > 0) {
-          const free = Math.floor(paidQty / bx) * gy;
-          if (free > bestFree) bestFree = free;
-        }
-      }
-      return bestFree;
-    }
-    return 0;
-  };
+  const { cartItems, cartTotal, discountDetails } = useMemo(() => {
+    let tempItems = Object.entries(cart).map(([pid, qty]) => {
+      const p = products.find((x) => x.id === pid);
+      return {
+        id: pid,
+        name: p?.name ?? pid,
+        price: Number(p?.single_price || p?.price || 0),
+        qty: qty,
+        freeQty: 0,
+        subtotal: 0,
+        product: p,
+        remark: p?.has_flavor_attributes ? getFlavorRemark(pid, flavorSelections, groupFlavorSelections, isGroupOrder) : "",
+        imageUrl: p?.imageUrl ?? "",
+      };
+    }).filter(item => item.product);
 
-  const calcProductSubtotal = (p, paidQty) => {
-    const singlePrice = Number(p.single_price) || Number(p.price);
-    // 買幾送幾：已轉為付費數量模式，結帳金額直接等於付費數量 * 單價
-    if (Array.isArray(p.promotions) && p.promotions.length > 0) {
-      return singlePrice * paidQty;
-    }
-    // 階梯組合價
-    if (p.has_volume_pricing && p.volume_pricing_settings) {
-      const targetQty = Number(p.volume_pricing_settings.target_quantity);
-      const packagePrice = Number(p.volume_pricing_settings.package_price);
-      const groupCount = Math.floor(qty / targetQty);
-      const remainderCount = qty % targetQty;
-      return groupCount * packagePrice + remainderCount * singlePrice;
-    }
-    return singlePrice * qty;
-  };
+    let totalAmount = 0;
+    const discounts = [];
 
-  const cartTotal = useMemo(
-    () =>
-      Object.entries(cart).reduce((s, [pid, qty]) => {
-        const p = products.find((x) => x.id === pid);
-        if (!p) return s;
-        return s + calcProductSubtotal(p, qty);
-      }, 0),
-    [cart, products],
-  );
+    // 分組
+    const promoGroups = {}; // promoId -> items
+    const standaloneItems = [];
 
-  // ── 運費計算 ──────────────────────────────────────────────────
-  const shippingFee = useMemo(() => {
-    // 只有一般散客群才需要計算運費，其餘社區大樓一律免運 (0元)
-    if (!isGeneralUser) return 0;
-
-    // 優先尋找使用者手動選定的社區
-    let activeComm = currentCommunity;
-    if (selectedCommunityId && allCommunities.length > 0) {
-      const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
-      if (match) {
-        activeComm = match;
+    for (const item of tempItems) {
+      if (item.product?.promoId && item.product?.promotion?.isActive) {
+        const pId = item.product.promoId;
+        if (!promoGroups[pId]) promoGroups[pId] = { promotion: item.product.promotion, items: [] };
+        promoGroups[pId].items.push(item);
+      } else {
+        standaloneItems.push(item);
       }
     }
 
-    if (!activeComm) return 0;
-    if (activeComm.DefaultFreeShipping) return 0;
-    const min = Number(activeComm.FreeShippingMin) || 0;
-    const fee = Number(activeComm.ShippingFee) || 0;
-    if (fee === 0) return 0; // 未設定運費視為免運
-    return cartTotal >= min ? 0 : fee;
-  }, [cartTotal, currentCommunity, isGeneralUser, selectedCommunityId, allCommunities]);
+    // 處理促銷群組
+    for (const pId in promoGroups) {
+      const group = promoGroups[pId];
+      const promo = group.promotion;
+      let groupTotalAmount = 0;
 
-  const orderTotal = cartTotal + shippingFee;
-
-  const cartItems = useMemo(
-    () =>
-      Object.entries(cart).map(([pid, qty]) => {
-        const p = products.find((x) => x.id === pid);
-        let subtotal = 0;
-        let displayPrice = p?.price ?? 0;
-        let freeQty = 0;
-
-        if (p) {
-          const singlePrice = Number(p.single_price) || Number(p.price);
-          subtotal = calcProductSubtotal(p, qty);
-          freeQty = calcFreeQty(p, qty);
-          displayPrice = singlePrice;
+      if (promo.promoType === 'BUY_X_GET_Y') {
+        const bx = Number(promo.buyQty);
+        const gy = Number(promo.freeQty);
+        const groupSize = bx + gy;
+        
+        const totalQtyInGroup = group.items.reduce((sum, item) => sum + item.qty, 0);
+        let totalFreeAllowed = 0;
+        if (groupSize > 0) {
+           const sets = Math.floor(totalQtyInGroup / groupSize);
+           totalFreeAllowed = sets * gy;
         }
 
-        const remark = p?.has_flavor_attributes
-          ? getFlavorRemark(pid, flavorSelections, groupFlavorSelections, isGroupOrder)
-          : "";
-        return {
-          id: pid,
-          name: p?.name ?? pid,
-          price: displayPrice,
-          qty,
-          freeQty,
-          remark,
-          subtotal,
-          imageUrl: p?.imageUrl ?? "",
-        };
-      }),
-    [cart, products, flavorSelections, groupFlavorSelections, isGroupOrder],
-  );
+        let expandedUnits = [];
+        for (const item of group.items) {
+          for (let i = 0; i < item.qty; i++) {
+            expandedUnits.push({ ...item, unitPrice: item.price });
+          }
+        }
+        // 價格由低到高排序，最低價的當作贈品
+        expandedUnits.sort((a, b) => a.unitPrice - b.unitPrice);
+        
+        for (let i = 0; i < expandedUnits.length; i++) {
+           expandedUnits[i].isFree = i < totalFreeAllowed;
+        }
+        
+        for (const item of group.items) {
+           const unitsOfThisItem = expandedUnits.filter(u => u.id === item.id);
+           item.freeQty = unitsOfThisItem.filter(u => u.isFree).length;
+           const paidCount = unitsOfThisItem.filter(u => !u.isFree).length;
+           item.subtotal = paidCount * item.price;
+           groupTotalAmount += item.subtotal;
+        }
+        
+        if (totalFreeAllowed > 0) {
+           const savedAmount = expandedUnits.filter(u => u.isFree).reduce((sum, u) => sum + u.unitPrice, 0);
+           discounts.push(`✨ [${promo.name}] 已折抵 ${totalFreeAllowed} 件 (省 $${savedAmount})`);
+        }
+        totalAmount += groupTotalAmount;
+
+      } else if (promo.promoType === 'BUNDLE_PRICE') {
+         const targetQty = Number(promo.buyQty);
+         const packagePrice = Number(promo.bundlePrice);
+         
+         const totalQtyInGroup = group.items.reduce((sum, item) => sum + item.qty, 0);
+         const sets = Math.floor(totalQtyInGroup / targetQty);
+         
+         let expandedUnits = [];
+         for (const item of group.items) {
+           for (let i = 0; i < item.qty; i++) {
+             expandedUnits.push({ ...item, unitPrice: item.price });
+           }
+         }
+         // 價格由高到低排序，最高價的先納入組合價
+         expandedUnits.sort((a, b) => b.unitPrice - a.unitPrice);
+         
+         for (let i = 0; i < expandedUnits.length; i++) {
+            expandedUnits[i].isPartOfBundle = i < sets * targetQty;
+         }
+         
+         const groupSubtotal = sets * packagePrice;
+         
+         for (const item of group.items) {
+           const unitsOfThisItem = expandedUnits.filter(u => u.id === item.id);
+           const bundleCount = unitsOfThisItem.filter(u => u.isPartOfBundle).length;
+           const remainCount = unitsOfThisItem.filter(u => !u.isPartOfBundle).length;
+           
+           // 組合價按比例分配到單品
+           let itemSub = remainCount * item.price;
+           if (bundleCount > 0 && sets * targetQty > 0) {
+             itemSub += (bundleCount / (sets * targetQty)) * groupSubtotal;
+           }
+           item.subtotal = Math.round(itemSub);
+         }
+         
+         // 修正四捨五入誤差
+         let sumOfItemSubtotals = group.items.reduce((sum, item) => sum + item.subtotal, 0);
+         const expectedTotal = groupSubtotal + expandedUnits.filter(u => !u.isPartOfBundle).reduce((sum, u) => sum + u.unitPrice, 0);
+         
+         if (sumOfItemSubtotals !== expectedTotal && group.items.length > 0) {
+            group.items[0].subtotal += (expectedTotal - sumOfItemSubtotals);
+         }
+         
+         totalAmount += expectedTotal;
+         
+         if (sets > 0) {
+            const originalPriceForBundled = expandedUnits.filter(u => u.isPartOfBundle).reduce((sum, u) => sum + u.unitPrice, 0);
+            const savedAmount = originalPriceForBundled - groupSubtotal;
+            discounts.push(`✨ [${promo.name}] 組合優惠 (省 $${savedAmount})`);
+         }
+      }
+    }
+
+    // 處理獨立商品 (舊版商品層級促銷)
+    for (const item of standaloneItems) {
+      const p = item.product;
+      const singlePrice = item.price;
+      
+      let legacyFreeQty = 0;
+      if (Array.isArray(p.promotions) && p.promotions.length > 0) {
+        let bestFree = 0;
+        for (const promo of p.promotions) {
+          const bx = Number(promo.buyX);
+          const gy = Number(promo.getY);
+          if (bx > 0 && gy > 0) {
+            const free = Math.floor(item.qty / (bx + gy)) * gy;
+            if (free > bestFree) bestFree = free;
+          }
+        }
+        legacyFreeQty = bestFree;
+        item.freeQty = legacyFreeQty;
+        item.subtotal = singlePrice * (item.qty - legacyFreeQty); 
+      } else if (p.has_volume_pricing && p.volume_pricing_settings) {
+        const targetQty = Number(p.volume_pricing_settings.target_quantity);
+        const packagePrice = Number(p.volume_pricing_settings.package_price);
+        const groupCount = Math.floor(item.qty / targetQty);
+        const remainderCount = item.qty % targetQty;
+        item.subtotal = groupCount * packagePrice + remainderCount * singlePrice;
+      } else {
+        item.subtotal = singlePrice * item.qty;
+      }
+      totalAmount += item.subtotal;
+    }
+
+    return { cartItems: tempItems, cartTotal: totalAmount, discountDetails: discounts };
+  }, [cart, products, flavorSelections, groupFlavorSelections, isGroupOrder]);
 
   // (已移至元件頂部)
 
@@ -1599,7 +1664,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     details[name] = validEntries.map(([pid, qty]) => {
                       const prod = products.find(p => p.id === pid);
                       const sub = prod ? calcProductSubtotal(prod, qty) : 0;
-                      const free = prod ? calcFreeQty(prod, qty) : 0;
+                      const free = item.freeQty || 0;
                       const price = qty > 0 ? Math.round(sub / qty) : (prod ? (Number(prod.single_price) || Number(prod.price)) : 0);
                       const rem = prod?.has_flavor_attributes ? getFlavorRemark(pid, {}, { [name]: groupFlavorSelections[name] }, true) : "";
                       return {
@@ -1823,7 +1888,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                       <div className="text-right shrink-0 flex flex-col items-end">
                         <div className="flex items-center">
                           <span className="text-xs text-[var(--text-secondary)] mr-2 font-mono">
-                            x{item.qty + (item.freeQty || 0)}
+                            x{item.qty}
                           </span>
                           <span className="font-mono font-bold text-[var(--text-primary)]">
                             ${item.subtotal}
@@ -1831,7 +1896,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                         </div>
                         {item.freeQty > 0 && (
                           <span className="text-[10px] font-bold text-emerald-600 mt-0.5">
-                            (付費:{item.qty} 贈:{item.freeQty})
+                            (內含贈品: {item.freeQty}件)
                           </span>
                         )}
                       </div>
@@ -3693,7 +3758,8 @@ ${freeNote(newFee, newMin)}
                   <div className="px-4 space-y-2.5">
                     {items.map((product) => {
                       const qty = isGroupOrder ? (groupCart[activeRecipient]?.[product.id] || 0) : (cart[product.id] || 0);
-                      const freeQty = qty > 0 ? calcFreeQty(product, qty) : 0;
+                      const itemInCart = cartItems.find(i => i.id === product.id);
+                      const freeQty = itemInCart ? itemInCart.freeQty : 0;
                       return (
                         <div
                           key={product.id}

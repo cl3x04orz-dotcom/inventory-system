@@ -18,29 +18,29 @@ model User {
 }
 
 model Product {
-  productId             String        @id
+  productId             String                  @id
   productName           String
   category              String?
-  defaultPrice          Decimal       @default(0)
-  reserve               Decimal       @default(0)
-  safetyStock           Int           @default(0)
-  sortWeight            Int           @default(0)
-  isActive              Boolean       @default(true)
-  isPurchasable         Boolean       @default(true) // 是否出現在進貨清單（與前台上架 isActive 完全獨立）
+  defaultPrice          Decimal                 @default(0)
+  reserve               Decimal                 @default(0)
+  safetyStock           Int                     @default(0)
+  sortWeight            Int                     @default(0)
+  isActive              Boolean                 @default(true)
+  isPurchasable         Boolean                 @default(true) // 是否出現在進貨清單（與前台上架 isActive 完全獨立）
   imageUrl              String?
   expiryDate            String?
-  hasFlavorAttributes   Boolean       @default(false)
-  flavorChoices         Json          @default("[]")
-  singlePrice           Decimal       @default(0)
-  hasVolumePricing      Boolean       @default(false)
+  hasFlavorAttributes   Boolean                 @default(false)
+  flavorChoices         Json                    @default("[]")
+  singlePrice           Decimal                 @default(0)
+  hasVolumePricing      Boolean                 @default(false)
   volumePricingSettings Json?
-  packSize              Int           @default(1)
-  dispatchSteps         Json          @default("[]") // e.g. [28, 42, 70]
+  packSize              Int                     @default(1)
+  dispatchSteps         Json                    @default("[]") // e.g. [28, 42, 70]
   roundThreshold        Int?
-  autoSuppress          Boolean       @default(false)
-  maxSuggestion         Int           @default(0)
-  isBundle              Boolean       @default(false)
-  bundleSize            Int           @default(1)
+  autoSuppress          Boolean                 @default(false)
+  maxSuggestion         Int                     @default(0)
+  isBundle              Boolean                 @default(false)
+  bundleSize            Int                     @default(1)
   inventories           Inventory[]
   salesDetails          SalesDetail[]
   customPrices          CommunityProductPrice[]
@@ -83,21 +83,21 @@ model Purchase {
 }
 
 model Sales {
-  saleId        String        @id
-  date          DateTime
-  salesRep      String
-  totalCash     Decimal       @default(0)
-  reserve       Decimal       @default(0)
-  finalTotal    Decimal       @default(0)
-  customer      String?
-  operator      String
-  paymentMethod String?
-  status        String        @default("COMPLETED")
-  workHours     Decimal       @default(0)
-  paymentDate   DateTime?
+  saleId              String        @id
+  date                DateTime
+  salesRep            String
+  totalCash           Decimal       @default(0)
+  reserve             Decimal       @default(0)
+  finalTotal          Decimal       @default(0)
+  customer            String?
+  operator            String
+  paymentMethod       String?
+  status              String        @default("COMPLETED")
+  workHours           Decimal       @default(0)
+  paymentDate         DateTime?
   actualPaymentMethod String?
-  cashCounts    Json?
-  details       SalesDetail[]
+  cashCounts          Json?
+  details             SalesDetail[]
 
   @@index([date])
 }
@@ -177,58 +177,59 @@ model EmployeeProfile {
 }
 
 model GroupBuyCommunity {
-  communityId           String    @id
-  communityCode         String    @unique
+  communityId           String                  @id
+  communityCode         String                  @unique
   communityName         String
   communityType         String?
   orderingMode          String?
   serviceArea           String?
-  isDefault             Boolean   @default(false)
+  isDefault             Boolean                 @default(false)
   icon                  String?
   contactPerson         String?
   contactPhone          String?
   openMessage           String?
   closeMessage          String?
   defaultDeliveryTime   String?
-  defaultFreeShipping   Boolean   @default(false)
-  freeShippingMin       Decimal   @default(0)   // 免運門檻金額（0 = 無門檻，直接免運）
-  shippingFee           Decimal   @default(0)   // 未達門檻時加收的運費
-  defaultPaymentMethods Json      @default("[]")
+  defaultFreeShipping   Boolean                 @default(false)
+  freeShippingMin       Decimal                 @default(0) // 免運門檻金額（0 = 無門檻，直接免運）
+  shippingFee           Decimal                 @default(0) // 未達門檻時加收的運費
+  defaultPaymentMethods Json                    @default("[]")
   defaultRoute          String?
   deliveryInstruction   String?
-  status                String    @default("ACTIVE")
+  status                String                  @default("ACTIVE")
   notes                 String?
   createdBy             String?
   updatedBy             String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
   deletedAt             DateTime?
   customPrices          CommunityProductPrice[]
+  promotions            Promotion[]
 }
 
 model GroupBuyOrder {
-  orderId            String               @id
-  status             String               @default("PENDING")
-  customerLineId     String?
-  customerName       String?
-  customerPhone      String?
-  deliveryAddress    String?
-  sourceGroup        String?
-  note               String?
-  totalAmount        Decimal              @default(0)
-  shippingFee        Decimal              @default(0)   // 此筆訂單實收運費
-  paymentMethod      String?
-  transferLastFive   String?
-  paymentStatus      String?
-  lineDisplayName    String?
-  source             String?              @default("NORMAL")
-  confirmedAt        DateTime?
-  confirmedBy        String?
+  orderId              String                   @id
+  status               String                   @default("PENDING")
+  customerLineId       String?
+  customerName         String?
+  customerPhone        String?
+  deliveryAddress      String?
+  sourceGroup          String?
+  note                 String?
+  totalAmount          Decimal                  @default(0)
+  shippingFee          Decimal                  @default(0) // 此筆訂單實收運費
+  paymentMethod        String?
+  transferLastFive     String?
+  paymentStatus        String?
+  lineDisplayName      String?
+  source               String?                  @default("NORMAL")
+  confirmedAt          DateTime?
+  confirmedBy          String?
   expectedDeliveryDate String?
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  details            GroupBuyOrderDetail[]
-  recipients         GroupBuyOrderRecipient[]
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  details              GroupBuyOrderDetail[]
+  recipients           GroupBuyOrderRecipient[]
 }
 
 model GroupBuyOrderDetail {
@@ -246,8 +247,8 @@ model GroupBuyOrderDetail {
 model GroupBuyOrderRecipient {
   recipientId   String                       @id @default(uuid())
   orderId       String
-  recipientName String                       // 團員姓名（例如 "王小明"）
-  note          String?                      // 該團員備註
+  recipientName String // 團員姓名（例如 "王小明"）
+  note          String? // 該團員備註
   createdAt     DateTime                     @default(now())
   order         GroupBuyOrder                @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
   items         GroupBuyOrderRecipientItem[]
@@ -261,9 +262,9 @@ model GroupBuyOrderRecipientItem {
   productId   String
   productName String
   qty         Int
-  price       Int                    // 商品單價
+  price       Int // 商品單價
   subtotal    Int?                   @default(0) // 商品小計 (精準多件優惠與促銷價)
-  remark      String?                // 口味備註
+  remark      String? // 口味備註
   recipient   GroupBuyOrderRecipient @relation(fields: [recipientId], references: [recipientId], onDelete: Cascade)
 
   @@index([recipientId])
@@ -382,18 +383,18 @@ model InventoryAdjustment {
 }
 
 model BuildingSetting {
-  building   String   @id
-  startTime  String?
-  endTime    String?
-  sortOrder  Int      @default(0)
-  adminNote  String?
-  updatedAt  DateTime @updatedAt
+  building  String   @id
+  startTime String?
+  endTime   String?
+  sortOrder Int      @default(0)
+  adminNote String?
+  updatedAt DateTime @updatedAt
 }
 
 model GroupBinding {
-  groupId    String   @id
-  groupName  String
-  updatedAt  DateTime @updatedAt
+  groupId   String   @id
+  groupName String
+  updatedAt DateTime @updatedAt
 }
 
 model Member {
@@ -413,7 +414,7 @@ model WalletTransaction {
   transactionId String   @id @default(uuid())
   memberId      String
   amount        Decimal
-  type          String   // e.g. "ORDER_PAY", "DEPOSIT"
+  type          String // e.g. "ORDER_PAY", "DEPOSIT"
   description   String?
   createdAt     DateTime @default(now())
   member        Member   @relation(fields: [memberId], references: [memberId], onDelete: Cascade)
@@ -427,7 +428,7 @@ model Subscription {
   productId      String
   productName    String
   quantity       Int
-  frequency      String   // 例如 "[1,3,5]"
+  frequency      String // 例如 "[1,3,5]"
   paymentMethod  String   @default("奶包金")
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
@@ -435,14 +436,32 @@ model Subscription {
 }
 
 model CommunityProductPrice {
-  communityId  String
-  productId    String
-  customPrice  Decimal
-  promotions   Json?
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  community    GroupBuyCommunity @relation(fields: [communityId], references: [communityId], onDelete: Cascade)
-  product      Product           @relation(fields: [productId], references: [productId], onDelete: Cascade)
+  communityId String
+  productId   String
+  customPrice Decimal
+  promotions  Json?
+  promoId     String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  community   GroupBuyCommunity @relation(fields: [communityId], references: [communityId], onDelete: Cascade)
+  product     Product           @relation(fields: [productId], references: [productId], onDelete: Cascade)
+  promotion   Promotion?        @relation(fields: [promoId], references: [promoId], onDelete: SetNull)
 
   @@id([communityId, productId])
+}
+
+model Promotion {
+  promoId     String   @id @default(uuid())
+  name        String
+  promoType   String   @default("BUY_X_GET_Y") // e.g. BUY_X_GET_Y, BUNDLE_PRICE
+  buyQty      Int      @default(0)
+  freeQty     Int      @default(0)
+  bundlePrice Decimal?
+  isActive    Boolean  @default(true)
+  communityId String? // null means global promotion
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  community GroupBuyCommunity?      @relation(fields: [communityId], references: [communityId], onDelete: Cascade)
+  prices    CommunityProductPrice[]
 }
