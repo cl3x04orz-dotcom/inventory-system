@@ -3956,25 +3956,62 @@ ${freeNote(newFee, newMin)}
                                     捆裝 {product.bundleSize}入
                                   </span>
                                 )}
-                                {(!Array.isArray(product.promotions) || product.promotions.length === 0) && product.buy_x > 0 && product.get_y > 0 && (
-                                  <span className="text-[9px] text-emerald-800 bg-emerald-500/10 border border-emerald-200/30 px-1 py-0.5 rounded font-bold shrink-0">
-                                    🔥買{product.buy_x}送{product.get_y}
-                                  </span>
-                                )}
-                                {Array.isArray(product.promotions) && product.promotions.map((promo, idx) => {
-                                  if (promo.promoType === 'BUY_X_GET_Y' || (promo.buyX > 0 && promo.getY > 0)) {
-                                    let text = `🔥買${promo.buyX || promo.buy_x}送${promo.getY || promo.get_y}`;
-                                    if (Array.isArray(promo.tiers) && promo.tiers.length > 0) {
-                                      text = '🔥' + promo.tiers.map(t => `買${t.buyQty}送${t.freeQty}`).join(' 🔥');
+                                {(() => {
+                                  // 1. 優先使用綁定的團購促銷活動 (product.promotion)
+                                  const groupPromo = product.promotion;
+                                  if (groupPromo && groupPromo.isActive !== false) {
+                                    if (groupPromo.promoType === 'BUY_X_GET_Y') {
+                                      let tierText = '';
+                                      if (Array.isArray(groupPromo.tiers) && groupPromo.tiers.length > 0) {
+                                        tierText = groupPromo.tiers.map(t => `買 ${t.buyQty} 送 ${t.freeQty}`).join(' 🔥 ');
+                                      } else if (groupPromo.buyQty > 0 && groupPromo.freeQty > 0) {
+                                        tierText = `買 ${groupPromo.buyQty} 送 ${groupPromo.freeQty}`;
+                                      }
+                                      if (tierText) {
+                                        return (
+                                          <span className="text-[10px] text-emerald-800 bg-emerald-500/10 border border-emerald-200/30 px-1.5 py-0.5 rounded font-bold shrink-0">
+                                            🔥 {tierText}
+                                          </span>
+                                        );
+                                      }
+                                    } else if (groupPromo.promoType === 'BUNDLE_PRICE') {
+                                      return (
+                                        <span className="text-[10px] text-purple-800 bg-purple-500/10 border border-purple-200/30 px-1.5 py-0.5 rounded font-bold shrink-0">
+                                          🎉 任選 {groupPromo.buyQty} 件 ${groupPromo.bundlePrice}
+                                        </span>
+                                      );
                                     }
+                                  }
+
+                                  // 2. 次之使用 product.promotions 陣列
+                                  if (Array.isArray(product.promotions) && product.promotions.length > 0) {
+                                    return product.promotions.map((promo, idx) => {
+                                      let text = '';
+                                      if (Array.isArray(promo.tiers) && promo.tiers.length > 0) {
+                                        text = promo.tiers.map(t => `買 ${t.buyQty} 送 ${t.freeQty}`).join(' 🔥 ');
+                                      } else if (promo.buyX > 0 && promo.getY > 0) {
+                                        text = `買 ${promo.buyX} 送 ${promo.getY}`;
+                                      }
+                                      if (!text) return null;
+                                      return (
+                                        <span key={idx} className="text-[10px] text-emerald-800 bg-emerald-500/10 border border-emerald-200/30 px-1.5 py-0.5 rounded font-bold shrink-0">
+                                          🔥 {text}
+                                        </span>
+                                      );
+                                    });
+                                  }
+
+                                  // 3. 舊版單一商品欄位 (product.buy_x)
+                                  if (product.buy_x > 0 && product.get_y > 0) {
                                     return (
-                                      <span key={idx} className="text-[9px] text-emerald-800 bg-emerald-500/10 border border-emerald-200/30 px-1 py-0.5 rounded font-bold shrink-0">
-                                        {text}
+                                      <span className="text-[10px] text-emerald-800 bg-emerald-500/10 border border-emerald-200/30 px-1.5 py-0.5 rounded font-bold shrink-0">
+                                        🔥 買 {product.buy_x} 送 {product.get_y}
                                       </span>
                                     );
                                   }
+
                                   return null;
-                                })}
+                                })()}
                               </div>
                               {product.expiryDate && (
                                 <span className="inline-block text-[10px] text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded mt-1">
