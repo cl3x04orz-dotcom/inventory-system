@@ -126,35 +126,55 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         const normalizedRecipients = hasRecipients ? order.recipients.map(r => ({
             ...r,
             items: (r.items || []).map(ri => {
+                const isGift = Boolean(
+                    ri.isGift ||
+                    Number(ri.price) === 0 ||
+                    Number(ri.unitPrice) === 0 ||
+                    (ri.remark && String(ri.remark).includes('贈品')) ||
+                    (ri.productName && String(ri.productName).includes('贈品'))
+                );
                 const prod = products.find(p => p.id === ri.productId || p.name === ri.productName || p.name === ri.productId);
-                let sub = ri.subtotal;
-                if (prod && (prod.has_volume_pricing || (Array.isArray(prod.promotions) && prod.promotions.length > 0))) {
-                    sub = calculateItemSubtotal(ri.productId, ri.qty, ri.price);
-                } else if (sub == null || isNaN(Number(sub)) || Number(sub) <= 0) {
-                    sub = calculateItemSubtotal(ri.productId, ri.qty, ri.price);
+                let sub = isGift ? 0 : ri.subtotal;
+                if (!isGift) {
+                    if (prod && (prod.has_volume_pricing || (Array.isArray(prod.promotions) && prod.promotions.length > 0))) {
+                        sub = calculateItemSubtotal(ri.productId, ri.qty, ri.price);
+                    } else if (sub == null || isNaN(Number(sub)) || Number(sub) <= 0) {
+                        sub = calculateItemSubtotal(ri.productId, ri.qty, ri.price);
+                    }
                 }
                 return {
                     ...ri,
-                    subtotal: Number(sub)
+                    price: isGift ? 0 : (ri.price ?? ri.unitPrice),
+                    unitPrice: isGift ? 0 : (ri.unitPrice ?? ri.price),
+                    subtotal: isGift ? 0 : (Number(sub) || 0)
                 };
             })
         })) : order.recipients;
 
         const normalizedItems = order.items.map(item => {
+            const isGift = Boolean(
+                item.isGift ||
+                Number(item.unitPrice) === 0 ||
+                Number(item.price) === 0 ||
+                (item.remark && String(item.remark).includes('贈品')) ||
+                (item.productName && String(item.productName).includes('贈品'))
+            );
             const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
-            let sub = item.subtotal;
-            if (prod && (prod.has_volume_pricing || (Array.isArray(prod.promotions) && prod.promotions.length > 0))) {
-                sub = calculateItemSubtotal(item.productId, item.qty, item.unitPrice);
-            } else if (hasRecipients && prod && prod.has_volume_pricing) {
-                const totalRecipQty = normalizedRecipients.reduce((sum, r) => {
-                    return sum + (r.items || []).reduce((s, ri) => (ri.productId === item.productId || ri.productName === item.productName) ? s + Number(ri.qty) : s, 0);
-                }, 0);
-                if (totalRecipQty === item.qty) {
+            let sub = isGift ? 0 : item.subtotal;
+            if (!isGift) {
+                if (prod && (prod.has_volume_pricing || (Array.isArray(prod.promotions) && prod.promotions.length > 0))) {
+                    sub = calculateItemSubtotal(item.productId, item.qty, item.unitPrice);
+                } else if (hasRecipients && prod && prod.has_volume_pricing) {
+                    const totalRecipQty = normalizedRecipients.reduce((sum, r) => {
+                        return sum + (r.items || []).reduce((s, ri) => (ri.productId === item.productId || ri.productName === item.productName) ? s + Number(ri.qty) : s, 0);
+                    }, 0);
+                    if (totalRecipQty === item.qty) {
+                        sub = calculateItemSubtotal(item.productId, item.qty, item.unitPrice);
+                    }
+                }
+                if (sub == null || isNaN(Number(sub)) || Number(sub) <= 0) {
                     sub = calculateItemSubtotal(item.productId, item.qty, item.unitPrice);
                 }
-            }
-            if (sub == null || isNaN(Number(sub)) || Number(sub) <= 0) {
-                sub = calculateItemSubtotal(item.productId, item.qty, item.unitPrice);
             }
 
             let finalRemark = item.remark || '';
@@ -192,7 +212,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
             return {
                 ...item,
-                subtotal: Number(sub),
+                unitPrice: isGift ? 0 : (item.unitPrice ?? (prod ? (Number(prod.single_price) || Number(prod.price)) : 0)),
+                subtotal: isGift ? 0 : (Number(sub) || 0),
                 remark: finalRemark
             };
         });
