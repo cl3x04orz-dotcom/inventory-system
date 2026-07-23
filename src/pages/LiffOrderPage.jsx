@@ -1820,13 +1820,20 @@ export default function LiffOrderPage({ user, apiUrl }) {
                       </div>
 
                       {/* 數量與金額 */}
-                      <div className="text-right shrink-0">
-                        <span className="text-xs text-[var(--text-secondary)] mr-2 font-mono">
-                          x{item.qty}
-                        </span>
-                        <span className="font-mono font-bold text-[var(--text-primary)]">
-                          ${item.subtotal}
-                        </span>
+                      <div className="text-right shrink-0 flex flex-col items-end">
+                        <div className="flex items-center">
+                          <span className="text-xs text-[var(--text-secondary)] mr-2 font-mono">
+                            x{item.qty + (item.freeQty || 0)}
+                          </span>
+                          <span className="font-mono font-bold text-[var(--text-primary)]">
+                            ${item.subtotal}
+                          </span>
+                        </div>
+                        {item.freeQty > 0 && (
+                          <span className="text-[10px] font-bold text-emerald-600 mt-0.5">
+                            (付費:{item.qty} 贈:{item.freeQty})
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -3726,31 +3733,33 @@ ${freeNote(newFee, newMin)}
 
                           <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                             <div>
-                              <h3 className="font-extrabold text-[18px] text-[var(--text-primary)] leading-snug">
-                                {product.name}
-                              </h3>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <h3 className="font-extrabold text-[18px] text-[var(--text-primary)] leading-snug">
+                                  {product.name}
+                                </h3>
+                                {product.isBundle && (
+                                  <span className="text-[10px] text-amber-800 bg-amber-500/10 border border-amber-200/30 px-1 py-0.5 rounded font-bold shrink-0">
+                                    捆裝 {product.bundleSize}入
+                                  </span>
+                                )}
+                                {product.buy_x && product.get_y && (
+                                  <span className="text-[9px] text-emerald-800 bg-emerald-500/10 border border-emerald-200/30 px-1 py-0.5 rounded font-bold shrink-0">
+                                    🔥買{product.buy_x}送{product.get_y}
+                                  </span>
+                                )}
+                                {Array.isArray(product.promotions) && product.promotions.map((promo, idx) => (
+                                  promo.buyX > 0 && promo.getY > 0 ? (
+                                    <span key={idx} className="text-[9px] text-emerald-800 bg-emerald-500/10 border border-emerald-200/30 px-1 py-0.5 rounded font-bold shrink-0">
+                                      🔥買{promo.buyX}送{promo.getY}
+                                    </span>
+                                  ) : null
+                                ))}
+                              </div>
                               {product.expiryDate && (
                                 <span className="inline-block text-[10px] text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded mt-1">
                                   有效: {product.expiryDate}
                                 </span>
                               )}
-                              {product.isBundle && (
-                                <span className="inline-block text-[10px] text-amber-800 bg-amber-500/10 border border-amber-200/30 px-1.5 py-0.5 rounded ml-1 font-bold">
-                                  捆裝 {product.bundleSize}入
-                                </span>
-                              )}
-                              {product.buy_x && product.get_y && (
-                                <span className="inline-block text-[10px] text-emerald-800 bg-emerald-500/10 border border-emerald-200/30 px-1.5 py-0.5 rounded ml-1 font-bold">
-                                  🔥 買 {product.buy_x} 送 {product.get_y}
-                                </span>
-                              )}
-                              {Array.isArray(product.promotions) && product.promotions.map((promo, idx) => (
-                                promo.buyX > 0 && promo.getY > 0 ? (
-                                  <span key={idx} className="inline-block text-[10px] text-emerald-800 bg-emerald-500/10 border border-emerald-200/30 px-1.5 py-0.5 rounded ml-1 font-bold">
-                                    🔥 買 {promo.buyX} 送 {promo.getY}
-                                  </span>
-                                ) : null
-                              ))}
                             </div>
                             <div className="flex flex-col mt-1.5">
                               <div className="flex justify-between items-center">
