@@ -1237,6 +1237,21 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         }
     };
 
+    const calculateFreeQtyFromTotal = useCallback((productId, qty) => {
+        const prod = products.find(p => p.id === productId || p.name === productId);
+        if (!prod || !Array.isArray(prod.promotions) || prod.promotions.length === 0) return 0;
+        let bestFree = 0;
+        for (const promo of prod.promotions) {
+            const bx = Number(promo.buyX);
+            const gy = Number(promo.getY);
+            if (bx > 0 && gy > 0) {
+                const free = Math.floor(qty / (bx + gy)) * gy;
+                if (free > bestFree) bestFree = free;
+            }
+        }
+        return bestFree;
+    }, [products]);
+
     // 批次確認付款/收款邏輯
     const handleBatchConfirmPayment = async () => {
         if (selectedOrderIds.length === 0) return;
@@ -2166,18 +2181,27 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                                     const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
                                                                     const isBundle = prod ? prod.isBundle : false;
                                                                     const bundleSize = prod ? prod.bundleSize : 1;
+                                                                    const freeQty = prod ? calculateFreeQtyFromTotal(prod.id, item.qty) : 0;
+                                                                    const paidQty = item.qty - freeQty;
                                                                     return (
-                                                                        <div className="flex justify-between items-center text-base md:text-lg">
-                                                                            <div className="flex items-center gap-2">
-                                                                                <span className="font-extrabold text-[var(--text-primary)]">
-                                                                                    {item.productName}
-                                                                                    {isBundle && <span className="text-[10px] font-extrabold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md ml-1.5">捆裝 {bundleSize}入</span>}
-                                                                                </span>
-                                                                                <span className="text-sm md:text-base text-blue-600 dark:text-blue-400 font-black">
-                                                                                    x {item.qty} {isBundle ? '組' : '瓶'}
-                                                                                </span>
+                                                                        <div className="flex justify-between items-start text-base md:text-lg">
+                                                                            <div className="flex flex-col gap-1">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="font-extrabold text-[var(--text-primary)]">
+                                                                                        {item.productName}
+                                                                                        {isBundle && <span className="text-[10px] font-extrabold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md ml-1.5">捆裝 {bundleSize}入</span>}
+                                                                                    </span>
+                                                                                    <span className="text-sm md:text-base text-blue-600 dark:text-blue-400 font-black">
+                                                                                        x {item.qty} {isBundle ? '組' : '瓶'}
+                                                                                    </span>
+                                                                                </div>
+                                                                                {freeQty > 0 && (
+                                                                                    <span className="text-xs font-bold text-emerald-600">
+                                                                                        (付費: {paidQty}, 贈送: {freeQty})
+                                                                                    </span>
+                                                                                )}
                                                                             </div>
-                                                                            <span className="font-mono font-bold text-[var(--text-secondary)]">${item.subtotal}</span>
+                                                                            <span className="font-mono font-bold text-[var(--text-secondary)] mt-0.5">${item.subtotal}</span>
                                                                         </div>
                                                                     );
                                                                 })()}
@@ -2219,10 +2243,15 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                                                 {r.items.map((ri, riIdx) => {
                                                                                     const sub = ri.subtotal != null && Number(ri.subtotal) > 0 ? Number(ri.subtotal) : calculateItemSubtotal(ri.productId, ri.qty, ri.price);
                                                                                     const pNameDisplay = ri.productName + (ri.remark && !String(ri.productName || '').includes(ri.remark) ? ` (${ri.remark})` : '');
+                                                                                    const freeQty = calculateFreeQtyFromTotal(ri.productId, ri.qty);
+                                                                                    const paidQty = ri.qty - freeQty;
+                                                                                    const qtyDisplay = freeQty > 0 ? `x${ri.qty} (付費:${paidQty},送:${freeQty})` : `x${ri.qty}`;
                                                                                     return (
-                                                                                        <div key={riIdx} className="flex justify-between items-center font-mono">
-                                                                                            <span className="truncate pr-2">{pNameDisplay} x{ri.qty}</span>
-                                                                                            <span className="flex-shrink-0 font-bold text-[var(--text-primary)]">${sub}</span>
+                                                                                        <div key={riIdx} className="flex justify-between items-start font-mono">
+                                                                                            <span className="pr-2 text-[var(--text-secondary)] break-words">
+                                                                                                <span className="text-[var(--text-primary)]">{pNameDisplay}</span> {qtyDisplay}
+                                                                                            </span>
+                                                                                            <span className="flex-shrink-0 font-bold text-[var(--text-primary)] mt-0.5">${sub}</span>
                                                                                         </div>
                                                                                     );
                                                                                 })}

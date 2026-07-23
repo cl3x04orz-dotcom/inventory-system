@@ -1251,20 +1251,27 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const totalQty = Object.values(cart).reduce((s, q) => s + q, 0);
 
   // 工具：計算某商品在 qty 件時的實際應收金額（含促銷折扣）
-  const calcProductSubtotal = (p, qty) => {
-    const singlePrice = Number(p.single_price) || Number(p.price);
-    // 多組促銷：選折扣最大的那組
+  const calcFreeQty = (p, paidQty) => {
     if (Array.isArray(p.promotions) && p.promotions.length > 0) {
       let bestFree = 0;
       for (const promo of p.promotions) {
         const bx = Number(promo.buyX);
         const gy = Number(promo.getY);
         if (bx > 0 && gy > 0) {
-          const free = Math.floor(qty / (bx + gy)) * gy;
+          const free = Math.floor(paidQty / bx) * gy;
           if (free > bestFree) bestFree = free;
         }
       }
-      return singlePrice * (qty - bestFree);
+      return bestFree;
+    }
+    return 0;
+  };
+
+  const calcProductSubtotal = (p, paidQty) => {
+    const singlePrice = Number(p.single_price) || Number(p.price);
+    // 買幾送幾：已轉為付費數量模式，結帳金額直接等於付費數量 * 單價
+    if (Array.isArray(p.promotions) && p.promotions.length > 0) {
+      return singlePrice * paidQty;
     }
     // 階梯組合價
     if (p.has_volume_pricing && p.volume_pricing_settings) {
@@ -1317,11 +1324,13 @@ export default function LiffOrderPage({ user, apiUrl }) {
         const p = products.find((x) => x.id === pid);
         let subtotal = 0;
         let displayPrice = p?.price ?? 0;
+        let freeQty = 0;
 
         if (p) {
           const singlePrice = Number(p.single_price) || Number(p.price);
           subtotal = calcProductSubtotal(p, qty);
-          displayPrice = qty > 0 ? subtotal / qty : singlePrice;
+          freeQty = calcFreeQty(p, qty);
+          displayPrice = singlePrice;
         }
 
         const remark = p?.has_flavor_attributes
@@ -1332,6 +1341,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
           name: p?.name ?? pid,
           price: displayPrice,
           qty,
+          freeQty,
           remark,
           subtotal,
           imageUrl: p?.imageUrl ?? "",
@@ -1589,12 +1599,13 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     details[name] = validEntries.map(([pid, qty]) => {
                       const prod = products.find(p => p.id === pid);
                       const sub = prod ? calcProductSubtotal(prod, qty) : 0;
+                      const free = prod ? calcFreeQty(prod, qty) : 0;
                       const price = qty > 0 ? Math.round(sub / qty) : (prod ? (Number(prod.single_price) || Number(prod.price)) : 0);
                       const rem = prod?.has_flavor_attributes ? getFlavorRemark(pid, {}, { [name]: groupFlavorSelections[name] }, true) : "";
                       return {
                         productId: pid,
                         productName: prod?.name || pid,
-                        qty: Number(qty),
+                        qty: Number(qty) + free,
                         price: price,
                         subtotal: sub,
                         remark: rem
@@ -1610,7 +1621,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
             productId: i.id,
             productName: i.name,
             unitPrice: i.price,
-            qty: i.qty,
+            qty: i.qty + (i.freeQty || 0),
             subtotal: i.subtotal,
             remark: i.remark,
           })),
@@ -2075,7 +2086,16 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     </span>
                   </div>
                   <div className="flex justify-between items-center mt-1 text-xs text-[var(--text-secondary)]">
-                    <span>單價 ${item.price}</span>
+                    <div className="flex flex-col gap-1">
+                      <span>單價 ${item.price}</span>
+                      {item.freeQty > 0 && (
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-emerald-600 font-bold">🎁 贈送 {item.freeQty}</span>
+                          <span className="text-red-500 font-bold">✨ 已折抵 {item.freeQty} 件金額 (${item.freeQty * item.price})</span>
+                          <span className="text-[var(--text-primary)] font-bold bg-[var(--bg-tertiary)] px-2 py-0.5 rounded w-fit">出貨共: {item.qty + item.freeQty}</span>
+                        </div>
+                      )}
+                    </div>
                     {(() => {
                       const product = products.find(p => p.id === item.id);
                       if (!product) return null;
@@ -3666,6 +3686,7 @@ ${freeNote(newFee, newMin)}
                   <div className="px-4 space-y-2.5">
                     {items.map((product) => {
                       const qty = isGroupOrder ? (groupCart[activeRecipient]?.[product.id] || 0) : (cart[product.id] || 0);
+                      const freeQty = qty > 0 ? calcFreeQty(product, qty) : 0;
                       return (
                         <div
                           key={product.id}
@@ -3802,6 +3823,16 @@ ${freeNote(newFee, newMin)}
                                   </button>
                                 </div>
                               </div>
+                              {qty > 0 && freeQty > 0 && (
+                                <div className="mt-2 flex flex-col gap-1 border-t border-[var(--border-primary)] pt-2 mb-1">
+                                  <span className="text-[12px] text-emerald-600 font-bold flex items-center gap-1 bg-emerald-50 w-fit px-1.5 py-0.5 rounded">
+                                    🎁 贈送 {freeQty}
+                                  </span>
+                                  <span className="text-[13px] font-extrabold text-[var(--text-primary)]">
+                                    出貨共 {qty + freeQty} 件
+                                  </span>
+                                </div>
+                              )}
                               {qty > 0 && product.has_flavor_attributes && (
                                 <div
                                   className="text-[10px] text-blue-600 font-medium mt-1.5 select-none cursor-pointer"
