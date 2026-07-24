@@ -2043,7 +2043,22 @@ export default function LiffOrderPage({ user, apiUrl }) {
       Object.entries(groupCart).forEach(([name, items]) => {
         if (!items || typeof items !== 'object') return;
         const validItems = Object.entries(items).filter(([_, qty]) => Number(qty) > 0);
-        if (validItems.length === 0) return;
+        const mGifts = groupGiftSelections[name] || {};
+        const giftList = [];
+        Object.entries(mGifts).forEach(([pId, gObj]) => {
+          if (gObj && typeof gObj === 'object') {
+            Object.entries(gObj).forEach(([gPid, gQty]) => {
+              if (Number(gQty) > 0) {
+                const gProd = products.find(p => p.id === gPid);
+                if (gProd) {
+                  giftList.push({ name: gProd.name, qty: Number(gQty) });
+                }
+              }
+            });
+          }
+        });
+
+        if (validItems.length === 0 && giftList.length === 0) return;
 
         text += `👤 ${name}\n`;
         let recipientSubtotal = 0;
@@ -2057,6 +2072,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
           grandTotalQty += qty;
           text += `   - ${product ? product.name : productId}${remDisplay} x ${qty} ($${subtotal})\n`;
         });
+
+        giftList.forEach((g) => {
+          grandTotalQty += g.qty;
+          text += `   - 🎁 [贈品] ${g.name} x ${g.qty} ($0)\n`;
+        });
+
         text += `   💰 小計：$${recipientSubtotal}\n`;
         text += `----------------------------------\n`;
         grandTotalAmount += recipientSubtotal;
