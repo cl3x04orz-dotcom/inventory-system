@@ -22,6 +22,7 @@ import {
   Home,
   Wallet,
   Calendar,
+  Trash2,
 } from "lucide-react";
 import { callGAS, memberApi } from "../utils/api";
 import logoImg from "../assets/logo.png";
@@ -1066,6 +1067,24 @@ export default function LiffOrderPage({ user, apiUrl }) {
         return next;
       });
     }
+  };
+
+  const handleUpdateMemberQty = (memberName, pid, delta) => {
+    setGroupCart((prev) => {
+      const recipientItems = prev[memberName] || {};
+      const currentQty = recipientItems[pid] || 0;
+      const qty = Math.max(0, currentQty + delta);
+      const nextItems = { ...recipientItems };
+      if (qty === 0) {
+        delete nextItems[pid];
+      } else {
+        nextItems[pid] = qty;
+      }
+      return {
+        ...prev,
+        [memberName]: nextItems,
+      };
+    });
   };
 
   const handleSetQty = (pid, valStr) => {
@@ -3027,15 +3046,40 @@ export default function LiffOrderPage({ user, apiUrl }) {
                           );
                         })
                       ) : (
-                        // 🛒 一般付費商品：顯示各團員付費購買之數量
+                        // 🛒 一般付費商品：顯示各團員獨立加減與 🗑️ 刪除按鈕
                         Object.entries(groupCart).map(([name, items]) => {
                           if (!items || typeof items !== 'object') return null;
-                          const qty = items[item.id] || 0;
-                          if (qty === 0) return null;
+                          const mQty = items[item.id] || 0;
+                          if (mQty === 0) return null;
                           return (
-                            <div key={name} className="flex justify-between items-center text-[11px] text-[var(--text-secondary)] font-sans">
-                              <span>👤 {name}</span>
-                              <span className="font-semibold font-mono">x{qty}</span>
+                            <div key={name} className="flex justify-between items-center text-xs text-[var(--text-primary)] font-sans py-0.5">
+                              <span className="font-medium text-slate-700 dark:text-slate-300 truncate mr-2">👤 {name}</span>
+                              <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] rounded-lg p-0.5 border border-[var(--border-primary)] shadow-2xs shrink-0">
+                                <button
+                                  onClick={() => handleUpdateMemberQty(name, item.id, -1)}
+                                  className="w-5 h-5 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-blue-600 active:scale-90"
+                                  title="減少此團員數量"
+                                >
+                                  <Minus size={10} />
+                                </button>
+                                <span className="w-5 text-center font-bold font-mono text-xs text-[var(--text-primary)]">
+                                  {mQty}
+                                </span>
+                                <button
+                                  onClick={() => handleUpdateMemberQty(name, item.id, 1)}
+                                  className="w-5 h-5 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-blue-600 active:scale-90"
+                                  title="增加此團員數量"
+                                >
+                                  <Plus size={10} />
+                                </button>
+                                <button
+                                  onClick={() => handleUpdateMemberQty(name, item.id, -mQty)}
+                                  className="w-5 h-5 flex items-center justify-center rounded-md text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-950/40 active:scale-90 ml-0.5"
+                                  title="刪除此團員此商品"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              </div>
                             </div>
                           );
                         })
