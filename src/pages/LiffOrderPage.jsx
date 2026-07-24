@@ -199,6 +199,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [tick, setTick] = useState(0);
   const [successOrderTotal, setSuccessOrderTotal] = useState(0);
   const [successOrderItems, setSuccessOrderItems] = useState([]);
+  const [successGroupCart, setSuccessGroupCart] = useState({});
+  const [successGroupGiftSelections, setSuccessGroupGiftSelections] = useState({});
   const [successCartTotal, setSuccessCartTotal] = useState(0);
   const [successShippingFee, setSuccessShippingFee] = useState(0);
   const [successWalletDeduction, setSuccessWalletDeduction] = useState(0);
@@ -1683,6 +1685,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   // 🧹 自動重置/清理不足額度之贈品：當商品減購或刪除導致已選數量 > 可得數量時，直接重置讓客人重新挑選
   useEffect(() => {
+    if (step === "success") return; // 避免在訂單成立後清空對帳單上的贈品紀錄！
     if (isGroupOrder) {
       setGroupGiftSelections(prev => {
         let changed = false;
@@ -1714,7 +1717,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
         return changed ? next : prev;
       });
     }
-  }, [availableGiftCredits, memberGiftCredits, isGroupOrder]);
+  }, [availableGiftCredits, memberGiftCredits, isGroupOrder, step]);
 
   const shippingFee = useMemo(() => {
     if (!isGeneralUser) return 0;
@@ -2146,6 +2149,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
       }
 
       setSuccessOrderItems(successItemsSnap);
+      setSuccessGroupCart(JSON.parse(JSON.stringify(groupCart)));
+      setSuccessGroupGiftSelections(JSON.parse(JSON.stringify(groupGiftSelections)));
       setSuccessCartTotal(cartTotal);
       setSuccessShippingFee(shippingFee);
       setSuccessWalletDeduction(useWallet ? maxDeduction : 0);
@@ -2176,12 +2181,15 @@ export default function LiffOrderPage({ user, apiUrl }) {
   // 感謝頁
   // ════════════════════════════════════════════════════════════
   if (step === "success") {
+    const activeGroupCart = Object.keys(successGroupCart).length > 0 ? successGroupCart : groupCart;
+    const activeGroupGiftSelections = Object.keys(successGroupGiftSelections).length > 0 ? successGroupGiftSelections : groupGiftSelections;
+
     const getMemberGifts = (name) => {
       const giftMap = {};
-      const memberItems = groupCart[name] || {};
+      const memberItems = activeGroupCart[name] || {};
 
       // 1. 自選贈品 (CUSTOMER_SELECT)
-      const mGifts = groupGiftSelections[name] || {};
+      const mGifts = activeGroupGiftSelections[name] || {};
       Object.entries(mGifts).forEach(([pId, gObj]) => {
         if (gObj && typeof gObj === 'object') {
           Object.entries(gObj).forEach(([gPid, gQty]) => {
@@ -2276,7 +2284,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
       let grandTotalQty = 0;
       let grandTotalAmount = 0;
 
-      Object.entries(groupCart).forEach(([name, items]) => {
+      Object.entries(activeGroupCart).forEach(([name, items]) => {
         if (!items || typeof items !== 'object') return;
         const validItems = Object.entries(items).filter(([_, qty]) => Number(qty) > 0);
         const giftList = getMemberGifts(name);
