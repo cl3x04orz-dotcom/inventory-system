@@ -1145,6 +1145,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
     } else {
       val = parseInt(valStr, 10);
       if (isNaN(val)) val = 0;
+    }
     setTempFlavorQty((prev) => ({ ...prev, [flavor]: val }));
   };
 
