@@ -1023,12 +1023,25 @@ export default function LiffOrderPage({ user, apiUrl }) {
     }, 150);
 
     if (isGroupOrder) {
-      if (!activeRecipient) {
-        alert("請先選擇或新增團員姓名！");
-        return;
-      }
       setGroupCart((prev) => {
-        const recipientItems = prev[activeRecipient] || {};
+        const next = { ...prev };
+        // 智能尋找該商品的對應團員：優先使用 activeRecipient，若無或扣減時則自動找尋擁有該商品的團員 (如 👤 ㄌ)
+        const owners = Object.keys(next).filter(name => (next[name]?.[pid] || 0) > 0);
+        let targetRecipient = activeRecipient;
+        if (!targetRecipient || (delta < 0 && !owners.includes(targetRecipient))) {
+          if (owners.length > 0) {
+            targetRecipient = owners[0];
+          } else if (Object.keys(next).length === 1) {
+            targetRecipient = Object.keys(next)[0];
+          }
+        }
+
+        if (!targetRecipient) {
+          alert("請先選擇或新增團員姓名！");
+          return prev;
+        }
+
+        const recipientItems = next[targetRecipient] || {};
         const currentQty = recipientItems[pid] || 0;
         const qty = Math.max(0, currentQty + delta);
         const nextItems = { ...recipientItems };
@@ -1038,8 +1051,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
           nextItems[pid] = qty;
         }
         return {
-          ...prev,
-          [activeRecipient]: nextItems,
+          ...next,
+          [targetRecipient]: nextItems,
         };
       });
     } else {
@@ -1069,12 +1082,24 @@ export default function LiffOrderPage({ user, apiUrl }) {
     }, 150);
 
     if (isGroupOrder) {
-      if (!activeRecipient) {
-        alert("請先選擇或新增團員姓名！");
-        return;
-      }
       setGroupCart((prev) => {
-        const recipientItems = prev[activeRecipient] || {};
+        const next = { ...prev };
+        const owners = Object.keys(next).filter(name => (next[name]?.[pid] || 0) > 0);
+        let targetRecipient = activeRecipient;
+        if (!targetRecipient || !owners.includes(targetRecipient)) {
+          if (owners.length > 0) {
+            targetRecipient = owners[0];
+          } else if (Object.keys(next).length === 1) {
+            targetRecipient = Object.keys(next)[0];
+          }
+        }
+
+        if (!targetRecipient) {
+          alert("請先選擇或新增團員姓名！");
+          return prev;
+        }
+
+        const recipientItems = next[targetRecipient] || {};
         const nextItems = { ...recipientItems };
         if (qty === 0 || qty === "") {
           delete nextItems[pid];
@@ -1082,8 +1107,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
           nextItems[pid] = qty;
         }
         return {
-          ...prev,
-          [activeRecipient]: nextItems,
+          ...next,
+          [targetRecipient]: nextItems,
         };
       });
     } else {
