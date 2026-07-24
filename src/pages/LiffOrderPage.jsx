@@ -4370,7 +4370,7 @@ ${freeNote(newFee, newMin)}
                   </div>
                 </div>
                 <button
-                  onClick={handleProceedToForm}
+                  onClick={() => setStep("confirm")}
                   className="btn-primary px-5 py-2.5 rounded-xl font-bold flex items-center gap-1 shadow-md shadow-blue-500/20"
                 >
                   前往結帳 <ArrowRight size={16} />
