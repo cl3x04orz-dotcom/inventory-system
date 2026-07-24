@@ -2176,6 +2176,99 @@ export default function LiffOrderPage({ user, apiUrl }) {
   // 感謝頁
   // ════════════════════════════════════════════════════════════
   if (step === "success") {
+    const getMemberGifts = (name) => {
+      const giftMap = {};
+      const memberItems = groupCart[name] || {};
+
+      // 1. 自選贈品 (CUSTOMER_SELECT)
+      const mGifts = groupGiftSelections[name] || {};
+      Object.entries(mGifts).forEach(([pId, gObj]) => {
+        if (gObj && typeof gObj === 'object') {
+          Object.entries(gObj).forEach(([gPid, gQty]) => {
+            if (Number(gQty) > 0) {
+              giftMap[gPid] = (giftMap[gPid] || 0) + Number(gQty);
+            }
+          });
+        }
+      });
+
+      // 2. 按促銷類別計算 AUTO_LOWEST_PRICE & SAME_PRODUCT 贈品
+      const promoGroups = {};
+      Object.entries(memberItems).forEach(([pid, qty]) => {
+        if (Number(qty) <= 0) return;
+        const p = products.find(x => x.id === pid);
+        if (p?.promoId && p?.promotion?.isActive) {
+          const pId = p.promoId;
+          if (!promoGroups[pId]) promoGroups[pId] = { promotion: p.promotion, items: [] };
+          promoGroups[pId].items.push({ id: pid, name: p.name, price: Number(p.single_price || p.price || 0), qty: Number(qty) });
+        }
+      });
+
+      Object.values(promoGroups).forEach(group => {
+        const promo = group.promotion;
+        if (promo.promoType === 'BUY_X_GET_Y') {
+          const mode = promo.rewardSelectionMode || 'AUTO_LOWEST_PRICE';
+          const rawTiers = Array.isArray(promo.tiers) && promo.tiers.length > 0
+            ? promo.tiers
+            : [{ buyQty: Number(promo.buyQty), freeQty: Number(promo.freeQty) }];
+          const sortedTiers = [...rawTiers]
+            .map(t => ({ buyQty: Number(t.buyQty) || 0, freeQty: Number(t.freeQty) || 0 }))
+            .filter(t => t.buyQty > 0)
+            .sort((a, b) => b.buyQty - a.buyQty);
+
+          if (mode === 'AUTO_LOWEST_PRICE') {
+            let memberExpandedUnits = [];
+            for (const item of group.items) {
+              for (let i = 0; i < item.qty; i++) {
+                memberExpandedUnits.push({ id: item.id, name: item.name, price: item.price });
+              }
+            }
+            let remainingQty = memberExpandedUnits.length;
+            let memberFree = 0;
+            for (const tier of sortedTiers) {
+              const groupSize = tier.buyQty + tier.freeQty;
+              if (groupSize > 0 && remainingQty >= groupSize) {
+                const sets = Math.floor(remainingQty / groupSize);
+                memberFree += sets * tier.freeQty;
+                remainingQty -= sets * groupSize;
+              }
+            }
+            memberExpandedUnits.sort((a, b) => a.price - b.price);
+            for (let i = 0; i < memberFree; i++) {
+              if (memberExpandedUnits[i]) {
+                const gPid = memberExpandedUnits[i].id;
+                giftMap[gPid] = (giftMap[gPid] || 0) + 1;
+              }
+            }
+          } else if (mode === 'SAME_PRODUCT') {
+            for (const item of group.items) {
+              let remaining = item.qty;
+              let itemFree = 0;
+              for (const tier of sortedTiers) {
+                if (tier.buyQty > 0 && remaining >= tier.buyQty) {
+                  const sets = Math.floor(remaining / tier.buyQty);
+                  itemFree += sets * tier.freeQty;
+                  remaining -= sets * tier.buyQty;
+                }
+              }
+              if (itemFree > 0) {
+                giftMap[item.id] = (giftMap[item.id] || 0) + itemFree;
+              }
+            }
+          }
+        }
+      });
+
+      const giftList = [];
+      Object.entries(giftMap).forEach(([gPid, gQty]) => {
+        const gProd = products.find(p => p.id === gPid);
+        if (gProd && gQty > 0) {
+          giftList.push({ name: gProd.name, qty: gQty });
+        }
+      });
+      return giftList;
+    };
+
     const generateGroupOrderShareText = () => {
       let text = `📋 【米立微團購】訂單對帳單 (單號: ${orderId})\n`;
       text += `----------------------------------\n`;
@@ -2186,20 +2279,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
       Object.entries(groupCart).forEach(([name, items]) => {
         if (!items || typeof items !== 'object') return;
         const validItems = Object.entries(items).filter(([_, qty]) => Number(qty) > 0);
-        const mGifts = groupGiftSelections[name] || {};
-        const giftList = [];
-        Object.entries(mGifts).forEach(([pId, gObj]) => {
-          if (gObj && typeof gObj === 'object') {
-            Object.entries(gObj).forEach(([gPid, gQty]) => {
-              if (Number(gQty) > 0) {
-                const gProd = products.find(p => p.id === gPid);
-                if (gProd) {
-                  giftList.push({ name: gProd.name, qty: Number(gQty) });
-                }
-              }
-            });
-          }
-        });
+        const giftList = getMemberGifts(name);
 
         if (validItems.length === 0 && giftList.length === 0) return;
 
