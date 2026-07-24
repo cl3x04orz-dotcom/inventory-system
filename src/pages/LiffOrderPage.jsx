@@ -1629,6 +1629,30 @@ export default function LiffOrderPage({ user, apiUrl }) {
       }
     }
 
+    // 🛡️ 補強孤兒贈品追蹤：若付費商品被刪除/減購，強制將殘留贈品寫入 (earned: 0) 確保觸發防呆
+    if (isGroupOrder) {
+      Object.entries(groupGiftSelections || {}).forEach(([memberName, mGifts]) => {
+        Object.entries(mGifts || {}).forEach(([pId, selections]) => {
+          const selectedCount = Object.values(selections || {}).reduce((a, b) => a + Number(b), 0);
+          if (selectedCount > 0) {
+            if (!memberGiftCredits[memberName]) memberGiftCredits[memberName] = {};
+            if (!memberGiftCredits[memberName][pId]) {
+              const promo = products.find(p => p.promoId === pId)?.promotion;
+              memberGiftCredits[memberName][pId] = { earned: 0, selected: selectedCount, promoName: promo?.name || "已刪除活動" };
+            }
+          }
+        });
+      });
+    } else {
+      Object.entries(giftSelections || {}).forEach(([pId, selections]) => {
+        const selectedCount = Object.values(selections || {}).reduce((a, b) => a + Number(b), 0);
+        if (selectedCount > 0 && !availableGiftCredits[pId]) {
+          const promo = products.find(p => p.promoId === pId)?.promotion;
+          availableGiftCredits[pId] = { earned: 0, selected: selectedCount, promoName: promo?.name || "已刪除活動" };
+        }
+      });
+    }
+
     return { cartItems: finalCartItems, cartTotal: totalAmount, discountDetails: discounts, availableGiftCredits, memberGiftCredits };
   }, [cart, giftSelections, groupGiftSelections, products, flavorSelections, groupFlavorSelections, isGroupOrder, groupCart]);
 
@@ -1692,12 +1716,40 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   // ── 進入填寫步驟：從 LocalStorage 自動帶入舊資料 ─────────────
   const handleProceedToForm = async () => {
-    // 🛡️ 檢查是否有未完成之贈品額度，若有則阻止前往填寫資料並立刻開出 Bottom Sheet
-    for (const [pId, credit] of Object.entries(availableGiftCredits)) {
-      if (credit.earned > 0 && credit.selected < credit.earned) {
-        setShowGiftModal(pId);
-        alert(`⚠️ 請先完成贈品選擇！還有 ${credit.earned - credit.selected} 件贈品尚未選擇。`);
-        return;
+    // 🛡️ 雙向贈品防呆檢查（少選與多選溢額均自動攔截）
+    if (isGroupOrder) {
+      for (const [memberName, mCredits] of Object.entries(memberGiftCredits)) {
+        for (const [pId, credit] of Object.entries(mCredits)) {
+          if (credit.earned > 0 && credit.selected < credit.earned) {
+            setShowGiftModal(pId);
+            alert(`⚠️ 團員【${memberName}】尚有 ${credit.earned - credit.selected} 件贈品未選擇，請先完成選擇！`);
+            return;
+          }
+          if (credit.selected > credit.earned) {
+            setShowGiftModal(pId);
+            alert(credit.earned === 0 
+              ? `⚠️ 團員【${memberName}】因付費商品已刪除/減購，不符合贈品資格，請重新調整贈品！`
+              : `⚠️ 團員【${memberName}】的贈品已超出額度！可得 ${credit.earned} 件，目前已選 ${credit.selected} 件，請點擊調整！`
+            );
+            return;
+          }
+        }
+      }
+    } else {
+      for (const [pId, credit] of Object.entries(availableGiftCredits)) {
+        if (credit.earned > 0 && credit.selected < credit.earned) {
+          setShowGiftModal(pId);
+          alert(`⚠️ 請先完成贈品選擇！還有 ${credit.earned - credit.selected} 件贈品尚未選擇。`);
+          return;
+        }
+        if (credit.selected > credit.earned) {
+          setShowGiftModal(pId);
+          alert(credit.earned === 0 
+            ? `⚠️ 因付費商品已刪除/減購，您已無【${credit.promoName || '贈品'}】獲得額度，請重新調整/清空贈品！`
+            : `⚠️ 贈品數量已超出可獲得額度！可得 ${credit.earned} 件，目前已選 ${credit.selected} 件，請重新調整贈品。`
+          );
+          return;
+        }
       }
     }
     try {
@@ -1830,13 +1882,44 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   // ── 送出訂單 ─────────────────────────────────────────────────
   const handleSubmitOrder = async () => {
-    // 🛡️ 強制贈品未完成檢查
-    for (const [pId, credit] of Object.entries(availableGiftCredits)) {
-      if (credit.earned > 0 && credit.selected < credit.earned) {
-        setIsSubmitting(false);
-        setShowGiftModal(pId);
-        alert(`⚠️ 請先完成贈品選擇！還有 ${credit.earned - credit.selected} 件贈品尚未選擇。`);
-        return;
+    // 🛡️ 強制雙向贈品防呆檢查（少選與多選溢額均自動攔截）
+    if (isGroupOrder) {
+      for (const [memberName, mCredits] of Object.entries(memberGiftCredits)) {
+        for (const [pId, credit] of Object.entries(mCredits)) {
+          if (credit.earned > 0 && credit.selected < credit.earned) {
+            setIsSubmitting(false);
+            setShowGiftModal(pId);
+            alert(`⚠️ 團員【${memberName}】尚有 ${credit.earned - credit.selected} 件贈品未選擇，請先完成選擇！`);
+            return;
+          }
+          if (credit.selected > credit.earned) {
+            setIsSubmitting(false);
+            setShowGiftModal(pId);
+            alert(credit.earned === 0 
+              ? `⚠️ 團員【${memberName}】因付費商品已刪除/減購，不符合贈品資格，請重新調整贈品！`
+              : `⚠️ 團員【${memberName}】的贈品已超出額度！可得 ${credit.earned} 件，目前已選 ${credit.selected} 件，請點擊調整！`
+            );
+            return;
+          }
+        }
+      }
+    } else {
+      for (const [pId, credit] of Object.entries(availableGiftCredits)) {
+        if (credit.earned > 0 && credit.selected < credit.earned) {
+          setIsSubmitting(false);
+          setShowGiftModal(pId);
+          alert(`⚠️ 請先完成贈品選擇！還有 ${credit.earned - credit.selected} 件贈品尚未選擇。`);
+          return;
+        }
+        if (credit.selected > credit.earned) {
+          setIsSubmitting(false);
+          setShowGiftModal(pId);
+          alert(credit.earned === 0 
+            ? `⚠️ 因付費商品已刪除/減購，您已無【${credit.promoName || '贈品'}】獲得額度，請重新調整/清空贈品！`
+            : `⚠️ 贈品數量已超出可獲得額度！可得 ${credit.earned} 件，目前已選 ${credit.selected} 件，請重新調整贈品。`
+          );
+          return;
+        }
       }
     }
 
@@ -2454,8 +2537,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
                   <h3 className="text-base font-extrabold text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
                     <span>🎉 選擇 👤【{currMember}】的贈品</span>
                   </h3>
-                  <p className="text-xs text-amber-600 dark:text-amber-400 font-bold mt-0.5">
-                    {promo?.name} ｜ 額度: {mCredits.earned} 件 / 已選: {mCredits.selected} 件 {mRemaining > 0 ? `(尚餘 ${mRemaining} 件)` : '✅ 已選完'}
+                  <p className={`text-xs font-bold mt-0.5 ${mRemaining < 0 ? 'text-red-600 dark:text-red-400 font-extrabold animate-pulse' : 'text-amber-600 dark:text-amber-400'}`}>
+                    {promo?.name} ｜ 額度: {mCredits.earned} 件 / 已選: {mCredits.selected} 件 {mRemaining > 0 ? `(尚餘 ${mRemaining} 件)` : (mRemaining < 0 ? `⚠️ 超出 ${Math.abs(mRemaining)} 件，請扣減` : '✅ 已選完')}
                   </p>
                 </div>
                 <button
@@ -2471,7 +2554,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
             <div className="flex gap-2 p-2.5 overflow-x-auto border-b border-[var(--border-primary)] bg-[var(--bg-tertiary)] shrink-0 no-scrollbar">
               {membersWithGifts.map(name => {
                 const mc = memberGiftCredits[name]?.[pId] || { earned: 0, selected: 0 };
-                const isDone = mc.selected >= mc.earned;
+                const isDone = mc.selected === mc.earned && mc.earned > 0;
+                const isOver = mc.selected > mc.earned;
                 const isActive = currMember === name;
                 return (
                   <button
@@ -2480,13 +2564,15 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all flex items-center gap-1 ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-md'
+                        : isOver
+                        ? 'bg-red-500/10 text-red-600 border border-red-300 dark:border-red-700 animate-pulse'
                         : isDone
                         ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-300 dark:border-emerald-700'
                         : 'bg-amber-500/10 text-amber-600 border border-amber-300 dark:border-amber-700 animate-pulse'
                     }`}
                   >
                     <span>👤 {name}</span>
-                    <span>{isDone ? `✅ (${mc.selected}/${mc.earned})` : `(${mc.selected}/${mc.earned})`}</span>
+                    <span>{isOver ? `⚠️ (${mc.selected}/${mc.earned})` : (isDone ? `✅ (${mc.selected}/${mc.earned})` : `(${mc.selected}/${mc.earned})`)}</span>
                   </button>
                 );
               })}
@@ -2514,7 +2600,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                       </span>
                       <button
                         onClick={() => handleSetGroupGift(prod.id, qty + 1)}
-                        disabled={mRemaining === 0}
+                        disabled={mRemaining <= 0}
                         className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200 active:scale-95 disabled:opacity-30 transition-all font-extrabold"
                       >
                         <Plus size={14} />
@@ -2814,21 +2900,24 @@ export default function LiffOrderPage({ user, apiUrl }) {
             
             {/* 贈品挑選區塊 */}
             {Object.entries(availableGiftCredits || {}).map(([pId, credits]) => {
-              if (credits.earned > 0) {
+              if (credits.earned > 0 || credits.selected > 0) {
                 const promo = products.find(p => p.promoId === pId)?.promotion;
                 const remaining = credits.earned - credits.selected;
+                const isOver = remaining < 0;
                 return (
-                  <div key={pId} className="px-4 py-3 bg-blue-50 border-t border-[var(--border-primary)]">
+                  <div key={pId} className={`px-4 py-3 border-t border-[var(--border-primary)] ${isOver ? 'bg-amber-50 dark:bg-amber-950/40' : 'bg-blue-50'}`}>
                     <div className="flex justify-between items-center">
                       <div className="flex flex-col">
-                        <span className="font-bold text-blue-800 text-sm">🎉 {promo?.name || '促銷活動'} 贈品</span>
-                        <span className="text-xs text-blue-600 mt-0.5">已獲得 {credits.earned} 件，尚未挑選 {remaining} 件</span>
+                        <span className={`font-bold text-sm ${isOver ? 'text-amber-800 dark:text-amber-300' : 'text-blue-800'}`}>🎉 {promo?.name || '促銷活動'} 贈品</span>
+                        <span className={`text-xs font-semibold mt-0.5 ${isOver ? 'text-amber-700 dark:text-amber-400' : 'text-blue-600'}`}>
+                          {isOver ? `⚠️ 贈品超出額度 (已獲得 ${credits.earned} 件，目前已選 ${credits.selected} 件)` : (remaining > 0 ? `已獲得 ${credits.earned} 件，尚未挑選 ${remaining} 件` : `✅ 已完成挑選 (${credits.selected}/${credits.earned} 件)`)}
+                        </span>
                       </div>
                       <button 
                         onClick={() => setShowGiftModal(pId)}
-                        className={`px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm transition-all ${remaining > 0 ? 'bg-blue-600 text-white hover:bg-blue-700 animate-pulse' : 'bg-blue-200 text-blue-700'}`}
+                        className={`px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm transition-all ${isOver ? 'bg-amber-600 text-white hover:bg-amber-700 animate-pulse' : (remaining > 0 ? 'bg-blue-600 text-white hover:bg-blue-700 animate-pulse' : 'bg-blue-200 text-blue-700')}`}
                       >
-                        {remaining > 0 ? '🎁 點此挑選贈品' : '✅ 重新挑選'}
+                        {isOver ? '⚠️ 調整贈品' : (remaining > 0 ? '🎁 點此挑選贈品' : '✅ 重新挑選')}
                       </button>
                     </div>
                   </div>
