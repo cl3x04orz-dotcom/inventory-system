@@ -3001,8 +3001,10 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
     const isPhoneValid = /^09\d{8}$/.test(safePhone.trim());
     const isBuildingValid =
-      selectedBuilding &&
-      (selectedBuilding !== "其它" || safeOther.trim());
+      isGeneralUser || (
+        selectedBuilding &&
+        (selectedBuilding !== "其它" || safeOther.trim())
+      );
     
     // 找出目前選中的行政區前綴
     let communityPrefix = "";
