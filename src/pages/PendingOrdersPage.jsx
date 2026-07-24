@@ -1963,312 +1963,242 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             const isExpanded = expandedOrderIds.has(order.orderId);
                             return (
                                 <div key={order.orderId} className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] shadow-sm hover:border-blue-500/40 hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col">
-                                    {/* 頂部 Summary 列 (標頭) - 點擊可折疊/展開 */}
+                                    {/* 頂部 Header & 完整訂單摘要 (收合狀態 = 100% 完整訂單摘要卡片，零視覺雜訊) */}
                                     <div 
                                         onClick={() => toggleExpandOrder(order.orderId)}
-                                        className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors select-none"
+                                        className="p-4 sm:p-5 flex flex-col justify-between gap-2.5 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors select-none"
                                     >
-                                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                                            {(activeTab === 'PENDING' || activeTab === 'UNPAID') && (
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedOrderIds.includes(order.orderId)}
-                                                    onChange={(e) => {
-                                                        e.stopPropagation();
-                                                        handleToggleSelectOrder(order.orderId);
-                                                    }}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer flex-shrink-0"
-                                                />
-                                            )}
-                                            <div className="flex flex-col min-w-0 flex-1">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="font-mono font-bold text-base md:text-lg text-[var(--text-primary)]">{order.orderId}</span>
-                                                    <span className="font-extrabold text-[var(--text-primary)] text-sm md:text-base flex items-center gap-1">
-                                                        <User size={15} className="text-[var(--text-tertiary)]" />
-                                                        {order.customerName}
-                                                    </span>
-                                                    {(() => {
-                                                        const knownNames = Array.from(new Set([...buildings, ...Object.values(groupBindings)])).filter(Boolean);
-                                                        const addr = String(order.deliveryAddress || '').trim();
-                                                        const matchedAddrBuilding = knownNames.find(name => name && addr.startsWith(name));
-                                                        const displayGroup = matchedAddrBuilding || groupBindings[order.sourceGroup] || order.sourceGroup;
-                                                        if (!displayGroup) return null;
-                                                        return (
-                                                            <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs px-2 py-0.5 rounded font-bold border border-slate-200 dark:border-slate-700">
-                                                                {displayGroup}
-                                                            </span>
-                                                        );
-                                                    })()}
-                                                </div>
-                                                
-                                                {/* 未展開時顯示之完整預覽區塊 (展開後隱藏避免重複) */}
-                                                {!isExpanded && (
-                                                    <div className="text-xs text-[var(--text-secondary)] mt-2 flex flex-col gap-1.5 border-t border-dashed border-[var(--border-primary)] pt-2">
-                                                        <div className="flex items-start gap-1.5 text-blue-600 dark:text-blue-400 font-bold leading-normal">
-                                                            <span className="shrink-0">📦</span>
-                                                            <span className="break-words">
-                                                                {order.items?.map(it => `${it.productName} x${it.qty}`).join('、 ') || '無商品'}
-                                                            </span>
-                                                        </div>
-                                                        {order.deliveryAddress && (
-                                                            <div className="flex items-start gap-1.5 text-[var(--text-secondary)] leading-normal">
-                                                                <span className="shrink-0">📍</span>
-                                                                <span className="break-all font-medium">{order.deliveryAddress}</span>
-                                                            </div>
-                                                        )}
-                                                        <div className="flex items-center gap-3 text-[var(--text-tertiary)] flex-wrap font-mono text-[11px] pt-0.5">
-                                                            {order.createdAt && (
-                                                                <span className="flex items-center gap-1">
-                                                                    🕒 {new Date(order.createdAt).toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                                                                </span>
-                                                            )}
-                                                            {order.expectedDeliveryDate && (
-                                                                <span
-                                                                    onClick={(e) => handleOpenDateModal(order, e)}
-                                                                    className="bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-md flex items-center gap-1 cursor-pointer hover:bg-emerald-200 border border-emerald-300 dark:border-emerald-700 transition-colors"
-                                                                    title="點擊修改預計配送日"
-                                                                >
-                                                                    <Calendar size={12} />
-                                                                    出貨日: {order.expectedDeliveryDate}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </div>
+                                        {/* 第一列：顧客姓名 + 深灰總金額 + 灰底/藍觸發按鈕 [📦 商品明細 ∨] */}
+                                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                {(activeTab === 'PENDING' || activeTab === 'UNPAID') && (
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedOrderIds.includes(order.orderId)}
+                                                        onChange={(e) => {
+                                                            e.stopPropagation();
+                                                            handleToggleSelectOrder(order.orderId);
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer flex-shrink-0"
+                                                    />
                                                 )}
+                                                <div className="flex flex-col min-w-0">
+                                                    <span className="font-extrabold text-[var(--text-primary)] text-lg md:text-xl flex items-center gap-1.5 leading-tight">
+                                                        <User size={18} className="text-slate-400 dark:text-slate-500 shrink-0" />
+                                                        <span className="truncate">{order.customerName}</span>
+                                                    </span>
+                                                    <span className="font-mono text-xs text-[var(--text-tertiary)] font-medium mt-0.5">
+                                                        #{order.orderId}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-3 flex-shrink-0">
+                                                <span className="font-mono font-black text-xl md:text-2xl text-[var(--text-primary)]">
+                                                    ${computeOrderTotals(order, buildingSettingsList, groupBindings).totalAmount}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        toggleExpandOrder(order.orderId);
+                                                    }}
+                                                    className={`py-1.5 px-3 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 ${
+                                                        isExpanded 
+                                                            ? 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/40 dark:border-blue-800' 
+                                                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:text-blue-600 shadow-2xs'
+                                                    }`}
+                                                >
+                                                    {isExpanded ? (
+                                                        <>
+                                                            <span>📦 收起明細</span>
+                                                            <ChevronUp size={14} />
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span>📦 商品明細</span>
+                                                            <ChevronDown size={14} />
+                                                        </>
+                                                    )}
+                                                </button>
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-3 flex-shrink-0 justify-between md:justify-end">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-mono font-extrabold text-base md:text-lg text-emerald-600 dark:text-emerald-400">
-                                                    ${computeOrderTotals(order, buildingSettingsList, groupBindings).totalAmount}
+                                        {/* 第二列：狀態 Badges 橫列 (資訊 Badge 統一中性灰，僅付款狀態保留 🟢綠/🟠橘 判讀) */}
+                                        <div className="flex items-center gap-2 flex-wrap text-xs pt-0.5">
+                                            {(() => {
+                                                const knownNames = Array.from(new Set([...buildings, ...Object.values(groupBindings)])).filter(Boolean);
+                                                const addr = String(order.deliveryAddress || '').trim();
+                                                const matchedAddrBuilding = knownNames.find(name => name && addr.startsWith(name));
+                                                const displayGroup = matchedAddrBuilding || groupBindings[order.sourceGroup] || order.sourceGroup;
+                                                if (!displayGroup) return null;
+                                                return (
+                                                    <span className="bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 text-xs px-2.5 py-0.5 rounded-md font-bold border border-slate-200 dark:border-slate-700 flex items-center gap-1">
+                                                        🌐 {displayGroup}
+                                                    </span>
+                                                );
+                                            })()}
+
+                                            {order.paymentMethod && (
+                                                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                                    💳 {order.paymentMethod}
                                                 </span>
-                                                {order.paymentStatus !== 'off' && order.paymentStatus !== '已付款' && order.paymentStatus !== '已入帳' ? (
+                                            )}
+
+                                            {/* 付款狀態 (狀態強調色: 🟠未付款 / 🟢已付款) */}
+                                            {order.paymentStatus !== 'off' && order.paymentStatus !== '已付款' && order.paymentStatus !== '已入帳' ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleQuickConfirmPayment(order);
+                                                    }}
+                                                    className="text-xs px-2.5 py-0.5 font-bold rounded bg-amber-50 dark:bg-amber-950/40 hover:bg-emerald-50 text-amber-700 dark:text-amber-300 hover:text-emerald-700 border border-amber-200 dark:border-amber-800 shadow-2xs flex items-center gap-1 transition-colors"
+                                                    title="點擊一鍵確認收款"
+                                                >
+                                                    <Check size={12} /> 🟠 未付款 (確認)
+                                                </button>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                                    ✓ 已付款
+                                                </span>
+                                            )}
+
+                                            {order.expectedDeliveryDate && (
+                                                <span
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleOpenDateModal(order, e);
+                                                    }}
+                                                    className="bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 font-bold px-2.5 py-0.5 rounded-md flex items-center gap-1 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors"
+                                                    title="點擊修改預計配送日"
+                                                >
+                                                    🚚 {order.expectedDeliveryDate} 配送
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* 第三列：物流通訊與下單時間 (統一藍灰圖示，經典 ERP 無壓感) */}
+                                        <div className="text-xs text-[var(--text-secondary)] mt-1 flex flex-col gap-1.5 border-t border-dashed border-[var(--border-primary)] pt-2.5">
+                                            <div className="flex items-center gap-3 flex-wrap">
+                                                <div className="flex items-center gap-1 font-semibold text-[var(--text-primary)]">
+                                                    <Phone size={14} className="text-slate-400 dark:text-slate-500" />
+                                                    <span>{order.customerPhone}</span>
                                                     <button
                                                         type="button"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            handleQuickConfirmPayment(order);
+                                                            handleCopyText(order.customerPhone, '電話');
                                                         }}
-                                                        className="text-xs px-2.5 py-1 font-bold rounded bg-white hover:bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-sm flex items-center gap-0.5"
-                                                        title="一鍵標記為已付款"
+                                                        className="p-1 hover:bg-[var(--bg-hover)] rounded text-slate-400 hover:text-blue-500 transition-colors"
+                                                        title="複製電話"
                                                     >
-                                                        <Check size={12} /> 確認收款
+                                                        <Copy size={12} />
                                                     </button>
-                                                ) : (
-                                                    <span className={`inline-block text-xs px-2 py-0.5 rounded font-extrabold border ${
-                                                        order.status === 'PENDING' ? 'bg-white text-blue-600 border-blue-200' : 'bg-white text-emerald-600 border-emerald-200'
-                                                    }`}>
-                                                        {order.status === 'PENDING' ? '待出貨' : '已出貨'}
+                                                </div>
+
+                                                {order.lineDisplayName && (
+                                                    <span className="text-[11px] text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 font-medium">
+                                                        LINE: {order.lineDisplayName}
                                                     </span>
                                                 )}
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => handleOpenDateModal(order, e)}
-                                                    className={`text-xs px-2.5 py-1 font-bold rounded shadow-sm flex items-center gap-1 transition-all ${
-                                                        order.expectedDeliveryDate
-                                                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700'
-                                                            : 'bg-amber-500 hover:bg-amber-600 text-white border border-amber-600'
-                                                    }`}
-                                                    title="設定/修改預計出貨與配送日期"
-                                                >
-                                                    <Calendar size={13} />
-                                                    {order.expectedDeliveryDate ? `${order.expectedDeliveryDate} 配送` : '預定出貨日'}
-                                                </button>
+
+                                                {order.createdAt && (
+                                                    <span className="text-slate-400 dark:text-slate-500 font-mono text-[11px] flex items-center gap-1 ml-auto">
+                                                        🕒 {new Date(order.createdAt).toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                )}
                                             </div>
 
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    toggleExpandOrder(order.orderId);
-                                                }}
-                                                className={`py-1 px-3 text-xs font-bold rounded-lg border transition-all flex items-center gap-1 ${
-                                                    isExpanded 
-                                                        ? 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/40 dark:border-blue-800' 
-                                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:bg-[var(--bg-hover)]'
-                                                }`}
-                                            >
-                                                {isExpanded ? (
-                                                    <>
-                                                        <span>折疊</span>
-                                                        <ChevronUp size={14} />
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <span>展開</span>
-                                                        <ChevronDown size={14} />
-                                                    </>
-                                                )}
-                                            </button>
+                                            {order.deliveryAddress && (
+                                                <div className="flex items-start gap-1.5 text-[var(--text-secondary)] leading-normal">
+                                                    <MapPin size={14} className="text-slate-400 dark:text-slate-500 shrink-0 mt-0.5" />
+                                                    <span className="break-all font-semibold flex-1">{order.deliveryAddress}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleCopyText(order.deliveryAddress, '地址');
+                                                        }}
+                                                        className="p-1 hover:bg-[var(--bg-hover)] rounded text-slate-400 hover:text-blue-500 transition-colors shrink-0"
+                                                        title="複製地址"
+                                                    >
+                                                        <Copy size={12} />
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
-                                    {/* 展開後的詳細內容區塊 */}
+                                    {/* 展開後的 100% 新資訊專區：【📦 訂單商品與作業明細區塊】 (零重複資訊) */}
                                     {isExpanded && (
-                                        <div className="p-6 pt-3 border-t border-[var(--border-primary)] bg-[var(--bg-secondary)] flex flex-col justify-between flex-1 animate-in fade-in duration-150">
+                                        <div className="p-5 border-t border-[var(--border-primary)] bg-[var(--bg-tertiary)]/50 flex flex-col justify-between flex-1 animate-in fade-in duration-150 space-y-4">
                                             <div>
-                                                {/* Client Details */}
-                                                <div className="space-y-2.5 text-base mb-4">
-                                                    <div className="flex flex-wrap items-center gap-2.5 text-[var(--text-primary)] text-base md:text-lg">
-                                                        <User size={18} className="text-[var(--text-tertiary)] flex-shrink-0" />
-                                                        <span className="font-extrabold">{order.customerName}</span>
-                                                        {order.lineDisplayName && (
-                                                            <span className="text-xs text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded font-medium">
-                                                                LINE: {order.lineDisplayName}
-                                                            </span>
-                                                        )}
-                                                        {(() => {
-                                                            const knownNames = Array.from(new Set([...buildings, ...Object.values(groupBindings)])).filter(Boolean);
-                                                            const addr = String(order.deliveryAddress || '').trim();
-                                                            const matchedAddrBuilding = knownNames.find(name => name && addr.startsWith(name));
-                                                            const displayGroup = matchedAddrBuilding || groupBindings[order.sourceGroup] || order.sourceGroup;
-                                                            if (!displayGroup) return null;
-                                                            return (
-                                                                <span className="bg-white text-slate-600 text-xs px-2 py-0.5 rounded flex items-center gap-1 font-bold border border-slate-200">
-                                                                    {displayGroup}
-                                                                    {groupBindings[order.sourceGroup] && groupBindings[order.sourceGroup] !== displayGroup && (
-                                                                        <span className="opacity-60 text-[10px] font-mono font-medium">({order.sourceGroup})</span>
-                                                                    )}
-                                                                </span>
-                                                            );
-                                                        })()}
+                                                {/* 訂單備註 (若有) */}
+                                                {order.note && (
+                                                    <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/40 p-3 mb-4 rounded-xl border border-amber-200 dark:border-amber-800 text-sm text-amber-900 dark:text-amber-200">
+                                                        <FileText size={16} className="text-amber-600 mt-0.5 shrink-0" />
+                                                        <span className="font-semibold">訂單備註："{order.note}"</span>
                                                     </div>
-                                                    
-                                                    {/* 付款方式與狀態標籤 */}
-                                                    {order.paymentMethod && (
-                                                        <div className="flex flex-wrap items-center gap-2 py-1">
-                                                            <span className={`inline-block text-xs px-2.5 py-0.5 rounded font-extrabold border uppercase tracking-wider ${
-                                                                order.paymentMethod === '轉帳' 
-                                                                    ? 'bg-indigo-50 text-indigo-600 border-indigo-200' 
-                                                                    : order.paymentMethod === 'LINE Pay'
-                                                                    ? 'bg-blue-50 text-blue-600 border-blue-200'
-                                                                    : order.paymentMethod === '現金'
-                                                                    ? 'bg-sky-50 text-sky-700 border-sky-200'
-                                                                    : 'bg-white text-slate-700 border-slate-200'
-                                                            }`}>
-                                                                💳 {order.paymentMethod}
-                                                            </span>
-                                                            {order.transferLastFive && (
-                                                                <span className="text-xs text-slate-500 dark:text-slate-400 font-mono bg-transparent px-1">
-                                                                    (末五碼：{order.transferLastFive})
-                                                                </span>
-                                                            )}
-                                                            {order.paymentStatus && (
-                                                                <span className={`inline-block text-xs px-2 py-0.5 rounded font-black border ${
-                                                                    order.paymentStatus === '已付款' || order.paymentStatus === '已入帳'
-                                                                        ? 'bg-white text-emerald-600 border-emerald-200'
-                                                                        : 'bg-white text-rose-600 border-rose-200'
-                                                                }`}>
-                                                                    {order.paymentStatus}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    )}
+                                                )}
 
-                                                    <div className="flex items-center gap-2 text-[var(--text-secondary)] text-base md:text-lg">
-                                                        <Phone size={18} className="text-[var(--text-tertiary)]" />
-                                                        <span className="font-semibold">{order.customerPhone}</span>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleCopyText(order.customerPhone, '電話')}
-                                                            className="p-1 hover:bg-[var(--bg-hover)] rounded text-[var(--text-tertiary)] hover:text-blue-500 transition-colors"
-                                                            title="複製電話"
-                                                        >
-                                                            <Copy size={13} />
-                                                        </button>
-                                                    </div>
-                                                    {order.deliveryAddress && (
-                                                        <div className="flex items-center gap-2 text-[var(--text-secondary)] text-base md:text-lg">
-                                                            <MapPin size={18} className="text-[var(--text-tertiary)] animate-pulse" />
-                                                            <span className="break-all font-semibold">{order.deliveryAddress}</span>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleCopyText(order.deliveryAddress, '地址')}
-                                                                className="p-1 hover:bg-[var(--bg-hover)] rounded text-[var(--text-tertiary)] hover:text-blue-500 transition-colors"
-                                                                title="複製地址"
-                                                            >
-                                                                <Copy size={13} />
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                    {order.createdAt && (
-                                                        <div className="flex items-center gap-2 text-[var(--text-secondary)] text-base md:text-lg">
-                                                            <Clock size={18} className="text-[var(--text-tertiary)]" />
-                                                            <span className="font-semibold">下單時間：<span className="font-mono text-blue-600 dark:text-blue-400">{new Date(order.createdAt).toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span></span>
-                                                        </div>
-                                                    )}
-                                                    <div className="flex items-center gap-2 text-[var(--text-secondary)] text-base md:text-lg">
-                                                        <Calendar size={18} className="text-emerald-600 dark:text-emerald-400" />
-                                                        <span className="font-semibold">
-                                                            預計出貨/配送：
-                                                            {order.expectedDeliveryDate ? (
-                                                                <span className="font-mono font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 rounded border border-emerald-300 dark:border-emerald-700 ml-1">
-                                                                    {order.expectedDeliveryDate}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-[var(--text-tertiary)] italic ml-1">尚未設定</span>
-                                                            )}
-                                                        </span>
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => handleOpenDateModal(order, e)}
-                                                            className="text-xs px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded shadow-sm ml-2 transition-transform active:scale-95"
-                                                        >
-                                                            修改日期
-                                                        </button>
-                                                    </div>
-                                                    {order.note && (
-                                                        <div className="flex items-start gap-2 bg-[var(--bg-tertiary)] p-3 rounded-lg border border-[var(--border-primary)] text-sm md:text-base text-[var(--text-secondary)]">
-                                                            <FileText size={16} className="text-[var(--text-tertiary)] mt-0.5 flex-shrink-0" />
-                                                            <span className="italic font-medium">"{order.note}"</span>
-                                                        </div>
-                                                    )}
+                                                {/* 商品明細卡片 */}
+                                            <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)] shadow-sm">
+                                                <div className="flex items-center justify-between mb-3 pb-2 border-b border-[var(--border-primary)]">
+                                                    <span className="text-xs font-extrabold uppercase text-[var(--text-tertiary)] tracking-wider flex items-center gap-1.5">
+                                                        <Package size={15} className="text-blue-500" />
+                                                        訂單商品明細 (共 {order.items?.reduce((sum, it) => sum + (Number(it.qty) || 0), 0) || 0} 件)
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => handleOpenDateModal(order, e)}
+                                                        className="text-xs px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-2xs transition-all flex items-center gap-1"
+                                                    >
+                                                        <Calendar size={12} />
+                                                        修改配送日
+                                                    </button>
                                                 </div>
 
-                                                {/* Items List */}
-                                                <div className="bg-[var(--bg-tertiary)] rounded-lg p-4 border border-[var(--border-primary)] mb-4 shadow-inner">
-                                                    <div className="text-xs md:text-sm uppercase font-bold text-[var(--text-tertiary)] mb-2.5 tracking-wider">訂單商品明細</div>
-                                                    <div className="divide-y divide-[var(--border-primary)] divide-dashed space-y-3">
-                                                        {order.items.map((item, idx) => (
-                                                            <div key={idx} className="flex flex-col pt-2.5 first:pt-0">
-                                                                {(() => {
-                                                                    const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
-                                                                    const isBundle = prod ? prod.isBundle : false;
-                                                                    const bundleSize = prod ? prod.bundleSize : 1;
-                                                                    const freeQty = prod ? calculateFreeQtyFromTotal(prod.id, item.qty) : 0;
-                                                                    const paidQty = item.qty - freeQty;
-                                                                    return (
-                                                                        <div className="flex justify-between items-start text-base md:text-lg">
-                                                                            <div className="flex flex-col gap-1">
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <span className="font-extrabold text-[var(--text-primary)]">
-                                                                                        {item.productName}
-                                                                                        {isBundle && <span className="text-[10px] font-extrabold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md ml-1.5">捆裝 {bundleSize}入</span>}
-                                                                                    </span>
-                                                                                    <span className="text-sm md:text-base text-blue-600 dark:text-blue-400 font-black">
-                                                                                        x {item.qty} {isBundle ? '組' : '瓶'}
-                                                                                    </span>
-                                                                                </div>
-                                                                                {freeQty > 0 && (
-                                                                                    <span className="text-xs font-bold text-emerald-600">
-                                                                                        (付費: {paidQty}, 贈送: {freeQty})
-                                                                                    </span>
-                                                                                )}
+                                                <div className="divide-y divide-[var(--border-primary)] divide-dashed space-y-3">
+                                                    {order.items.map((item, idx) => (
+                                                        <div key={idx} className="flex flex-col pt-2.5 first:pt-0">
+                                                            {(() => {
+                                                                const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
+                                                                const isBundle = prod ? prod.isBundle : false;
+                                                                const bundleSize = prod ? prod.bundleSize : 1;
+                                                                const freeQty = prod ? calculateFreeQtyFromTotal(prod.id, item.qty) : 0;
+                                                                const paidQty = item.qty - freeQty;
+                                                                return (
+                                                                    <div className="flex justify-between items-start text-sm md:text-base">
+                                                                        <div className="flex flex-col gap-1">
+                                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                                <span className="font-extrabold text-[var(--text-primary)]">
+                                                                                    {item.productName}
+                                                                                    {isBundle && <span className="text-[10px] font-extrabold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md ml-1.5">捆裝 {bundleSize}入</span>}
+                                                                                </span>
+                                                                                <span className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-extrabold">
+                                                                                    x {item.qty} {isBundle ? '組' : '瓶'}
+                                                                                </span>
                                                                             </div>
-                                                                            <span className="font-mono font-bold text-[var(--text-secondary)] mt-0.5">${item.subtotal}</span>
+                                                                            {freeQty > 0 && (
+                                                                                <span className="text-xs font-bold text-emerald-600">
+                                                                                    (付費: {paidQty}, 贈送: {freeQty})
+                                                                                </span>
+                                                                            )}
                                                                         </div>
-                                                                    );
-                                                                })()}
-                                                                {item.remark && (
-                                                                    <div className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-bold mt-1 ml-1">
-                                                                        {item.remark}
+                                                                        <span className="font-mono font-bold text-[var(--text-secondary)] mt-0.5">${item.subtotal}</span>
                                                                     </div>
-                                                                )}
-                                                            </div>
-                                                        ))}
-                                                    </div>
+                                                                );
+                                                            })()}
+                                                            {item.remark && (
+                                                                <div className="text-xs text-blue-600 dark:text-blue-400 font-bold mt-1 ml-1">
+                                                                    {item.remark}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
                                                     {(() => {
                                                         const totals = computeOrderTotals(order, buildingSettingsList, groupBindings);
                                                         if (totals.shippingFee <= 0) return null;
