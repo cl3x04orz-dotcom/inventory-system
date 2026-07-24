@@ -1427,29 +1427,33 @@ export default function LiffOrderPage({ user, apiUrl }) {
            
            let selectedGiftsCount = 0;
            if (isGroupOrder && groupCart && typeof groupCart === 'object') {
+             const aggregatedGifts = {}; // { [gPid]: totalQty }
              Object.entries(groupGiftSelections || {}).forEach(([memberName, mGifts]) => {
                const selections = mGifts?.[pId] || {};
                Object.entries(selections).forEach(([gPid, gQty]) => {
                  if (gQty > 0) {
                    selectedGiftsCount += gQty;
-                   const gProd = products.find(p => p.id === gPid);
-                   if (gProd) {
-                     finalCartItems.push({
-                       id: gPid,
-                       name: gProd.name,
-                       price: 0,
-                       qty: gQty,
-                       freeQty: 0,
-                       subtotal: 0,
-                       product: gProd,
-                       remark: `贈品 (${memberName})`,
-                       memberName: memberName,
-                       imageUrl: gProd.imageUrl || "",
-                       isGift: true
-                     });
-                   }
+                   aggregatedGifts[gPid] = (aggregatedGifts[gPid] || 0) + gQty;
                  }
                });
+             });
+
+             Object.entries(aggregatedGifts).forEach(([gPid, totalGQty]) => {
+               const gProd = products.find(p => p.id === gPid);
+               if (gProd) {
+                 finalCartItems.push({
+                   id: gPid,
+                   name: gProd.name,
+                   price: 0,
+                   qty: totalGQty,
+                   freeQty: 0,
+                   subtotal: 0,
+                   product: gProd,
+                   remark: "免費贈品",
+                   imageUrl: gProd.imageUrl || "",
+                   isGift: true
+                 });
+               }
              });
            } else {
              const selections = giftSelections[pId] || {};
@@ -2741,31 +2745,20 @@ export default function LiffOrderPage({ user, apiUrl }) {
                   {isGroupOrder && (
                     <div className="mt-1.5 pt-1.5 border-t border-dashed border-[var(--border-primary)] space-y-1">
                       {item.isGift ? (
-                        // 🎁 贈品品項：僅顯示選取該贈品之團員與贈送數量
-                        (() => {
-                          const mName = item.memberName || item.remark?.match(/贈品 \((.*?)\)/)?.[1];
-                          if (mName) {
-                            return (
-                              <div className="flex justify-between items-center text-[11px] text-amber-700 dark:text-amber-300 font-sans font-bold">
-                                <span>👤 {mName}</span>
-                                <span className="font-semibold font-mono">x{item.qty}</span>
-                              </div>
-                            );
-                          }
-                          return Object.entries(groupGiftSelections || {}).map(([name, pObj]) => {
-                            let gQty = 0;
-                            Object.values(pObj || {}).forEach(selections => {
-                              if (selections && selections[item.id]) gQty += Number(selections[item.id]);
-                            });
-                            if (gQty === 0) return null;
-                            return (
-                              <div key={name} className="flex justify-between items-center text-[11px] text-amber-700 dark:text-amber-300 font-sans font-bold">
-                                <span>👤 {name}</span>
-                                <span className="font-semibold font-mono">x{gQty}</span>
-                              </div>
-                            );
+                        // 🎁 贈品品項：合併展示選取此款贈品之各團員與選取數量
+                        Object.entries(groupGiftSelections || {}).map(([name, pObj]) => {
+                          let gQty = 0;
+                          Object.values(pObj || {}).forEach(selections => {
+                            if (selections && selections[item.id]) gQty += Number(selections[item.id]);
                           });
-                        })()
+                          if (gQty === 0) return null;
+                          return (
+                            <div key={name} className="flex justify-between items-center text-[11px] text-[var(--text-secondary)] font-sans">
+                              <span>👤 {name}</span>
+                              <span className="font-semibold font-mono">x{gQty}</span>
+                            </div>
+                          );
+                        })
                       ) : (
                         // 🛒 一般付費商品：顯示各團員付費購買之數量
                         Object.entries(groupCart).map(([name, items]) => {
