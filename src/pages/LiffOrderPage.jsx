@@ -1443,6 +1443,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                        subtotal: 0,
                        product: gProd,
                        remark: `贈品 (${memberName})`,
+                       memberName: memberName,
                        imageUrl: gProd.imageUrl || "",
                        isGift: true
                      });
@@ -2739,17 +2740,46 @@ export default function LiffOrderPage({ user, apiUrl }) {
                   )}
                   {isGroupOrder && (
                     <div className="mt-1.5 pt-1.5 border-t border-dashed border-[var(--border-primary)] space-y-1">
-                      {Object.entries(groupCart).map(([name, items]) => {
-                        if (!items || typeof items !== 'object') return null;
-                        const qty = items[item.id] || 0;
-                        if (qty === 0) return null;
-                        return (
-                          <div key={name} className="flex justify-between items-center text-[11px] text-[var(--text-secondary)] font-sans">
-                            <span>👤 {name}</span>
-                            <span className="font-semibold font-mono">x{qty}</span>
-                          </div>
-                        );
-                      })}
+                      {item.isGift ? (
+                        // 🎁 贈品品項：僅顯示選取該贈品之團員與贈送數量
+                        (() => {
+                          const mName = item.memberName || item.remark?.match(/贈品 \((.*?)\)/)?.[1];
+                          if (mName) {
+                            return (
+                              <div className="flex justify-between items-center text-[11px] text-amber-700 dark:text-amber-300 font-sans font-bold">
+                                <span>👤 {mName}</span>
+                                <span className="font-semibold font-mono">x{item.qty}</span>
+                              </div>
+                            );
+                          }
+                          return Object.entries(groupGiftSelections || {}).map(([name, pObj]) => {
+                            let gQty = 0;
+                            Object.values(pObj || {}).forEach(selections => {
+                              if (selections && selections[item.id]) gQty += Number(selections[item.id]);
+                            });
+                            if (gQty === 0) return null;
+                            return (
+                              <div key={name} className="flex justify-between items-center text-[11px] text-amber-700 dark:text-amber-300 font-sans font-bold">
+                                <span>👤 {name}</span>
+                                <span className="font-semibold font-mono">x{gQty}</span>
+                              </div>
+                            );
+                          });
+                        })()
+                      ) : (
+                        // 🛒 一般付費商品：顯示各團員付費購買之數量
+                        Object.entries(groupCart).map(([name, items]) => {
+                          if (!items || typeof items !== 'object') return null;
+                          const qty = items[item.id] || 0;
+                          if (qty === 0) return null;
+                          return (
+                            <div key={name} className="flex justify-between items-center text-[11px] text-[var(--text-secondary)] font-sans">
+                              <span>👤 {name}</span>
+                              <span className="font-semibold font-mono">x{qty}</span>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
                   )}
                 </div>
