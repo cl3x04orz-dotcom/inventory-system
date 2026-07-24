@@ -2960,19 +2960,22 @@ export default function LiffOrderPage({ user, apiUrl }) {
                     <span className="font-semibold text-[var(--text-primary)] truncate">
                       {item.name}
                     </span>
-                    <span className="font-mono font-bold text-[var(--text-primary)] ml-2 shrink-0">
-                      ${item.subtotal}
-                    </span>
+                    {item.isGift ? (
+                      <span className="text-amber-700 dark:text-amber-300 font-bold bg-amber-100 dark:bg-amber-950/40 px-2 py-0.5 rounded text-xs ml-2 shrink-0 border border-amber-200 dark:border-amber-800">
+                        🎁 免費贈品
+                      </span>
+                    ) : (
+                      <span className="font-mono font-bold text-[var(--text-primary)] ml-2 shrink-0">
+                        ${item.subtotal}
+                      </span>
+                    )}
                   </div>
                   <div className="flex justify-between items-center mt-1 text-xs text-[var(--text-secondary)]">
-                    <div className="flex flex-col gap-1">
-                      <span>單價 ${item.price}</span>
-                      {item.isGift && (
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-amber-600 font-bold bg-amber-100 px-2 py-0.5 rounded w-fit">🎁 免費贈品</span>
-                        </div>
-                      )}
-                    </div>
+                    {!item.isGift && (
+                      <div className="flex flex-col gap-1">
+                        <span>單價 ${item.price}</span>
+                      </div>
+                    )}
                     {(() => {
                       if (item.isGift) {
                         return (
@@ -3030,7 +3033,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                       );
                     })()}
                   </div>
-                  {item.remark && (
+                  {item.remark && !item.isGift && (
                     <div className="text-xs text-blue-600 font-medium mt-1">
                       {item.remark}
                     </div>
