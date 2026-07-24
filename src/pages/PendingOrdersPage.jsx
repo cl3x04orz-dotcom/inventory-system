@@ -2006,8 +2006,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                     }}
                                                     className={`py-1.5 px-3 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 ${
                                                         isExpanded 
-                                                            ? 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/40 dark:border-blue-800' 
-                                                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:text-blue-600 shadow-2xs'
+                                                            ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30' 
+                                                            : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border-[var(--border-primary)] hover:border-blue-400 hover:text-blue-600 shadow-2xs'
                                                     }`}
                                                 >
                                                     {isExpanded ? (
@@ -2017,7 +2017,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <span>📦 商品明細</span>
+                                                            <span>{order.recipients && order.recipients.length > 0 ? '📦 商品與分貨明細' : '📦 商品明細'}</span>
                                                             <ChevronDown size={14} />
                                                         </>
                                                     )}
@@ -2025,7 +2025,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                             </div>
                                         </div>
 
-                                        {/* 第二列：狀態 Badges 橫列 (資訊 Badge 統一中性灰，僅付款狀態保留 🟢綠/🟠橘 判讀) */}
+                                        {/* 第二列：狀態 Badges 橫列 (使用輕量 10% 透明度與主題變數，擺脫 Mac 深色模式的大黑塊感) */}
                                         <div className="flex items-center gap-2 flex-wrap text-xs pt-0.5">
                                             {(() => {
                                                 const knownNames = Array.from(new Set([...buildings, ...Object.values(groupBindings)])).filter(Boolean);
@@ -2034,19 +2034,28 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                 const displayGroup = matchedAddrBuilding || groupBindings[order.sourceGroup] || order.sourceGroup;
                                                 if (!displayGroup) return null;
                                                 return (
-                                                    <span className="bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 text-xs px-2.5 py-0.5 rounded-md font-bold border border-slate-200 dark:border-slate-700 flex items-center gap-1">
+                                                    <span className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs px-2.5 py-0.5 rounded-md font-bold border border-[var(--border-primary)] flex items-center gap-1">
                                                         🌐 {displayGroup}
                                                     </span>
                                                 );
                                             })()}
 
+                                            {order.recipients && order.recipients.length > 0 && (
+                                                <span 
+                                                    className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs px-2.5 py-0.5 rounded-md font-bold border border-[var(--border-primary)] flex items-center gap-1"
+                                                    title={`含 ${order.recipients.length} 位團員代訂分貨明細`}
+                                                >
+                                                    👥 團員代訂 ({order.recipients.length}人)
+                                                </span>
+                                            )}
+
                                             {order.paymentMethod && (
-                                                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-primary)]">
                                                     💳 {order.paymentMethod}
                                                 </span>
                                             )}
 
-                                            {/* 付款狀態 (狀態強調色: 🟠未付款 / 🟢已付款) */}
+                                            {/* 付款狀態 (狀態強調色: 10% 柔和透明度，不論深淺模式都不會變成濃重深塊) */}
                                             {order.paymentStatus !== 'off' && order.paymentStatus !== '已付款' && order.paymentStatus !== '已入帳' ? (
                                                 <button
                                                     type="button"
@@ -2054,13 +2063,13 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                         e.stopPropagation();
                                                         handleQuickConfirmPayment(order);
                                                     }}
-                                                    className="text-xs px-2.5 py-0.5 font-bold rounded bg-amber-50 dark:bg-amber-950/40 hover:bg-emerald-50 text-amber-700 dark:text-amber-300 hover:text-emerald-700 border border-amber-200 dark:border-amber-800 shadow-2xs flex items-center gap-1 transition-colors"
+                                                    className="text-xs px-2.5 py-0.5 font-bold rounded bg-amber-500/10 hover:bg-emerald-500/10 text-amber-600 dark:text-amber-400 hover:text-emerald-600 border border-amber-500/20 shadow-2xs flex items-center gap-1 transition-colors"
                                                     title="點擊一鍵確認收款"
                                                 >
                                                     <Check size={12} /> 🟠 未付款 (確認)
                                                 </button>
                                             ) : (
-                                                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                                                     ✓ 已付款
                                                 </span>
                                             )}
@@ -2071,7 +2080,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                         e.stopPropagation();
                                                         handleOpenDateModal(order, e);
                                                     }}
-                                                    className="bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 font-bold px-2.5 py-0.5 rounded-md flex items-center gap-1 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors"
+                                                    className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] font-bold px-2.5 py-0.5 rounded-md flex items-center gap-1 cursor-pointer hover:bg-[var(--bg-hover)] border border-[var(--border-primary)] transition-colors"
                                                     title="點擊修改預計配送日"
                                                 >
                                                     🚚 {order.expectedDeliveryDate} 配送
@@ -2079,11 +2088,11 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                             )}
                                         </div>
 
-                                        {/* 第三列：物流通訊與下單時間 (統一藍灰圖示，經典 ERP 無壓感) */}
+                                        {/* 第三列：物流通訊與下單時間 */}
                                         <div className="text-xs text-[var(--text-secondary)] mt-1 flex flex-col gap-1.5 border-t border-dashed border-[var(--border-primary)] pt-2.5">
                                             <div className="flex items-center gap-3 flex-wrap">
                                                 <div className="flex items-center gap-1 font-semibold text-[var(--text-primary)]">
-                                                    <Phone size={14} className="text-slate-400 dark:text-slate-500" />
+                                                    <Phone size={14} className="text-[var(--text-tertiary)]" />
                                                     <span>{order.customerPhone}</span>
                                                     <button
                                                         type="button"
@@ -2091,7 +2100,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                             e.stopPropagation();
                                                             handleCopyText(order.customerPhone, '電話');
                                                         }}
-                                                        className="p-1 hover:bg-[var(--bg-hover)] rounded text-slate-400 hover:text-blue-500 transition-colors"
+                                                        className="p-1 hover:bg-[var(--bg-hover)] rounded text-[var(--text-tertiary)] hover:text-blue-500 transition-colors"
                                                         title="複製電話"
                                                     >
                                                         <Copy size={12} />
@@ -2099,13 +2108,13 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                 </div>
 
                                                 {order.lineDisplayName && (
-                                                    <span className="text-[11px] text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 font-medium">
+                                                    <span className="text-[11px] text-[var(--text-secondary)] bg-[var(--bg-tertiary)] px-2 py-0.5 rounded border border-[var(--border-primary)] font-medium">
                                                         LINE: {order.lineDisplayName}
                                                     </span>
                                                 )}
 
                                                 {order.createdAt && (
-                                                    <span className="text-slate-400 dark:text-slate-500 font-mono text-[11px] flex items-center gap-1 ml-auto">
+                                                    <span className="text-[var(--text-tertiary)] font-mono text-[11px] flex items-center gap-1 ml-auto">
                                                         🕒 {new Date(order.createdAt).toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                                                     </span>
                                                 )}
