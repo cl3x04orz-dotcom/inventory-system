@@ -2002,32 +2002,40 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                     })()}
                                                 </div>
                                                 
-                                                {/* 簡化版商品與地址預覽 */}
-                                                <div className="text-xs text-[var(--text-secondary)] mt-1.5 flex items-center gap-2 flex-wrap">
-                                                    <span className="text-blue-600 dark:text-blue-400 font-bold truncate max-w-md">
-                                                        📦 {order.items?.map(it => `${it.productName} x${it.qty}`).join('、 ') || '無商品'}
-                                                    </span>
-                                                    {order.deliveryAddress && (
-                                                        <span className="text-[var(--text-tertiary)] truncate max-w-xs">
-                                                            📍 {order.deliveryAddress}
-                                                        </span>
-                                                    )}
-                                                    {order.createdAt && (
-                                                        <span className="text-[var(--text-tertiary)] flex items-center gap-1 font-mono">
-                                                            🕒 {new Date(order.createdAt).toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                                                        </span>
-                                                    )}
-                                                    {order.expectedDeliveryDate && (
-                                                        <span
-                                                            onClick={(e) => handleOpenDateModal(order, e)}
-                                                            className="bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-md flex items-center gap-1 cursor-pointer hover:bg-emerald-200 border border-emerald-300 dark:border-emerald-700 transition-colors"
-                                                            title="點擊修改預計配送日"
-                                                        >
-                                                            <Calendar size={13} />
-                                                            出貨日: {order.expectedDeliveryDate}
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                {/* 未展開時顯示之完整預覽區塊 (展開後隱藏避免重複) */}
+                                                {!isExpanded && (
+                                                    <div className="text-xs text-[var(--text-secondary)] mt-2 flex flex-col gap-1.5 border-t border-dashed border-[var(--border-primary)] pt-2">
+                                                        <div className="flex items-start gap-1.5 text-blue-600 dark:text-blue-400 font-bold leading-normal">
+                                                            <span className="shrink-0">📦</span>
+                                                            <span className="break-words">
+                                                                {order.items?.map(it => `${it.productName} x${it.qty}`).join('、 ') || '無商品'}
+                                                            </span>
+                                                        </div>
+                                                        {order.deliveryAddress && (
+                                                            <div className="flex items-start gap-1.5 text-[var(--text-secondary)] leading-normal">
+                                                                <span className="shrink-0">📍</span>
+                                                                <span className="break-all font-medium">{order.deliveryAddress}</span>
+                                                            </div>
+                                                        )}
+                                                        <div className="flex items-center gap-3 text-[var(--text-tertiary)] flex-wrap font-mono text-[11px] pt-0.5">
+                                                            {order.createdAt && (
+                                                                <span className="flex items-center gap-1">
+                                                                    🕒 {new Date(order.createdAt).toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                                                </span>
+                                                            )}
+                                                            {order.expectedDeliveryDate && (
+                                                                <span
+                                                                    onClick={(e) => handleOpenDateModal(order, e)}
+                                                                    className="bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-md flex items-center gap-1 cursor-pointer hover:bg-emerald-200 border border-emerald-300 dark:border-emerald-700 transition-colors"
+                                                                    title="點擊修改預計配送日"
+                                                                >
+                                                                    <Calendar size={12} />
+                                                                    出貨日: {order.expectedDeliveryDate}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
