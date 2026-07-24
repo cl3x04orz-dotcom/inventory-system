@@ -1306,58 +1306,106 @@ export default function LiffOrderPage({ user, apiUrl }) {
         let totalQtyInGroup = group.items.reduce((sum, item) => sum + item.qty, 0);
 
         if (mode === 'AUTO_LOWEST_PRICE') {
-           let remainingQty = totalQtyInGroup;
            let totalFreeAllowed = 0;
+           let totalSavedAmount = 0;
 
-           for (const tier of sortedTiers) {
-             const groupSize = tier.buyQty + tier.freeQty;
-             if (groupSize > 0 && remainingQty >= groupSize) {
-               const sets = Math.floor(remainingQty / groupSize);
-               totalFreeAllowed += sets * tier.freeQty;
-               remainingQty -= sets * groupSize;
+           if (isGroupOrder && groupCart && typeof groupCart === 'object') {
+             for (const [memberName, memberItems] of Object.entries(groupCart)) {
+               if (!memberItems || typeof memberItems !== 'object') continue;
+               let memberExpandedUnits = [];
+               for (const item of group.items) {
+                 const mQty = Number(memberItems[item.id] || 0);
+                 for (let i = 0; i < mQty; i++) {
+                   memberExpandedUnits.push({ ...item, unitPrice: item.price });
+                 }
+               }
+               let remainingQty = memberExpandedUnits.length;
+               let memberFree = 0;
+               for (const tier of sortedTiers) {
+                 const groupSize = tier.buyQty + tier.freeQty;
+                 if (groupSize > 0 && remainingQty >= groupSize) {
+                   const sets = Math.floor(remainingQty / groupSize);
+                   memberFree += sets * tier.freeQty;
+                   remainingQty -= sets * groupSize;
+                 }
+               }
+               memberExpandedUnits.sort((a, b) => a.unitPrice - b.unitPrice);
+               for (let i = 0; i < memberFree; i++) {
+                 if (memberExpandedUnits[i]) {
+                   totalSavedAmount += memberExpandedUnits[i].unitPrice;
+                 }
+               }
+               totalFreeAllowed += memberFree;
              }
-           }
-
-           let expandedUnits = [];
-           for (const item of group.items) {
-             for (let i = 0; i < item.qty; i++) {
-               expandedUnits.push({ ...item, unitPrice: item.price });
+             for (const item of group.items) {
+               finalCartItems.push({ ...item, qty: item.qty, subtotal: item.qty * item.price, isGift: false });
+               totalAmount += item.qty * item.price;
              }
-           }
-           expandedUnits.sort((a, b) => a.unitPrice - b.unitPrice);
-           
-           for (let i = 0; i < expandedUnits.length; i++) {
-              expandedUnits[i].isFree = i < totalFreeAllowed;
-           }
-           
-           for (const item of group.items) {
-              const unitsOfThisItem = expandedUnits.filter(u => u.id === item.id);
-              const freeCount = unitsOfThisItem.filter(u => u.isFree).length;
-              const paidCount = unitsOfThisItem.filter(u => !u.isFree).length;
-              
-              if (paidCount > 0) {
-                  finalCartItems.push({ ...item, qty: paidCount, subtotal: paidCount * item.price, isGift: false });
-                  totalAmount += paidCount * item.price;
-              }
-              if (freeCount > 0) {
-                  finalCartItems.push({ ...item, qty: freeCount, subtotal: 0, price: 0, isGift: true, remark: item.remark ? `${item.remark} (贈品)` : "贈品" });
-              }
+           } else {
+             let remainingQty = totalQtyInGroup;
+             for (const tier of sortedTiers) {
+               const groupSize = tier.buyQty + tier.freeQty;
+               if (groupSize > 0 && remainingQty >= groupSize) {
+                 const sets = Math.floor(remainingQty / groupSize);
+                 totalFreeAllowed += sets * tier.freeQty;
+                 remainingQty -= sets * groupSize;
+               }
+             }
+             let expandedUnits = [];
+             for (const item of group.items) {
+               for (let i = 0; i < item.qty; i++) {
+                 expandedUnits.push({ ...item, unitPrice: item.price });
+               }
+             }
+             expandedUnits.sort((a, b) => a.unitPrice - b.unitPrice);
+             for (let i = 0; i < expandedUnits.length; i++) {
+                expandedUnits[i].isFree = i < totalFreeAllowed;
+             }
+             for (const item of group.items) {
+                const unitsOfThisItem = expandedUnits.filter(u => u.id === item.id);
+                const freeCount = unitsOfThisItem.filter(u => u.isFree).length;
+                const paidCount = unitsOfThisItem.filter(u => !u.isFree).length;
+                if (paidCount > 0) {
+                    finalCartItems.push({ ...item, qty: paidCount, subtotal: paidCount * item.price, isGift: false });
+                    totalAmount += paidCount * item.price;
+                }
+                if (freeCount > 0) {
+                    finalCartItems.push({ ...item, qty: freeCount, subtotal: 0, price: 0, isGift: true, remark: item.remark ? `${item.remark} (贈品)` : "贈品" });
+                }
+             }
+             totalSavedAmount = expandedUnits.filter(u => u.isFree).reduce((sum, u) => sum + u.unitPrice, 0);
            }
            
            if (totalFreeAllowed > 0) {
-              const savedAmount = expandedUnits.filter(u => u.isFree).reduce((sum, u) => sum + u.unitPrice, 0);
-              discounts.push(`✨ [${promo.name}] 已自動折抵 ${totalFreeAllowed} 件最低價商品 (省 $${savedAmount})`);
+              discounts.push(`✨ [${promo.name}] 已自動折抵 ${totalFreeAllowed} 件免費商品 (省 $${totalSavedAmount})`);
            }
 
         } else if (mode === 'CUSTOMER_SELECT') {
-           let remaining = totalQtyInGroup;
            let earnedGifts = 0;
-
-           for (const tier of sortedTiers) {
-             if (tier.buyQty > 0 && remaining >= tier.buyQty) {
-               const sets = Math.floor(remaining / tier.buyQty);
-               earnedGifts += sets * tier.freeQty;
-               remaining -= sets * tier.buyQty;
+           if (isGroupOrder && groupCart && typeof groupCart === 'object') {
+             for (const [memberName, memberItems] of Object.entries(groupCart)) {
+               if (!memberItems || typeof memberItems !== 'object') continue;
+               let memberGroupQty = 0;
+               for (const item of group.items) {
+                 memberGroupQty += Number(memberItems[item.id] || 0);
+               }
+               let remaining = memberGroupQty;
+               for (const tier of sortedTiers) {
+                 if (tier.buyQty > 0 && remaining >= tier.buyQty) {
+                   const sets = Math.floor(remaining / tier.buyQty);
+                   earnedGifts += sets * tier.freeQty;
+                   remaining -= sets * tier.buyQty;
+                 }
+               }
+             }
+           } else {
+             let remaining = totalQtyInGroup;
+             for (const tier of sortedTiers) {
+               if (tier.buyQty > 0 && remaining >= tier.buyQty) {
+                 const sets = Math.floor(remaining / tier.buyQty);
+                 earnedGifts += sets * tier.freeQty;
+                 remaining -= sets * tier.buyQty;
+               }
              }
            }
            
@@ -1389,30 +1437,44 @@ export default function LiffOrderPage({ user, apiUrl }) {
                }
            }
            
-           availableGiftCredits[pId] = { earned: earnedGifts, selected: selectedGiftsCount };
+           availableGiftCredits[pId] = { earned: earnedGifts, selected: selectedGiftsCount, promoName: promo.name };
            if (earnedGifts > 0) {
                discounts.push(`✨ [${promo.name}] 獲得 ${earnedGifts} 件贈品額度 (已選 ${selectedGiftsCount} 件)`);
            }
 
         } else if (mode === 'SAME_PRODUCT') {
            for (const item of group.items) {
-               let remaining = item.qty;
-               let itemFree = 0;
-
-               for (const tier of sortedTiers) {
-                 if (tier.buyQty > 0 && remaining >= tier.buyQty) {
-                   const sets = Math.floor(remaining / tier.buyQty);
-                   itemFree += sets * tier.freeQty;
-                   remaining -= sets * tier.buyQty;
+               let totalItemFree = 0;
+               if (isGroupOrder && groupCart && typeof groupCart === 'object') {
+                 for (const [memberName, memberItems] of Object.entries(groupCart)) {
+                   if (!memberItems || typeof memberItems !== 'object') continue;
+                   let memberItemQty = Number(memberItems[item.id] || 0);
+                   let remaining = memberItemQty;
+                   for (const tier of sortedTiers) {
+                     if (tier.buyQty > 0 && remaining >= tier.buyQty) {
+                       const sets = Math.floor(remaining / tier.buyQty);
+                       totalItemFree += sets * tier.freeQty;
+                       remaining -= sets * tier.buyQty;
+                     }
+                   }
+                 }
+               } else {
+                 let remaining = item.qty;
+                 for (const tier of sortedTiers) {
+                   if (tier.buyQty > 0 && remaining >= tier.buyQty) {
+                     const sets = Math.floor(remaining / tier.buyQty);
+                     totalItemFree += sets * tier.freeQty;
+                     remaining -= sets * tier.buyQty;
+                   }
                  }
                }
                
                finalCartItems.push({ ...item, qty: item.qty, subtotal: item.qty * item.price, isGift: false });
                totalAmount += item.qty * item.price;
                
-               if (itemFree > 0) {
-                   finalCartItems.push({ ...item, qty: itemFree, subtotal: 0, price: 0, isGift: true, remark: item.remark ? `${item.remark} (贈品)` : "贈品" });
-                   discounts.push(`✨ [${promo.name}] ${item.name} 滿贈獲得 ${itemFree} 件贈品`);
+               if (totalItemFree > 0) {
+                   finalCartItems.push({ ...item, qty: totalItemFree, subtotal: 0, price: 0, isGift: true, remark: item.remark ? `${item.remark} (贈品)` : "贈品" });
+                   discounts.push(`✨ [${promo.name}] ${item.name} 滿贈獲得 ${totalItemFree} 件贈品`);
                }
            }
         }
