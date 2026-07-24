@@ -48,6 +48,41 @@ const calculateTotalQtyFromFlavorMap = (flavorMap = {}) => {
     return Object.values(flavorMap).reduce((sum, q) => sum + (Number(q) || 0), 0);
 };
 
+const formatDetailItemLine = (item, prod) => {
+    let rawName = item.productName || item.productId || '';
+    let cleanName = rawName.replace(/\s*\([\s\S]*?\)\s*$/, '').trim();
+    if (cleanName.includes('【口味備註：')) {
+        cleanName = cleanName.split('【口味備註：')[0].trim();
+    } else if (cleanName.includes('【')) {
+        cleanName = cleanName.split('【')[0].trim();
+    }
+
+    const isBundle = prod ? prod.isBundle : false;
+    const bundleSize = prod ? prod.bundleSize : 1;
+    const unitStr = isBundle ? `組 (共 ${item.qty * bundleSize} 瓶)` : '瓶';
+
+    let cleanRemarkStr = '';
+    const rawRemark = item.remark ? String(item.remark).trim() : '';
+    let remarkToParse = rawRemark;
+    if (!remarkToParse && rawName.includes('【')) {
+        remarkToParse = rawName;
+    }
+
+    if (remarkToParse) {
+        if (remarkToParse.includes('【口味備註：')) {
+            const inner = remarkToParse.replace(/.*?【口味備註：(.*?)】.*/, '$1').trim();
+            if (inner) cleanRemarkStr = `【${inner}】`;
+        } else if (remarkToParse.includes('【') && remarkToParse.includes('】')) {
+            const inner = remarkToParse.replace(/.*?【(.*?)】.*/, '$1').trim();
+            if (inner) cleanRemarkStr = `【${inner}】`;
+        } else {
+            cleanRemarkStr = ` (${remarkToParse})`;
+        }
+    }
+
+    return `   - ${cleanName} x ${item.qty} ${unitStr}${cleanRemarkStr}`;
+};
+
 export default function PendingOrdersPage({ user, apiUrl }) {
     const [orders, setOrders] = useState([]);
     const [products, setProducts] = useState([]);
@@ -1491,11 +1526,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             lines.push('   訂購品項：');
             order.items.forEach(item => {
                 const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
-                const isBundle = prod ? prod.isBundle : false;
-                const bundleSize = prod ? prod.bundleSize : 1;
-                const unitStr = isBundle ? `組 (共 ${item.qty * bundleSize} 瓶)` : '瓶';
-                const remarkStr = item.remark ? ` (${item.remark})` : '';
-                lines.push(`   - ${item.productName} x ${item.qty} ${unitStr}${remarkStr}`);
+                lines.push(formatDetailItemLine(item, prod));
             });
             
             lines.push(`   合計金額：$${order.totalAmount}`);
@@ -1561,11 +1592,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             lines.push('   訂購品項：');
             order.items.forEach(item => {
                 const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
-                const isBundle = prod ? prod.isBundle : false;
-                const bundleSize = prod ? prod.bundleSize : 1;
-                const unitStr = isBundle ? `組 (共 ${item.qty * bundleSize} 瓶)` : '瓶';
-                const remarkStr = item.remark ? ` (${item.remark})` : '';
-                lines.push(`   - ${item.productName} x ${item.qty} ${unitStr}${remarkStr}`);
+                lines.push(formatDetailItemLine(item, prod));
             });
             
             lines.push(`   合計金額：$${order.totalAmount}`);
