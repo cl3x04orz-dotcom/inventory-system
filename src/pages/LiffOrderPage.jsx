@@ -1145,9 +1145,20 @@ export default function LiffOrderPage({ user, apiUrl }) {
     } else {
       val = parseInt(valStr, 10);
       if (isNaN(val)) val = 0;
-      val = Math.max(0, Math.min(99, val));
-    }
     setTempFlavorQty((prev) => ({ ...prev, [flavor]: val }));
+  };
+
+  const calcProductSubtotal = (product, qty) => {
+    if (!product || !qty) return 0;
+    const singlePrice = Number(product.single_price) || Number(product.price) || 0;
+    if (product.has_volume_pricing && product.volume_pricing_settings) {
+      const targetQty = Number(product.volume_pricing_settings.target_quantity) || 1;
+      const packagePrice = Number(product.volume_pricing_settings.package_price) || 0;
+      const groupCount = Math.floor(qty / targetQty);
+      const remainderCount = qty % targetQty;
+      return groupCount * packagePrice + remainderCount * singlePrice;
+    }
+    return singlePrice * qty;
   };
 
   const getFlavorRemark = (productId, pFlavorSelections, pGroupFlavorSelections = null, pIsGroupOrder = false) => {
