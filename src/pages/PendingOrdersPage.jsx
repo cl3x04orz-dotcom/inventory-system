@@ -1962,7 +1962,17 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         {sortedFilteredOrders.map(order => {
                             const isExpanded = expandedOrderIds.has(order.orderId);
                             return (
-                                <div key={order.orderId} className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] shadow-sm hover:border-blue-500/40 hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col">
+                                <div key={order.orderId} className="relative bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] shadow-sm hover:border-blue-500/40 hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col">
+                                    {/* 右上角紅底邊角標籤：極速辨識團員代訂單 */}
+                                    {order.recipients && order.recipients.length > 0 && (
+                                        <div 
+                                            className="absolute top-0 right-0 z-10 bg-rose-600 text-white font-black text-[10px] sm:text-xs px-2.5 py-0.5 rounded-bl-lg rounded-tr-xl shadow-sm tracking-wider flex items-center gap-1 pointer-events-none"
+                                            title={`含 ${order.recipients.length} 位團員代訂明細`}
+                                        >
+                                            代訂單 ({order.recipients.length}人)
+                                        </div>
+                                    )}
+
                                     {/* 頂部 Header & 完整訂單摘要 (收合狀態 = 100% 完整訂單摘要卡片，零視覺雜訊) */}
                                     <div 
                                         onClick={() => toggleExpandOrder(order.orderId)}
@@ -1995,7 +2005,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                             </div>
 
                                             <div className="flex items-center gap-3 flex-shrink-0">
-                                                <span className="font-mono font-black text-xl md:text-2xl text-[var(--text-primary)]">
+                                                <span className="font-mono font-black text-xl md:text-2xl text-blue-600 dark:text-blue-400">
                                                     ${computeOrderTotals(order, buildingSettingsList, groupBindings).totalAmount}
                                                 </span>
                                                 <button
@@ -2025,7 +2035,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                             </div>
                                         </div>
 
-                                        {/* 第二列：狀態 Badges 橫列 (使用輕量 10% 透明度與主題變數，擺脫 Mac 深色模式的大黑塊感) */}
+                                        {/* 第二列：狀態 Badges 橫列 */}
                                         <div className="flex items-center gap-2 flex-wrap text-xs pt-0.5">
                                             {(() => {
                                                 const knownNames = Array.from(new Set([...buildings, ...Object.values(groupBindings)])).filter(Boolean);
@@ -2039,15 +2049,6 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                     </span>
                                                 );
                                             })()}
-
-                                            {order.recipients && order.recipients.length > 0 && (
-                                                <span 
-                                                    className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs px-2.5 py-0.5 rounded-md font-bold border border-[var(--border-primary)] flex items-center gap-1"
-                                                    title={`含 ${order.recipients.length} 位團員代訂分貨明細`}
-                                                >
-                                                    👥 團員代訂 ({order.recipients.length}人)
-                                                </span>
-                                            )}
 
                                             {order.paymentMethod && (
                                                 <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-primary)]">
