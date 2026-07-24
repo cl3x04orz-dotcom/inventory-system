@@ -2981,6 +2981,13 @@ export default function LiffOrderPage({ user, apiUrl }) {
                           </span>
                         );
                       }
+                      if (isGroupOrder) {
+                        return (
+                          <span className="font-extrabold font-mono text-xs text-[var(--text-secondary)] bg-[var(--bg-tertiary)] px-2.5 py-1 rounded-lg border border-[var(--border-primary)] mr-1">
+                            共 {item.qty} 件
+                          </span>
+                        );
+                      }
                       const product = products.find(p => p.id === item.id);
                       if (!product) return null;
                       return (
