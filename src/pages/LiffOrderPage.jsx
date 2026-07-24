@@ -97,6 +97,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
   const [isGroupOrder, setIsGroupOrder] = useState(false);
   const [activeRecipient, setActiveRecipient] = useState("");
   const [groupCart, setGroupCart] = useState({});
+  const [groupGiftSelections, setGroupGiftSelections] = useState({}); // { [memberName]: { [promoId]: { [productId]: qty } } }
+  const [activeGroupMember, setActiveGroupMember] = useState("");
   const [commonRecipients, setCommonRecipients] = useState(() => {
     try {
       const saved = localStorage.getItem("mlw_common_recipients");
@@ -1252,7 +1254,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   const totalQty = Object.values(cart).reduce((s, q) => s + q, 0);
 
-  const { cartItems, cartTotal, discountDetails, availableGiftCredits } = useMemo(() => {
+  const { cartItems, cartTotal, discountDetails, availableGiftCredits, memberGiftCredits } = useMemo(() => {
     let tempItems = Object.entries(cart).map(([pid, qty]) => {
       const p = products.find((x) => x.id === pid);
       return {
@@ -1272,6 +1274,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
     let totalAmount = 0;
     const discounts = [];
     const availableGiftCredits = {}; // { [promoId]: { earned: number, selected: number } }
+    const memberGiftCredits = {}; // { [memberName]: { [promoId]: { earned: number, selected: number } } }
     const finalCartItems = [];
 
     // 分組
@@ -1390,13 +1393,21 @@ export default function LiffOrderPage({ user, apiUrl }) {
                  memberGroupQty += Number(memberItems[item.id] || 0);
                }
                let remaining = memberGroupQty;
+               let mEarned = 0;
                for (const tier of sortedTiers) {
                  if (tier.buyQty > 0 && remaining >= tier.buyQty) {
                    const sets = Math.floor(remaining / tier.buyQty);
-                   earnedGifts += sets * tier.freeQty;
+                   mEarned += sets * tier.freeQty;
                    remaining -= sets * tier.buyQty;
                  }
                }
+               earnedGifts += mEarned;
+
+               // 計算該成員已選取贈品
+               const mSelections = groupGiftSelections[memberName]?.[pId] || {};
+               const mSelectedCount = Object.values(mSelections).reduce((a, b) => a + Number(b), 0);
+               if (!memberGiftCredits[memberName]) memberGiftCredits[memberName] = {};
+               memberGiftCredits[memberName][pId] = { earned: mEarned, selected: mSelectedCount, promoName: promo.name };
              }
            } else {
              let remaining = totalQtyInGroup;
@@ -1415,26 +1426,52 @@ export default function LiffOrderPage({ user, apiUrl }) {
            }
            
            let selectedGiftsCount = 0;
-           const selections = giftSelections[pId] || {};
-           for (const [gPid, gQty] of Object.entries(selections)) {
-               if (gQty > 0) {
+           if (isGroupOrder && groupCart && typeof groupCart === 'object') {
+             Object.entries(groupGiftSelections || {}).forEach(([memberName, mGifts]) => {
+               const selections = mGifts?.[pId] || {};
+               Object.entries(selections).forEach(([gPid, gQty]) => {
+                 if (gQty > 0) {
                    selectedGiftsCount += gQty;
                    const gProd = products.find(p => p.id === gPid);
                    if (gProd) {
-                       finalCartItems.push({
-                           id: gPid,
-                           name: gProd.name,
-                           price: 0,
-                           qty: gQty,
-                           freeQty: 0,
-                           subtotal: 0,
-                           product: gProd,
-                           remark: "贈品",
-                           imageUrl: gProd.imageUrl || "",
-                           isGift: true
-                       });
+                     finalCartItems.push({
+                       id: gPid,
+                       name: gProd.name,
+                       price: 0,
+                       qty: gQty,
+                       freeQty: 0,
+                       subtotal: 0,
+                       product: gProd,
+                       remark: `贈品 (${memberName})`,
+                       imageUrl: gProd.imageUrl || "",
+                       isGift: true
+                     });
                    }
-               }
+                 }
+               });
+             });
+           } else {
+             const selections = giftSelections[pId] || {};
+             for (const [gPid, gQty] of Object.entries(selections)) {
+                 if (gQty > 0) {
+                     selectedGiftsCount += gQty;
+                     const gProd = products.find(p => p.id === gPid);
+                     if (gProd) {
+                         finalCartItems.push({
+                             id: gPid,
+                             name: gProd.name,
+                             price: 0,
+                             qty: gQty,
+                             freeQty: 0,
+                             subtotal: 0,
+                             product: gProd,
+                             remark: "贈品",
+                             imageUrl: gProd.imageUrl || "",
+                             isGift: true
+                         });
+                     }
+                 }
+             }
            }
            
            availableGiftCredits[pId] = { earned: earnedGifts, selected: selectedGiftsCount, promoName: promo.name };
@@ -1575,8 +1612,8 @@ export default function LiffOrderPage({ user, apiUrl }) {
       }
     }
 
-    return { cartItems: finalCartItems, cartTotal: totalAmount, discountDetails: discounts, availableGiftCredits };
-  }, [cart, giftSelections, products, flavorSelections, groupFlavorSelections, isGroupOrder]);
+    return { cartItems: finalCartItems, cartTotal: totalAmount, discountDetails: discounts, availableGiftCredits, memberGiftCredits };
+  }, [cart, giftSelections, groupGiftSelections, products, flavorSelections, groupFlavorSelections, isGroupOrder, groupCart]);
 
   const shippingFee = useMemo(() => {
     if (!isGeneralUser) return 0;
@@ -1856,25 +1893,45 @@ export default function LiffOrderPage({ user, apiUrl }) {
             const details = {};
             if (groupCart && typeof groupCart === "object") {
               Object.entries(groupCart).forEach(([name, recipientItems]) => {
-                if (recipientItems && typeof recipientItems === "object") {
-                  const validEntries = Object.entries(recipientItems).filter(([_, qty]) => Number(qty) > 0);
-                  if (validEntries.length > 0) {
-                    details[name] = validEntries.map(([pid, qty]) => {
-                      const prod = products.find(p => p.id === pid);
-                      const sub = prod ? calcProductSubtotal(prod, qty) : 0;
-                      const free = item.freeQty || 0;
-                      const price = qty > 0 ? Math.round(sub / qty) : (prod ? (Number(prod.single_price) || Number(prod.price)) : 0);
-                      const rem = prod?.has_flavor_attributes ? getFlavorRemark(pid, {}, { [name]: groupFlavorSelections[name] }, true) : "";
-                      return {
-                        productId: pid,
-                        productName: prod?.name || pid,
-                        qty: Number(qty) + free,
-                        price: price,
-                        subtotal: sub,
-                        remark: rem
-                      };
-                    });
-                  }
+                const validEntries = recipientItems && typeof recipientItems === "object"
+                  ? Object.entries(recipientItems).filter(([_, qty]) => Number(qty) > 0)
+                  : [];
+                const mGifts = groupGiftSelections[name] || {};
+
+                if (validEntries.length > 0 || Object.keys(mGifts).length > 0) {
+                  details[name] = validEntries.map(([pid, qty]) => {
+                    const prod = products.find(p => p.id === pid);
+                    const sub = prod ? calcProductSubtotal(prod, qty) : 0;
+                    const price = qty > 0 ? Math.round(sub / qty) : (prod ? (Number(prod.single_price) || Number(prod.price)) : 0);
+                    const rem = prod?.has_flavor_attributes ? getFlavorRemark(pid, {}, { [name]: groupFlavorSelections[name] }, true) : "";
+                    return {
+                      productId: pid,
+                      productName: prod?.name || pid,
+                      qty: Number(qty),
+                      price: price,
+                      subtotal: sub,
+                      remark: rem
+                    };
+                  });
+
+                  // 🎁 將該團員特有的贈品寫入 groupDetails
+                  Object.entries(mGifts).forEach(([pId, gObj]) => {
+                    if (gObj && typeof gObj === 'object') {
+                      Object.entries(gObj).forEach(([gPid, gQty]) => {
+                        if (Number(gQty) > 0) {
+                          const gProd = products.find(p => p.id === gPid);
+                          details[name].push({
+                            productId: gPid,
+                            productName: gProd?.name || gPid,
+                            qty: Number(gQty),
+                            price: 0,
+                            subtotal: 0,
+                            remark: "贈品"
+                          });
+                        }
+                      });
+                    }
+                  });
                 }
               });
             }
@@ -2297,12 +2354,170 @@ export default function LiffOrderPage({ user, apiUrl }) {
   }
 
   // ── 🎁 贈品選擇 Bottom Sheet 抽屜組件 ─────────────────────────────
+  // ── 🎁 贈品選擇 Bottom Sheet 抽屜組件 ─────────────────────────────
   const renderGiftModal = () => {
     if (!showGiftModal) return null;
     const pId = showGiftModal;
-    const credits = availableGiftCredits[pId] || { earned: 0, selected: 0 };
     const promoItems = products.filter(p => p.promoId === pId);
     const promo = promoItems[0]?.promotion;
+
+    if (isGroupOrder) {
+      const membersWithGifts = Object.keys(groupCart || {}).filter(
+        name => (memberGiftCredits[name]?.[pId]?.earned || 0) > 0
+      );
+
+      if (membersWithGifts.length === 0) return null;
+
+      const currMember = (activeGroupMember && membersWithGifts.includes(activeGroupMember))
+        ? activeGroupMember
+        : (membersWithGifts.find(name => (memberGiftCredits[name]?.[pId]?.selected || 0) < (memberGiftCredits[name]?.[pId]?.earned || 0)) || membersWithGifts[0]);
+
+      const mCredits = memberGiftCredits[currMember]?.[pId] || { earned: 0, selected: 0 };
+      const mSelections = groupGiftSelections[currMember]?.[pId] || {};
+      const mRemaining = mCredits.earned - mCredits.selected;
+
+      const handleSetGroupGift = (prodId, num) => {
+        const current = mSelections[prodId] || 0;
+        const diff = num - current;
+        if (num < 0) return;
+        if (diff > 0 && mRemaining < diff) return;
+
+        setGroupGiftSelections(prev => ({
+          ...prev,
+          [currMember]: {
+            ...(prev[currMember] || {}),
+            [pId]: {
+              ...(prev[currMember]?.[pId] || {}),
+              [prodId]: num
+            }
+          }
+        }));
+      };
+
+      const nextIncomplete = membersWithGifts.find(
+        name => name !== currMember && (memberGiftCredits[name]?.[pId]?.selected || 0) < (memberGiftCredits[name]?.[pId]?.earned || 0)
+      );
+
+      return (
+        <div className="fixed inset-0 z-[9999] flex flex-col justify-end p-3 pb-[75px]">
+          {/* 遮罩背景 */}
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-fadeIn"
+            onClick={() => setShowGiftModal(null)}
+          />
+
+          {/* Bottom Sheet 抽屜卡片 */}
+          <div className="relative z-50 bg-[var(--bg-secondary)] rounded-[28px] border border-[var(--border-primary)] shadow-2xl w-full max-w-md mx-auto flex flex-col overflow-hidden max-h-[80vh] animate-slideUp">
+            {/* 頂部拖拽條與 Header */}
+            <div className="pt-3 pb-2 px-4 border-b border-[var(--border-primary)] bg-[var(--bg-tertiary)] flex flex-col items-center relative">
+              <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mb-2 cursor-pointer" onClick={() => setShowGiftModal(null)} />
+              <div className="w-full flex justify-between items-center">
+                <div>
+                  <h3 className="text-base font-extrabold text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
+                    <span>🎉 選擇 👤【{currMember}】的贈品</span>
+                  </h3>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 font-bold mt-0.5">
+                    {promo?.name} ｜ 額度: {mCredits.earned} 件 / 已選: {mCredits.selected} 件 {mRemaining > 0 ? `(尚餘 ${mRemaining} 件)` : '✅ 已選完'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowGiftModal(null)}
+                  className="text-[var(--text-secondary)] hover:text-red-500 p-1.5 rounded-lg hover:bg-[var(--bg-hover)] shrink-0"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              </div>
+            </div>
+
+            {/* 👥 團員頁籤切換 Bar */}
+            <div className="flex gap-2 p-2.5 overflow-x-auto border-b border-[var(--border-primary)] bg-[var(--bg-tertiary)] shrink-0 no-scrollbar">
+              {membersWithGifts.map(name => {
+                const mc = memberGiftCredits[name]?.[pId] || { earned: 0, selected: 0 };
+                const isDone = mc.selected >= mc.earned;
+                const isActive = currMember === name;
+                return (
+                  <button
+                    key={name}
+                    onClick={() => setActiveGroupMember(name)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all flex items-center gap-1 ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : isDone
+                        ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-300 dark:border-emerald-700'
+                        : 'bg-amber-500/10 text-amber-600 border border-amber-300 dark:border-amber-700 animate-pulse'
+                    }`}
+                  >
+                    <span>👤 {name}</span>
+                    <span>{isDone ? `✅ (${mc.selected}/${mc.earned})` : `(${mc.selected}/${mc.earned})`}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 贈品品項列表 */}
+            <div className="p-4 overflow-y-auto space-y-3 bg-[var(--bg-secondary)] min-h-[140px] max-h-[45vh]">
+              {promoItems.map((prod) => {
+                const qty = mSelections[prod.id] || 0;
+                return (
+                  <div key={prod.id} className="flex items-center justify-between p-3.5 border border-[var(--border-primary)] rounded-2xl hover:border-blue-200 hover:bg-blue-50/30 transition-all">
+                    <div className="font-bold text-sm text-[var(--text-primary)] pr-2 line-clamp-2">
+                      {prod.name}
+                    </div>
+                    <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] rounded-xl p-1 border border-[var(--border-primary)] shadow-sm shrink-0">
+                      <button
+                        onClick={() => handleSetGroupGift(prod.id, qty - 1)}
+                        disabled={qty === 0}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200 active:scale-95 disabled:opacity-30 transition-all font-extrabold"
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <span className="w-6 text-center font-extrabold font-mono text-base text-[var(--text-primary)]">
+                        {qty}
+                      </span>
+                      <button
+                        onClick={() => handleSetGroupGift(prod.id, qty + 1)}
+                        disabled={mRemaining === 0}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200 active:scale-95 disabled:opacity-30 transition-all font-extrabold"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 底部完成 / 下一步按鈕 */}
+            <div className="p-4 border-t border-[var(--border-primary)] bg-[var(--bg-tertiary)]">
+              <button
+                onClick={() => {
+                  if (mRemaining === 0 && nextIncomplete) {
+                    setActiveGroupMember(nextIncomplete);
+                  } else {
+                    setShowGiftModal(null);
+                  }
+                }}
+                className={`w-full py-3.5 rounded-xl font-extrabold text-sm transition-all shadow-md active:scale-95 flex items-center justify-center gap-1 text-white ${
+                  mRemaining === 0 && nextIncomplete
+                    ? 'bg-amber-500 hover:bg-amber-600 animate-pulse'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                {mRemaining > 0 ? (
+                  `確認 👤【${currMember}】的選取 (尚有 ${mRemaining} 件未選)`
+                ) : nextIncomplete ? (
+                  `下一步：選擇 👤【${nextIncomplete}】的贈品 ➔`
+                ) : (
+                  '完成全體團員贈品選取 ✅'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const credits = availableGiftCredits[pId] || { earned: 0, selected: 0 };
     const selections = giftSelections[pId] || {};
     const remaining = credits.earned - credits.selected;
 
@@ -2683,6 +2898,33 @@ export default function LiffOrderPage({ user, apiUrl }) {
                             </div>
                           );
                         })}
+                        {/* 🎁 展示該團員所選取的贈品明細 */}
+                        {(() => {
+                          const mGifts = groupGiftSelections[name] || {};
+                          const giftList = [];
+                          Object.entries(mGifts).forEach(([pId, gObj]) => {
+                            if (gObj && typeof gObj === 'object') {
+                              Object.entries(gObj).forEach(([gPid, gQty]) => {
+                                if (Number(gQty) > 0) {
+                                  const gProd = products.find(p => p.id === gPid);
+                                  if (gProd) {
+                                    giftList.push({ id: gPid, name: gProd.name, qty: gQty });
+                                  }
+                                }
+                              });
+                            }
+                          });
+                          if (giftList.length === 0) return null;
+                          return giftList.map((g, idx) => (
+                            <div key={idx} className="flex justify-between items-center text-xs text-amber-700 dark:text-amber-300 font-bold bg-amber-500/10 px-2.5 py-1 rounded-lg mt-1">
+                              <span className="font-sans flex items-center gap-1">
+                                <span>🎁</span>
+                                <span>[贈品] {g.name} x{g.qty}</span>
+                              </span>
+                              <span className="font-mono text-amber-600 dark:text-amber-400 font-extrabold">$0</span>
+                            </div>
+                          ));
+                        })()}
                       </div>
                       <div className="flex justify-end items-center text-xs font-bold text-blue-600 pt-1">
                         <span>小計：${memberTotal} 元</span>
