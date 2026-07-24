@@ -2179,12 +2179,20 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                                 const bundleSize = prod ? prod.bundleSize : 1;
                                                                 const freeQty = prod ? calculateFreeQtyFromTotal(prod.id, item.qty) : 0;
                                                                 const paidQty = item.qty - freeQty;
+
+                                                                const cleanName = String(item.productName || '')
+                                                                     .replace(/\s*\(\s*【?口味備註：.*$/gi, '')
+                                                                     .replace(/\s*【口味備註：.*$/gi, '')
+                                                                     .replace(/\s*\([^)]*口味備註.*$/gi, '')
+                                                                     .replace(/[)】\s]+$/g, '')
+                                                                     .trim();
+
                                                                 return (
                                                                     <div className="flex justify-between items-start text-sm md:text-base">
                                                                         <div className="flex flex-col gap-1">
                                                                             <div className="flex items-center gap-2 flex-wrap">
                                                                                 <span className="font-extrabold text-[var(--text-primary)]">
-                                                                                    {item.productName}
+                                                                                    {cleanName}
                                                                                     {isBundle && <span className="text-[10px] font-extrabold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md ml-1.5">捆裝 {bundleSize}入</span>}
                                                                                 </span>
                                                                                 <span className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-extrabold">
@@ -2201,11 +2209,18 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                                     </div>
                                                                 );
                                                             })()}
-                                                            {item.remark && (
-                                                                <div className="text-xs text-blue-600 dark:text-blue-400 font-bold mt-1 ml-1">
-                                                                    {item.remark}
-                                                                </div>
-                                                            )}
+                                                            {item.remark && (() => {
+                                                                const flavorTag = String(item.remark || '')
+                                                                    .replace(/【?口味備註：?/g, '')
+                                                                    .replace(/】/g, '')
+                                                                    .trim();
+                                                                if (!flavorTag) return null;
+                                                                return (
+                                                                    <div className="text-xs text-blue-600 dark:text-blue-400 font-bold mt-1 ml-1">
+                                                                        【{flavorTag}】
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     ))}
                                                 </div>
@@ -2238,7 +2253,15 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                                             <div className="pl-3 mt-1.5 space-y-0.5 text-xs text-[var(--text-secondary)]">
                                                                                 {r.items.map((ri, riIdx) => {
                                                                                     const sub = ri.subtotal != null && Number(ri.subtotal) > 0 ? Number(ri.subtotal) : calculateItemSubtotal(ri.productId, ri.qty, ri.price);
-                                                                                    const pNameDisplay = ri.productName + (ri.remark && !String(ri.productName || '').includes(ri.remark) ? ` (${ri.remark})` : '');
+                                                                                    const cleanName = String(ri.productName || '')
+                                                                                        .replace(/\s*\(\s*【?口味備註：[^】)]+】?\s*\)/g, '')
+                                                                                        .replace(/\s*【口味備註：[^】]+】/g, '')
+                                                                                        .trim();
+                                                                                    const cleanRemark = String(ri.remark || '')
+                                                                                        .replace(/【?口味備註：?/g, '')
+                                                                                        .replace(/】/g, '')
+                                                                                        .trim();
+                                                                                    const pNameDisplay = cleanName + (cleanRemark ? ` 【${cleanRemark}】` : '');
                                                                                     const freeQty = calculateFreeQtyFromTotal(ri.productId, ri.qty);
                                                                                     const paidQty = ri.qty - freeQty;
                                                                                     const qtyDisplay = freeQty > 0 ? `x${ri.qty} (付費:${paidQty},送:${freeQty})` : `x${ri.qty}`;
