@@ -1656,6 +1656,41 @@ export default function LiffOrderPage({ user, apiUrl }) {
     return { cartItems: finalCartItems, cartTotal: totalAmount, discountDetails: discounts, availableGiftCredits, memberGiftCredits };
   }, [cart, giftSelections, groupGiftSelections, products, flavorSelections, groupFlavorSelections, isGroupOrder, groupCart]);
 
+  // 🧹 自動重置/清理不足額度之贈品：當商品減購或刪除導致已選數量 > 可得數量時，直接重置讓客人重新挑選
+  useEffect(() => {
+    if (isGroupOrder) {
+      setGroupGiftSelections(prev => {
+        let changed = false;
+        const next = { ...prev };
+        Object.entries(memberGiftCredits || {}).forEach(([memberName, mCredits]) => {
+          Object.entries(mCredits || {}).forEach(([pId, credit]) => {
+            if (credit.selected > credit.earned) {
+              if (next[memberName]?.[pId]) {
+                const nextMember = { ...next[memberName] };
+                delete nextMember[pId];
+                next[memberName] = nextMember;
+                changed = true;
+              }
+            }
+          });
+        });
+        return changed ? next : prev;
+      });
+    } else {
+      setGiftSelections(prev => {
+        let changed = false;
+        const next = { ...prev };
+        Object.entries(availableGiftCredits || {}).forEach(([pId, credit]) => {
+          if (credit.selected > credit.earned) {
+            delete next[pId];
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    }
+  }, [availableGiftCredits, memberGiftCredits, isGroupOrder]);
+
   const shippingFee = useMemo(() => {
     if (!isGeneralUser) return 0;
     let activeComm = currentCommunity;
