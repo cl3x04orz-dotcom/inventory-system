@@ -218,7 +218,9 @@ export const ProductService = {
         maxSuggestion: maxSuggestion !== undefined ? Number(maxSuggestion) : undefined,
         isBundle: isBundle !== undefined ? Boolean(isBundle) : undefined,
         bundleSize: bundleSize !== undefined ? Number(bundleSize) : undefined,
-        maxTotalQty: parsedMaxTotalQty
+        maxTotalQty: parsedMaxTotalQty,
+        // 每次重新設定活動上限（不論是新值還是清除），soldQty 都歸零重新起算
+        soldQty: parsedMaxTotalQty !== undefined ? 0 : undefined,
       }
     });
 
