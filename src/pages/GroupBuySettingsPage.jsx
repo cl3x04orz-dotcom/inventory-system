@@ -46,6 +46,42 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
         });
     };
 
+    // ── LINE 群組發文文案範本 state (依大樓個別記憶) ──────────────────
+    const [customTemplates, setCustomTemplates] = useState(() => {
+        try {
+            const saved = localStorage.getItem('admin_line_templates');
+            return saved ? JSON.parse(saved) : {};
+        } catch (e) {
+            return {};
+        }
+    });
+    const [templateInputText, setTemplateInputText] = useState('');
+
+    const getDefaultTemplate = useCallback((bName, url) => {
+        return `📢【${bName || '大樓名稱'}】本週團購開跑囉！🎉\n\n各位住戶鄰居大家好，本週團購專屬下單連結已開放：\n👉 點擊下單：${url || ''}\n\n🚚 預計配送時間：請依結單提示為準\n小提醒：下單後可直接選擇付款方式，有任何問題隨時在群組詢問小編喔！❤️`;
+    }, []);
+
+    const handleSaveTemplate = (bName, newText) => {
+        if (!bName) return;
+        setCustomTemplates(prev => {
+            const next = { ...prev, [bName]: newText };
+            localStorage.setItem('admin_line_templates', JSON.stringify(next));
+            return next;
+        });
+        alert(`✅ 已成功儲存【${bName}】專屬 LINE 發文文案範本！`);
+    };
+
+    const handleResetTemplate = (bName) => {
+        if (!bName) return;
+        setCustomTemplates(prev => {
+            const next = { ...prev };
+            delete next[bName];
+            localStorage.setItem('admin_line_templates', JSON.stringify(next));
+            return next;
+        });
+        alert(`已重設【${bName}】的文案為預設範本。`);
+    };
+
     // HTML5 date / time state
     const [startDate, setStartDate] = useState('');
     const [startTime, setStartTime] = useState('');
@@ -578,6 +614,17 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
 
     const activeUrl = getGeneratedUrl();
 
+    useEffect(() => {
+        if (selectedBuilding && selectedBuilding !== '__new__') {
+            const custom = customTemplates[selectedBuilding];
+            if (custom !== undefined) {
+                setTemplateInputText(custom);
+            } else {
+                setTemplateInputText(getDefaultTemplate(selectedBuilding, activeUrl));
+            }
+        }
+    }, [selectedBuilding, activeUrl, customTemplates, getDefaultTemplate]);
+
     return (
         <div className="max-w-6xl mx-auto min-h-screen flex flex-col p-4 gap-4 pb-24">
             {/* Header Area */}
@@ -1103,32 +1150,79 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                     </p>
                                                 </div>
 
-                                                {/* LINE 群組開團發文喊單範本 */}
-                                                <div className="p-4 bg-emerald-50/40 border border-emerald-200/60 rounded-2xl space-y-2.5">
-                                                    <h4 className="font-extrabold text-sm text-emerald-800 flex items-center gap-1.5">
-                                                        📢 LINE 群組發文喊單預設範本
-                                                    </h4>
-                                                    <div className="p-3 bg-white rounded-xl border border-emerald-200 text-xs font-mono text-slate-700 whitespace-pre-wrap leading-relaxed">
-{`📢【${selectedBuilding}】本週團購開跑囉！🎉
-
-各位住戶鄰居大家好，本週團購專屬下單連結已開放：
-👉 點擊下單：${activeUrl}
-
-🚚 預計配送時間：請依結單提示為準
-小提醒：下單後可直接選擇付款方式，有任何問題隨時在群組詢問小編喔！❤️`}
+                                                {/* LINE 群組開團發文喊單範本 (可編輯與儲存) */}
+                                                <div className="p-4 bg-emerald-50/40 border border-emerald-200/60 rounded-2xl space-y-3">
+                                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                                                        <h4 className="font-extrabold text-sm text-emerald-800 flex items-center gap-1.5">
+                                                            📢【{selectedBuilding}】專屬 LINE 群組發文喊單範本
+                                                            {customTemplates[selectedBuilding] && (
+                                                                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">已自訂範本</span>
+                                                            )}
+                                                        </h4>
+                                                        {customTemplates[selectedBuilding] && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleResetTemplate(selectedBuilding)}
+                                                                className="text-xs text-slate-500 hover:text-slate-700 underline font-bold cursor-pointer"
+                                                            >
+                                                                重設為預設範本
+                                                            </button>
+                                                        )}
                                                     </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const text = `📢【${selectedBuilding}】本週團購開跑囉！🎉\n\n各位住戶鄰居大家好，本週團購專屬下單連結已開放：\n👉 點擊下單：${activeUrl}\n\n🚚 預計配送時間：請依結單提示為準\n小提醒：下單後可直接選擇付款方式，有任何問題隨時在群組詢問小編喔！❤️`;
-                                                            navigator.clipboard.writeText(text);
-                                                            alert('已複製 LINE 群組開團文案！');
-                                                        }}
-                                                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
-                                                    >
-                                                        <Copy size={13} />
-                                                        一鍵複製 LINE 開團發文文案
-                                                    </button>
+
+                                                    {/* 變數輔助按鈕 */}
+                                                    <div className="flex flex-wrap items-center gap-2 text-xs text-emerald-800">
+                                                        <span className="font-bold text-[11px]">快速插入動態變數：</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setTemplateInputText(prev => prev + '{building}')}
+                                                            className="px-2 py-0.5 bg-white hover:bg-emerald-100 text-emerald-700 rounded text-[11px] font-bold border border-emerald-300 transition-colors cursor-pointer"
+                                                            title="將在複製時自動替換為當前大樓名稱"
+                                                        >
+                                                            ＋ 大樓名稱 {"{building}"}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setTemplateInputText(prev => prev + '{url}')}
+                                                            className="px-2 py-0.5 bg-white hover:bg-emerald-100 text-emerald-700 rounded text-[11px] font-bold border border-emerald-300 transition-colors cursor-pointer"
+                                                            title="將在複製時自動替換為當前 LIFF 下單連結"
+                                                        >
+                                                            ＋ 下單網址 {"{url}"}
+                                                        </button>
+                                                    </div>
+
+                                                    {/* 可編輯文案區域 */}
+                                                    <textarea
+                                                        rows={7}
+                                                        className="w-full p-3 rounded-xl border border-emerald-300 bg-white text-xs font-mono text-slate-800 focus:outline-none focus:border-emerald-500 leading-relaxed shadow-inner"
+                                                        value={templateInputText}
+                                                        onChange={(e) => setTemplateInputText(e.target.value)}
+                                                        placeholder={`可自訂【${selectedBuilding}】專屬發文文案...`}
+                                                    />
+
+                                                    <div className="flex flex-wrap justify-between items-center gap-2 pt-1">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleSaveTemplate(selectedBuilding, templateInputText)}
+                                                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
+                                                        >
+                                                            <Save size={13} />
+                                                            儲存【{selectedBuilding}】專屬文案
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const textToCopy = templateInputText.replace(/\{building\}/g, selectedBuilding).replace(/\{url\}/g, activeUrl);
+                                                                navigator.clipboard.writeText(textToCopy);
+                                                                alert(`已成功複製【${selectedBuilding}】LINE 開團發文文案！`);
+                                                            }}
+                                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
+                                                        >
+                                                            <Copy size={13} />
+                                                            一鍵複製【{selectedBuilding}】發文文案
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         ) : (
