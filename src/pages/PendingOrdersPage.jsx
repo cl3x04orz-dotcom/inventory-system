@@ -1670,45 +1670,50 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
     return (
         <div className="max-w-6xl mx-auto min-h-screen flex flex-col p-4 gap-4">
-            {/* Header Area */}
-            <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shadow-sm gap-4">
-                <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
-                    <ClipboardList className="text-blue-600" />
-                    訂單審核
-                </h2>
+            {/* Header Area (解決跑版：標題與搜尋欄彈性自適應，防止元件擠壓成細條) */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between bg-[var(--bg-secondary)] p-4 sm:p-5 rounded-2xl border border-[var(--border-primary)] shadow-sm gap-4">
+                <div className="flex items-center justify-between shrink-0">
+                    <h2 className="text-xl md:text-2xl font-black flex items-center gap-2 text-[var(--text-primary)] whitespace-nowrap">
+                        <ClipboardList className="text-blue-600 shrink-0" size={24} />
+                        <span>訂單審核</span>
+                    </h2>
+                </div>
 
-                {/* 篩選與搜尋 */}
-                <div className="flex flex-wrap md:flex-nowrap gap-2 w-full md:w-auto items-center">
+                {/* 篩選與搜尋工具欄 */}
+                <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
                     {/* 大樓篩選選單 */}
-                    <select
-                        className="input-field text-sm py-2 px-3 bg-[var(--bg-secondary)] border-[var(--border-primary)] rounded-lg font-bold text-[var(--text-primary)] focus:outline-none w-full md:w-48"
-                        value={selectedBuilding}
-                        onChange={(e) => setSelectedBuilding(e.target.value)}
-                    >
-                        <option value="全部">全部社區大樓</option>
-                        {allAvailableBuildings.map(bname => (
-                            <option key={bname} value={bname}>{bname}</option>
-                        ))}
-                    </select>
+                    <div className="w-full sm:w-44 shrink-0">
+                        <select
+                            className="input-field text-xs md:text-sm py-2 px-3 bg-[var(--bg-secondary)] border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none w-full shadow-2xs"
+                            value={selectedBuilding}
+                            onChange={(e) => setSelectedBuilding(e.target.value)}
+                        >
+                            <option value="全部">全部社區大樓</option>
+                            {allAvailableBuildings.map(bname => (
+                                <option key={bname} value={bname}>{bname}</option>
+                            ))}
+                        </select>
+                    </div>
 
-                    <div className="relative flex-1 md:flex-none">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
+                    {/* 綜合搜尋 */}
+                    <div className="relative flex-1 min-w-[160px] sm:min-w-[200px]">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} />
                         <input
                             type="text"
-                            placeholder="搜尋編號、姓名、電話、金額..."
-                            className="input-field pl-10 w-full md:w-60"
+                            placeholder="搜尋編號、姓名、電話..."
+                            className="input-field pl-9 pr-3 text-xs md:text-sm py-2 w-full rounded-xl"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
 
                     {/* 商品名稱特化查詢 */}
-                    <div className="relative flex-1 md:flex-none">
-                        <PackageSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500" size={18} />
+                    <div className="relative flex-1 min-w-[160px] sm:min-w-[200px]">
+                        <PackageSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500" size={16} />
                         <input
                             type="text"
-                            placeholder="🔍 查詢商品 (如: 崙背1L)..."
-                            className="input-field pl-10 pr-8 w-full md:w-64 border-emerald-500/40 focus:border-emerald-500"
+                            placeholder="查詢商品 (如: 崙背)..."
+                            className="input-field pl-9 pr-8 text-xs md:text-sm py-2 w-full rounded-xl border-emerald-500/40 focus:border-emerald-500"
                             value={productSearchTerm}
                             onChange={(e) => setProductSearchTerm(e.target.value)}
                         />
@@ -1725,11 +1730,11 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     </div>
 
                     {/* 預計出貨日篩選 */}
-                    <div className="relative flex-1 md:flex-none flex items-center">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400" size={18} />
+                    <div className="relative w-full sm:w-40 shrink-0">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400" size={16} />
                         <input
                             type="date"
-                            className="input-field pl-10 pr-8 w-full md:w-48 text-sm font-bold border-emerald-500/40 focus:border-emerald-500"
+                            className="input-field pl-9 pr-7 text-xs py-2 w-full rounded-xl font-bold border-emerald-500/40 focus:border-emerald-500"
                             value={dateFilter}
                             onChange={(e) => setDateFilter(e.target.value)}
                             title="篩選預計出貨日"
@@ -1746,19 +1751,21 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         )}
                     </div>
 
-                    <button onClick={fetchOrders} className="btn-secondary p-2 whitespace-nowrap" title="重新整理">
-                        <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-                    </button>
-                    {activeTab === 'PENDING' && (
-                        <button
-                            onClick={handleImportSubscriptions}
-                            className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs px-4.5 py-2.5 rounded-xl shadow-lg shadow-amber-500/10 flex items-center gap-1.5 transition-all whitespace-nowrap"
-                            title="導入今日定期配計畫到此大樓"
-                        >
-                            <Calendar size={16} />
-                            ⚡ 導入今日定期配
+                    <div className="flex items-center gap-2 shrink-0">
+                        <button onClick={fetchOrders} className="btn-secondary p-2 rounded-xl" title="重新整理">
+                            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                         </button>
-                    )}
+                        {activeTab === 'PENDING' && (
+                            <button
+                                onClick={handleImportSubscriptions}
+                                className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-md shadow-amber-500/10 flex items-center gap-1.5 transition-all whitespace-nowrap"
+                                title="導入今日定期配計畫到此大樓"
+                            >
+                                <Calendar size={15} />
+                                ⚡ 導入今日定期配
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
 
