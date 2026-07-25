@@ -1690,8 +1690,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 </div>
 
                 {/* 第二列：統一框框樣式之篩選與搜尋工具欄 */}
-                <div className="flex flex-wrap items-center gap-2.5 w-full">
-                    {/* 大樓篩選選單 (款式 A：現代極簡客製選單) */}
+                <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2.5 w-full max-w-full overflow-hidden">
+                    {/* 大樓篩選選單 */}
                     <div className="relative w-full sm:w-48 shrink-0">
                         <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={16} />
                         <select
@@ -1707,8 +1707,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={15} />
                     </div>
 
-                    {/* 綜合搜尋 (統一框框樣式) */}
-                    <div className="relative flex-1 min-w-[160px] sm:min-w-[200px]">
+                    {/* 綜合搜尋 */}
+                    <div className="relative w-full sm:flex-1 sm:min-w-[180px]">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} />
                         <input
                             type="text"
@@ -1719,8 +1719,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         />
                     </div>
 
-                    {/* 商品名稱特化查詢 (統一框框樣式) */}
-                    <div className="relative flex-1 min-w-[160px] sm:min-w-[200px]">
+                    {/* 商品名稱特化查詢 */}
+                    <div className="relative w-full sm:flex-1 sm:min-w-[180px]">
                         <PackageSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} />
                         <input
                             type="text"
@@ -1741,12 +1741,12 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         )}
                     </div>
 
-                    {/* 預計出貨日篩選 (統一框框樣式) */}
-                    <div className="relative w-full sm:w-40 shrink-0">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} />
+                    {/* 預計出貨日篩選 (解決手機版 iOS 日期元件邊界溢出跑版) */}
+                    <div className="relative w-full sm:w-44 shrink-0 min-w-0 max-w-full overflow-hidden">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={16} />
                         <input
                             type="date"
-                            className="w-full pl-9 pr-7 text-xs py-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all"
+                            className="w-full max-w-full box-border min-w-0 pl-9 pr-7 text-xs py-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all appearance-none"
                             value={dateFilter}
                             onChange={(e) => setDateFilter(e.target.value)}
                             title="篩選預計出貨日"
@@ -1763,11 +1763,11 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         )}
                     </div>
 
-                    {/* 導入今日定期配 (淡淡優雅黃底，不再突兀硬刺) */}
+                    {/* 導入今日定期配 */}
                     {activeTab === 'PENDING' && (
                         <button
                             onClick={handleImportSubscriptions}
-                            className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold text-xs px-3.5 py-2 rounded-xl border border-amber-500/20 flex items-center gap-1.5 transition-all whitespace-nowrap shadow-2xs"
+                            className="w-full sm:w-auto justify-center bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold text-xs px-3.5 py-2 rounded-xl border border-amber-500/20 flex items-center gap-1.5 transition-all whitespace-nowrap shadow-2xs"
                             title="導入今日定期配計畫到此大樓"
                         >
                             <Calendar size={15} />
@@ -2023,30 +2023,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                 <span className="font-mono font-black text-xl md:text-2xl text-blue-600 dark:text-blue-400">
                                                     ${computeOrderTotals(order, buildingSettingsList, groupBindings).totalAmount}
                                                 </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        toggleExpandOrder(order.orderId);
-                                                    }}
-                                                    className={`py-1.5 px-3 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 ${
-                                                        isExpanded 
-                                                            ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30' 
-                                                            : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border-[var(--border-primary)] hover:border-blue-400 hover:text-blue-600 shadow-2xs'
-                                                    }`}
-                                                >
-                                                    {isExpanded ? (
-                                                        <>
-                                                            <span>📦 收起明細</span>
-                                                            <ChevronUp size={14} />
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <span>{order.recipients && order.recipients.length > 0 ? '📦 商品與分貨明細' : '📦 商品明細'}</span>
-                                                            <ChevronDown size={14} />
-                                                        </>
-                                                    )}
-                                                </button>
+                                                
                                             </div>
                                         </div>
 
@@ -2079,10 +2056,11 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                         e.stopPropagation();
                                                         handleQuickConfirmPayment(order);
                                                     }}
-                                                    className="text-xs px-2.5 py-0.5 font-bold rounded bg-amber-500/10 hover:bg-emerald-500/10 text-amber-600 dark:text-amber-400 hover:text-emerald-600 border border-amber-500/20 shadow-2xs flex items-center gap-1 transition-colors"
-                                                    title="點擊一鍵確認收款"
+                                                    className="text-xs px-2.5 py-1 font-extrabold rounded-lg bg-pink-50 hover:bg-pink-100 text-pink-600 border border-pink-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+                                                    title="點擊確認付款"
                                                 >
-                                                    <Check size={12} /> 🟠 未付款 (確認)
+                                                    <span className="w-2 h-2 rounded-full bg-pink-500 shrink-0 inline-block" />
+                                                    <span>點擊確認付款</span>
                                                 </button>
                                             ) : (
                                                 <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
