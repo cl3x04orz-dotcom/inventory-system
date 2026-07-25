@@ -161,11 +161,18 @@ export default function ProductManagementPage({ user, apiUrl }) {
                             String(p.id || '').toLowerCase().includes(search.toLowerCase());
         if (!matchSearch) return false;
 
-        const qty = stockMap[p.name] || 0;
-        if (stockFilter === 'HAS_STOCK') {
-            return qty > 0;
+        const isOnline = p.isActive === true || p.isActive === 'true' || p.isActive === 1 || p.isActive === '1';
+
+        if (stockFilter === 'ONLINE') {
+            if (!isOnline) return false;
+        } else if (stockFilter === 'OFFLINE') {
+            if (isOnline) return false;
+        } else if (stockFilter === 'HAS_STOCK') {
+            const qty = stockMap[p.name] || 0;
+            if (qty <= 0) return false;
         } else if (stockFilter === 'NO_STOCK') {
-            return qty === 0;
+            const qty = stockMap[p.name] || 0;
+            if (qty > 0) return false;
         }
 
         return true;
@@ -180,16 +187,23 @@ export default function ProductManagementPage({ user, apiUrl }) {
                     商品屬性
                 </h2>
 
-                <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
-                    <select
-                        className="input-field py-2.5 px-3 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)] font-bold cursor-pointer w-40"
-                        value={stockFilter}
-                        onChange={(e) => setStockFilter(e.target.value)}
-                    >
-                        <option value="ALL">📦 顯示全部商品</option>
-                        <option value="HAS_STOCK">🟢 只看有庫存</option>
-                        <option value="NO_STOCK">🔴 只看無庫存</option>
-                    </select>
+                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                    {/* Style A Custom Dropdown Selector */}
+                    <div className="relative inline-block w-44">
+                        <Package size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                        <select
+                            value={stockFilter}
+                            onChange={(e) => setStockFilter(e.target.value)}
+                            className="w-full appearance-none pl-9 pr-8 py-2 text-xs font-bold rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500 hover:border-blue-300 transition-all cursor-pointer shadow-sm"
+                        >
+                            <option value="ALL">📦 顯示全部商品</option>
+                            <option value="ONLINE">🟢 已上架</option>
+                            <option value="OFFLINE">🔴 已下架</option>
+                            <option value="HAS_STOCK">🟢 只看有庫存</option>
+                            <option value="NO_STOCK">🔴 只看無庫存</option>
+                        </select>
+                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
 
                     <div className="relative flex-1 md:flex-none">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
