@@ -41,6 +41,8 @@ model Product {
   maxSuggestion         Int                     @default(0)
   isBundle              Boolean                 @default(false)
   bundleSize            Int                     @default(1)
+  maxTotalQty           Int?
+  soldQty               Int                     @default(0)
   inventories           Inventory[]
   salesDetails          SalesDetail[]
   customPrices          CommunityProductPrice[]

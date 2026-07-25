@@ -40,6 +40,8 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       return ProductService.updateProductDetails(payload, user);
     case 'updateProductPurchasable':
       return ProductService.updateProductPurchasable(payload, user);
+    case 'getProductStock':
+      return ProductService.getProductStock(payload.productId || payload.id);
 
     // 3. 銷售與收支 (Sales & Report)
     case 'saveSales':

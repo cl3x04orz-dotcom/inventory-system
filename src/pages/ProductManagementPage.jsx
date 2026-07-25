@@ -117,6 +117,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 price: mergedProduct.price,
                 isBundle: mergedProduct.isBundle,
                 bundleSize: mergedProduct.bundleSize !== undefined ? Number(mergedProduct.bundleSize) : 1,
+                maxTotalQty: (mergedProduct.maxTotalQty !== undefined && mergedProduct.maxTotalQty !== '' && mergedProduct.maxTotalQty !== null) ? Number(mergedProduct.maxTotalQty) : null,
                 
                 packSize: Number(mergedProduct.packSize || 1),
                 dispatchSteps: parsedSteps,
@@ -272,6 +273,12 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                     <span>庫存成本(進價)：<span className="font-mono text-sm text-amber-600">${product.price || '-'}</span></span>
                                                     <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700" />
                                                     <span>當前庫存：<span className={`font-mono text-sm ${ (stockMap[product.name] || 0) > 0 ? 'text-emerald-600 font-extrabold' : 'text-slate-400' }`}>{stockMap[product.name] || 0}</span></span>
+                                                    {product.maxTotalQty !== null && product.maxTotalQty !== undefined && (
+                                                        <>
+                                                            <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700" />
+                                                            <span className="text-purple-600 dark:text-purple-400 font-extrabold">活動限額：<span className="font-mono text-sm">{product.soldQty || 0} / {product.maxTotalQty}</span> (剩餘 {Math.max(0, Number(product.maxTotalQty) - Number(product.soldQty || 0))})</span>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -425,6 +432,22 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                             onChange={(e) => handleFieldChange(product.id, 'bundleSize', e.target.value !== '' ? Number(e.target.value) : '')}
                                                             onBlur={(e) => handleSaveProduct(product.id, { bundleSize: e.target.value !== '' ? Number(e.target.value) : 1 })}
                                                         />
+                                                </div>
+
+                                                {/* 最大販售上限 (活動總限量) */}
+                                                <div className="flex flex-col gap-2 bg-[var(--bg-tertiary)]/30 p-3.5 rounded-xl border border-[var(--border-primary)]/50">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">最大販售上限 (活動總限量)</span>
+                                                    </div>
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        className="input-field text-xs p-2.5 mt-auto"
+                                                        placeholder="例：100 (留空代表無上限)"
+                                                        value={product.maxTotalQty === '' || product.maxTotalQty === undefined || product.maxTotalQty === null ? '' : product.maxTotalQty}
+                                                        onChange={(e) => handleFieldChange(product.id, 'maxTotalQty', e.target.value !== '' ? Number(e.target.value) : '')}
+                                                        onBlur={(e) => handleSaveProduct(product.id, { maxTotalQty: e.target.value !== '' ? Number(e.target.value) : null })}
+                                                    />
                                                 </div>
 
                                                 {/* 階梯組合價 */}

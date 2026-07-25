@@ -106,10 +106,32 @@ export const ProductService = {
         sortWeight: p.sortWeight,
         isBundle: Boolean(p.isBundle),
         bundleSize: Number(p.bundleSize || 1),
+        maxTotalQty: p.maxTotalQty !== null && p.maxTotalQty !== undefined ? Number(p.maxTotalQty) : null,
+        soldQty: Number(p.soldQty || 0),
         isPurchasable: p.isPurchasable !== false, // 進貨清單顯示，與前台上架無關
         _fromSheet: 'Products'
       };
     });
+  },
+
+  async getProductStock(productId: string) {
+    if (!productId) throw new Error('缺少 productId');
+    const p = await prisma.product.findUnique({
+      where: { productId: String(productId).trim() },
+      select: { productId: true, productName: true, maxTotalQty: true, soldQty: true }
+    });
+    if (!p) throw new Error('商品不存在');
+
+    const maxTotalQty = p.maxTotalQty !== null && p.maxTotalQty !== undefined ? Number(p.maxTotalQty) : null;
+    const soldQty = Number(p.soldQty || 0);
+    const remaining = maxTotalQty === null ? null : Math.max(0, maxTotalQty - soldQty);
+
+    return {
+      productId: p.productId,
+      remaining,
+      soldQty,
+      maxTotalQty
+    };
   },
 
   async updateProductSortOrder(payload: any) {
@@ -157,11 +179,21 @@ export const ProductService = {
       maxSuggestion,
       price,
       isBundle,
-      bundleSize
+      bundleSize,
+      maxTotalQty
     } = payload;
 
     if (!productId) {
       throw new Error('缺少 productId');
+    }
+
+    let parsedMaxTotalQty: number | null | undefined = undefined;
+    if (maxTotalQty !== undefined) {
+      if (maxTotalQty === '' || maxTotalQty === null || Number(maxTotalQty) < 0 || isNaN(Number(maxTotalQty))) {
+        parsedMaxTotalQty = null;
+      } else {
+        parsedMaxTotalQty = Math.floor(Number(maxTotalQty));
+      }
     }
 
     await prisma.product.update({
@@ -185,7 +217,8 @@ export const ProductService = {
         autoSuppress: autoSuppress !== undefined ? Boolean(autoSuppress) : undefined,
         maxSuggestion: maxSuggestion !== undefined ? Number(maxSuggestion) : undefined,
         isBundle: isBundle !== undefined ? Boolean(isBundle) : undefined,
-        bundleSize: bundleSize !== undefined ? Number(bundleSize) : undefined
+        bundleSize: bundleSize !== undefined ? Number(bundleSize) : undefined,
+        maxTotalQty: parsedMaxTotalQty
       }
     });
 
@@ -207,3 +240,55 @@ export const ProductService = {
     return { success: true };
   }
 };
+
+export async function verifyAndDeductProductQuota(tx: any, items: Array<{ productId: string; qty: number }>) {
+  if (!items || !Array.isArray(items)) return;
+
+  for (const item of items) {
+    if (!item || !item.productId || !item.qty) continue;
+
+    const pid = String(item.productId).trim();
+    const requestedQty = Number(item.qty || 0);
+    if (requestedQty <= 0) continue;
+
+    const prod = await tx.product.findUnique({
+      where: { productId: pid },
+      select: { productId: true, productName: true, maxTotalQty: true, soldQty: true }
+    });
+
+    if (!prod) continue;
+
+    // 無上限商品：直接記錄累加 soldQty，無上限配額攔截
+    if (prod.maxTotalQty === null || prod.maxTotalQty === undefined) {
+      await tx.product.update({
+        where: { productId: pid },
+        data: { soldQty: { increment: requestedQty } }
+      });
+      continue;
+    }
+
+    const limit = Number(prod.maxTotalQty);
+    const currentSold = Number(prod.soldQty || 0);
+    const remain = limit - currentSold;
+
+    if (remain < requestedQty) {
+      throw new Error(`【${prod.productName || prod.productId}】活動剩餘額度僅剩 ${Math.max(0, remain)} 罐，無法購買 ${requestedQty} 罐`);
+    }
+
+    // 原子條件更新
+    const upd = await tx.product.updateMany({
+      where: {
+        productId: pid,
+        soldQty: { lte: limit - requestedQty }
+      },
+      data: {
+        soldQty: { increment: requestedQty }
+      }
+    });
+
+    if (upd.count === 0) {
+      throw new Error(`【${prod.productName || prod.productId}】商品熱銷中，剩餘額度不足，請重新整理頁面`);
+    }
+  }
+}
+

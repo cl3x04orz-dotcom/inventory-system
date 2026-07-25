@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma, runInTransaction } from '../database/context.js';
-import { ProductService } from './product.service.js';
+import { ProductService, verifyAndDeductProductQuota } from './product.service.js';
 import { deductInventory } from './sales.service.js';
 
 function generateOrderId(): string {
@@ -105,35 +105,39 @@ export const GroupBuyService = {
     else if (paymentMethod === '轉帳') paymentStatus = '待對帳';
     else if (paymentMethod === 'LINE Pay') paymentStatus = '待確認';
 
-    await prisma.groupBuyOrder.create({
-      data: {
-        orderId,
-        status: 'PENDING',
-        customerLineId: lineUserId || user.username || '',
-        customerName: customerName || '',
-        customerPhone: customerPhone || '',
-        deliveryAddress: deliveryAddress || '',
-        sourceGroup: sourceGroup || '',
-        note: note || '',
-        totalAmount,
-        paymentMethod: paymentMethod || '',
-        transferLastFive: transferLastFive || '',
-        paymentStatus,
-        lineDisplayName: lineDisplayName || '',
-        source: source || 'NORMAL',
-        expectedDeliveryDate: payload.expectedDeliveryDate || '',
-        details: {
-          create: items.map((item: any) => ({
-            productId: item.productId || '',
-            productName: item.productName || '',
-            unitPrice: Number(item.unitPrice) || 0,
-            qty: Number(item.qty) || 0,
-            subtotal: Math.round(Number(item.subtotal !== undefined && item.subtotal !== null ? item.subtotal : (Number(item.unitPrice) * Number(item.qty)))) || 0,
-            remark: item.remark || ''
-          }))
+    await prisma.$transaction(async (tx) => {
+      await verifyAndDeductProductQuota(tx, items);
+
+      await tx.groupBuyOrder.create({
+        data: {
+          orderId,
+          status: 'PENDING',
+          customerLineId: lineUserId || user.username || '',
+          customerName: customerName || '',
+          customerPhone: customerPhone || '',
+          deliveryAddress: deliveryAddress || '',
+          sourceGroup: sourceGroup || '',
+          note: note || '',
+          totalAmount,
+          paymentMethod: paymentMethod || '',
+          transferLastFive: transferLastFive || '',
+          paymentStatus,
+          lineDisplayName: lineDisplayName || '',
+          source: source || 'NORMAL',
+          expectedDeliveryDate: payload.expectedDeliveryDate || '',
+          details: {
+            create: items.map((item: any) => ({
+              productId: item.productId || '',
+              productName: item.productName || '',
+              unitPrice: Number(item.unitPrice) || 0,
+              qty: Number(item.qty) || 0,
+              subtotal: Math.round(Number(item.subtotal !== undefined && item.subtotal !== null ? item.subtotal : (Number(item.unitPrice) * Number(item.qty)))) || 0,
+              remark: item.remark || ''
+            }))
+          }
         }
-      }
-    });
+      });
+    }, { maxWait: 15000, timeout: 30000 });
 
     return { success: true, orderId };
   },
@@ -980,38 +984,42 @@ export const GroupBuyService = {
       };
     }
 
-    await prisma.groupBuyOrder.create({
-      data: {
-        orderId,
-        status: 'PENDING',
-        customerLineId: lineUserId || '',
-        customerName: customerName || '',
-        customerPhone: customerPhone || '',
-        deliveryAddress: deliveryAddress || '',
-        sourceGroup: commNameSnap || sourceGroup || '',
-        note: combinedNote,
-        totalAmount,
-        shippingFee: appliedShippingFee,
-        paymentMethod: actualPaymentMethod,
-        transferLastFive: transferLastFive || '',
-        paymentStatus,
-        lineDisplayName: lineDisplayName || '',
-        source: 'LIFF_V2',
-        confirmedAt: deductionApplied === totalAmount ? now : null, // 全額扣抵直接標記確認
-        expectedDeliveryDate: payload.expectedDeliveryDate || '',
-        details: {
-          create: items.map((item: any) => ({
-            productId: item.productId || '',
-            productName: item.productName + (item.remark ? ` (${item.remark})` : ''),
-            unitPrice: Number(item.unitPrice) || 0,
-            qty: Number(item.qty) || 0,
-            subtotal: Math.round(Number(item.subtotal !== undefined && item.subtotal !== null ? item.subtotal : (Number(item.unitPrice) * Number(item.qty)))) || 0,
-            remark: item.remark || ''
-          }))
-        },
-        recipients: recipientsInput
-      }
-    });
+    await prisma.$transaction(async (tx) => {
+      await verifyAndDeductProductQuota(tx, items);
+
+      await tx.groupBuyOrder.create({
+        data: {
+          orderId,
+          status: 'PENDING',
+          customerLineId: lineUserId || '',
+          customerName: customerName || '',
+          customerPhone: customerPhone || '',
+          deliveryAddress: deliveryAddress || '',
+          sourceGroup: commNameSnap || sourceGroup || '',
+          note: combinedNote,
+          totalAmount,
+          shippingFee: appliedShippingFee,
+          paymentMethod: actualPaymentMethod,
+          transferLastFive: transferLastFive || '',
+          paymentStatus,
+          lineDisplayName: lineDisplayName || '',
+          source: 'LIFF_V2',
+          confirmedAt: deductionApplied === totalAmount ? now : null, // 全額扣抵直接標記確認
+          expectedDeliveryDate: payload.expectedDeliveryDate || '',
+          details: {
+            create: items.map((item: any) => ({
+              productId: item.productId || '',
+              productName: item.productName + (item.remark ? ` (${item.remark})` : ''),
+              unitPrice: Number(item.unitPrice) || 0,
+              qty: Number(item.qty) || 0,
+              subtotal: Math.round(Number(item.subtotal !== undefined && item.subtotal !== null ? item.subtotal : (Number(item.unitPrice) * Number(item.qty)))) || 0,
+              remark: item.remark || ''
+            }))
+          },
+          recipients: recipientsInput
+        }
+      });
+    }, { maxWait: 15000, timeout: 30000 });
 
     return { success: true, orderId, orderNo: orderId };
   },

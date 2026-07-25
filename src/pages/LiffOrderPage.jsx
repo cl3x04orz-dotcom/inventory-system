@@ -1025,6 +1025,22 @@ export default function LiffOrderPage({ user, apiUrl }) {
       setAnimatingProductId((prev) => (prev === pid ? null : prev));
     }, 150);
 
+    const prod = products.find(p => p.id === pid);
+    if (prod && prod.maxTotalQty !== null && prod.maxTotalQty !== undefined && delta > 0) {
+      const limit = Number(prod.maxTotalQty);
+      const currentSold = Number(prod.soldQty || 0);
+      const remaining = Math.max(0, limit - currentSold);
+
+      const totalCartQty = isGroupOrder
+        ? Object.values(groupCart).reduce((sum, itemMap) => sum + (itemMap?.[pid] || 0), 0)
+        : (cart[pid] || 0);
+
+      if (totalCartQty + delta > remaining) {
+        alert(`【${prod.name}】活動總配額僅剩 ${remaining} 罐，無法再增加！`);
+        return;
+      }
+    }
+
     if (isGroupOrder) {
       setGroupCart((prev) => {
         const next = { ...prev };
@@ -1095,6 +1111,18 @@ export default function LiffOrderPage({ user, apiUrl }) {
       qty = parseInt(valStr, 10);
       if (isNaN(qty)) qty = 0;
       qty = Math.max(0, Math.min(99, qty));
+    }
+
+    // 配額上限限制
+    if (qty !== "" && qty > 0) {
+      const prod = products.find(p => p.id === pid);
+      if (prod && prod.maxTotalQty !== null && prod.maxTotalQty !== undefined) {
+        const remaining = Math.max(0, Number(prod.maxTotalQty) - Number(prod.soldQty || 0));
+        if (qty > remaining) {
+          alert(`【${prod.name}】活動總配額僅剩 ${remaining} 罐！`);
+          qty = remaining;
+        }
+      }
     }
 
     setAnimatingProductId(pid);
@@ -1249,6 +1277,24 @@ export default function LiffOrderPage({ user, apiUrl }) {
     });
 
     const total = Object.values(cleanedTempFlavorQty).reduce((a, b) => a + b, 0);
+
+    // 配額檢查：口味商品同樣要受 maxTotalQty 限制
+    if (total > 0 && flavorModalProduct.maxTotalQty !== null && flavorModalProduct.maxTotalQty !== undefined) {
+      const limit = Number(flavorModalProduct.maxTotalQty);
+      const currentSold = Number(flavorModalProduct.soldQty || 0);
+      const remaining = Math.max(0, limit - currentSold);
+
+      // 計算購物車中已有的數量（不含本次選擇，因為本次會覆蓋）
+      const existingCartQty = isGroupOrder
+        ? Object.values(groupCart).reduce((sum, itemMap) => sum + (itemMap?.[pid] || 0), 0)
+        : (cart[pid] || 0);
+      // 本次選擇會完全取代現有購物車的同商品，所以用 total 而非 existingCartQty + total
+      // 但若 total > remaining，就超出配額
+      if (total > remaining) {
+        alert(`【${flavorModalProduct.name}】活動總配額僅剩 ${remaining} 罐，您選擇了 ${total} 罐，已超出上限！`);
+        return;
+      }
+    }
 
     setAnimatingProductId(pid);
     setTimeout(() => {
@@ -4794,6 +4840,20 @@ ${freeNote(newFee, newMin)}
                                   有效: {product.expiryDate}
                                 </span>
                               )}
+                              {product.maxTotalQty !== null && product.maxTotalQty !== undefined && (() => {
+                                const remaining = Math.max(0, Number(product.maxTotalQty) - Number(product.soldQty || 0));
+                                return (
+                                  <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded mt-1 font-bold ${
+                                    remaining === 0
+                                      ? 'text-red-600 bg-red-50'
+                                      : remaining <= 10
+                                      ? 'text-orange-600 bg-orange-50'
+                                      : 'text-purple-600 bg-purple-50'
+                                  }`}>
+                                    {remaining === 0 ? '🚫 已售完' : `🔖 活動限量 剩 ${remaining} 罐`}
+                                  </span>
+                                );
+                              })()}
                             </div>
                             <div className="flex flex-col mt-1.5">
                               <div className="flex justify-between items-center">
@@ -4846,7 +4906,9 @@ ${freeNote(newFee, newMin)}
                                           inputMode="numeric"
                                           pattern="[0-9]*"
                                           min="0"
-                                          max="99"
+                                          max={product.maxTotalQty !== null && product.maxTotalQty !== undefined
+                                            ? Math.max(0, Number(product.maxTotalQty) - Number(product.soldQty || 0))
+                                            : 99}
                                           value={qty}
                                           onChange={(e) => handleSetQty(product.id, e.target.value)}
                                           onBlur={(e) => {
@@ -4860,17 +4922,25 @@ ${freeNote(newFee, newMin)}
                                       )}
                                     </>
                                   )}
-                                  <button
-                                    onClick={() =>
-                                      handleProductAction(product, true)
-                                    }
-                                    className={`w-7 h-7 flex items-center justify-center rounded-lg shadow-sm transition-all duration-100 active:scale-90 ${qty > 0
-                                        ? "bg-slate-700 text-white hover:bg-slate-800"
-                                        : "bg-blue-500 text-white hover:bg-blue-600"
-                                      }`}
-                                  >
-                                    <Plus size={13} />
-                                  </button>
+                                  {(() => {
+                                    const isSoldOut = product.maxTotalQty !== null && product.maxTotalQty !== undefined &&
+                                      Math.max(0, Number(product.maxTotalQty) - Number(product.soldQty || 0)) === 0;
+                                    return (
+                                      <button
+                                        onClick={() => !isSoldOut && handleProductAction(product, true)}
+                                        disabled={isSoldOut}
+                                        className={`w-7 h-7 flex items-center justify-center rounded-lg shadow-sm transition-all duration-100 ${
+                                          isSoldOut
+                                            ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
+                                            : qty > 0
+                                            ? 'bg-slate-700 text-white hover:bg-slate-800 active:scale-90'
+                                            : 'bg-blue-500 text-white hover:bg-blue-600 active:scale-90'
+                                        }`}
+                                      >
+                                        <Plus size={13} />
+                                      </button>
+                                    );
+                                  })()}
                                 </div>
                               </div>
 
