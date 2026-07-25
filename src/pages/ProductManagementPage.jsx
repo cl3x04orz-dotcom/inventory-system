@@ -57,10 +57,45 @@ export default function ProductManagementPage({ user, apiUrl }) {
     useEffect(() => {
         if (user?.token) {
             fetchProducts();
-            // 拉取社區清單供白名單選單使用
-            callGAS(apiUrl, 'getCommunities', {}, user.token)
-                .then(res => { if (Array.isArray(res)) setCommunities(res); })
-                .catch(() => {});
+            // 同時拉取開團大樓 (getBuildingSettings) 與社區清單 (getCommunities)，確保與「開團管理」100% 同步
+            Promise.all([
+                callGAS(apiUrl, 'getBuildingSettings', {}, user.token).catch(() => []),
+                callGAS(apiUrl, 'getCommunities', {}, user.token).catch(() => [])
+            ]).then(([buildingsData, communitiesData]) => {
+                const combined = [];
+                const seen = new Set();
+                
+                if (Array.isArray(buildingsData)) {
+                    buildingsData.forEach(b => {
+                        const name = b.building || b.communityName;
+                        if (name && !seen.has(name)) {
+                            seen.add(name);
+                            combined.push({
+                                communityId: b.community_id || b.communityId || name,
+                                communityName: name,
+                                status: b.status || 'ACTIVE'
+                            });
+                        }
+                    });
+                }
+                
+                if (Array.isArray(communitiesData)) {
+                    communitiesData.forEach(c => {
+                        const name = c.communityName || c.CommunityName;
+                        const id = c.communityId || c.CommunityId || name;
+                        if (name && !seen.has(name)) {
+                            seen.add(name);
+                            combined.push({
+                                communityId: id,
+                                communityName: name,
+                                status: c.status || 'ACTIVE'
+                            });
+                        }
+                    });
+                }
+                
+                setCommunities(combined);
+            });
         }
     }, [user.token, fetchProducts, apiUrl]);
 
@@ -494,7 +529,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 <span className="text-[10px] uppercase font-extrabold text-purple-500 tracking-wider">🏠 開放社區（不選代表全部開放）</span>
                                                                 {(product.allowedCommunityIds || []).length > 0 && (
                                                                     <button
-                                                                        className="text-[10px] text-red-400 hover:text-red-600"
+                                                                        className="text-[10px] text-red-400 hover:text-red-600 font-bold"
                                                                         onClick={() => {
                                                                             handleFieldChange(product.id, 'allowedCommunityIds', []);
                                                                             handleSaveProduct(product.id, { allowedCommunityIds: [] });
@@ -507,18 +542,23 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                             <div className="flex flex-col gap-1.5 max-h-44 overflow-y-auto pr-1">
                                                                 {visibleCommunities.map(c => {
                                                                     const ids = product.allowedCommunityIds || [];
-                                                                    const checked = ids.includes(c.communityId || c.CommunityId);
                                                                     const cid = c.communityId || c.CommunityId;
                                                                     const cname = c.communityName || c.CommunityName;
+                                                                    const checked = ids.includes(cid) || ids.includes(cname);
                                                                     return (
-                                                                        <label key={cid} className="flex items-center gap-2 cursor-pointer group">
+                                                                        <label key={cid || cname} className="flex items-center gap-2 cursor-pointer group">
                                                                             <input
                                                                                 type="checkbox"
                                                                                 checked={checked}
-                                                                                className="w-3.5 h-3.5 accent-purple-500"
+                                                                                className="w-3.5 h-3.5 accent-purple-500 cursor-pointer"
                                                                                 onChange={(e) => {
                                                                                     const next = new Set(ids);
-                                                                                    e.target.checked ? next.add(cid) : next.delete(cid);
+                                                                                    if (e.target.checked) {
+                                                                                        next.add(cid);
+                                                                                    } else {
+                                                                                        next.delete(cid);
+                                                                                        next.delete(cname);
+                                                                                    }
                                                                                     const newIds = [...next];
                                                                                     handleFieldChange(product.id, 'allowedCommunityIds', newIds);
                                                                                     handleSaveProduct(product.id, { allowedCommunityIds: newIds });
