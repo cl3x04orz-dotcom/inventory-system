@@ -108,6 +108,7 @@ export const ProductService = {
         bundleSize: Number(p.bundleSize || 1),
         maxTotalQty: p.maxTotalQty !== null && p.maxTotalQty !== undefined ? Number(p.maxTotalQty) : null,
         soldQty: Number(p.soldQty || 0),
+        allowedCommunityIds: Array.isArray(p.allowedCommunityIds) ? p.allowedCommunityIds : [],
         isPurchasable: p.isPurchasable !== false, // 進貨清單顯示，與前台上架無關
         _fromSheet: 'Products'
       };
@@ -180,7 +181,8 @@ export const ProductService = {
       price,
       isBundle,
       bundleSize,
-      maxTotalQty
+      maxTotalQty,
+      allowedCommunityIds
     } = payload;
 
     if (!productId) {
@@ -193,6 +195,20 @@ export const ProductService = {
         parsedMaxTotalQty = null;
       } else {
         parsedMaxTotalQty = Math.floor(Number(maxTotalQty));
+      }
+    }
+
+    // 解析 allowedCommunityIds：只在 maxTotalQty 有傳入時才處理
+    let parsedAllowedIds: string[] | undefined = undefined;
+    if (parsedMaxTotalQty !== undefined) {
+      if (parsedMaxTotalQty === null) {
+        // 清除限額 → 白名單強制清空
+        parsedAllowedIds = [];
+      } else {
+        // 有限額 → 存入前端傳來的白名單（可為空陣列代表全社區開放）
+        parsedAllowedIds = Array.isArray(allowedCommunityIds)
+          ? allowedCommunityIds.map(String)
+          : [];
       }
     }
 
@@ -219,8 +235,9 @@ export const ProductService = {
         isBundle: isBundle !== undefined ? Boolean(isBundle) : undefined,
         bundleSize: bundleSize !== undefined ? Number(bundleSize) : undefined,
         maxTotalQty: parsedMaxTotalQty,
-        // 每次重新設定活動上限（不論是新值還是清除），soldQty 都歸零重新起算
+        // 每次重新設定活動上限（不論是新值還是清除），soldQty 與白名單都同步重設
         soldQty: parsedMaxTotalQty !== undefined ? 0 : undefined,
+        allowedCommunityIds: parsedAllowedIds,
       }
     });
 

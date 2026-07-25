@@ -106,6 +106,27 @@ export const GroupBuyService = {
     else if (paymentMethod === 'LINE Pay') paymentStatus = '待確認';
 
     await prisma.$transaction(async (tx) => {
+      // 社區白名單寫入防護：防止未授權社區繞過 LIFF UI 直接 API 下單
+      const communityId: string = payload?.communityId || payload?.sourceGroup || '';
+      if (communityId) {
+        for (const item of items) {
+          if (!item?.productId) continue;
+          const prod = await tx.product.findUnique({
+            where: { productId: String(item.productId).trim() },
+            select: { productName: true, maxTotalQty: true, allowedCommunityIds: true }
+          });
+          if (
+            prod &&
+            prod.maxTotalQty !== null &&
+            prod.allowedCommunityIds &&
+            prod.allowedCommunityIds.length > 0 &&
+            !prod.allowedCommunityIds.includes(communityId)
+          ) {
+            throw new Error(`商品【${prod.productName}】未開放您所在的社區購買`);
+          }
+        }
+      }
+
       await verifyAndDeductProductQuota(tx, items);
 
       await tx.groupBuyOrder.create({
@@ -769,7 +790,7 @@ export const GroupBuyService = {
       }
     ]));
 
-    const products = rawProducts.map((p: any) => {
+    const mappedProducts = rawProducts.map((p: any) => {
       if (customPriceMap.has(p.id)) {
         const cp = customPriceMap.get(p.id);
         return {
@@ -781,6 +802,14 @@ export const GroupBuyService = {
         };
       }
       return p;
+    });
+
+    // 社區白名單過濾：有 maxTotalQty 且 allowedCommunityIds 不為空時，只有白名單內的社區才看得到
+    const communityId = targetComm.communityId;
+    const products = mappedProducts.filter((p: any) => {
+      if (p.maxTotalQty === null || p.maxTotalQty === undefined) return true; // 無限額 → 不受限
+      if (!p.allowedCommunityIds || p.allowedCommunityIds.length === 0) return true; // 有限額但無白名單 → 全社區可見
+      return p.allowedCommunityIds.includes(communityId); // 有白名單 → 只有白名單社區可見
     });
 
     const community = {
@@ -985,6 +1014,26 @@ export const GroupBuyService = {
     }
 
     await prisma.$transaction(async (tx) => {
+      // 社區白名單寫入防護：防止未授權社區繞過 LIFF UI 直接 API 下單
+      if (CommunityId) {
+        for (const item of items) {
+          if (!item?.productId) continue;
+          const prod = await tx.product.findUnique({
+            where: { productId: String(item.productId).trim() },
+            select: { productName: true, maxTotalQty: true, allowedCommunityIds: true }
+          });
+          if (
+            prod &&
+            prod.maxTotalQty !== null &&
+            prod.allowedCommunityIds &&
+            prod.allowedCommunityIds.length > 0 &&
+            !prod.allowedCommunityIds.includes(CommunityId)
+          ) {
+            throw new Error(`商品【${prod.productName}】未開放您所在的社區購買`);
+          }
+        }
+      }
+
       await verifyAndDeductProductQuota(tx, items);
 
       await tx.groupBuyOrder.create({

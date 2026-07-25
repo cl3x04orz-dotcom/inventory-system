@@ -43,6 +43,7 @@ model Product {
   bundleSize            Int                     @default(1)
   maxTotalQty           Int?
   soldQty               Int                     @default(0)
+  allowedCommunityIds   String[]                @default([])
   inventories           Inventory[]
   salesDetails          SalesDetail[]
   customPrices          CommunityProductPrice[]

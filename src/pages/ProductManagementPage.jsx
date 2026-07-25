@@ -12,6 +12,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
     const [lastError, setLastError] = useState({}); // { [productId]: string }
     const [stockMap, setStockMap] = useState({}); // { [productName]: number }
     const [stockFilter, setStockFilter] = useState('ALL'); // 'ALL' | 'HAS_STOCK' | 'NO_STOCK'
+    const [communities, setCommunities] = useState([]); // [{ communityId, communityName }]
 
     const fetchProducts = useCallback(async () => {
         setLoading(true);
@@ -56,8 +57,12 @@ export default function ProductManagementPage({ user, apiUrl }) {
     useEffect(() => {
         if (user?.token) {
             fetchProducts();
+            // 拉取社區清單供白名單選單使用
+            callGAS(apiUrl, 'getCommunities', {}, user.token)
+                .then(res => { if (Array.isArray(res)) setCommunities(res); })
+                .catch(() => {});
         }
-    }, [user.token, fetchProducts]);
+    }, [user.token, fetchProducts, apiUrl]);
 
     const handleFieldChange = (id, field, value) => {
         setProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: value, _dirty: true } : p));
@@ -118,6 +123,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 isBundle: mergedProduct.isBundle,
                 bundleSize: mergedProduct.bundleSize !== undefined ? Number(mergedProduct.bundleSize) : 1,
                 maxTotalQty: (mergedProduct.maxTotalQty !== undefined && mergedProduct.maxTotalQty !== '' && mergedProduct.maxTotalQty !== null) ? Number(mergedProduct.maxTotalQty) : null,
+                allowedCommunityIds: Array.isArray(mergedProduct.allowedCommunityIds) ? mergedProduct.allowedCommunityIds : [],
                 
                 packSize: Number(mergedProduct.packSize || 1),
                 dispatchSteps: parsedSteps,
@@ -446,9 +452,64 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                         placeholder="例：100 (留空代表無上限)"
                                                         value={product.maxTotalQty === '' || product.maxTotalQty === undefined || product.maxTotalQty === null ? '' : product.maxTotalQty}
                                                         onChange={(e) => handleFieldChange(product.id, 'maxTotalQty', e.target.value !== '' ? Number(e.target.value) : '')}
-                                                        onBlur={(e) => handleSaveProduct(product.id, { maxTotalQty: e.target.value !== '' ? Number(e.target.value) : null })}
+                                                        onBlur={(e) => {
+                                                            const newQty = e.target.value !== '' ? Number(e.target.value) : null;
+                                                            // Bug B修正：清空限額時，同步清空前端白名單 state
+                                                            if (newQty === null) {
+                                                                handleFieldChange(product.id, 'allowedCommunityIds', []);
+                                                            }
+                                                            handleSaveProduct(product.id, {
+                                                                maxTotalQty: newQty,
+                                                                allowedCommunityIds: newQty === null ? [] : (product.allowedCommunityIds || [])
+                                                            });
+                                                        }}
                                                     />
                                                 </div>
+
+                                                {/* Bug A修正：用 !== null/undefined 而非 truthy 判斷，防止0被視為 false */}
+                                                {product.maxTotalQty !== null && product.maxTotalQty !== undefined && product.maxTotalQty !== '' && communities.length > 0 && (
+                                                    <div className="flex flex-col gap-2 bg-[var(--bg-tertiary)]/30 p-3.5 rounded-xl border border-purple-400/30">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-[10px] uppercase font-extrabold text-purple-500 tracking-wider">🏠 開放社區（不選代表全部開放）</span>
+                                                            {(product.allowedCommunityIds || []).length > 0 && (
+                                                                <button
+                                                                    className="text-[10px] text-red-400 hover:text-red-600"
+                                                                    onClick={() => {
+                                                                        handleFieldChange(product.id, 'allowedCommunityIds', []);
+                                                                        handleSaveProduct(product.id, { allowedCommunityIds: [] });
+                                                                    }}
+                                                                >
+                                                                    清除全部
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex flex-col gap-1.5 max-h-44 overflow-y-auto pr-1">
+                                                            {communities.map(c => {
+                                                                const ids = product.allowedCommunityIds || [];
+                                                                const checked = ids.includes(c.communityId || c.CommunityId);
+                                                                const cid = c.communityId || c.CommunityId;
+                                                                const cname = c.communityName || c.CommunityName;
+                                                                return (
+                                                                    <label key={cid} className="flex items-center gap-2 cursor-pointer group">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={checked}
+                                                                            className="w-3.5 h-3.5 accent-purple-500"
+                                                                            onChange={(e) => {
+                                                                                const next = new Set(ids);
+                                                                                e.target.checked ? next.add(cid) : next.delete(cid);
+                                                                                const newIds = [...next];
+                                                                                handleFieldChange(product.id, 'allowedCommunityIds', newIds);
+                                                                                handleSaveProduct(product.id, { allowedCommunityIds: newIds });
+                                                                            }}
+                                                                        />
+                                                                        <span className="text-xs text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">{cname}</span>
+                                                                    </label>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                )}
 
                                                 {/* 階梯組合價 */}
                                                 <div className="lg:col-span-4 flex flex-col gap-3 bg-[var(--bg-tertiary)]/30 p-3.5 rounded-xl border border-[var(--border-primary)]/50">
