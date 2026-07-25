@@ -467,49 +467,71 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                 </div>
 
                                                 {/* Bug A修正：用 !== null/undefined 而非 truthy 判斷，防止0被視為 false */}
-                                                {product.maxTotalQty !== null && product.maxTotalQty !== undefined && product.maxTotalQty !== '' && communities.length > 0 && (
-                                                    <div className="flex flex-col gap-2 bg-[var(--bg-tertiary)]/30 p-3.5 rounded-xl border border-purple-400/30">
-                                                        <div className="flex justify-between items-center">
-                                                            <span className="text-[10px] uppercase font-extrabold text-purple-500 tracking-wider">🏠 開放社區（不選代表全部開放）</span>
-                                                            {(product.allowedCommunityIds || []).length > 0 && (
-                                                                <button
-                                                                    className="text-[10px] text-red-400 hover:text-red-600"
-                                                                    onClick={() => {
-                                                                        handleFieldChange(product.id, 'allowedCommunityIds', []);
-                                                                        handleSaveProduct(product.id, { allowedCommunityIds: [] });
-                                                                    }}
-                                                                >
-                                                                    清除全部
-                                                                </button>
-                                                            )}
+                                                {product.maxTotalQty !== null && product.maxTotalQty !== undefined && product.maxTotalQty !== '' && communities.length > 0 && (() => {
+                                                    // 同步「開團管理」的隱藏設定：讀取 admin_hidden_buildings 並過濾非 ACTIVE 狀態
+                                                    const hiddenBuildings = (() => {
+                                                        try {
+                                                            const saved = localStorage.getItem('admin_hidden_buildings');
+                                                            return saved ? JSON.parse(saved) : [];
+                                                        } catch (e) {
+                                                            return [];
+                                                        }
+                                                    })();
+
+                                                    const visibleCommunities = communities.filter(c => {
+                                                        const cid = c.communityId || c.CommunityId;
+                                                        const cname = c.communityName || c.CommunityName;
+                                                        if (c.status && c.status !== 'ACTIVE') return false;
+                                                        if (hiddenBuildings.includes(cname) || hiddenBuildings.includes(cid)) return false;
+                                                        return true;
+                                                    });
+
+                                                    if (visibleCommunities.length === 0) return null;
+
+                                                    return (
+                                                        <div className="flex flex-col gap-2 bg-[var(--bg-tertiary)]/30 p-3.5 rounded-xl border border-purple-400/30">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-[10px] uppercase font-extrabold text-purple-500 tracking-wider">🏠 開放社區（不選代表全部開放）</span>
+                                                                {(product.allowedCommunityIds || []).length > 0 && (
+                                                                    <button
+                                                                        className="text-[10px] text-red-400 hover:text-red-600"
+                                                                        onClick={() => {
+                                                                            handleFieldChange(product.id, 'allowedCommunityIds', []);
+                                                                            handleSaveProduct(product.id, { allowedCommunityIds: [] });
+                                                                        }}
+                                                                    >
+                                                                        清除全部
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex flex-col gap-1.5 max-h-44 overflow-y-auto pr-1">
+                                                                {visibleCommunities.map(c => {
+                                                                    const ids = product.allowedCommunityIds || [];
+                                                                    const checked = ids.includes(c.communityId || c.CommunityId);
+                                                                    const cid = c.communityId || c.CommunityId;
+                                                                    const cname = c.communityName || c.CommunityName;
+                                                                    return (
+                                                                        <label key={cid} className="flex items-center gap-2 cursor-pointer group">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={checked}
+                                                                                className="w-3.5 h-3.5 accent-purple-500"
+                                                                                onChange={(e) => {
+                                                                                    const next = new Set(ids);
+                                                                                    e.target.checked ? next.add(cid) : next.delete(cid);
+                                                                                    const newIds = [...next];
+                                                                                    handleFieldChange(product.id, 'allowedCommunityIds', newIds);
+                                                                                    handleSaveProduct(product.id, { allowedCommunityIds: newIds });
+                                                                                }}
+                                                                            />
+                                                                            <span className="text-xs text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">{cname}</span>
+                                                                        </label>
+                                                                    );
+                                                                })}
+                                                            </div>
                                                         </div>
-                                                        <div className="flex flex-col gap-1.5 max-h-44 overflow-y-auto pr-1">
-                                                            {communities.map(c => {
-                                                                const ids = product.allowedCommunityIds || [];
-                                                                const checked = ids.includes(c.communityId || c.CommunityId);
-                                                                const cid = c.communityId || c.CommunityId;
-                                                                const cname = c.communityName || c.CommunityName;
-                                                                return (
-                                                                    <label key={cid} className="flex items-center gap-2 cursor-pointer group">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={checked}
-                                                                            className="w-3.5 h-3.5 accent-purple-500"
-                                                                            onChange={(e) => {
-                                                                                const next = new Set(ids);
-                                                                                e.target.checked ? next.add(cid) : next.delete(cid);
-                                                                                const newIds = [...next];
-                                                                                handleFieldChange(product.id, 'allowedCommunityIds', newIds);
-                                                                                handleSaveProduct(product.id, { allowedCommunityIds: newIds });
-                                                                            }}
-                                                                        />
-                                                                        <span className="text-xs text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">{cname}</span>
-                                                                    </label>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </div>
-                                                )}
+                                                    );
+                                                })()}
 
                                                 {/* 階梯組合價 */}
                                                 <div className="lg:col-span-4 flex flex-col gap-3 bg-[var(--bg-tertiary)]/30 p-3.5 rounded-xl border border-[var(--border-primary)]/50">
