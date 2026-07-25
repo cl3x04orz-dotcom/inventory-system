@@ -1787,18 +1787,18 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
             {/* 頂部數據加總面板 */}
             {sortedFilteredOrders.length > 0 && (
-                <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl p-3.5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-                        <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">訂單總筆數</span>
-                        <span className="text-xl font-extrabold text-[var(--text-primary)] mt-1">{summaryStats.ordersCount} <span className="text-xs font-medium text-[var(--text-tertiary)]">筆</span></span>
+                <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+                    <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl p-2.5 sm:p-3.5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                        <span className="text-[10px] sm:text-xs font-bold text-[var(--text-secondary)] uppercase tracking-tight sm:tracking-wider whitespace-nowrap truncate block">訂單總筆數</span>
+                        <span className="text-lg sm:text-xl font-extrabold text-[var(--text-primary)] mt-1">{summaryStats.ordersCount} <span className="text-xs font-medium text-[var(--text-tertiary)]">筆</span></span>
                     </div>
-                    <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl p-3.5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-                        <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{activeTab === 'UNPAID' ? '未付款商品數量' : '待出貨數量'}</span>
-                        <span className="text-xl font-extrabold text-blue-600 mt-1">{summaryStats.totalQty} <span className="text-xs font-medium text-[var(--text-tertiary)]">瓶/件</span></span>
+                    <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl p-2.5 sm:p-3.5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                        <span className="text-[10px] sm:text-xs font-bold text-[var(--text-secondary)] uppercase tracking-tight sm:tracking-wider whitespace-nowrap truncate block">{activeTab === 'UNPAID' ? '未付款商品數量' : '待出貨數量'}</span>
+                        <span className="text-lg sm:text-xl font-extrabold text-blue-600 mt-1">{summaryStats.totalQty} <span className="text-xs font-medium text-[var(--text-tertiary)]">瓶/件</span></span>
                     </div>
-                    <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl p-3.5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-                        <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{activeTab === 'UNPAID' ? '未付款總金額' : '待出貨總金額'}</span>
-                        <span className="text-xl font-extrabold text-emerald-600 mt-1">${summaryStats.totalAmount.toLocaleString()}</span>
+                    <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl p-2.5 sm:p-3.5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                        <span className="text-[10px] sm:text-xs font-bold text-[var(--text-secondary)] uppercase tracking-tight sm:tracking-wider whitespace-nowrap truncate block">{activeTab === 'UNPAID' ? '未付款總金額' : '待出貨總金額'}</span>
+                        <span className="text-lg sm:text-xl font-extrabold text-emerald-600 mt-1">${summaryStats.totalAmount.toLocaleString()}</span>
                     </div>
                 </div>
             )}
@@ -1875,34 +1875,34 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             )}
 
             {/* Tabs */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-[var(--border-primary)] pb-1 gap-2">
-                <div className="flex gap-2">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-[var(--border-primary)] pb-1 gap-2 w-full max-w-full overflow-hidden">
+                <div className="grid grid-cols-3 w-full sm:flex sm:w-auto items-center gap-1 sm:gap-2">
                     <button
                         onClick={() => { setActiveTab('PENDING'); }}
-                        className={`px-5 py-2.5 font-bold text-sm transition-colors border-b-2 ${activeTab === 'PENDING'
+                        className={`px-1 sm:px-4 py-2 font-bold text-xs sm:text-sm text-center transition-colors border-b-2 whitespace-nowrap ${activeTab === 'PENDING'
                                 ? 'border-blue-500 text-blue-600'
                                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                             }`}
                     >
-                        待確認訂單 (PENDING)
+                        <span>待確認訂單</span><span className="hidden md:inline text-[11px] opacity-80"> (PENDING)</span>
                     </button>
                     <button
                         onClick={() => { setActiveTab('CONFIRMED'); }}
-                        className={`px-5 py-2.5 font-bold text-sm transition-colors border-b-2 ${activeTab === 'CONFIRMED'
+                        className={`px-1 sm:px-4 py-2 font-bold text-xs sm:text-sm text-center transition-colors border-b-2 whitespace-nowrap ${activeTab === 'CONFIRMED'
                                 ? 'border-blue-500 text-blue-600'
                                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                             }`}
                     >
-                        已出貨/確認訂單 (CONFIRMED)
+                        <span>已出貨/確認</span><span className="hidden md:inline text-[11px] opacity-80"> (CONFIRMED)</span>
                     </button>
                     <button
                         onClick={() => { setActiveTab('UNPAID'); }}
-                        className={`px-5 py-2.5 font-bold text-sm transition-colors border-b-2 ${activeTab === 'UNPAID'
+                        className={`px-1 sm:px-4 py-2 font-bold text-xs sm:text-sm text-center transition-colors border-b-2 whitespace-nowrap ${activeTab === 'UNPAID'
                                 ? 'border-amber-500 text-amber-600'
                                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                             }`}
                     >
-                        未付款訂單 (UNPAID)
+                        <span>未付款訂單</span><span className="hidden md:inline text-[11px] opacity-80"> (UNPAID)</span>
                     </button>
                 </div>
 
@@ -2063,7 +2063,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                     <span>點擊確認付款</span>
                                                 </button>
                                             ) : (
-                                                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-2xs">
                                                     ✓ 已付款
                                                 </span>
                                             )}
