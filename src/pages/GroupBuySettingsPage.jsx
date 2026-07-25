@@ -920,14 +920,16 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                     <span className="flex items-center justify-center bg-blue-500 text-white rounded-full w-5 h-5 text-xs font-black">2</span>
                                                     每週定期自動開關團設定
                                                 </h3>
-                                                <label className="relative inline-flex items-center cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        className="sr-only peer"
-                                                        checked={isAuto}
-                                                        onChange={(e) => setIsAuto(e.target.checked)}
-                                                    />
-                                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                                <label className="inline-flex items-center cursor-pointer select-none">
+                                                    <div className="relative inline-block w-11 h-6 flex-shrink-0">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="sr-only peer"
+                                                            checked={isAuto}
+                                                            onChange={(e) => setIsAuto(e.target.checked)}
+                                                        />
+                                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                                    </div>
                                                 </label>
                                             </div>
 
@@ -1245,15 +1247,17 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                         【{selectedBuilding}】運費規則設定
                                                     </h3>
                                                     {/* 免運切換 */}
-                                                    <label className="relative inline-flex items-center cursor-pointer gap-2">
+                                                    <label className="inline-flex items-center cursor-pointer gap-2 select-none">
                                                         <span className="text-sm font-semibold text-[var(--text-secondary)]">永久免運</span>
-                                                        <input
-                                                            type="checkbox"
-                                                            className="sr-only peer"
-                                                            checked={isFreeShipping}
-                                                            onChange={(e) => setIsFreeShipping(e.target.checked)}
-                                                        />
-                                                        <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                                                        <div className="relative inline-block w-11 h-6 flex-shrink-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="sr-only peer"
+                                                                checked={isFreeShipping}
+                                                                onChange={(e) => setIsFreeShipping(e.target.checked)}
+                                                            />
+                                                            <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                                                        </div>
                                                     </label>
                                                 </div>
 
@@ -1587,14 +1591,16 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
 
                                         <div className="flex justify-between items-center bg-[var(--bg-tertiary)] p-3 rounded-xl border border-[var(--border-primary)]">
                                             <span className="text-xs font-bold text-[var(--text-secondary)]">此區域永久免運</span>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    className="sr-only peer"
-                                                    checked={areaFreeShipping}
-                                                    onChange={(e) => setAreaFreeShipping(e.target.checked)}
-                                                />
-                                                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                                            <label className="inline-flex items-center cursor-pointer select-none">
+                                                <div className="relative inline-block w-9 h-5 flex-shrink-0">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="sr-only peer"
+                                                        checked={areaFreeShipping}
+                                                        onChange={(e) => setAreaFreeShipping(e.target.checked)}
+                                                    />
+                                                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                                                </div>
                                             </label>
                                         </div>
 
