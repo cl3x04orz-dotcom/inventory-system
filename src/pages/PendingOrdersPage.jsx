@@ -2095,7 +2095,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                             )}
                                         </div>
 
-                                        /* 第三列：物流通訊與下單時間 */}
+                                        {/* 第三列：物流通訊與下單時間 */}
                                         <div className="text-xs text-[var(--text-secondary)] mt-1 flex flex-col gap-1.5 border-t border-dashed border-[var(--border-primary)] pt-2.5">
                                             <div className="flex items-center gap-3 flex-wrap">
                                                 <div className="flex items-center gap-1 font-semibold text-[var(--text-primary)]">
