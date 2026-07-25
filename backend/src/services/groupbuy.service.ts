@@ -127,7 +127,7 @@ export const GroupBuyService = {
         }
       }
 
-      await verifyAndDeductProductQuota(tx, items);
+      await verifyAndDeductProductQuota(tx, items, communityId, payload?.sourceGroup || '');
 
       await tx.groupBuyOrder.create({
         data: {
@@ -1035,7 +1035,7 @@ export const GroupBuyService = {
         }
       }
 
-      await verifyAndDeductProductQuota(tx, items);
+      await verifyAndDeductProductQuota(tx, items, CommunityId, commNameSnap || sourceGroup || '');
 
       await tx.groupBuyOrder.create({
         data: {

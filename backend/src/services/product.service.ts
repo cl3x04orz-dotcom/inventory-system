@@ -109,6 +109,7 @@ export const ProductService = {
         maxTotalQty: p.maxTotalQty !== null && p.maxTotalQty !== undefined ? Number(p.maxTotalQty) : null,
         soldQty: Number(p.soldQty || 0),
         allowedCommunityIds: Array.isArray(p.allowedCommunityIds) ? p.allowedCommunityIds : [],
+        communityQuotas: p.communityQuotas || {},
         isPurchasable: p.isPurchasable !== false, // 進貨清單顯示，與前台上架無關
         _fromSheet: 'Products'
       };
@@ -182,7 +183,8 @@ export const ProductService = {
       isBundle,
       bundleSize,
       maxTotalQty,
-      allowedCommunityIds
+      allowedCommunityIds,
+      communityQuotas
     } = payload;
 
     if (!productId) {
@@ -238,6 +240,7 @@ export const ProductService = {
         // 每次重新設定活動上限（不論是新值還是清除），soldQty 與白名單都同步重設
         soldQty: parsedMaxTotalQty !== undefined ? 0 : undefined,
         allowedCommunityIds: parsedAllowedIds,
+        communityQuotas: communityQuotas !== undefined ? (communityQuotas || {}) : undefined,
       }
     });
 
@@ -260,7 +263,12 @@ export const ProductService = {
   }
 };
 
-export async function verifyAndDeductProductQuota(tx: any, items: Array<{ productId: string; qty: number }>) {
+export async function verifyAndDeductProductQuota(
+  tx: any,
+  items: Array<{ productId: string; qty: number }>,
+  communityId?: string,
+  communityName?: string
+) {
   if (!items || !Array.isArray(items)) return;
 
   for (const item of items) {
@@ -272,12 +280,42 @@ export async function verifyAndDeductProductQuota(tx: any, items: Array<{ produc
 
     const prod = await tx.product.findUnique({
       where: { productId: pid },
-      select: { productId: true, productName: true, maxTotalQty: true, soldQty: true }
+      select: { productId: true, productName: true, maxTotalQty: true, soldQty: true, communityQuotas: true }
     });
 
     if (!prod) continue;
 
-    // 無上限商品：直接記錄累加 soldQty，無上限配額攔截
+    // A. 優先檢查是否設定了「社區專屬配額 (Community Quotas)」
+    const cQuotas: Record<string, { maxQty: number; soldQty: number }> = (prod.communityQuotas as any) || {};
+    const matchedCommKey = [communityId, communityName].find(key => key && cQuotas[key] && typeof cQuotas[key].maxQty === 'number');
+
+    if (matchedCommKey) {
+      const cItem = cQuotas[matchedCommKey];
+      const maxQty = Number(cItem.maxQty || 0);
+      const currentSold = Number(cItem.soldQty || 0);
+      const remain = maxQty - currentSold;
+
+      if (remain < requestedQty) {
+        throw new Error(`【${prod.productName || prod.productId}】在您的社區專屬限量剩餘 ${Math.max(0, remain)} 罐，無法購買 ${requestedQty} 罐`);
+      }
+
+      cQuotas[matchedCommKey] = {
+        maxQty,
+        soldQty: currentSold + requestedQty
+      };
+
+      await tx.product.update({
+        where: { productId: pid },
+        data: {
+          communityQuotas: cQuotas,
+          soldQty: { increment: requestedQty }
+        }
+      });
+
+      continue;
+    }
+
+    // B. 全局無上限商品
     if (prod.maxTotalQty === null || prod.maxTotalQty === undefined) {
       await tx.product.update({
         where: { productId: pid },
@@ -286,6 +324,7 @@ export async function verifyAndDeductProductQuota(tx: any, items: Array<{ produc
       continue;
     }
 
+    // C. 全局上限商品
     const limit = Number(prod.maxTotalQty);
     const currentSold = Number(prod.soldQty || 0);
     const remain = limit - currentSold;
@@ -294,7 +333,6 @@ export async function verifyAndDeductProductQuota(tx: any, items: Array<{ produc
       throw new Error(`【${prod.productName || prod.productId}】活動剩餘額度僅剩 ${Math.max(0, remain)} 罐，無法購買 ${requestedQty} 罐`);
     }
 
-    // 原子條件更新
     const upd = await tx.product.updateMany({
       where: {
         productId: pid,

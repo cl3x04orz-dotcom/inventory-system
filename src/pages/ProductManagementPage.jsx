@@ -159,6 +159,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 bundleSize: mergedProduct.bundleSize !== undefined ? Number(mergedProduct.bundleSize) : 1,
                 maxTotalQty: (mergedProduct.maxTotalQty !== undefined && mergedProduct.maxTotalQty !== '' && mergedProduct.maxTotalQty !== null) ? Number(mergedProduct.maxTotalQty) : null,
                 allowedCommunityIds: Array.isArray(mergedProduct.allowedCommunityIds) ? mergedProduct.allowedCommunityIds : [],
+                communityQuotas: mergedProduct.communityQuotas || {},
                 
                 packSize: Number(mergedProduct.packSize || 1),
                 dispatchSteps: parsedSteps,
@@ -501,7 +502,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                     />
                                                 </div>
 
-                                                {/* Bug A修正：用 !== null/undefined 而非 truthy 判斷，防止0被視為 false */}
+                                                {/* 🏠 開放社區白名單 */}
                                                 {product.maxTotalQty !== null && product.maxTotalQty !== undefined && product.maxTotalQty !== '' && communities.length > 0 && (() => {
                                                     // 同步「開團管理」的隱藏設定：讀取 admin_hidden_buildings 並過濾非 ACTIVE 狀態
                                                     const hiddenBuildings = (() => {
@@ -566,6 +567,98 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                             />
                                                                             <span className="text-xs text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">{cname}</span>
                                                                         </label>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+
+                                                {/* 🔥 社區專屬飢餓行銷配額 (即使全區公開，亦可針對特定社區設定快閃搶購限量) */}
+                                                {communities.length > 0 && (() => {
+                                                    const hiddenBuildings = (() => {
+                                                        try {
+                                                            const saved = localStorage.getItem('admin_hidden_buildings');
+                                                            return saved ? JSON.parse(saved) : [];
+                                                        } catch (e) {
+                                                            return [];
+                                                        }
+                                                    })();
+
+                                                    const visibleCommunities = communities.filter(c => {
+                                                        const cid = c.communityId || c.CommunityId;
+                                                        const cname = c.communityName || c.CommunityName;
+                                                        if (c.status && c.status !== 'ACTIVE') return false;
+                                                        if (hiddenBuildings.includes(cname) || hiddenBuildings.includes(cid)) return false;
+                                                        return true;
+                                                    });
+
+                                                    if (visibleCommunities.length === 0) return null;
+                                                    const quotas = product.communityQuotas || {};
+
+                                                    return (
+                                                        <div className="lg:col-span-4 flex flex-col gap-2.5 bg-gradient-to-r from-amber-500/5 via-purple-500/5 to-amber-500/5 p-4 rounded-xl border border-amber-400/30">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-xs uppercase font-extrabold text-amber-600 dark:text-amber-400 tracking-wider flex items-center gap-1.5">
+                                                                    🔥 社區專屬飢餓行銷配額 (未填代表該社區不設限，填寫則獨家快閃限量)
+                                                                </span>
+                                                                {Object.keys(quotas).length > 0 && (
+                                                                    <button
+                                                                        className="text-[10px] text-red-400 hover:text-red-600 font-bold"
+                                                                        onClick={() => {
+                                                                            handleFieldChange(product.id, 'communityQuotas', {});
+                                                                            handleSaveProduct(product.id, { communityQuotas: {} });
+                                                                        }}
+                                                                    >
+                                                                        清除所有社區配額
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-56 overflow-y-auto pr-1">
+                                                                {visibleCommunities.map(c => {
+                                                                    const cid = c.communityId || c.CommunityId;
+                                                                    const cname = c.communityName || c.CommunityName;
+                                                                    const qObj = quotas[cid] || quotas[cname] || {};
+                                                                    const maxQtyVal = qObj.maxQty !== undefined && qObj.maxQty !== null ? qObj.maxQty : '';
+                                                                    const soldQtyVal = qObj.soldQty || 0;
+
+                                                                    return (
+                                                                        <div key={cid || cname} className="flex flex-col gap-1 p-2.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)]/70 rounded-lg shadow-sm">
+                                                                            <div className="flex justify-between items-center">
+                                                                                <span className="text-xs font-bold text-[var(--text-primary)] truncate">{cname}</span>
+                                                                                {maxQtyVal !== '' && (
+                                                                                    <span className="text-[10px] text-purple-600 dark:text-purple-400 font-bold shrink-0">
+                                                                                        已售 {soldQtyVal}
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                            <div className="flex items-center gap-1.5 mt-1">
+                                                                                <input
+                                                                                    type="number"
+                                                                                    min="1"
+                                                                                    placeholder="無限制"
+                                                                                    className="input-field text-xs p-1.5 w-full font-mono"
+                                                                                    value={maxQtyVal}
+                                                                                    onChange={(e) => {
+                                                                                        const val = e.target.value !== '' ? Number(e.target.value) : '';
+                                                                                        const nextQuotas = { ...(product.communityQuotas || {}) };
+                                                                                        if (val === '' || val === null) {
+                                                                                            delete nextQuotas[cid];
+                                                                                            delete nextQuotas[cname];
+                                                                                        } else {
+                                                                                            nextQuotas[cid] = {
+                                                                                                maxQty: Number(val),
+                                                                                                soldQty: soldQtyVal
+                                                                                            };
+                                                                                        }
+                                                                                        handleFieldChange(product.id, 'communityQuotas', nextQuotas);
+                                                                                    }}
+                                                                                    onBlur={() => {
+                                                                                        handleSaveProduct(product.id, { communityQuotas: product.communityQuotas || {} });
+                                                                                    }}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
                                                                     );
                                                                 })}
                                                             </div>

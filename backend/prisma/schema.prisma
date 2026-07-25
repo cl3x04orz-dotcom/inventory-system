@@ -44,6 +44,7 @@ model Product {
   maxTotalQty           Int?
   soldQty               Int                     @default(0)
   allowedCommunityIds   String[]                @default([])
+  communityQuotas       Json?                   @default("{}")
   inventories           Inventory[]
   salesDetails          SalesDetail[]
   customPrices          CommunityProductPrice[]

@@ -1018,7 +1018,31 @@ export default function LiffOrderPage({ user, apiUrl }) {
     }
   }, [activeCategory]);
 
-  // ── 購物車 ───────────────────────────────────────────────────
+  // ── 購物車配額與狀態計算 ─────────────────────────────────────
+  const getProductQuotaInfo = useCallback((prod) => {
+    if (!prod) return { hasQuota: false, remaining: null, isCommunityQuota: false };
+
+    const commId = currentCommunity?.CommunityId;
+    const commName = currentCommunity?.CommunityName;
+    const cQuotas = prod.communityQuotas || {};
+
+    const matchedKey = [commId, commName].find(k => k && cQuotas[k] && typeof cQuotas[k].maxQty === 'number');
+    if (matchedKey) {
+      const qObj = cQuotas[matchedKey];
+      const maxQty = Number(qObj.maxQty || 0);
+      const soldQty = Number(qObj.soldQty || 0);
+      const remaining = Math.max(0, maxQty - soldQty);
+      return { hasQuota: true, remaining, isCommunityQuota: true, maxQty };
+    }
+
+    if (prod.maxTotalQty !== null && prod.maxTotalQty !== undefined) {
+      const remaining = Math.max(0, Number(prod.maxTotalQty) - Number(prod.soldQty || 0));
+      return { hasQuota: true, remaining, isCommunityQuota: false, maxQty: Number(prod.maxTotalQty) };
+    }
+
+    return { hasQuota: false, remaining: null, isCommunityQuota: false };
+  }, [currentCommunity]);
+
   const handleUpdateQty = (pid, delta) => {
     setAnimatingProductId(pid);
     setTimeout(() => {
@@ -1026,17 +1050,17 @@ export default function LiffOrderPage({ user, apiUrl }) {
     }, 150);
 
     const prod = products.find(p => p.id === pid);
-    if (prod && prod.maxTotalQty !== null && prod.maxTotalQty !== undefined && delta > 0) {
-      const limit = Number(prod.maxTotalQty);
-      const currentSold = Number(prod.soldQty || 0);
-      const remaining = Math.max(0, limit - currentSold);
+    const quotaInfo = getProductQuotaInfo(prod);
+    if (prod && quotaInfo.hasQuota && delta > 0) {
+      const remaining = quotaInfo.remaining;
 
       const totalCartQty = isGroupOrder
         ? Object.values(groupCart).reduce((sum, itemMap) => sum + (itemMap?.[pid] || 0), 0)
         : (cart[pid] || 0);
 
       if (totalCartQty + delta > remaining) {
-        alert(`【${prod.name}】活動總配額僅剩 ${remaining} 罐，無法再增加！`);
+        const tagText = quotaInfo.isCommunityQuota ? "【本社區專屬限量】" : "";
+        alert(`【${prod.name}】${tagText}活動配額僅剩 ${remaining} 罐，無法再增加！`);
         return;
       }
     }
@@ -1116,10 +1140,12 @@ export default function LiffOrderPage({ user, apiUrl }) {
     // 配額上限限制
     if (qty !== "" && qty > 0) {
       const prod = products.find(p => p.id === pid);
-      if (prod && prod.maxTotalQty !== null && prod.maxTotalQty !== undefined) {
-        const remaining = Math.max(0, Number(prod.maxTotalQty) - Number(prod.soldQty || 0));
+      const quotaInfo = getProductQuotaInfo(prod);
+      if (prod && quotaInfo.hasQuota) {
+        const remaining = quotaInfo.remaining;
         if (qty > remaining) {
-          alert(`【${prod.name}】活動總配額僅剩 ${remaining} 罐！`);
+          const tagText = quotaInfo.isCommunityQuota ? "【本社區專屬限量】" : "";
+          alert(`【${prod.name}】${tagText}活動配額僅剩 ${remaining} 罐！`);
           qty = remaining;
         }
       }
@@ -1278,20 +1304,13 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
     const total = Object.values(cleanedTempFlavorQty).reduce((a, b) => a + b, 0);
 
-    // 配額檢查：口味商品同樣要受 maxTotalQty 限制
-    if (total > 0 && flavorModalProduct.maxTotalQty !== null && flavorModalProduct.maxTotalQty !== undefined) {
-      const limit = Number(flavorModalProduct.maxTotalQty);
-      const currentSold = Number(flavorModalProduct.soldQty || 0);
-      const remaining = Math.max(0, limit - currentSold);
-
-      // 計算購物車中已有的數量（不含本次選擇，因為本次會覆蓋）
-      const existingCartQty = isGroupOrder
-        ? Object.values(groupCart).reduce((sum, itemMap) => sum + (itemMap?.[pid] || 0), 0)
-        : (cart[pid] || 0);
-      // 本次選擇會完全取代現有購物車的同商品，所以用 total 而非 existingCartQty + total
-      // 但若 total > remaining，就超出配額
+    // 配額檢查：支援社區專屬與全局限量
+    const quotaInfo = getProductQuotaInfo(flavorModalProduct);
+    if (total > 0 && quotaInfo.hasQuota) {
+      const remaining = quotaInfo.remaining;
       if (total > remaining) {
-        alert(`【${flavorModalProduct.name}】活動總配額僅剩 ${remaining} 罐，您選擇了 ${total} 罐，已超出上限！`);
+        const tagText = quotaInfo.isCommunityQuota ? "【本社區專屬限量】" : "";
+        alert(`【${flavorModalProduct.name}】${tagText}活動配額僅剩 ${remaining} 罐，您選擇了 ${total} 罐，已超出上限！`);
         return;
       }
     }
@@ -4840,17 +4859,22 @@ ${freeNote(newFee, newMin)}
                                   有效: {product.expiryDate}
                                 </span>
                               )}
-                              {product.maxTotalQty !== null && product.maxTotalQty !== undefined && (() => {
-                                const remaining = Math.max(0, Number(product.maxTotalQty) - Number(product.soldQty || 0));
+                              {(() => {
+                                const qInfo = getProductQuotaInfo(product);
+                                if (!qInfo.hasQuota) return null;
+                                const remaining = qInfo.remaining;
+                                const isComm = qInfo.isCommunityQuota;
                                 return (
                                   <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded mt-1 font-bold ${
                                     remaining === 0
-                                      ? 'text-red-600 bg-red-50'
+                                      ? 'text-red-600 bg-red-50 border border-red-200'
                                       : remaining <= 10
-                                      ? 'text-orange-600 bg-orange-50'
-                                      : 'text-purple-600 bg-purple-50'
+                                      ? 'text-orange-600 bg-orange-50 border border-orange-200'
+                                      : 'text-purple-600 bg-purple-50 border border-purple-200'
                                   }`}>
-                                    {remaining === 0 ? '🚫 已售完' : `🔖 活動限量 剩 ${remaining} 罐`}
+                                    {remaining === 0 
+                                      ? (isComm ? '🚫 本社區專屬額度已售完' : '🚫 已售完') 
+                                      : (isComm ? `🔥 本社區獨家專屬 剩 ${remaining} 罐` : `🔖 活動限量 剩 ${remaining} 罐`)}
                                   </span>
                                 );
                               })()}
@@ -4906,9 +4930,10 @@ ${freeNote(newFee, newMin)}
                                           inputMode="numeric"
                                           pattern="[0-9]*"
                                           min="0"
-                                          max={product.maxTotalQty !== null && product.maxTotalQty !== undefined
-                                            ? Math.max(0, Number(product.maxTotalQty) - Number(product.soldQty || 0))
-                                            : 99}
+                                          max={(() => {
+                                            const qInfo = getProductQuotaInfo(product);
+                                            return qInfo.hasQuota ? qInfo.remaining : 99;
+                                          })()}
                                           value={qty}
                                           onChange={(e) => handleSetQty(product.id, e.target.value)}
                                           onBlur={(e) => {
@@ -4923,8 +4948,8 @@ ${freeNote(newFee, newMin)}
                                     </>
                                   )}
                                   {(() => {
-                                    const isSoldOut = product.maxTotalQty !== null && product.maxTotalQty !== undefined &&
-                                      Math.max(0, Number(product.maxTotalQty) - Number(product.soldQty || 0)) === 0;
+                                    const qInfo = getProductQuotaInfo(product);
+                                    const isSoldOut = qInfo.hasQuota && qInfo.remaining === 0;
                                     return (
                                       <button
                                         onClick={() => !isSoldOut && handleProductAction(product, true)}
