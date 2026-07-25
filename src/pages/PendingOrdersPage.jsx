@@ -2019,11 +2019,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center gap-3 flex-shrink-0">
+                                            <div className="flex items-center gap-2 shrink-0">
                                                 <span className="font-mono font-black text-xl md:text-2xl text-blue-600 dark:text-blue-400">
                                                     ${computeOrderTotals(order, buildingSettingsList, groupBindings).totalAmount}
                                                 </span>
-                                                
                                             </div>
                                         </div>
 
@@ -2048,7 +2047,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                 </span>
                                             )}
 
-                                            {/* 付款狀態 (狀態強調色: 10% 柔和透明度，不論深淺模式都不會變成濃重深塊) */}
+                                            {/* 付款狀態 */}
                                             {order.paymentStatus !== 'off' && order.paymentStatus !== '已付款' && order.paymentStatus !== '已入帳' ? (
                                                 <button
                                                     type="button"
@@ -2068,21 +2067,35 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                 </span>
                                             )}
 
-                                            {order.expectedDeliveryDate && (
-                                                <span
+                                            {/* 預計配送日按鈕 (已有日期顯示配送日，尚未設定顯示『🚚 點擊確認配送日』框框) */}
+                                            {order.expectedDeliveryDate ? (
+                                                <button
+                                                    type="button"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         handleOpenDateModal(order, e);
                                                     }}
-                                                    className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] font-bold px-2.5 py-0.5 rounded-md flex items-center gap-1 cursor-pointer hover:bg-[var(--bg-hover)] border border-[var(--border-primary)] transition-colors"
+                                                    className="bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-2.5 py-1 rounded-md flex items-center gap-1 cursor-pointer border border-blue-200 transition-colors shadow-2xs text-xs"
                                                     title="點擊修改預計配送日"
                                                 >
                                                     🚚 {order.expectedDeliveryDate} 配送
-                                                </span>
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleOpenDateModal(order, e);
+                                                    }}
+                                                    className="bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold px-2.5 py-1 rounded-md flex items-center gap-1 cursor-pointer border border-amber-200 transition-colors text-xs shadow-2xs"
+                                                    title="點擊確認預計配送日"
+                                                >
+                                                    🚚 點擊確認配送日
+                                                </button>
                                             )}
                                         </div>
 
-                                        {/* 第三列：物流通訊與下單時間 */}
+                                        /* 第三列：物流通訊與下單時間 */}
                                         <div className="text-xs text-[var(--text-secondary)] mt-1 flex flex-col gap-1.5 border-t border-dashed border-[var(--border-primary)] pt-2.5">
                                             <div className="flex items-center gap-3 flex-wrap">
                                                 <div className="flex items-center gap-1 font-semibold text-[var(--text-primary)]">
