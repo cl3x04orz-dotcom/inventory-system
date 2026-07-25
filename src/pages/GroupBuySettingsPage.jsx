@@ -1,14 +1,51 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, Calendar, Clock, Copy, Save, Plus, Check, RefreshCw, Truck, Edit2, Trash2, ChevronUp, ChevronDown, StickyNote } from 'lucide-react';
+import { Link, Calendar, Clock, Copy, Save, Plus, Check, RefreshCw, Truck, Edit2, Trash2, ChevronUp, ChevronDown, StickyNote, Eye, EyeOff, Search } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
 export default function GroupBuySettingsPage({ user, apiUrl }) {
+    const [activeTab, setActiveTab] = useState('SCHEDULE'); // SCHEDULE | PROMOTION_LINK | PRICING_SHIPPING | DELIVERY_ZONES
     const [settings, setSettings] = useState([]);
     const [loading, setLoading] = useState(false);
     const [selectedBuilding, setSelectedBuilding] = useState('');
     const [isAddingNew, setIsAddingNew] = useState(false);
     const [newBuildingName, setNewBuildingName] = useState('');
+    const [buildingSearchTerm, setBuildingSearchTerm] = useState(''); // 大樓搜尋關鍵字
+    const [deliveryAreaSearchTerm, setDeliveryAreaSearchTerm] = useState(''); // 散客外送區域搜尋關鍵字
     
+    // 隱藏/顯示大樓控制狀態 (持久化儲存在 localStorage)
+    const [hiddenBuildings, setHiddenBuildings] = useState(() => {
+        try {
+            const saved = localStorage.getItem('admin_hidden_buildings');
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            return [];
+        }
+    });
+    const [showHidden, setShowHidden] = useState(false); // 是否在列表中顯示已隱藏的項目
+
+    const toggleHideBuilding = (bname) => {
+        setHiddenBuildings(prev => {
+            const next = prev.includes(bname) 
+                ? prev.filter(b => b !== bname) 
+                : [...prev, bname];
+            localStorage.setItem('admin_hidden_buildings', JSON.stringify(next));
+            return next;
+        });
+    };
+
+    const hideAllDistricts = () => {
+        const districtNames = settings
+            .map(s => s.building)
+            .filter(b => (b.startsWith('台南市') || b.startsWith('高雄市')) && b.endsWith('區'));
+        
+        setHiddenBuildings(prev => {
+            const set = new Set([...prev, ...districtNames]);
+            const next = Array.from(set);
+            localStorage.setItem('admin_hidden_buildings', JSON.stringify(next));
+            return next;
+        });
+    };
+
     // HTML5 date / time state
     const [startDate, setStartDate] = useState('');
     const [startTime, setStartTime] = useState('');
@@ -554,893 +591,1076 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                 </button>
             </div>
 
+            {/* 4 大核心頁籤 (Tab Navigation Bar) */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-[var(--border-primary)] scrollbar-none">
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('SCHEDULE')}
+                    className={`px-4 py-2.5 rounded-xl font-extrabold text-xs md:text-sm flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+                        activeTab === 'SCHEDULE'
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                            : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)]'
+                    }`}
+                >
+                    <Calendar size={16} />
+                    <span>📅 開團與時程控制</span>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('PROMOTION_LINK')}
+                    className={`px-4 py-2.5 rounded-xl font-extrabold text-xs md:text-sm flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+                        activeTab === 'PROMOTION_LINK'
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                            : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)]'
+                    }`}
+                >
+                    <Link size={16} />
+                    <span>🔗 下單網址與推廣</span>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('PRICING_SHIPPING')}
+                    className={`px-4 py-2.5 rounded-xl font-extrabold text-xs md:text-sm flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+                        activeTab === 'PRICING_SHIPPING'
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                            : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)]'
+                    }`}
+                >
+                    <Truck size={16} />
+                    <span>💰 專屬定價與運費</span>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('DELIVERY_ZONES')}
+                    className={`px-4 py-2.5 rounded-xl font-extrabold text-xs md:text-sm flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+                        activeTab === 'DELIVERY_ZONES'
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                            : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)]'
+                    }`}
+                >
+                    <Truck size={16} />
+                    <span>🛵 散客外送區域</span>
+                </button>
+            </div>
+
             {loading && settings.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center py-20 gap-3 text-[var(--text-secondary)]">
                     <RefreshCw className="animate-spin text-blue-500" size={36} />
                     <span>載入大樓時段設定中...</span>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pb-6">
-                    {/* Left: Building Selection Card */}
-                    <div className="md:col-span-1 bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4 h-auto md:h-full overflow-hidden">
-                        <h3 className="font-extrabold text-base text-[var(--text-primary)] pb-2.5 border-b border-[var(--border-primary)] flex items-center gap-1.5 flex-shrink-0">
-                            <span className="flex items-center justify-center bg-blue-500 text-white rounded-full w-5 h-5 text-xs font-black">1</span>
-                            選擇大樓 / 社區
-                        </h3>
-                        
-                        {/* 大樓清單區 */}
-                        <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
-                            {settings.map((s, idx) => {
-                                const isSelected = selectedBuilding === s.building && !isAddingNew;
-                                return (
-                                    <button
-                                        key={s.building}
-                                        type="button"
-                                        onClick={() => {
-                                            setIsAddingNew(false);
-                                            setSelectedBuilding(s.building);
-                                            updateFormFields(s.building);
-                                        }}
-                                        className={`w-full text-left p-3 rounded-xl border flex items-center justify-between transition-all duration-200 ${
-                                            isSelected 
-                                                ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm font-extrabold' 
-                                                : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:text-slate-900'
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                                            <span className="text-base flex-shrink-0">🏢</span>
-                                            <div className="flex flex-col min-w-0">
-                                                <span className="text-base font-bold tracking-wide truncate">{s.building}</span>
-                                                {s.admin_note && (
-                                                    <span className="text-xs text-amber-600 font-medium truncate leading-tight mt-0.5">
-                                                        {s.admin_note}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        {isSelected ? (
-                                            <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleMoveBuilding(idx, -1)}
-                                                    disabled={idx === 0}
-                                                    className="p-1 hover:bg-blue-100 rounded text-blue-400 disabled:opacity-30 transition-colors"
-                                                    title="上移"
-                                                >
-                                                    <ChevronUp size={14} />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleMoveBuilding(idx, 1)}
-                                                    disabled={idx === settings.length - 1}
-                                                    className="p-1 hover:bg-blue-100 rounded text-blue-400 disabled:opacity-30 transition-colors"
-                                                    title="下移"
-                                                >
-                                                    <ChevronDown size={14} />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleRenameClick(s.building)}
-                                                    className="p-1 hover:bg-blue-150 rounded text-blue-600 transition-colors"
-                                                    title="修改名稱"
-                                                >
-                                                    <Edit2 size={15} />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleDeleteClick(s.building)}
-                                                    className="p-1 hover:bg-red-50 rounded text-red-500 transition-colors"
-                                                    title="刪除大樓"
-                                                >
-                                                    <Trash2 size={15} />
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <div className="w-4 h-4"></div>
+                <>
+                    {/* 大樓專屬三大頁籤 (SCHEDULE / PROMOTION_LINK / PRICING_SHIPPING) */}
+                    {activeTab !== 'DELIVERY_ZONES' && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pb-6">
+                            {/* Left: Building Selection Card */}
+                            <div className="md:col-span-1 bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4 h-auto md:h-full overflow-hidden">
+                                <div className="flex flex-col gap-2 pb-2.5 border-b border-[var(--border-primary)] flex-shrink-0">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="font-extrabold text-base text-[var(--text-primary)] flex items-center gap-1.5">
+                                            <span className="flex items-center justify-center bg-blue-500 text-white rounded-full w-5 h-5 text-xs font-black">1</span>
+                                            選擇大樓 / 社區
+                                        </h3>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowHidden(prev => !prev)}
+                                            className={`text-[11px] font-bold px-2 py-1 rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
+                                                showHidden 
+                                                    ? 'bg-amber-500/10 text-amber-600 border-amber-500/30 hover:bg-amber-500 hover:text-white'
+                                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-200'
+                                            }`}
+                                            title={showHidden ? '隱藏已關閉的項目' : '顯示包含已隱藏的項目'}
+                                        >
+                                            {showHidden ? <Eye size={12} /> : <EyeOff size={12} />}
+                                            {showHidden ? '隱藏關閉' : `顯示全數 (${hiddenBuildings.length}已隱藏)`}
+                                        </button>
+                                    </div>
+
+                                    {/* 🔍 大樓快速搜尋框 */}
+                                    <div className="relative">
+                                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="搜尋大樓 / 社區名稱..."
+                                            value={buildingSearchTerm}
+                                            onChange={(e) => setBuildingSearchTerm(e.target.value)}
+                                            className="w-full pl-8 pr-8 py-2 text-xs rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500 font-bold placeholder:font-normal placeholder:text-slate-400 transition-colors"
+                                        />
+                                        {buildingSearchTerm && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setBuildingSearchTerm('')}
+                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold w-4 h-4 rounded-full hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer"
+                                            >
+                                                ✕
+                                            </button>
                                         )}
-                                    </button>
-                                );
-                            })}
-                            
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setIsAddingNew(true);
-                                    setSelectedBuilding('__new__');
-                                    setNewBuildingName('');
-                                    setStartDate('');
-                                    setStartTime('');
-                                    setEndDate('');
-                                    setEndTime('');
-                                    setIsAuto(false);
-                                    setAutoOpenDay('');
-                                    setAutoOpenTime('');
-                                    setAutoCloseDay('');
-                                    setAutoCloseTime('');
-                                }}
-                                className={`w-full text-left p-3 rounded-xl border-2 border-dashed flex items-center gap-2 transition-all duration-200 ${
-                                    isAddingNew 
-                                        ? 'bg-blue-50 border-blue-300 text-blue-600 font-extrabold' 
-                                        : 'bg-transparent border-slate-300 hover:border-slate-400 text-slate-500 hover:text-slate-700'
-                                }`}
-                            >
-                                <Plus size={20} />
-                                <span className="text-lg font-bold">新增大樓 / 社區</span>
-                            </button>
-                        </div>
-
-                        {isAddingNew && (
-                            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150 p-3 bg-blue-50/30 border border-blue-100 rounded-xl flex-shrink-0">
-                                <label className="text-sm font-extrabold text-blue-600">自訂新大樓名稱</label>
-                                <input
-                                    type="text"
-                                    className="input-field w-full p-3 rounded-xl border border-blue-200 bg-white text-base font-bold focus:outline-none focus:border-blue-500"
-                                    placeholder="例如：遠雄富源大樓"
-                                    value={newBuildingName}
-                                    onChange={(e) => setNewBuildingName(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            const nextEl = document.getElementById('startDate');
-                                            if (nextEl) nextEl.focus();
-                                        }
-                                    }}
-                                />
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Right: Settings Container */}
-                    <div className="md:col-span-2 flex flex-col gap-5">
-                        
-                        {/* Auto Settings Card */}
-                        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
-                            <div className="flex justify-between items-center pb-2.5 border-b border-[var(--border-primary)]">
-                                <h3 className="font-extrabold text-base text-[var(--text-primary)] flex items-center gap-1.5">
-                                    <span className="flex items-center justify-center bg-blue-500 text-white rounded-full w-5 h-5 text-xs font-black">2</span>
-                                    每週定期自動開關團設定
-                                </h3>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        className="sr-only peer"
-                                        checked={isAuto}
-                                        onChange={(e) => setIsAuto(e.target.checked)}
-                                    />
-                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                                </label>
-                            </div>
-
-                            {isAuto ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in duration-200">
-                                    {/* Auto Open Time */}
-                                    <div className="space-y-3 p-4 bg-emerald-50/10 dark:bg-emerald-950/10 rounded-2xl border border-emerald-500/20">
-                                        <label className="text-base font-extrabold text-emerald-600 flex items-center gap-1.5">
-                                            <Clock size={18} />
-                                            自動開團時間 (每週)
-                                        </label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <select
-                                                className="input-field p-3 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)]"
-                                                value={autoOpenDay}
-                                                onChange={(e) => setAutoOpenDay(e.target.value)}
-                                            >
-                                                <option value="">選擇星期</option>
-                                                <option value="1">星期一</option>
-                                                <option value="2">星期二</option>
-                                                <option value="3">星期三</option>
-                                                <option value="4">星期四</option>
-                                                <option value="5">星期五</option>
-                                                <option value="6">星期六</option>
-                                                <option value="0">星期日</option>
-                                            </select>
-                                            <input
-                                                type="time"
-                                                className="input-field p-3 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)]"
-                                                value={autoOpenTime}
-                                                onChange={(e) => setAutoOpenTime(e.target.value)}
-                                            />
-                                        </div>
                                     </div>
 
-                                    {/* Auto Close Time */}
-                                    <div className="space-y-3 p-4 bg-rose-50/10 dark:bg-rose-950/10 rounded-2xl border border-rose-500/20">
-                                        <label className="text-base font-extrabold text-rose-600 flex items-center gap-1.5">
-                                            <Clock size={18} />
-                                            自動結單時間 (每週)
-                                        </label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <select
-                                                className="input-field p-3 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)]"
-                                                value={autoCloseDay}
-                                                onChange={(e) => setAutoCloseDay(e.target.value)}
-                                            >
-                                                <option value="">選擇星期</option>
-                                                <option value="1">星期一</option>
-                                                <option value="2">星期二</option>
-                                                <option value="3">星期三</option>
-                                                <option value="4">星期四</option>
-                                                <option value="5">星期五</option>
-                                                <option value="6">星期六</option>
-                                                <option value="0">星期日</option>
-                                            </select>
-                                            <input
-                                                type="time"
-                                                className="input-field p-3 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)]"
-                                                value={autoCloseTime}
-                                                onChange={(e) => setAutoCloseTime(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
+                                    {/* 快速一鍵隱藏全台行政區輔助按鈕 */}
+                                    {settings.some(s => (s.building.startsWith('台南市') || s.building.startsWith('高雄市')) && s.building.endsWith('區') && !hiddenBuildings.includes(s.building)) && (
+                                        <button
+                                            type="button"
+                                            onClick={hideAllDistricts}
+                                            className="text-[10px] text-blue-600 hover:text-blue-800 font-bold underline text-left self-start"
+                                        >
+                                            ⚡ 一鍵隱藏選單中的所有散客行政區 (如台南市永康區等)
+                                        </button>
+                                    )}
                                 </div>
-                            ) : (
-                                <p className="text-sm text-[var(--text-tertiary)] italic">
-                                    💡 啟用後，大樓每週將在指定星期與時間「自動開關團」，不需每次手動設定。
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Manual Settings Card */}
-                        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
-                            <h3 className="font-extrabold text-base text-[var(--text-primary)] pb-2.5 border-b border-[var(--border-primary)] flex items-center gap-1.5">
-                                <span className="flex items-center justify-center bg-blue-500 text-white rounded-full w-5 h-5 text-xs font-black">3</span>
-                                手動臨時加開時段設定
-                            </h3>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {/* Start Time */}
-                                <div className="space-y-3 p-4 bg-[var(--bg-tertiary)] rounded-2xl border border-[var(--border-primary)] flex flex-col justify-between">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-extrabold text-[var(--text-primary)] flex items-center gap-1.5">
-                                            <Calendar className="text-amber-500" size={16} />
-                                            加開：開始時間
-                                        </label>
-                                        <input
-                                            type="date"
-                                            id="startDate"
-                                            className="input-field w-full p-3 text-sm rounded-lg border bg-[var(--bg-secondary)] font-bold focus:border-blue-500"
-                                            value={startDate}
-                                            onChange={(e) => setStartDate(e.target.value)}
-                                            onKeyDown={(e) => handleKeyDown(e, 'startTime', null)}
-                                        />
-                                        <input
-                                            type="time"
-                                            id="startTime"
-                                            className="input-field w-full p-3 text-sm rounded-lg border bg-[var(--bg-secondary)] font-bold focus:border-blue-500"
-                                            value={startTime}
-                                            onChange={(e) => setStartTime(e.target.value)}
-                                            onKeyDown={(e) => handleKeyDown(e, 'endDate', 'startDate')}
-                                        />
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setStartDate(''); setStartTime(''); }}
-                                        className="text-xs text-red-500 font-bold hover:underline self-start mt-2"
-                                    >
-                                        清除開始時間
-                                    </button>
-                                </div>
-
-                                {/* End Time */}
-                                <div className="space-y-3 p-4 bg-[var(--bg-tertiary)] rounded-2xl border border-[var(--border-primary)] flex flex-col justify-between">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-extrabold text-[var(--text-primary)] flex items-center gap-1.5">
-                                            <Clock className="text-rose-500" size={16} />
-                                            加開：結束時間
-                                        </label>
-                                        <input
-                                            type="date"
-                                            id="endDate"
-                                            className="input-field w-full p-3 text-sm rounded-lg border bg-[var(--bg-secondary)] font-bold focus:border-blue-500"
-                                            value={endDate}
-                                            onChange={(e) => setEndDate(e.target.value)}
-                                            onKeyDown={(e) => handleKeyDown(e, 'endTime', 'startTime')}
-                                        />
-                                        <input
-                                            type="time"
-                                            id="endTime"
-                                            className="input-field w-full p-3 text-sm rounded-lg border bg-[var(--bg-secondary)] font-bold focus:border-blue-500"
-                                            value={endTime}
-                                            onChange={(e) => setEndTime(e.target.value)}
-                                            onKeyDown={(e) => handleKeyDown(e, 'saveBtn', 'endDate')}
-                                        />
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setEndDate(''); setEndTime(''); }}
-                                        className="text-xs text-red-500 font-bold hover:underline self-start mt-2"
-                                    >
-                                        清除結束時間
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="flex justify-end border-t border-[var(--border-primary)]/50 pt-3">
-                                <button
-                                    id="saveBtn"
-                                    onClick={handleSave}
-                                    disabled={isSaving}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'ArrowUp') {
-                                            e.preventDefault();
-                                            document.getElementById('endTime')?.focus();
-                                        }
-                                    }}
-                                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 shadow-md shadow-blue-500/20 active:scale-95 transition-all focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                >
-                                    <Save size={14} />
-                                    {isSaving ? '儲存中...' : '儲存大樓設定'}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Shipping Settings Card */}
-                        {!isAddingNew && selectedBuilding && (
-                            <>
-                            {/* 管理員備注 */}
-                            <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-2xl flex flex-col gap-2">
-                                <label className="text-sm font-extrabold text-amber-700 flex items-center gap-1.5">
-                                    <StickyNote size={15} />
-                                    管理員備注（僅自己可見）
-                                </label>
-                                <textarea
-                                    rows={2}
-                                    className="input-field w-full p-2.5 text-sm rounded-xl border border-amber-200 bg-white resize-none focus:outline-none focus:border-amber-400"
-                                    placeholder="例：每週二固定補貨、聯絡人：王小明 0912-345-678"
-                                    value={adminNote}
-                                    onChange={(e) => setAdminNote(e.target.value)}
-                                />
-                                <p className="text-xs text-amber-600/70">備注會在「儲存大樓設定」時一併儲存。</p>
-                            </div>
-                            <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
-                                <div className="flex justify-between items-center pb-2.5 border-b border-[var(--border-primary)]">
-                                    <h3 className="font-extrabold text-base text-[var(--text-primary)] flex items-center gap-1.5">
-                                        <Truck size={18} className="text-emerald-500" />
-                                        運費設定
-                                    </h3>
-                                    {/* 免運切換 */}
-                                    <label className="relative inline-flex items-center cursor-pointer gap-2">
-                                        <span className="text-sm font-semibold text-[var(--text-secondary)]">永久免運</span>
-                                        <input
-                                            type="checkbox"
-                                            className="sr-only peer"
-                                            checked={isFreeShipping}
-                                            onChange={(e) => setIsFreeShipping(e.target.checked)}
-                                        />
-                                        <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                                    </label>
-                                </div>
-
-                                {isFreeShipping ? (
-                                    <p className="text-sm text-emerald-600 font-semibold bg-emerald-50 rounded-xl p-3 flex items-center gap-2">
-                                        ✅ 此社區永久免運，不加收任何運費。
-                                    </p>
-                                ) : (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        {/* 免運門檻 */}
-                                        <div className="flex flex-col gap-1.5">
-                                            <label className="text-sm font-extrabold text-[var(--text-primary)]">
-                                                免運門檻
-                                            </label>
-                                            <p className="text-xs text-[var(--text-tertiary)]">訂單滿此金額免運（填 0 表示不開放免運）</p>
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-bold font-mono text-sm">$</span>
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    className="input-field pl-7 p-3 w-full text-base font-bold"
-                                                    placeholder="例：500"
-                                                    value={freeShippingMin}
-                                                    onChange={(e) => setFreeShippingMin(e.target.value)}
-                                                />
-                                            </div>
-                                        </div>
-                                        {/* 運費金額 */}
-                                        <div className="flex flex-col gap-1.5">
-                                            <label className="text-sm font-extrabold text-[var(--text-primary)]">
-                                                未達門檻運費
-                                            </label>
-                                            <p className="text-xs text-[var(--text-tertiary)]">未達免運門檻時加收的運費</p>
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-bold font-mono text-sm">$</span>
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    className="input-field pl-7 p-3 w-full text-base font-bold"
-                                                    placeholder="例：60"
-                                                    value={shippingFee}
-                                                    onChange={(e) => setShippingFee(e.target.value)}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* 預覽 */}
-                                {!isFreeShipping && (Number(shippingFee) > 0 || Number(freeShippingMin) > 0) && (
-                                    <div className="text-xs text-slate-500 bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                        📦 規則預覽：訂單滿 <strong>${Number(freeShippingMin) || 0}</strong> 免運；未滿則加收 <strong>${Number(shippingFee) || 0}</strong> 運費。
-                                    </div>
-                                )}
-
-                                <div className="flex justify-end border-t border-[var(--border-primary)]/50 pt-3">
-                                    <button
-                                        onClick={handleSaveShipping}
-                                        disabled={isSavingShipping}
-                                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
-                                    >
-                                        <Truck size={14} />
-                                        {isSavingShipping ? '儲存中...' : '儲存運費設定'}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* 促銷活動引擎設定區塊 */}
-                            <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
-                                <h3 className="font-extrabold text-base text-[var(--text-primary)] pb-2.5 border-b border-[var(--border-primary)] flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="text-base flex-shrink-0">🎉</span>
-                                        促銷活動引擎管理
-                                    </div>
-                                    <button
-                                        onClick={async () => {
-                                            const name = prompt('請輸入促銷名稱 (例：燕麥任選買3送2)');
-                                            if (!name) return;
-                                            const type = prompt('請選擇促銷類型 (輸入 1 買X送Y，輸入 2 任選組合價)', '1');
-                                            
-                                            try {
-                                                if (type === '1') {
-                                                    const inputRule = prompt('請輸入優惠門檻 (格式：買:送，多階梯請用逗號分隔，例 "3:2, 5:4")', '3:2');
-                                                    if (!inputRule) return;
-
-                                                    const tierPairs = inputRule.split(',').map(s => s.trim()).filter(Boolean);
-                                                    const tiers = [];
-                                                    for (const pair of tierPairs) {
-                                                        const parts = pair.split(':').map(n => Number(n.trim()));
-                                                        if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) {
-                                                            tiers.push({ buyQty: parts[0], freeQty: parts[1] });
-                                                        }
-                                                    }
-
-                                                    if (tiers.length === 0) {
-                                                        alert('❌ 格式錯誤！請依據 "買:送" 格式輸入，例如 "3:2" 或 "3:2, 5:4"');
-                                                        return;
-                                                    }
-
-                                                    const modeStr = prompt('請選擇贈品模式：\n1. 客人自選贈品 (CUSTOMER_SELECT)\n2. 自動折抵最低價 (AUTO_LOWEST_PRICE)\n3. 送同品項 (SAME_PRODUCT)', '1');
-                                                    let rewardSelectionMode = 'CUSTOMER_SELECT';
-                                                    if (modeStr === '2') rewardSelectionMode = 'AUTO_LOWEST_PRICE';
-                                                    if (modeStr === '3') rewardSelectionMode = 'SAME_PRODUCT';
-
-                                                    await callGAS(apiUrl, 'createPromotion', {
-                                                        name,
-                                                        promoType: 'BUY_X_GET_Y',
-                                                        buyQty: tiers[0].buyQty,
-                                                        freeQty: tiers[0].freeQty,
-                                                        tiers,
-                                                        communityId: selectedCommunityId,
-                                                        rewardSelectionMode
-                                                    }, user.token);
-                                                    alert('✅ 促銷活動已成功新增！');
-                                                } else if (type === '2') {
-                                                    const buyX = prompt('請輸入任選幾件 (例：3)');
-                                                    const bundlePrice = prompt('請輸入組合價 (例：100)');
-                                                    if (!buyX || !bundlePrice) return;
-                                                    await callGAS(apiUrl, 'createPromotion', {
-                                                        name, promoType: 'BUNDLE_PRICE', buyQty: buyX, bundlePrice, communityId: selectedCommunityId
-                                                    }, user.token);
-                                                    alert('✅ 促銷活動已成功新增！');
-                                                }
-                                                fetchAllProducts();
-                                            } catch (error) {
-                                                console.error(error);
-                                                alert('❌ 新增失敗：' + error.message);
-                                            }
-                                        }}
-                                        className="text-[10px] text-emerald-600 hover:text-emerald-800 font-bold flex items-center gap-1 transition-colors"
-                                    >
-                                        <span className="text-base leading-none">＋</span> 新增促銷活動
-                                    </button>
-                                </h3>
                                 
-                                {allPromotions.filter(p => p.communityId === selectedCommunityId || !p.communityId).length === 0 ? (
-                                    <div className="text-center py-6 text-xs text-[var(--text-secondary)]">目前尚無設定促銷活動</div>
-                                ) : (
-                                    <div className="flex flex-col gap-2">
-                                        {allPromotions
-                                            .filter(p => p.communityId === selectedCommunityId || !p.communityId)
-                                            .map(promo => (
-                                                <div key={promo.promoId} className="flex items-center justify-between p-3 border border-[var(--border-primary)] rounded-xl bg-[var(--bg-tertiary)]">
-                                                    <div>
-                                                        <div className="font-bold text-sm text-[var(--text-primary)]">{promo.name}</div>
-                                                        <div className="text-xs text-[var(--text-secondary)] mt-0.5">
-                                                            {promo.promoType === 'BUY_X_GET_Y' && (() => {
-                                                                if (Array.isArray(promo.tiers) && promo.tiers.length > 0) {
-                                                                    const tierText = promo.tiers.map(t => `買 ${t.buyQty} 送 ${t.freeQty}`).join(' 🔥 ');
-                                                                    return `規則：${tierText}`;
-                                                                }
-                                                                return `規則：買 ${promo.buyQty} 送 ${promo.freeQty}`;
-                                                            })()}
-                                                            {promo.promoType === 'BUNDLE_PRICE' && `規則：任選 ${promo.buyQty} 件 $${promo.bundlePrice}`}
-                                                            {promo.promoType === 'BUY_X_GET_Y' && promo.rewardSelectionMode === 'CUSTOMER_SELECT' && <span className="ml-2 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">自選贈品</span>}
-                                                            {promo.promoType === 'BUY_X_GET_Y' && promo.rewardSelectionMode === 'AUTO_LOWEST_PRICE' && <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">折抵最低價</span>}
-                                                            {promo.promoType === 'BUY_X_GET_Y' && promo.rewardSelectionMode === 'SAME_PRODUCT' && <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">送同品項</span>}
-                                                            {!promo.communityId && <span className="ml-2 text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">全域可用</span>}
+                                {/* 大樓清單區 */}
+                                <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 max-h-[500px] md:max-h-none">
+                                    {settings
+                                        .filter(s => showHidden || !hiddenBuildings.includes(s.building))
+                                        .filter(s => !buildingSearchTerm.trim() || s.building.toLowerCase().includes(buildingSearchTerm.trim().toLowerCase()))
+                                        .map((s, idx) => {
+                                            const isHidden = hiddenBuildings.includes(s.building);
+                                            const isSelected = selectedBuilding === s.building && !isAddingNew;
+                                            return (
+                                                <button
+                                                    key={s.building}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setIsAddingNew(false);
+                                                        setSelectedBuilding(s.building);
+                                                        updateFormFields(s.building);
+                                                    }}
+                                                    className={`w-full text-left p-3 rounded-xl border flex items-center justify-between transition-all duration-200 ${
+                                                        isHidden
+                                                            ? 'bg-slate-100/60 dark:bg-slate-900/40 border-dashed border-slate-300 text-slate-400 opacity-60'
+                                                            : isSelected 
+                                                                ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm font-extrabold' 
+                                                                : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:text-slate-900'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                        <span className="text-base flex-shrink-0">{isHidden ? '🙈' : '🏢'}</span>
+                                                        <div className="flex flex-col min-w-0">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className={`text-base font-bold tracking-wide truncate ${isHidden ? 'line-through text-slate-400' : ''}`}>
+                                                                    {s.building}
+                                                                </span>
+                                                                {isHidden && (
+                                                                    <span className="text-[10px] bg-slate-200 text-slate-600 px-1 py-0.2 rounded font-normal">已隱藏</span>
+                                                                )}
+                                                            </div>
+                                                            {s.admin_note && (
+                                                                <span className="text-xs text-amber-600 font-medium truncate leading-tight mt-0.5">
+                                                                    {s.admin_note}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     </div>
-                                                    <button
-                                                        onClick={async () => {
-                                                            if (!window.confirm(`確定刪除促銷活動 [${promo.name}]？(若有綁定商品可能受影響)`)) return;
-                                                            await callGAS(apiUrl, 'deletePromotion', { promoId: promo.promoId }, user.token);
-                                                            fetchAllProducts();
-                                                        }}
-                                                        className="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors"
-                                                        title="刪除"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
+                                                    <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                        {/* 👁️ 隱藏 / 顯示切換按鈕 */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleHideBuilding(s.building)}
+                                                            className={`p-1 rounded transition-colors ${
+                                                                isHidden
+                                                                    ? 'hover:bg-emerald-100 text-emerald-600'
+                                                                    : 'hover:bg-slate-200 text-slate-400 hover:text-slate-600'
+                                                            }`}
+                                                            title={isHidden ? '取消隱藏 (重新顯示)' : '隱藏此大樓'}
+                                                        >
+                                                            {isHidden ? <Eye size={15} /> : <EyeOff size={15} />}
+                                                        </button>
 
-                            {/* 社區專屬定價管理區塊 */}
-                            <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
-                                <h3 className="font-extrabold text-base text-[var(--text-primary)] pb-2.5 border-b border-[var(--border-primary)] flex items-center gap-1.5">
-                                    <span className="text-base flex-shrink-0">🏷️</span>
-                                    群組/大樓專屬商品定價設定
-                                </h3>
-                                <p className="text-xs text-[var(--text-tertiary)]">
-                                    在此設定專屬售價並綁定促銷活動引擎。若無設定則採用預設原價。
-                                </p>
-
-                                {loadingCustomPrices ? (
-                                    <div className="text-center py-6 text-xs text-[var(--text-secondary)]">載入客製化價格中...</div>
-                                ) : (
-                                    <div className="border border-[var(--border-primary)] rounded-xl overflow-hidden max-h-[500px] overflow-y-auto">
-                                        <table className="w-full text-left text-xs">
-                                            <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] font-bold sticky top-0 z-10">
-                                                <tr className="border-b border-[var(--border-primary)]">
-                                                    <th className="p-3 w-40">商品名稱</th>
-                                                    <th className="p-3 text-right w-24">預設原價</th>
-                                                    <th className="p-3 w-28">專屬定價</th>
-                                                    <th className="p-3 w-40">綁定促銷活動引擎</th>
-                                                    <th className="p-3 text-center w-20">操作</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-[var(--border-primary)]">
-                                                {allProducts.map(p => {
-                                                    const customData = customPrices[p.id] || { price: '', promotions: [] };
-                                                    const priceVal = customData.price !== undefined ? customData.price : '';
-                                                    const promos = Array.isArray(customData.promotions) ? customData.promotions : [];
-                                                    const hasCustom = customPrices[p.id] !== undefined;
-
-                                                    const saveNow = (newData) => {
-                                                        handleSaveCustomPrice(p.id, newData);
-                                                    };
-
-                                                    const handlePriceChange = (val) => {
-                                                        setCustomPrices(prev => ({
-                                                            ...prev,
-                                                            [p.id]: {
-                                                                ...(prev[p.id] || { price: '', promotions: [] }),
-                                                                price: val !== '' ? Number(val) : ''
-                                                            }
-                                                        }));
-                                                    };
-
-                                                    const handlePromoChange = (idx, field, val) => {
-                                                        setCustomPrices(prev => {
-                                                            const current = prev[p.id] || { price: '', promotions: [] };
-                                                            const newPromos = [...(current.promotions || [])];
-                                                            newPromos[idx] = { ...newPromos[idx], [field]: val !== '' ? Number(val) : '' };
-                                                            return { ...prev, [p.id]: { ...current, promotions: newPromos } };
-                                                        });
-                                                    };
-
-                                                    const handlePromoBlur = () => {
-                                                        saveNow(customPrices[p.id] || { price: '', promotions: [] });
-                                                    };
-
-                                                    const addPromo = () => {
-                                                        setCustomPrices(prev => {
-                                                            const current = prev[p.id] || { price: '', promotions: [] };
-                                                            const newPromos = [...(current.promotions || []), { buyX: '', getY: '' }];
-                                                            return { ...prev, [p.id]: { ...current, promotions: newPromos } };
-                                                        });
-                                                    };
-
-                                                    const removePromo = (idx) => {
-                                                        setCustomPrices(prev => {
-                                                            const current = prev[p.id] || { price: '', promotions: [] };
-                                                            const newPromos = (current.promotions || []).filter((_, i) => i !== idx);
-                                                            const newData = { ...current, promotions: newPromos };
-                                                            // 立即儲存
-                                                            handleSaveCustomPrice(p.id, newData);
-                                                            return { ...prev, [p.id]: newData };
-                                                        });
-                                                    };
-
-                                                    return (
-                                                        <tr key={p.id} className="hover:bg-slate-50/60 transition-colors align-top">
-                                                            <td className="p-3 font-bold text-slate-800 leading-snug pt-4">{p.name}</td>
-                                                            <td className="p-3 text-right font-mono font-bold text-slate-400 pt-4">${p.single_price}</td>
-                                                            <td className="p-3 pt-4">
-                                                                <div className="relative w-24">
-                                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
-                                                                    <input
-                                                                        type="number"
-                                                                        min="0"
-                                                                        placeholder="未設定"
-                                                                        className="input-field pl-5 p-1.5 w-full text-xs font-bold text-slate-800"
-                                                                        value={priceVal}
-                                                                        onChange={(e) => handlePriceChange(e.target.value)}
-                                                                        onBlur={() => saveNow(customPrices[p.id] || { price: '', promotions: [] })}
-                                                                    />
-                                                                </div>
-                                                            </td>
-                                                            <td className="p-3 pt-4">
-                                                                <div className="flex flex-col gap-1.5">
-                                                                    <select
-                                                                        className="input-field p-1.5 w-full text-xs font-bold text-slate-800 bg-white"
-                                                                        value={customData.promoId || ''}
-                                                                        onChange={(e) => {
-                                                                            const val = e.target.value;
-                                                                            setCustomPrices(prev => {
-                                                                                const current = prev[p.id] || { price: '', promotions: [], promoId: '' };
-                                                                                const newData = { ...current, promoId: val };
-                                                                                handleSaveCustomPrice(p.id, newData);
-                                                                                return { ...prev, [p.id]: newData };
-                                                                            });
-                                                                        }}
-                                                                    >
-                                                                        <option value="">無促銷活動</option>
-                                                                        {allPromotions.map(promo => (
-                                                                            <option key={promo.promoId} value={promo.promoId}>
-                                                                                {promo.name} ({promo.promoType === 'BUY_X_GET_Y' ? `買${promo.buyQty}送${promo.freeQty}` : `任${promo.buyQty}件$${promo.bundlePrice}`})
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                </div>
-                                                            </td>
-                                                            <td className="p-3 text-center pt-4">
-                                                                {savingPriceProductId === p.id ? (
-                                                                    <span className="text-blue-500 font-semibold animate-pulse text-[10px]">儲存中...</span>
-                                                                ) : hasCustom ? (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleDeleteCustomPrice(p.id)}
-                                                                        className="px-2 py-1 bg-red-100 hover:bg-red-500 text-red-600 hover:text-white rounded text-[10px] font-bold active:scale-95 transition-all"
-                                                                    >
-                                                                        移除全部
-                                                                    </button>
-                                                                ) : (
-                                                                    <span className="text-slate-300 text-[10px]">—</span>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </div>
-                            </>
-                        )}
-
-
-                        {/* URL Generation display */}
-                        {activeUrl && (
-                            <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-2xl space-y-2.5 animate-in fade-in duration-200">
-                                <h4 className="font-extrabold text-sm text-blue-800">
-                                    🔗 獲取大樓專屬下單網址
-                                </h4>
-                                <div className="flex flex-col sm:flex-row gap-2">
-                                    <input
-                                        type="text"
-                                        readOnly
-                                        className="input-field flex-1 p-2.5 bg-white rounded-xl border border-blue-200 text-xs text-slate-800 font-mono font-bold focus:outline-none"
-                                        value={activeUrl}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={handleCopy}
-                                        className="sm:w-28 py-2.5 rounded-xl font-bold flex items-center justify-center gap-1 shadow-sm text-xs text-white bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all"
-                                        style={{ backgroundColor: copied ? '#10B981' : undefined }}
-                                    >
-                                        {copied ? <Check size={14} /> : <Copy size={14} />}
-                                        {copied ? '已複製！' : '一鍵複製'}
-                                    </button>
-                                </div>
-                                <p className="text-xs text-slate-500 font-medium">
-                                    ※ 複製此網址丟給該大樓社區住戶即可下單。系統會自動鎖定該大樓，並依據您所設定的每週自動或手動加開時段進行下單驗證。
-                                </p>
-                            </div>
-                        )}
-
-                    </div>
-                </div>
-            )}
-
-            {/* 🚚 線上下單散客外送區域管理面板 */}
-            <div className="bg-[var(--bg-secondary)] p-6 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-6 mt-4">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-[var(--border-primary)] gap-2">
-                    <div>
-                        <h3 className="font-extrabold text-lg text-[var(--text-primary)] flex items-center gap-2">
-                            <Truck className="text-emerald-500" />
-                            線上下單外送區域與運費管理 (散客專用)
-                        </h3>
-                        <p className="text-xs text-[var(--text-secondary)] mt-1">針對「一般常態線上下單」的散客，依據台南不同行政區(如東區、永康、白河)設定各自的配送運費與免運門檻。</p>
-                    </div>
-                    <button
-                        onClick={fetchCommunities}
-                        className="btn-secondary px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5"
-                        disabled={loadingCommunities}
-                    >
-                        <RefreshCw size={12} className={loadingCommunities ? 'animate-spin' : ''} />
-                        重新整理
-                    </button>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* 新增/編輯區域區 */}
-                    <div className="lg:col-span-1 border-r border-[var(--border-primary)]/50 pr-0 lg:pr-6 space-y-4">
-                        <h4 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-1.5">
-                            {editingAreaId ? '📝 編輯外送區域' : '➕ 新增外送區域'}
-                        </h4>
-                        
-                        <form onSubmit={handleSaveArea} className="space-y-4">
-                            <div className="flex flex-col gap-1">
-                                <label className="text-xs font-extrabold text-[var(--text-secondary)]">外送區域名稱 <span className="text-red-500">*</span></label>
-                                <input
-                                    type="text"
-                                    className="input-field p-2.5 w-full text-sm font-bold"
-                                    placeholder="例：台南東區散客、台南白河區"
-                                    value={areaName}
-                                    onChange={(e) => setAreaName(e.target.value)}
-                                />
-                            </div>
-
-                            <div className="flex justify-between items-center bg-[var(--bg-tertiary)] p-3 rounded-xl border border-[var(--border-primary)]">
-                                <span className="text-xs font-bold text-[var(--text-secondary)]">此區域永久免運</span>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        className="sr-only peer"
-                                        checked={areaFreeShipping}
-                                        onChange={(e) => setAreaFreeShipping(e.target.checked)}
-                                    />
-                                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
-                                </label>
-                            </div>
-
-                            {!areaFreeShipping && (
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-xs font-extrabold text-[var(--text-secondary)]">未達門檻運費</label>
-                                        <div className="relative">
-                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] text-xs font-bold font-mono">$</span>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                className="input-field pl-6 p-2.5 w-full text-sm font-bold"
-                                                placeholder="例：60"
-                                                value={areaFee}
-                                                onChange={(e) => setAreaFee(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-xs font-extrabold text-[var(--text-secondary)]">免運門檻金額</label>
-                                        <div className="relative">
-                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] text-xs font-bold font-mono">$</span>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                className="input-field pl-6 p-2.5 w-full text-sm font-bold"
-                                                placeholder="例：500"
-                                                value={areaFreeMin}
-                                                onChange={(e) => setAreaFreeMin(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="flex gap-2 justify-end pt-2">
-                                {editingAreaId && (
+                                                        {isSelected && (
+                                                            <>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleMoveBuilding(idx, -1)}
+                                                                    disabled={idx === 0}
+                                                                    className="p-1 hover:bg-blue-100 rounded text-blue-400 disabled:opacity-30 transition-colors"
+                                                                    title="上移"
+                                                                >
+                                                                    <ChevronUp size={14} />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleMoveBuilding(idx, 1)}
+                                                                    disabled={idx === settings.length - 1}
+                                                                    className="p-1 hover:bg-blue-100 rounded text-blue-400 disabled:opacity-30 transition-colors"
+                                                                    title="下移"
+                                                                >
+                                                                    <ChevronDown size={14} />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleRenameClick(s.building)}
+                                                                    className="p-1 hover:bg-blue-150 rounded text-blue-600 transition-colors"
+                                                                    title="修改名稱"
+                                                                >
+                                                                    <Edit2 size={15} />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDeleteClick(s.building)}
+                                                                    className="p-1 hover:bg-red-50 rounded text-red-500 transition-colors"
+                                                                    title="刪除大樓"
+                                                                >
+                                                                    <Trash2 size={15} />
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    
                                     <button
                                         type="button"
                                         onClick={() => {
-                                            setEditingAreaId('');
-                                            setAreaName('');
-                                            setAreaFee('');
-                                            setAreaFreeMin('');
-                                            setAreaFreeShipping(false);
+                                            setIsAddingNew(true);
+                                            setSelectedBuilding('__new__');
+                                            setNewBuildingName('');
+                                            setStartDate('');
+                                            setStartTime('');
+                                            setEndDate('');
+                                            setEndTime('');
+                                            setIsAuto(false);
+                                            setAutoOpenDay('');
+                                            setAutoOpenTime('');
+                                            setAutoCloseDay('');
+                                            setAutoCloseTime('');
                                         }}
-                                        className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold active:scale-95 transition-all"
+                                        className={`w-full text-left p-3 rounded-xl border-2 border-dashed flex items-center gap-2 transition-all duration-200 ${
+                                            isAddingNew 
+                                                ? 'bg-blue-50 border-blue-300 text-blue-600 font-extrabold' 
+                                                : 'bg-transparent border-slate-300 hover:border-slate-400 text-slate-500 hover:text-slate-700'
+                                        }`}
                                     >
-                                        取消編輯
+                                        <Plus size={20} />
+                                        <span className="text-lg font-bold">新增大樓 / 社區</span>
                                     </button>
+                                </div>
+
+                                {isAddingNew && (
+                                    <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150 p-3 bg-blue-50/30 border border-blue-100 rounded-xl flex-shrink-0">
+                                        <label className="text-sm font-extrabold text-blue-600">自訂新大樓名稱</label>
+                                        <input
+                                            type="text"
+                                            className="input-field w-full p-3 rounded-xl border border-blue-200 bg-white text-base font-bold focus:outline-none focus:border-blue-500"
+                                            placeholder="例如：遠雄富源大樓"
+                                            value={newBuildingName}
+                                            onChange={(e) => setNewBuildingName(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    const nextEl = document.getElementById('startDate');
+                                                    if (nextEl) nextEl.focus();
+                                                }
+                                            }}
+                                        />
+                                    </div>
                                 )}
+                            </div>
+
+                            {/* Right Column Content Panel */}
+                            <div className="md:col-span-2 flex flex-col gap-5">
+                                
+                                {/* 📅 頁籤一：開團與時程控制面板 */}
+                                {activeTab === 'SCHEDULE' && (
+                                    <>
+                                        {/* Auto Settings Card */}
+                                        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
+                                            <div className="flex justify-between items-center pb-2.5 border-b border-[var(--border-primary)]">
+                                                <h3 className="font-extrabold text-base text-[var(--text-primary)] flex items-center gap-1.5">
+                                                    <span className="flex items-center justify-center bg-blue-500 text-white rounded-full w-5 h-5 text-xs font-black">2</span>
+                                                    每週定期自動開關團設定
+                                                </h3>
+                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="sr-only peer"
+                                                        checked={isAuto}
+                                                        onChange={(e) => setIsAuto(e.target.checked)}
+                                                    />
+                                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                                </label>
+                                            </div>
+
+                                            {isAuto ? (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in duration-200">
+                                                    {/* Auto Open Time */}
+                                                    <div className="space-y-3 p-4 bg-emerald-50/10 dark:bg-emerald-950/10 rounded-2xl border border-emerald-500/20">
+                                                        <label className="text-base font-extrabold text-emerald-600 flex items-center gap-1.5">
+                                                            <Clock size={18} />
+                                                            自動開團時間 (每週)
+                                                        </label>
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <select
+                                                                className="input-field p-3 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)]"
+                                                                value={autoOpenDay}
+                                                                onChange={(e) => setAutoOpenDay(e.target.value)}
+                                                            >
+                                                                <option value="">選擇星期</option>
+                                                                <option value="1">星期一</option>
+                                                                <option value="2">星期二</option>
+                                                                <option value="3">星期三</option>
+                                                                <option value="4">星期四</option>
+                                                                <option value="5">星期五</option>
+                                                                <option value="6">星期六</option>
+                                                                <option value="0">星期日</option>
+                                                            </select>
+                                                            <input
+                                                                type="time"
+                                                                className="input-field p-3 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)]"
+                                                                value={autoOpenTime}
+                                                                onChange={(e) => setAutoOpenTime(e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Auto Close Time */}
+                                                    <div className="space-y-3 p-4 bg-rose-50/10 dark:bg-rose-950/10 rounded-2xl border border-rose-500/20">
+                                                        <label className="text-base font-extrabold text-rose-600 flex items-center gap-1.5">
+                                                            <Clock size={18} />
+                                                            自動結單時間 (每週)
+                                                        </label>
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <select
+                                                                className="input-field p-3 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)]"
+                                                                value={autoCloseDay}
+                                                                onChange={(e) => setAutoCloseDay(e.target.value)}
+                                                            >
+                                                                <option value="">選擇星期</option>
+                                                                <option value="1">星期一</option>
+                                                                <option value="2">星期二</option>
+                                                                <option value="3">星期三</option>
+                                                                <option value="4">星期四</option>
+                                                                <option value="5">星期五</option>
+                                                                <option value="6">星期六</option>
+                                                                <option value="0">星期日</option>
+                                                            </select>
+                                                            <input
+                                                                type="time"
+                                                                className="input-field p-3 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)]"
+                                                                value={autoCloseTime}
+                                                                onChange={(e) => setAutoCloseTime(e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm text-[var(--text-tertiary)] italic">
+                                                    💡 啟用後，大樓每週將在指定星期與時間「自動開關團」，不需每次手動設定。
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {/* Manual Settings Card */}
+                                        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
+                                            <h3 className="font-extrabold text-base text-[var(--text-primary)] pb-2.5 border-b border-[var(--border-primary)] flex items-center gap-1.5">
+                                                <span className="flex items-center justify-center bg-blue-500 text-white rounded-full w-5 h-5 text-xs font-black">3</span>
+                                                手動臨時加開時段設定
+                                            </h3>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                {/* Start Time */}
+                                                <div className="space-y-3 p-4 bg-[var(--bg-tertiary)] rounded-2xl border border-[var(--border-primary)] flex flex-col justify-between">
+                                                    <div className="space-y-2">
+                                                        <label className="text-sm font-extrabold text-[var(--text-primary)] flex items-center gap-1.5">
+                                                            <Calendar className="text-amber-500" size={16} />
+                                                            加開：開始時間
+                                                        </label>
+                                                        <input
+                                                            type="date"
+                                                            id="startDate"
+                                                            className="input-field w-full p-3 text-sm rounded-lg border bg-[var(--bg-secondary)] font-bold focus:border-blue-500"
+                                                            value={startDate}
+                                                            onChange={(e) => setStartDate(e.target.value)}
+                                                            onKeyDown={(e) => handleKeyDown(e, 'startTime', null)}
+                                                        />
+                                                        <input
+                                                            type="time"
+                                                            id="startTime"
+                                                            className="input-field w-full p-3 text-sm rounded-lg border bg-[var(--bg-secondary)] font-bold focus:border-blue-500"
+                                                            value={startTime}
+                                                            onChange={(e) => setStartTime(e.target.value)}
+                                                            onKeyDown={(e) => handleKeyDown(e, 'endDate', 'startDate')}
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setStartDate(''); setStartTime(''); }}
+                                                        className="text-xs text-red-500 font-bold hover:underline self-start mt-2"
+                                                    >
+                                                        清除開始時間
+                                                    </button>
+                                                </div>
+
+                                                {/* End Time */}
+                                                <div className="space-y-3 p-4 bg-[var(--bg-tertiary)] rounded-2xl border border-[var(--border-primary)] flex flex-col justify-between">
+                                                    <div className="space-y-2">
+                                                        <label className="text-sm font-extrabold text-[var(--text-primary)] flex items-center gap-1.5">
+                                                            <Clock className="text-rose-500" size={16} />
+                                                            加開：結束時間
+                                                        </label>
+                                                        <input
+                                                            type="date"
+                                                            id="endDate"
+                                                            className="input-field w-full p-3 text-sm rounded-lg border bg-[var(--bg-secondary)] font-bold focus:border-blue-500"
+                                                            value={endDate}
+                                                            onChange={(e) => setEndDate(e.target.value)}
+                                                            onKeyDown={(e) => handleKeyDown(e, 'endTime', 'startTime')}
+                                                        />
+                                                        <input
+                                                            type="time"
+                                                            id="endTime"
+                                                            className="input-field w-full p-3 text-sm rounded-lg border bg-[var(--bg-secondary)] font-bold focus:border-blue-500"
+                                                            value={endTime}
+                                                            onChange={(e) => setEndTime(e.target.value)}
+                                                            onKeyDown={(e) => handleKeyDown(e, 'saveBtn', 'endDate')}
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setEndDate(''); setEndTime(''); }}
+                                                        className="text-xs text-red-500 font-bold hover:underline self-start mt-2"
+                                                    >
+                                                        清除結束時間
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* 管理員備注 */}
+                                            {!isAddingNew && selectedBuilding && (
+                                                <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-2xl flex flex-col gap-2 mt-2">
+                                                    <label className="text-sm font-extrabold text-amber-700 flex items-center gap-1.5">
+                                                        <StickyNote size={15} />
+                                                        管理員備注（僅自己可見）
+                                                    </label>
+                                                    <textarea
+                                                        rows={2}
+                                                        className="input-field w-full p-2.5 text-sm rounded-xl border border-amber-200 bg-white resize-none focus:outline-none focus:border-amber-400"
+                                                        placeholder="例：每週二固定補貨、聯絡人：王小明 0912-345-678"
+                                                        value={adminNote}
+                                                        onChange={(e) => setAdminNote(e.target.value)}
+                                                    />
+                                                    <p className="text-xs text-amber-600/70">備注會在「儲存大樓設定」時一併儲存。</p>
+                                                </div>
+                                            )}
+
+                                            <div className="flex justify-end border-t border-[var(--border-primary)]/50 pt-3">
+                                                <button
+                                                    id="saveBtn"
+                                                    onClick={handleSave}
+                                                    disabled={isSaving}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'ArrowUp') {
+                                                            e.preventDefault();
+                                                            document.getElementById('endTime')?.focus();
+                                                        }
+                                                    }}
+                                                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 shadow-md shadow-blue-500/20 active:scale-95 transition-all focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                                >
+                                                    <Save size={14} />
+                                                    {isSaving ? '儲存中...' : '儲存大樓設定'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* 🔗 頁籤二：下單網址與推廣面板 */}
+                                {activeTab === 'PROMOTION_LINK' && (
+                                    <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
+                                        <h3 className="font-extrabold text-base text-[var(--text-primary)] pb-2.5 border-b border-[var(--border-primary)] flex items-center gap-1.5">
+                                            <Link size={18} className="text-blue-500" />
+                                            獲取大樓專屬下單網址 & 推廣文案
+                                        </h3>
+
+                                        {activeUrl ? (
+                                            <div className="space-y-4">
+                                                <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-2xl space-y-2.5">
+                                                    <h4 className="font-extrabold text-sm text-blue-800">
+                                                        🔗 {selectedBuilding} 專屬 LIFF 下單連結
+                                                    </h4>
+                                                    <div className="flex flex-col sm:flex-row gap-2">
+                                                        <input
+                                                            type="text"
+                                                            readOnly
+                                                            className="input-field flex-1 p-2.5 bg-white rounded-xl border border-blue-200 text-xs text-slate-800 font-mono font-bold focus:outline-none"
+                                                            value={activeUrl}
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleCopy}
+                                                            className="sm:w-28 py-2.5 rounded-xl font-bold flex items-center justify-center gap-1 shadow-sm text-xs text-white bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all cursor-pointer"
+                                                            style={{ backgroundColor: copied ? '#10B981' : undefined }}
+                                                        >
+                                                            {copied ? <Check size={14} /> : <Copy size={14} />}
+                                                            {copied ? '已複製！' : '一鍵複製'}
+                                                        </button>
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 font-medium">
+                                                        ※ 複製此網址丟給該大樓社區住戶即可下單。系統會自動鎖定該大樓，並依據設定進行下單時段驗證。
+                                                    </p>
+                                                </div>
+
+                                                {/* LINE 群組開團發文喊單範本 */}
+                                                <div className="p-4 bg-emerald-50/40 border border-emerald-200/60 rounded-2xl space-y-2.5">
+                                                    <h4 className="font-extrabold text-sm text-emerald-800 flex items-center gap-1.5">
+                                                        📢 LINE 群組發文喊單預設範本
+                                                    </h4>
+                                                    <div className="p-3 bg-white rounded-xl border border-emerald-200 text-xs font-mono text-slate-700 whitespace-pre-wrap leading-relaxed">
+{`📢【${selectedBuilding}】本週團購開跑囉！🎉
+
+各位住戶鄰居大家好，本週團購專屬下單連結已開放：
+👉 點擊下單：${activeUrl}
+
+🚚 預計配送時間：請依結單提示為準
+小提醒：下單後可直接選擇付款方式，有任何問題隨時在群組詢問小編喔！❤️`}
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const text = `📢【${selectedBuilding}】本週團購開跑囉！🎉\n\n各位住戶鄰居大家好，本週團購專屬下單連結已開放：\n👉 點擊下單：${activeUrl}\n\n🚚 預計配送時間：請依結單提示為準\n小提醒：下單後可直接選擇付款方式，有任何問題隨時在群組詢問小編喔！❤️`;
+                                                            navigator.clipboard.writeText(text);
+                                                            alert('已複製 LINE 群組開團文案！');
+                                                        }}
+                                                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
+                                                    >
+                                                        <Copy size={13} />
+                                                        一鍵複製 LINE 開團發文文案
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-10 text-xs text-slate-400">
+                                                請先在左側選擇大樓社區以查看專屬網址與文案。
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* 💰 頁籤三：專屬定價與運費面板 */}
+                                {activeTab === 'PRICING_SHIPPING' && (
+                                    <>
+                                        {/* Shipping Settings Card */}
+                                        {!isAddingNew && selectedBuilding && (
+                                            <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
+                                                <div className="flex justify-between items-center pb-2.5 border-b border-[var(--border-primary)]">
+                                                    <h3 className="font-extrabold text-base text-[var(--text-primary)] flex items-center gap-1.5">
+                                                        <Truck size={18} className="text-emerald-500" />
+                                                        【{selectedBuilding}】運費規則設定
+                                                    </h3>
+                                                    {/* 免運切換 */}
+                                                    <label className="relative inline-flex items-center cursor-pointer gap-2">
+                                                        <span className="text-sm font-semibold text-[var(--text-secondary)]">永久免運</span>
+                                                        <input
+                                                            type="checkbox"
+                                                            className="sr-only peer"
+                                                            checked={isFreeShipping}
+                                                            onChange={(e) => setIsFreeShipping(e.target.checked)}
+                                                        />
+                                                        <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                                                    </label>
+                                                </div>
+
+                                                {isFreeShipping ? (
+                                                    <p className="text-sm text-emerald-600 font-semibold bg-emerald-50 rounded-xl p-3 flex items-center gap-2">
+                                                        ✅ 此社區永久免運，不加收任何運費。
+                                                    </p>
+                                                ) : (
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                        {/* 免運門檻 */}
+                                                        <div className="flex flex-col gap-1.5">
+                                                            <label className="text-sm font-extrabold text-[var(--text-primary)]">
+                                                                免運門檻
+                                                            </label>
+                                                            <p className="text-xs text-[var(--text-tertiary)]">訂單滿此金額免運（填 0 表示不開放免運）</p>
+                                                            <div className="relative">
+                                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-bold font-mono text-sm">$</span>
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    className="input-field pl-7 p-3 w-full text-base font-bold"
+                                                                    placeholder="例：500"
+                                                                    value={freeShippingMin}
+                                                                    onChange={(e) => setFreeShippingMin(e.target.value)}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        {/* 運費金額 */}
+                                                        <div className="flex flex-col gap-1.5">
+                                                            <label className="text-sm font-extrabold text-[var(--text-primary)]">
+                                                                未達門檻運費
+                                                            </label>
+                                                            <p className="text-xs text-[var(--text-tertiary)]">未達免運門檻時加收的運費</p>
+                                                            <div className="relative">
+                                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-bold font-mono text-sm">$</span>
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    className="input-field pl-7 p-3 w-full text-base font-bold"
+                                                                    placeholder="例：60"
+                                                                    value={shippingFee}
+                                                                    onChange={(e) => setShippingFee(e.target.value)}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div className="flex justify-end border-t border-[var(--border-primary)]/50 pt-3">
+                                                    <button
+                                                        onClick={handleSaveShipping}
+                                                        disabled={isSavingShipping}
+                                                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
+                                                    >
+                                                        <Truck size={14} />
+                                                        {isSavingShipping ? '儲存中...' : '儲存運費設定'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* 促銷活動引擎與專屬定價 */}
+                                        {!isAddingNew && selectedBuilding && (
+                                            <>
+                                                {/* 促銷活動引擎區塊 */}
+                                                <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
+                                                    <h3 className="font-extrabold text-base text-[var(--text-primary)] pb-2.5 border-b border-[var(--border-primary)] flex items-center justify-between">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-base flex-shrink-0">🎉</span>
+                                                            促銷活動引擎管理
+                                                        </div>
+                                                        <button
+                                                            onClick={async () => {
+                                                                const name = prompt('請輸入促銷名稱 (例：燕麥任選買3送2)');
+                                                                if (!name) return;
+                                                                const type = prompt('請選擇促銷類型 (輸入 1 買X送Y，輸入 2 任選組合價)', '1');
+                                                                
+                                                                try {
+                                                                    if (type === '1') {
+                                                                        const inputRule = prompt('請輸入優惠門檻 (格式：買:送，多階梯請用逗號分隔，例 "3:2, 5:4")', '3:2');
+                                                                        if (!inputRule) return;
+
+                                                                        const tierPairs = inputRule.split(',').map(s => s.trim()).filter(Boolean);
+                                                                        const tiers = [];
+                                                                        for (const pair of tierPairs) {
+                                                                            const parts = pair.split(':').map(n => Number(n.trim()));
+                                                                            if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) {
+                                                                                tiers.push({ buyQty: parts[0], freeQty: parts[1] });
+                                                                            }
+                                                                        }
+
+                                                                        if (tiers.length === 0) {
+                                                                            alert('❌ 格式錯誤！請依據 "買:送" 格式輸入，例如 "3:2" 或 "3:2, 5:4"');
+                                                                            return;
+                                                                        }
+
+                                                                        const modeStr = prompt('請選擇贈品模式：\n1. 客人自選贈品 (CUSTOMER_SELECT)\n2. 自動折抵最低價 (AUTO_LOWEST_PRICE)\n3. 送同品項 (SAME_PRODUCT)', '1');
+                                                                        let rewardSelectionMode = 'CUSTOMER_SELECT';
+                                                                        if (modeStr === '2') rewardSelectionMode = 'AUTO_LOWEST_PRICE';
+                                                                        if (modeStr === '3') rewardSelectionMode = 'SAME_PRODUCT';
+
+                                                                        await callGAS(apiUrl, 'createPromotion', {
+                                                                            name,
+                                                                            promoType: 'BUY_X_GET_Y',
+                                                                            buyQty: tiers[0].buyQty,
+                                                                            freeQty: tiers[0].freeQty,
+                                                                            tiers,
+                                                                            communityId: selectedCommunityId,
+                                                                            rewardSelectionMode
+                                                                        }, user.token);
+                                                                        alert('✅ 促銷活動已成功新增！');
+                                                                    } else if (type === '2') {
+                                                                        const buyX = prompt('請輸入任選幾件 (例：3)');
+                                                                        const bundlePrice = prompt('請輸入組合價 (例：100)');
+                                                                        if (!buyX || !bundlePrice) return;
+                                                                        await callGAS(apiUrl, 'createPromotion', {
+                                                                            name, promoType: 'BUNDLE_PRICE', buyQty: buyX, bundlePrice, communityId: selectedCommunityId
+                                                                        }, user.token);
+                                                                        alert('✅ 促銷活動已成功新增！');
+                                                                    }
+                                                                    fetchAllProducts();
+                                                                } catch (error) {
+                                                                    console.error(error);
+                                                                    alert('❌ 新增失敗：' + error.message);
+                                                                }
+                                                            }}
+                                                            className="text-[10px] text-emerald-600 hover:text-emerald-800 font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                                        >
+                                                            <span className="text-base leading-none">＋</span> 新增促銷活動
+                                                        </button>
+                                                    </h3>
+                                                    
+                                                    {allPromotions.filter(p => p.communityId === selectedCommunityId || !p.communityId).length === 0 ? (
+                                                        <div className="text-center py-6 text-xs text-[var(--text-secondary)]">目前尚無設定促銷活動</div>
+                                                    ) : (
+                                                        <div className="flex flex-col gap-2">
+                                                            {allPromotions
+                                                                .filter(p => p.communityId === selectedCommunityId || !p.communityId)
+                                                                .map(promo => (
+                                                                    <div key={promo.promoId} className="flex items-center justify-between p-3 border border-[var(--border-primary)] rounded-xl bg-[var(--bg-tertiary)]">
+                                                                        <div>
+                                                                            <div className="font-bold text-sm text-[var(--text-primary)]">{promo.name}</div>
+                                                                            <div className="text-xs text-[var(--text-secondary)] mt-0.5">
+                                                                                {promo.promoType === 'BUY_X_GET_Y' && (() => {
+                                                                                    if (Array.isArray(promo.tiers) && promo.tiers.length > 0) {
+                                                                                        const tierText = promo.tiers.map(t => `買 ${t.buyQty} 送 ${t.freeQty}`).join(' 🔥 ');
+                                                                                        return `規則：${tierText}`;
+                                                                                    }
+                                                                                    return `規則：買 ${promo.buyQty} 送 ${promo.freeQty}`;
+                                                                                })()}
+                                                                                {promo.promoType === 'BUNDLE_PRICE' && `規則：任選 ${promo.buyQty} 件 $${promo.bundlePrice}`}
+                                                                                {promo.promoType === 'BUY_X_GET_Y' && promo.rewardSelectionMode === 'CUSTOMER_SELECT' && <span className="ml-2 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">自選贈品</span>}
+                                                                                {promo.promoType === 'BUY_X_GET_Y' && promo.rewardSelectionMode === 'AUTO_LOWEST_PRICE' && <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">折抵最低價</span>}
+                                                                                {promo.promoType === 'BUY_X_GET_Y' && promo.rewardSelectionMode === 'SAME_PRODUCT' && <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">送同品項</span>}
+                                                                                {!promo.communityId && <span className="ml-2 text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">全域可用</span>}
+                                                                            </div>
+                                                                        </div>
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                if (!window.confirm(`確定刪除促銷活動 [${promo.name}]？(若有綁定商品可能受影響)`)) return;
+                                                                                await callGAS(apiUrl, 'deletePromotion', { promoId: promo.promoId }, user.token);
+                                                                                fetchAllProducts();
+                                                                            }}
+                                                                            className="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors cursor-pointer"
+                                                                            title="刪除"
+                                                                        >
+                                                                            <Trash2 size={16} />
+                                                                        </button>
+                                                                    </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* 社區專屬定價管理區塊 */}
+                                                <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
+                                                    <h3 className="font-extrabold text-base text-[var(--text-primary)] pb-2.5 border-b border-[var(--border-primary)] flex items-center gap-1.5">
+                                                        <span className="text-base flex-shrink-0">🏷️</span>
+                                                        【{selectedBuilding}】專屬商品定價與促銷綁定
+                                                    </h3>
+                                                    <p className="text-xs text-[var(--text-tertiary)]">
+                                                        在此設定專屬售價並綁定促銷活動引擎。若無設定則採用預設原價。
+                                                    </p>
+
+                                                    {loadingCustomPrices ? (
+                                                        <div className="text-center py-6 text-xs text-[var(--text-secondary)]">載入客製化價格中...</div>
+                                                    ) : (
+                                                        <div className="border border-[var(--border-primary)] rounded-xl overflow-hidden max-h-[500px] overflow-y-auto">
+                                                            <table className="w-full text-left text-xs">
+                                                                <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] font-bold sticky top-0 z-10">
+                                                                    <tr className="border-b border-[var(--border-primary)]">
+                                                                        <th className="p-3 w-40">商品名稱</th>
+                                                                        <th className="p-3 text-right w-24">原價</th>
+                                                                        <th className="p-3 w-28">專屬定價</th>
+                                                                        <th className="p-3 w-40">促銷活動引擎</th>
+                                                                        <th className="p-3 text-center w-20">操作</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-[var(--border-primary)]">
+                                                                    {allProducts.map(p => {
+                                                                        const customData = customPrices[p.id] || { price: '', promotions: [] };
+                                                                        const priceVal = customData.price !== undefined ? customData.price : '';
+                                                                        const hasCustom = customPrices[p.id] !== undefined;
+
+                                                                        const saveNow = (newData) => {
+                                                                            handleSaveCustomPrice(p.id, newData);
+                                                                        };
+
+                                                                        const handlePriceChange = (val) => {
+                                                                            setCustomPrices(prev => ({
+                                                                                ...prev,
+                                                                                [p.id]: {
+                                                                                    ...(prev[p.id] || { price: '', promotions: [] }),
+                                                                                    price: val !== '' ? Number(val) : ''
+                                                                                }
+                                                                            }));
+                                                                        };
+
+                                                                        return (
+                                                                            <tr key={p.id} className="hover:bg-slate-50/60 transition-colors align-top">
+                                                                                <td className="p-3 font-bold text-slate-800 leading-snug pt-4">{p.name}</td>
+                                                                                <td className="p-3 text-right font-mono font-bold text-slate-400 pt-4">${p.single_price}</td>
+                                                                                <td className="p-3 pt-4">
+                                                                                    <div className="relative w-24">
+                                                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                                                                                        <input
+                                                                                            type="number"
+                                                                                            min="0"
+                                                                                            placeholder="預設"
+                                                                                            className="input-field pl-5 p-1.5 w-full text-xs font-bold text-slate-800"
+                                                                                            value={priceVal}
+                                                                                            onChange={(e) => handlePriceChange(e.target.value)}
+                                                                                            onBlur={() => saveNow(customPrices[p.id] || { price: '', promotions: [] })}
+                                                                                        />
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="p-3 pt-4">
+                                                                                    <div className="flex flex-col gap-1.5">
+                                                                                        <select
+                                                                                            className="input-field p-1.5 w-full text-xs font-bold text-slate-800 bg-white"
+                                                                                            value={customData.promoId || ''}
+                                                                                            onChange={(e) => {
+                                                                                                const val = e.target.value;
+                                                                                                setCustomPrices(prev => {
+                                                                                                    const current = prev[p.id] || { price: '', promotions: [], promoId: '' };
+                                                                                                    const newData = { ...current, promoId: val };
+                                                                                                    handleSaveCustomPrice(p.id, newData);
+                                                                                                    return { ...prev, [p.id]: newData };
+                                                                                                });
+                                                                                            }}
+                                                                                        >
+                                                                                            <option value="">無促銷活動</option>
+                                                                                            {allPromotions.map(promo => (
+                                                                                                <option key={promo.promoId} value={promo.promoId}>
+                                                                                                    {promo.name} ({promo.promoType === 'BUY_X_GET_Y' ? `買${promo.buyQty}送${promo.freeQty}` : `任${promo.buyQty}件$${promo.bundlePrice}`})
+                                                                                                </option>
+                                                                                            ))}
+                                                                                        </select>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="p-3 text-center pt-4">
+                                                                                    {savingPriceProductId === p.id ? (
+                                                                                        <span className="text-blue-500 font-semibold animate-pulse text-[10px]">儲存中...</span>
+                                                                                    ) : hasCustom ? (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => handleDeleteCustomPrice(p.id)}
+                                                                                            className="px-2 py-1 bg-red-100 hover:bg-red-500 text-red-600 hover:text-white rounded text-[10px] font-bold active:scale-95 transition-all cursor-pointer"
+                                                                                        >
+                                                                                            移除專屬
+                                                                                        </button>
+                                                                                    ) : (
+                                                                                        <span className="text-slate-300 text-[10px]">—</span>
+                                                                                    )}
+                                                                                </td>
+                                                                            </tr>
+                                                                        );
+                                                                    })}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 🛵 頁籤四：散客外送區域管理面板 */}
+                    {activeTab === 'DELIVERY_ZONES' && (
+                        <div className="bg-[var(--bg-secondary)] p-6 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-6">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-[var(--border-primary)] gap-2">
+                                <div>
+                                    <h3 className="font-extrabold text-lg text-[var(--text-primary)] flex items-center gap-2">
+                                        <Truck className="text-emerald-500" />
+                                        線上下單外送區域與運費管理 (散客專用)
+                                    </h3>
+                                    <p className="text-xs text-[var(--text-secondary)] mt-1">針對「一般常態線上下單」的散客，依據台南不同行政區(如東區、永康、白河)設定各自的配送運費與免運門檻。</p>
+                                </div>
                                 <button
-                                    type="submit"
-                                    disabled={isSavingArea}
-                                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-500/20 active:scale-95 transition-all"
+                                    onClick={fetchCommunities}
+                                    className="btn-secondary px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                                    disabled={loadingCommunities}
                                 >
-                                    <Save size={12} />
-                                    {isSavingArea ? '儲存中...' : (editingAreaId ? '更新區域' : '新增區域')}
+                                    <RefreshCw size={12} className={loadingCommunities ? 'animate-spin' : ''} />
+                                    重新整理
                                 </button>
                             </div>
-                        </form>
-                    </div>
 
-                    {/* 已設定區域列表 */}
-                    <div className="lg:col-span-2 space-y-3">
-                        <h4 className="font-bold text-sm text-[var(--text-primary)]">📦 目前已設定的外送區域列表</h4>
-                        
-                        {loadingCommunities && communities.length === 0 ? (
-                            <div className="text-center py-10 text-xs text-[var(--text-secondary)]">載入外送區域中...</div>
-                        ) : (
-                            <div className="border border-[var(--border-primary)] rounded-xl overflow-hidden">
-                                <table className="w-full text-left text-xs">
-                                    <thead className="bg-[var(--bg-secondary)] text-[var(--text-secondary)] font-bold">
-                                        <tr className="border-b border-[var(--border-primary)]">
-                                            <th className="p-3">區域名稱</th>
-                                            <th className="p-3">運費</th>
-                                            <th className="p-3">免運門檻</th>
-                                            <th className="p-3 text-center">操作</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-[var(--border-primary)] bg-[var(--bg-primary)]">
-                                        {communities.length > 0 ? (
-                                            communities.map((c) => (
-                                                <tr key={c.communityId} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="p-3 font-bold text-slate-800">{c.communityName}</td>
-                                                    <td className="p-3 font-mono font-bold text-orange-500">
-                                                        {c.defaultFreeShipping ? '免運' : `$${c.shippingFee}`}
-                                                    </td>
-                                                    <td className="p-3 font-mono font-bold text-slate-600">
-                                                        {c.defaultFreeShipping ? '-' : (c.freeShippingMin > 0 ? `滿 $${c.freeShippingMin} 免運` : '無免運門檻')}
-                                                    </td>
-                                                    <td className="p-3 text-center space-x-1.5">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                setEditingAreaId(c.communityId);
-                                                                setAreaName(c.communityName);
-                                                                setAreaFreeShipping(c.defaultFreeShipping);
-                                                                setAreaFee(c.shippingFee || '');
-                                                                setAreaFreeMin(c.freeShippingMin || '');
-                                                            }}
-                                                            className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500 text-amber-600 hover:text-white rounded border border-amber-500/20 active:scale-95 transition-all"
-                                                        >
-                                                            編輯
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleDeleteArea(c.communityId, c.communityName)}
-                                                            className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500 text-rose-600 hover:text-white rounded border border-rose-500/20 active:scale-95 transition-all"
-                                                        >
-                                                            刪除
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td colSpan="4" className="text-center p-8 text-slate-400">目前尚無外送區域，請在左側表單建立第一個區域！</td>
-                                            </tr>
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* 新增/編輯區域區 */}
+                                <div className="lg:col-span-1 border-r border-[var(--border-primary)]/50 pr-0 lg:pr-6 space-y-4">
+                                    <h4 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-1.5">
+                                        {editingAreaId ? '📝 編輯外送區域' : '➕ 新增外送區域'}
+                                    </h4>
+                                    
+                                    <form onSubmit={handleSaveArea} className="space-y-4">
+                                        <div className="flex flex-col gap-1">
+                                            <label className="text-xs font-extrabold text-[var(--text-secondary)]">外送區域名稱 <span className="text-red-500">*</span></label>
+                                            <input
+                                                type="text"
+                                                className="input-field p-2.5 w-full text-sm font-bold"
+                                                placeholder="例：台南東區散客、台南白河區"
+                                                value={areaName}
+                                                onChange={(e) => setAreaName(e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div className="flex justify-between items-center bg-[var(--bg-tertiary)] p-3 rounded-xl border border-[var(--border-primary)]">
+                                            <span className="text-xs font-bold text-[var(--text-secondary)]">此區域永久免運</span>
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    className="sr-only peer"
+                                                    checked={areaFreeShipping}
+                                                    onChange={(e) => setAreaFreeShipping(e.target.checked)}
+                                                />
+                                                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                                            </label>
+                                        </div>
+
+                                        {!areaFreeShipping && (
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="flex flex-col gap-1">
+                                                    <label className="text-xs font-extrabold text-[var(--text-secondary)]">未達門檻運費</label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] text-xs font-bold font-mono">$</span>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            className="input-field pl-6 p-2.5 w-full text-sm font-bold"
+                                                            placeholder="例：60"
+                                                            value={areaFee}
+                                                            onChange={(e) => setAreaFee(e.target.value)}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col gap-1">
+                                                    <label className="text-xs font-extrabold text-[var(--text-secondary)]">免運門檻金額</label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] text-xs font-bold font-mono">$</span>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            className="input-field pl-6 p-2.5 w-full text-sm font-bold"
+                                                            placeholder="例：500"
+                                                            value={areaFreeMin}
+                                                            onChange={(e) => setAreaFreeMin(e.target.value)}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
                                         )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
 
+                                        <div className="flex gap-2 justify-end pt-2">
+                                            {editingAreaId && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setEditingAreaId('');
+                                                        setAreaName('');
+                                                        setAreaFee('');
+                                                        setAreaFreeMin('');
+                                                        setAreaFreeShipping(false);
+                                                    }}
+                                                    className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold active:scale-95 transition-all cursor-pointer"
+                                                >
+                                                    取消編輯
+                                                </button>
+                                            )}
+                                            <button
+                                                type="submit"
+                                                disabled={isSavingArea}
+                                                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-500/20 active:scale-95 transition-all cursor-pointer"
+                                            >
+                                                <Save size={12} />
+                                                {isSavingArea ? '儲存中...' : (editingAreaId ? '更新區域' : '新增區域')}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+
+                                {/* 已設定區域列表 */}
+                                <div className="lg:col-span-2 space-y-3">
+                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                                        <h4 className="font-bold text-sm text-[var(--text-primary)]">📦 目前已設定的外送區域列表</h4>
+                                        
+                                        {/* 🔍 散客外送區域搜尋框 */}
+                                        <div className="relative w-full sm:w-56">
+                                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="搜尋外送區域名稱..."
+                                                value={deliveryAreaSearchTerm}
+                                                onChange={(e) => setDeliveryAreaSearchTerm(e.target.value)}
+                                                className="w-full pl-8 pr-8 py-1.5 text-xs rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500 font-bold placeholder:font-normal placeholder:text-slate-400 transition-colors"
+                                            />
+                                            {deliveryAreaSearchTerm && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setDeliveryAreaSearchTerm('')}
+                                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold w-4 h-4 rounded-full hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    
+                                    {loadingCommunities && communities.length === 0 ? (
+                                        <div className="text-center py-10 text-xs text-[var(--text-secondary)]">載入外送區域中...</div>
+                                    ) : (
+                                        <div className="border border-[var(--border-primary)] rounded-xl overflow-hidden">
+                                            <table className="w-full text-left text-xs">
+                                                <thead className="bg-[var(--bg-secondary)] text-[var(--text-secondary)] font-bold">
+                                                    <tr className="border-b border-[var(--border-primary)]">
+                                                        <th className="p-3">區域名稱</th>
+                                                        <th className="p-3">運費</th>
+                                                        <th className="p-3">免運門檻</th>
+                                                        <th className="p-3 text-center">操作</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-[var(--border-primary)] bg-[var(--bg-primary)]">
+                                                    {communities
+                                                        .filter(c => !deliveryAreaSearchTerm.trim() || c.communityName.toLowerCase().includes(deliveryAreaSearchTerm.trim().toLowerCase()))
+                                                        .length > 0 ? (
+                                                        communities
+                                                            .filter(c => !deliveryAreaSearchTerm.trim() || c.communityName.toLowerCase().includes(deliveryAreaSearchTerm.trim().toLowerCase()))
+                                                            .map((c) => (
+                                                                <tr key={c.communityId} className="hover:bg-slate-50 transition-colors">
+                                                                    <td className="p-3 font-bold text-slate-800">{c.communityName}</td>
+                                                                    <td className="p-3 font-mono font-bold text-orange-500">
+                                                                        {c.defaultFreeShipping ? '免運' : `$${c.shippingFee}`}
+                                                                    </td>
+                                                                    <td className="p-3 font-mono font-bold text-slate-600">
+                                                                        {c.defaultFreeShipping ? '-' : (c.freeShippingMin > 0 ? `滿 $${c.freeShippingMin} 免運` : '無免運門檻')}
+                                                                    </td>
+                                                                    <td className="p-3 text-center space-x-1.5">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setEditingAreaId(c.communityId);
+                                                                                setAreaName(c.communityName);
+                                                                                setAreaFreeShipping(c.defaultFreeShipping);
+                                                                                setAreaFee(c.shippingFee || '');
+                                                                                setAreaFreeMin(c.freeShippingMin || '');
+                                                                            }}
+                                                                            className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500 text-amber-600 hover:text-white rounded border border-amber-500/20 active:scale-95 transition-all cursor-pointer"
+                                                                        >
+                                                                            編輯
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleDeleteArea(c.communityId, c.communityName)}
+                                                                            className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500 text-rose-600 hover:text-white rounded border border-rose-500/20 active:scale-95 transition-all cursor-pointer"
+                                                                        >
+                                                                            刪除
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))
+                                                    ) : (
+                                                        <tr>
+                                                            <td colSpan="4" className="text-center p-8 text-slate-400">
+                                                                {deliveryAreaSearchTerm ? `查無符合「${deliveryAreaSearchTerm}」的外送區域` : '目前尚無外送區域，請在左側表單建立第一個區域！'}
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </>
+            )}
         </div>
     );
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Package, ClipboardList, Eye, Edit, Trash2, CheckCircle, RefreshCw, X, User, Users, Phone, MapPin, FileText, Plus, Minus, Save, Calendar, Clock, Check, Search, Copy, PackageSearch, ChevronDown, ChevronUp } from 'lucide-react';
+import { Package, ClipboardList, Eye, Edit, Trash2, CheckCircle, RefreshCw, X, User, Users, Phone, MapPin, FileText, Plus, Minus, Save, Calendar, Clock, Check, Search, Copy, PackageSearch, ChevronDown, ChevronUp, Building2 } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
 // --- 🎨 口味備註解析與格式化輔助函數 ---
@@ -1670,21 +1670,32 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
     return (
         <div className="max-w-6xl mx-auto min-h-screen flex flex-col p-4 gap-4">
-            {/* Header Area (解決跑版：標題與搜尋欄彈性自適應，防止元件擠壓成細條) */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between bg-[var(--bg-secondary)] p-4 sm:p-5 rounded-2xl border border-[var(--border-primary)] shadow-sm gap-4">
-                <div className="flex items-center justify-between shrink-0">
+            {/* Header Area */}
+            <div className="bg-[var(--bg-secondary)] p-4 sm:p-5 rounded-2xl border border-[var(--border-primary)] shadow-sm space-y-3.5">
+                {/* 第一列：標題 + 刷新按鈕擺放至右上角 */}
+                <div className="flex items-center justify-between gap-4">
                     <h2 className="text-xl md:text-2xl font-black flex items-center gap-2 text-[var(--text-primary)] whitespace-nowrap">
                         <ClipboardList className="text-blue-600 shrink-0" size={24} />
                         <span>訂單審核</span>
                     </h2>
+
+                    {/* 右上角刷新按鈕 */}
+                    <button 
+                        onClick={fetchOrders} 
+                        className="p-2 text-slate-500 hover:text-blue-600 hover:bg-[var(--bg-hover)] rounded-xl border border-[var(--border-primary)] transition-all shadow-2xs flex items-center gap-1 text-xs font-bold"
+                        title="重新整理"
+                    >
+                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                    </button>
                 </div>
 
-                {/* 篩選與搜尋工具欄 */}
-                <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
-                    {/* 大樓篩選選單 */}
-                    <div className="w-full sm:w-44 shrink-0">
+                {/* 第二列：統一框框樣式之篩選與搜尋工具欄 */}
+                <div className="flex flex-wrap items-center gap-2.5 w-full">
+                    {/* 大樓篩選選單 (款式 A：現代極簡客製選單) */}
+                    <div className="relative w-full sm:w-48 shrink-0">
+                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={16} />
                         <select
-                            className="input-field text-xs md:text-sm py-2 px-3 bg-[var(--bg-secondary)] border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none w-full shadow-2xs"
+                            className="w-full text-xs md:text-sm py-2 pl-9 pr-8 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] appearance-none focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all cursor-pointer truncate"
                             value={selectedBuilding}
                             onChange={(e) => setSelectedBuilding(e.target.value)}
                         >
@@ -1693,27 +1704,28 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                 <option key={bname} value={bname}>{bname}</option>
                             ))}
                         </select>
+                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={15} />
                     </div>
 
-                    {/* 綜合搜尋 */}
+                    {/* 綜合搜尋 (統一框框樣式) */}
                     <div className="relative flex-1 min-w-[160px] sm:min-w-[200px]">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} />
                         <input
                             type="text"
                             placeholder="搜尋編號、姓名、電話..."
-                            className="input-field pl-9 pr-3 text-xs md:text-sm py-2 w-full rounded-xl"
+                            className="w-full pl-9 pr-3 text-xs md:text-sm py-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-medium text-[var(--text-primary)] focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
 
-                    {/* 商品名稱特化查詢 */}
+                    {/* 商品名稱特化查詢 (統一框框樣式) */}
                     <div className="relative flex-1 min-w-[160px] sm:min-w-[200px]">
-                        <PackageSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500" size={16} />
+                        <PackageSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} />
                         <input
                             type="text"
                             placeholder="查詢商品 (如: 崙背)..."
-                            className="input-field pl-9 pr-8 text-xs md:text-sm py-2 w-full rounded-xl border-emerald-500/40 focus:border-emerald-500"
+                            className="w-full pl-9 pr-8 text-xs md:text-sm py-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-medium text-[var(--text-primary)] focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all"
                             value={productSearchTerm}
                             onChange={(e) => setProductSearchTerm(e.target.value)}
                         />
@@ -1729,12 +1741,12 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         )}
                     </div>
 
-                    {/* 預計出貨日篩選 */}
+                    {/* 預計出貨日篩選 (統一框框樣式) */}
                     <div className="relative w-full sm:w-40 shrink-0">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400" size={16} />
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} />
                         <input
                             type="date"
-                            className="input-field pl-9 pr-7 text-xs py-2 w-full rounded-xl font-bold border-emerald-500/40 focus:border-emerald-500"
+                            className="w-full pl-9 pr-7 text-xs py-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all"
                             value={dateFilter}
                             onChange={(e) => setDateFilter(e.target.value)}
                             title="篩選預計出貨日"
@@ -1751,21 +1763,17 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         )}
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                        <button onClick={fetchOrders} className="btn-secondary p-2 rounded-xl" title="重新整理">
-                            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                    {/* 導入今日定期配 (淡淡優雅黃底，不再突兀硬刺) */}
+                    {activeTab === 'PENDING' && (
+                        <button
+                            onClick={handleImportSubscriptions}
+                            className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold text-xs px-3.5 py-2 rounded-xl border border-amber-500/20 flex items-center gap-1.5 transition-all whitespace-nowrap shadow-2xs"
+                            title="導入今日定期配計畫到此大樓"
+                        >
+                            <Calendar size={15} />
+                            ⚡ 導入今日定期配
                         </button>
-                        {activeTab === 'PENDING' && (
-                            <button
-                                onClick={handleImportSubscriptions}
-                                className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-md shadow-amber-500/10 flex items-center gap-1.5 transition-all whitespace-nowrap"
-                                title="導入今日定期配計畫到此大樓"
-                            >
-                                <Calendar size={15} />
-                                ⚡ 導入今日定期配
-                            </button>
-                        )}
-                    </div>
+                    )}
                 </div>
             </div>
 
