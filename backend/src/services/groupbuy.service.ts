@@ -96,6 +96,11 @@ export const GroupBuyService = {
       throw new Error('訂單明細不得為空');
     }
 
+    const BACKEND_PHONE_REGEX = /^(09\d{8}|0[2-8]\d{7,8})(#\d{1,6})?$/;
+    if (customerPhone && !BACKEND_PHONE_REGEX.test(String(customerPhone).trim())) {
+      throw new Error('聯絡電話格式不正確（請輸入正確的手機號碼或含區碼市話）');
+    }
+
     const orderId = generateOrderId();
     const totalAmount = items.reduce((sum: number, item: any) =>
       sum + (item.subtotal !== undefined && item.subtotal !== null ? Number(item.subtotal) : (Number(item.unitPrice) * Number(item.qty))), 0);
@@ -887,6 +892,11 @@ export const GroupBuyService = {
     } = payload;
 
     if (!items || items.length === 0) throw new Error('購物車為空');
+
+    const BACKEND_PHONE_REGEX = /^(09\d{8}|0[2-8]\d{7,8})(#\d{1,6})?$/;
+    if (customerPhone && !BACKEND_PHONE_REGEX.test(String(customerPhone).trim())) {
+      throw new Error('聯絡電話格式不正確（請輸入正確的手機號碼或含區碼市話）');
+    }
 
     // 產生訂單號
     const now = new Date();

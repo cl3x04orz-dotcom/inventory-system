@@ -48,14 +48,23 @@ const LINE_PAY_URL = "https://line.me/ti/p/kjGUUdBqLE";
 const LINE_CONTACT_URL = "https://line.me/R/ti/p/@839rpabi";
 const LS_KEY = "mlw_customer"; // LocalStorage key
 
-// 自動補 0 輔助函數 (針對 Google Sheets 可能將 09xx 當成數字導致遺失首 0)
+// 自動補 0 與分機拆解輔助函數 (相容 09 手機、02-08 市話與 # 分機)
 const formatTaiwanPhone = (phone) => {
-  if (!phone) return "";
-  let str = String(phone).replace(/\D/g, "");
-  if (str.length === 9 && str.startsWith("9")) {
-    str = "0" + str;
+  if (!phone) return { phone: "", ext: "" };
+  let str = String(phone).trim();
+  let ext = "";
+  if (str.includes("#")) {
+    const parts = str.split("#");
+    str = parts[0];
+    ext = parts[1] || "";
   }
-  return str;
+  let digits = str.replace(/\D/g, "");
+  if (digits.length === 9 && digits.startsWith("9")) {
+    digits = "0" + digits;
+  } else if ((digits.length === 8 || digits.length === 9) && /^[2-8]/.test(digits)) {
+    digits = "0" + digits;
+  }
+  return { phone: digits, ext };
 };
 
 // 全域鎖：防止 React 嚴格模式或重複 Render 觸發多次 LIFF 初始化與登入轉址
@@ -156,6 +165,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
   // ── 表單 state ───────────────────────────────────────────────
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [phoneExt, setPhoneExt] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [note, setNote] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("現金");
@@ -661,10 +671,15 @@ export default function LiffOrderPage({ user, apiUrl }) {
             }
             
             if (mRes.member.Phone) {
-              const formattedPhone = formatTaiwanPhone(mRes.member.Phone);
-              setCustomerPhone(formattedPhone);
-              savedObj.phone = formattedPhone;
-            } else if (savedObj.phone) setCustomerPhone(formatTaiwanPhone(savedObj.phone));
+              const { phone: pVal, ext: eVal } = formatTaiwanPhone(mRes.member.Phone);
+              setCustomerPhone(pVal);
+              if (eVal) setPhoneExt(eVal);
+              savedObj.phone = mRes.member.Phone;
+            } else if (savedObj.phone) {
+              const { phone: pVal, ext: eVal } = formatTaiwanPhone(savedObj.phone);
+              setCustomerPhone(pVal);
+              if (eVal) setPhoneExt(eVal);
+            }
             
             if (lockedBuilding) {
               setSelectedBuilding(lockedBuilding);
@@ -711,13 +726,14 @@ export default function LiffOrderPage({ user, apiUrl }) {
 
   const syncMemberToCloud = async () => {
     if (!lineUserId) return;
+    const fullPhone = phoneExt.trim() ? `${customerPhone.trim()}#${phoneExt.trim()}` : customerPhone.trim();
     try {
       await memberApi.saveMember(apiUrl, {
         userId: lineUserId,
         displayName: customerName,
         pictureUrl: linePictureUrl,
         receiverName: customerName,
-        phone: customerPhone,
+        phone: fullPhone,
         community: selectedBuilding,
         floorRoom: detailAddress,
         remark: note
@@ -734,7 +750,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
       syncMemberToCloud();
     }, 1500);
     return () => clearTimeout(timer);
-  }, [customerName, customerPhone, selectedBuilding, detailAddress, note, step, lineUserId]);
+  }, [customerName, customerPhone, phoneExt, selectedBuilding, detailAddress, note, step, lineUserId]);
 
   useEffect(() => {
     let active = true;
@@ -1914,7 +1930,11 @@ export default function LiffOrderPage({ user, apiUrl }) {
           }
         }
       }
-      if (saved.phone) setCustomerPhone(formatTaiwanPhone(saved.phone));
+      if (saved.phone) {
+        const { phone: pVal, ext: eVal } = formatTaiwanPhone(saved.phone);
+        setCustomerPhone(pVal);
+        if (eVal) setPhoneExt(eVal);
+      }
 
       const isLocked = !!lockedBuilding;
 
@@ -2073,6 +2093,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
     const successItemsSnap = [...cartItems];
     setIsSubmitting(true);
     try {
+      const fullPhone = phoneExt.trim() ? `${customerPhone.trim()}#${phoneExt.trim()}` : customerPhone.trim();
       // 儲存客戶資料到 LocalStorage（下次自動帶入）
       // 正規化 detailAddress：去除行政區前綴再存，避免下次疊加
       let saveDetail = detailAddress.trim();
@@ -2086,7 +2107,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
         LS_KEY,
         JSON.stringify({
           name: customerName,
-          phone: customerPhone,
+          phone: fullPhone,
           building: selectedBuilding === "其它" ? otherBuildingText.trim() : selectedBuilding,
           detailAddress: saveDetail,
           companyName: isGeneralUser ? companyName.trim() : "",
@@ -2115,7 +2136,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
         "v2_createOrder",
         {
           customerName,
-          customerPhone,
+          customerPhone: fullPhone,
           deliveryAddress: getFullAddress(),
           CommunityId: (isGeneralUser && selectedCommunityId) ? selectedCommunityId : (currentCommunity?.CommunityId || ""),
           CampaignId: activeCampaign?.CampaignId || "",
@@ -3388,7 +3409,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
     const payAmount = useWallet ? Math.max(0, orderTotal - maxDeduction) : orderTotal;
     const isFullyCovered = useWallet && payAmount === 0;
 
-    const isPhoneValid = /^09\d{8}$/.test(safePhone.trim());
+    const isPhoneValid = /^(09\d{8}|0[2-8]\d{7,8})$/.test(safePhone.trim());
     const isBuildingValid =
       isGeneralUser || (
         selectedBuilding &&
@@ -3494,20 +3515,33 @@ export default function LiffOrderPage({ user, apiUrl }) {
               <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
                 <Phone size={12} /> 聯絡電話 <span className="text-red-500">*</span>
               </label>
-              <input
-                type="tel"
-                className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)]"
-                placeholder="請輸入 10 位數手機號碼 (如：0912345678)"
-                value={customerPhone}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, ""); // 只允許數字
-                  setCustomerPhone(val);
-                }}
-                maxLength={10}
-              />
-              {safePhone.trim() && !/^09\d{8}$/.test(safePhone.trim()) && (
+              <div className="flex gap-2">
+                <input
+                  type="tel"
+                  className="input-field flex-1 p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)]"
+                  placeholder="手機或市話 (如 0912345678 或 062345678)"
+                  value={customerPhone}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, ""); // 自動過濾連字號、空格
+                    setCustomerPhone(val);
+                  }}
+                  maxLength={10}
+                />
+                <input
+                  type="tel"
+                  className="input-field w-28 p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-xs font-medium"
+                  placeholder="分機(選填)"
+                  value={phoneExt}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "");
+                    setPhoneExt(val);
+                  }}
+                  maxLength={6}
+                />
+              </div>
+              {safePhone.trim() && !/^(09\d{8}|0[2-8]\d{7,8})$/.test(safePhone.trim()) && (
                 <p className="text-[11px] text-red-500 font-medium">
-                  ⚠️ 請輸入正確的 10 位數手機號碼 (09 開頭)
+                  ⚠️ 請輸入正確的手機號碼 (09開頭10碼) 或市話 (含0區碼9-10碼)
                 </p>
               )}
             </div>
