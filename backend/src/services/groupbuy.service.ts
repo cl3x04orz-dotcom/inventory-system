@@ -449,6 +449,25 @@ export const GroupBuyService = {
     });
   },
 
+  // 5d. 批次設定預計配送日
+  async batchSetDeliveryDates(payload: any, user: any) {
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
+    const { orderIds, expectedDeliveryDate } = payload;
+    if (!orderIds || !Array.isArray(orderIds)) throw new Error('缺少 orderIds');
+
+    return runInTransaction(async () => {
+      const now = new Date();
+      await prisma.groupBuyOrder.updateMany({
+        where: { orderId: { in: orderIds } },
+        data: {
+          expectedDeliveryDate: expectedDeliveryDate || '',
+          updatedAt: now
+        }
+      });
+      return { success: true, count: orderIds.length };
+    });
+  },
+
   // 6. 快速變更訂單狀態
   async updateOrderStatus(payload: any, user: any) {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');

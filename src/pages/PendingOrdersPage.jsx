@@ -1052,19 +1052,45 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         setDateModalValue(order.expectedDeliveryDate || '');
     };
 
+    const handleBatchSetDeliveryDate = () => {
+        if (selectedOrderIds.length === 0) return;
+        setDateModalOrder({
+            isBatch: true,
+            orderIds: [...selectedOrderIds],
+            customerName: `選取的 ${selectedOrderIds.length} 筆訂單`
+        });
+        setDateModalValue('');
+    };
+
     const handleSaveDateModal = async () => {
         if (!dateModalOrder) return;
         setIsSavingDate(true);
         try {
-            const res = await callGAS(apiUrl, 'updatePendingOrder', {
-                orderId: dateModalOrder.orderId,
-                expectedDeliveryDate: dateModalValue
-            }, user.token);
-            if (res.success) {
-                setOrders(prev => prev.map(o => o.orderId === dateModalOrder.orderId ? { ...o, expectedDeliveryDate: dateModalValue } : o));
-                setDateModalOrder(null);
+            if (dateModalOrder.isBatch) {
+                const res = await callGAS(apiUrl, 'batchSetDeliveryDates', {
+                    orderIds: dateModalOrder.orderIds,
+                    expectedDeliveryDate: dateModalValue
+                }, user.token);
+                if (res && (res.success || !res.error)) {
+                    const targetIds = dateModalOrder.orderIds;
+                    setOrders(prev => prev.map(o => targetIds.includes(o.orderId) ? { ...o, expectedDeliveryDate: dateModalValue } : o));
+                    setDateModalOrder(null);
+                    setSelectedOrderIds([]);
+                    alert(`✅ 已成功將 ${targetIds.length} 筆選取訂單的預計配送日設定為：${dateModalValue || '未指定(已清除)'}`);
+                } else {
+                    alert('批次設定預計配送日失敗: ' + (res?.message || res?.error || '未知錯誤'));
+                }
             } else {
-                alert('設定出貨日期失敗: ' + (res.message || '未知錯誤'));
+                const res = await callGAS(apiUrl, 'updatePendingOrder', {
+                    orderId: dateModalOrder.orderId,
+                    expectedDeliveryDate: dateModalValue
+                }, user.token);
+                if (res && (res.success || !res.error)) {
+                    setOrders(prev => prev.map(o => o.orderId === dateModalOrder.orderId ? { ...o, expectedDeliveryDate: dateModalValue } : o));
+                    setDateModalOrder(null);
+                } else {
+                    alert('設定出貨日期失敗: ' + (res?.message || res?.error || '未知錯誤'));
+                }
             }
         } catch (error) {
             console.error('Save expected delivery date failed:', error);
@@ -1854,25 +1880,33 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         </span>
                     </div>
                     {selectedOrderIds.length > 0 && (
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap items-center">
                             <button
                                 type="button"
                                 onClick={handleBatchDelete}
-                                className="py-1.5 px-4 text-xs font-bold rounded-lg bg-rose-600 hover:bg-rose-700 active:scale-95 transition-transform text-white shadow-sm flex items-center gap-1"
+                                className="py-1.5 px-3 text-xs font-bold rounded-lg bg-rose-600 hover:bg-rose-700 active:scale-95 transition-transform text-white shadow-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
                             >
                                 <Trash2 size={14} /> 批次刪除 ({selectedOrderIds.length})
                             </button>
                             <button
                                 type="button"
+                                onClick={handleBatchSetDeliveryDate}
+                                className="py-1.5 px-3 text-xs font-bold rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 transition-transform text-white shadow-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                                title="批次設定選取訂單的預計配送日"
+                            >
+                                <Calendar size={14} /> 🚚 批次設定配送日 ({selectedOrderIds.length})
+                            </button>
+                            <button
+                                type="button"
                                 onClick={handleBatchConfirmPayment}
-                                className="py-1.5 px-4 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-transform text-white shadow-sm flex items-center gap-1"
+                                className="py-1.5 px-3 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-transform text-white shadow-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
                             >
                                 <CheckCircle size={14} /> 批次確認收款 ({selectedOrderIds.length})
                             </button>
                             <button
                                 type="button"
                                 onClick={handleBatchConfirm}
-                                className="btn-primary py-1.5 px-4 text-xs font-bold bg-blue-600 hover:bg-blue-700 border-none shadow-sm active:scale-95 transition-transform flex items-center gap-1"
+                                className="btn-primary py-1.5 px-3 text-xs font-bold bg-blue-600 hover:bg-blue-700 border-none shadow-sm active:scale-95 transition-transform flex items-center gap-1 cursor-pointer whitespace-nowrap"
                             >
                                 <CheckCircle size={14} /> 批次確認出貨 ({selectedOrderIds.length})
                             </button>
@@ -1881,8 +1915,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 </div>
             )}
 
-            {/* Tabs */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-[var(--border-primary)] pb-1 gap-2 w-full max-w-full overflow-hidden">
+            {/* Tabs & 右側操作按鈕列 (使用 overflow-x-auto 防止右側切邊跑版) */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-[var(--border-primary)] pb-1.5 gap-2 w-full max-w-full">
                 <div className="grid grid-cols-3 w-full sm:flex sm:w-auto items-center gap-1 sm:gap-2">
                     <button
                         onClick={() => { setActiveTab('PENDING'); }}
@@ -1913,11 +1947,11 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     </button>
                 </div>
 
-                <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+                <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto max-w-full pb-1 pt-0.5 scrollbar-thin">
                     <button
                         type="button"
                         onClick={handleExpandAll}
-                        className="py-1.5 px-3 text-xs font-bold rounded-lg flex items-center gap-1 shadow-sm active:scale-95 transition-all duration-200 border bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)] whitespace-nowrap"
+                        className="py-1.5 px-2.5 sm:px-3 text-xs font-bold rounded-lg flex items-center gap-1 shadow-sm active:scale-95 transition-all duration-200 border bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)] whitespace-nowrap cursor-pointer shrink-0"
                         title="展開所有訂單詳情"
                     >
                         <ChevronDown size={14} /> <span>全部展開</span>
@@ -1925,7 +1959,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     <button
                         type="button"
                         onClick={handleCollapseAll}
-                        className="py-1.5 px-3 text-xs font-bold rounded-lg flex items-center gap-1 shadow-sm active:scale-95 transition-all duration-200 border bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)] whitespace-nowrap"
+                        className="py-1.5 px-2.5 sm:px-3 text-xs font-bold rounded-lg flex items-center gap-1 shadow-sm active:scale-95 transition-all duration-200 border bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)] whitespace-nowrap cursor-pointer shrink-0"
                         title="折疊所有訂單"
                     >
                         <ChevronUp size={14} /> <span>全部折疊</span>
@@ -1933,7 +1967,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     <button
                         type="button"
                         onClick={handleCopyShipmentSummary}
-                        className={`py-1.5 px-3 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-200 border whitespace-nowrap ${copied 
+                        className={`py-1.5 px-2.5 sm:px-3 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-200 border whitespace-nowrap cursor-pointer shrink-0 ${copied 
                             ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent' 
                             : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)]'
                         }`}
@@ -1945,7 +1979,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     <button
                         type="button"
                         onClick={handleCopyDetailSummary}
-                        className={`py-1.5 px-3 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-200 border whitespace-nowrap ${detailCopied 
+                        className={`py-1.5 px-2.5 sm:px-3 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-200 border whitespace-nowrap cursor-pointer shrink-0 ${detailCopied 
                             ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent' 
                             : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)]'
                         }`}
@@ -1957,7 +1991,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     <button
                         type="button"
                         onClick={handleCopyClientDetailSummary}
-                        className={`py-1.5 px-3 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-200 border whitespace-nowrap ${clientDetailCopied 
+                        className={`py-1.5 px-2.5 sm:px-3 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-200 border whitespace-nowrap cursor-pointer shrink-0 ${clientDetailCopied 
                             ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent' 
                             : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)]'
                         }`}

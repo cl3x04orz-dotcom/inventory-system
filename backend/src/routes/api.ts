@@ -50,6 +50,7 @@ const actionPermissions: Record<string, string> = {
   batchConfirmPendingOrders: 'sales_pending',
   batchConfirmPayments: 'sales_pending',
   batchDeletePendingOrders: 'sales_pending',
+  batchSetDeliveryDates: 'sales_pending',
   saveGroupBinding: 'sales_pending',
   updateOrderStatus: 'sales_pending',
   saveBuildingSettings: 'sales_pending',
