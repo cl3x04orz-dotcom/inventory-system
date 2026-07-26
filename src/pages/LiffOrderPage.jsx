@@ -4907,13 +4907,11 @@ ${freeNote(newFee, newMin)}
                                   <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded mt-1 font-bold ${
                                     remaining === 0
                                       ? 'text-red-600 bg-red-50 border border-red-200'
-                                      : remaining <= 10
-                                      ? 'text-orange-600 bg-orange-50 border border-orange-200'
-                                      : 'text-purple-600 bg-purple-50 border border-purple-200'
+                                      : 'text-purple-600 dark:text-purple-300 bg-purple-500/10 border border-purple-200/50'
                                   }`}>
                                     {remaining === 0 
                                       ? (isComm ? '🚫 本社區專屬額度已售完' : '🚫 已售完') 
-                                      : (isComm ? `🔥 本社區獨家專屬 剩 ${remaining} 罐` : `🔖 活動限量 剩 ${remaining} 罐`)}
+                                      : (isComm ? `⚡️ 本社區獨家專屬 剩 ${remaining} 罐` : `⚡️ 活動限量 剩 ${remaining} 罐`)}
                                   </span>
                                 );
                               })()}
