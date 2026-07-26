@@ -110,6 +110,7 @@ export const ProductService = {
         soldQty: Number(p.soldQty || 0),
         allowedCommunityIds: Array.isArray(p.allowedCommunityIds) ? p.allowedCommunityIds : [],
         communityQuotas: p.communityQuotas || {},
+        capacity: p.capacity || (p.productName.match(/(\d+\s*(?:ml|g|kg|l|cc|mL|G|KG|L|入|瓶|罐|包|盒|罐裝|瓶裝))/i)?.[1]?.trim() || ''),
         isPurchasable: p.isPurchasable !== false, // 進貨清單顯示，與前台上架無關
         _fromSheet: 'Products'
       };
@@ -220,6 +221,7 @@ export const ProductService = {
         isActive: isActive !== undefined ? Boolean(isActive) : undefined,
         imageUrl: imageUrl !== undefined ? String(imageUrl) : undefined,
         category: category !== undefined ? String(category) : undefined,
+        capacity: payload.capacity !== undefined ? String(payload.capacity).trim() : undefined,
         expiryDate: expiryDate !== undefined ? String(expiryDate) : undefined,
         defaultPrice: price !== undefined && price !== '' && price !== null ? Number(price) : undefined,
         hasFlavorAttributes: has_flavor_attributes !== undefined ? Boolean(has_flavor_attributes) : undefined,

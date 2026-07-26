@@ -302,9 +302,15 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                     <Image size={24} className="text-[var(--text-tertiary)]" />
                                                 )}
                                             </div>
-                                            {/* 名稱與ID */}
+                                             {/* 名稱與ID */}
                                             <div className="min-w-0 flex-1">
-                                                <div className="font-extrabold text-base md:text-lg text-[var(--text-primary)] truncate">{product.name}</div>
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="font-extrabold text-base md:text-lg text-[var(--text-primary)] truncate">{product.name}</span>
+                                                    <span className="bg-amber-500/10 text-amber-700 dark:text-amber-300 font-extrabold text-[11px] px-2 py-0.5 rounded-lg border border-amber-500/20 shrink-0 flex items-center gap-1">
+                                                        <span>🏷️</span>
+                                                        <span>{product.capacity || (product.name.match(/(\d+\s*(?:ml|g|kg|l|cc|mL|G|KG|L|入|瓶|罐|包|盒|罐裝|瓶裝))/i)?.[1]?.trim() || '未設容量')}</span>
+                                                    </span>
+                                                </div>
                                                 <div className="text-xs text-[var(--text-tertiary)] font-mono mt-0.5 flex items-center gap-1.5">
                                                     <span className="bg-[var(--bg-tertiary)] px-1.5 py-0.2 rounded border border-[var(--border-primary)] text-[10px]">ID</span> 
                                                     <span className="truncate max-w-[120px] md:max-w-none">{product.id}</span>
@@ -400,6 +406,19 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                         value={product.imageUrl || ''}
                                                         onChange={(e) => handleFieldChange(product.id, 'imageUrl', e.target.value)}
                                                         onBlur={(e) => handleSaveProduct(product.id, { imageUrl: e.target.value })}
+                                                    />
+                                                </div>
+
+                                                {/* 商品容量 / 規格 */}
+                                                <div className="flex flex-col gap-2 bg-[var(--bg-tertiary)]/30 p-3.5 rounded-xl border border-[var(--border-primary)]/50">
+                                                    <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">容量 / 規格</span>
+                                                    <input
+                                                        type="text"
+                                                        className="input-field text-xs p-2.5 font-bold"
+                                                        placeholder="例：936ml、360g、6入/盒"
+                                                        value={product.capacity || ''}
+                                                        onChange={(e) => handleFieldChange(product.id, 'capacity', e.target.value)}
+                                                        onBlur={(e) => handleSaveProduct(product.id, { capacity: e.target.value })}
                                                     />
                                                 </div>
 

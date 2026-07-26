@@ -4826,6 +4826,15 @@ ${freeNote(newFee, newMin)}
                                 <h3 className="font-extrabold text-[18px] text-[var(--text-primary)] leading-snug">
                                   {product.name}
                                 </h3>
+                                {(() => {
+                                  const cap = product.capacity || (product.name.match(/(\d+\s*(?:ml|g|kg|l|cc|mL|G|KG|L|入|瓶|罐|包|盒|罐裝|瓶裝))/i)?.[1]?.trim());
+                                  if (!cap) return null;
+                                  return (
+                                    <span className="text-[11px] text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-300/40 px-2 py-0.5 rounded-lg font-bold shrink-0 flex items-center gap-0.5 shadow-2xs">
+                                      🏷️ {cap}
+                                    </span>
+                                  );
+                                })()}
                                 {product.isBundle && (
                                   <span className="text-[10px] text-amber-800 bg-amber-500/10 border border-amber-200/30 px-1 py-0.5 rounded font-bold shrink-0">
                                     捆裝 {product.bundleSize}入
