@@ -4822,19 +4822,15 @@ ${freeNote(newFee, newMin)}
 
                           <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                             <div>
-                              <div className="flex flex-wrap items-center gap-1.5">
+                              <div className="flex flex-wrap items-baseline gap-1.5">
                                 <h3 className="font-extrabold text-[18px] text-[var(--text-primary)] leading-snug">
                                   {product.name}
-                                </h3>
-                                {(() => {
-                                  const cap = product.capacity ? String(product.capacity).trim() : '';
-                                  if (!cap) return null;
-                                  return (
-                                    <span className="text-[11px] text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-300/40 px-2 py-0.5 rounded-lg font-bold shrink-0 flex items-center gap-0.5 shadow-2xs">
-                                      🏷️ {cap}
+                                  {product.capacity && String(product.capacity).trim() && (
+                                    <span className="font-bold text-[14px] text-[var(--text-secondary)] opacity-75 ml-1.5 font-sans">
+                                      {String(product.capacity).trim()}
                                     </span>
-                                  );
-                                })()}
+                                  )}
+                                </h3>
                                 {product.isBundle && (
                                   <span className="text-[10px] text-amber-800 bg-amber-500/10 border border-amber-200/30 px-1 py-0.5 rounded font-bold shrink-0">
                                     捆裝 {product.bundleSize}入
