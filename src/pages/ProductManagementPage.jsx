@@ -304,13 +304,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                             </div>
                                              {/* 名稱與ID */}
                                             <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="font-extrabold text-base md:text-lg text-[var(--text-primary)] truncate">{product.name}</span>
-                                                    <span className="bg-amber-500/10 text-amber-700 dark:text-amber-300 font-extrabold text-[11px] px-2 py-0.5 rounded-lg border border-amber-500/20 shrink-0 flex items-center gap-1">
-                                                        <span>🏷️</span>
-                                                        <span>{product.capacity || (product.name.match(/(\d+\s*(?:ml|g|kg|l|cc|mL|G|KG|L|入|瓶|罐|包|盒|罐裝|瓶裝))/i)?.[1]?.trim() || '未設容量')}</span>
-                                                    </span>
-                                                </div>
+                                                <div className="font-extrabold text-base md:text-lg text-[var(--text-primary)] truncate">{product.name}</div>
                                                 <div className="text-xs text-[var(--text-tertiary)] font-mono mt-0.5 flex items-center gap-1.5">
                                                     <span className="bg-[var(--bg-tertiary)] px-1.5 py-0.2 rounded border border-[var(--border-primary)] text-[10px]">ID</span> 
                                                     <span className="truncate max-w-[120px] md:max-w-none">{product.id}</span>
