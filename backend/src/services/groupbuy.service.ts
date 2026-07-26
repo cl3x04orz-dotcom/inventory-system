@@ -623,9 +623,10 @@ export const GroupBuyService = {
 
     await prisma.$transaction(
       buildings.map((name: string, idx: number) =>
-        prisma.buildingSetting.update({
+        prisma.buildingSetting.upsert({
           where: { building: name },
-          data: { sortOrder: idx }
+          update: { sortOrder: idx },
+          create: { building: name, sortOrder: idx }
         })
       )
     );
