@@ -2787,28 +2787,28 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                 <Calendar size={18} />
                                 設定預計出貨/配送日
                             </span>
-                            <button type="button" onClick={() => setDateModalOrder(null)} className="hover:bg-emerald-700 p-1 rounded-lg">
+                            <button type="button" onClick={() => setDateModalOrder(null)} className="hover:bg-emerald-700 p-1 rounded-lg transition-colors">
                                 <X size={18} />
                             </button>
                         </div>
-                        <div className="p-5 space-y-4">
-                            <div className="text-sm font-semibold text-[var(--text-secondary)]">
+                        <div className="p-4 sm:p-5 space-y-4 max-w-full overflow-hidden">
+                            <div className="text-sm font-semibold text-[var(--text-secondary)] truncate">
                                 訂單：<span className="font-mono text-[var(--text-primary)] font-extrabold">{dateModalOrder.orderId}</span> ({dateModalOrder.customerName})
                             </div>
-                            <div>
+                            <div className="w-full min-w-0 max-w-full overflow-hidden">
                                 <label className="block text-xs font-bold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
                                     選擇預計出貨日期
                                 </label>
                                 <input
                                     type="date"
-                                    className="input-field w-full text-base font-bold py-2.5 px-3 border-emerald-500 focus:ring-emerald-500"
+                                    className="input-field w-full max-w-full box-border min-w-0 text-base font-bold py-2.5 px-3 border-emerald-500 focus:ring-emerald-500 appearance-none"
                                     value={dateModalValue}
                                     onChange={(e) => setDateModalValue(e.target.value)}
                                 />
                             </div>
-                            <div>
+                            <div className="w-full min-w-0 max-w-full overflow-hidden">
                                 <span className="block text-xs font-bold text-[var(--text-tertiary)] mb-1.5">快速選擇：</span>
-                                <div className="flex flex-wrap gap-2">
+                                <div className="grid grid-cols-5 sm:flex sm:flex-wrap gap-1 sm:gap-2 w-full max-w-full">
                                     {[
                                         { label: '今天', date: new Date().toISOString().split('T')[0] },
                                         { label: '明天', date: new Date(Date.now() + 86400000).toISOString().split('T')[0] },
@@ -2820,7 +2820,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                             key={btn.label}
                                             type="button"
                                             onClick={() => setDateModalValue(btn.date)}
-                                            className={`text-xs px-3 py-1.5 rounded-lg font-bold border transition-colors ${
+                                            className={`text-[10px] sm:text-xs px-1 sm:px-3 py-1.5 rounded-lg font-bold border transition-colors text-center truncate ${
                                                 dateModalValue === btn.date
                                                     ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
                                                     : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)]'
@@ -2844,7 +2844,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             <button
                                 type="button"
                                 onClick={handleSaveDateModal}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2 text-xs rounded-xl shadow flex items-center gap-1.5"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2 text-xs rounded-xl shadow flex items-center gap-1.5 active:scale-95 transition-all"
                                 disabled={isSavingDate}
                             >
                                 <Save size={14} />
