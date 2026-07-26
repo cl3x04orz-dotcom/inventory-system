@@ -3,7 +3,7 @@ import { callGAS } from '../utils/api';
 import { 
     Calendar, Users, RefreshCw, Plus, Edit2, Trash2, 
     X, Sparkles, Phone, Search, 
-    ArrowLeftRight
+    ArrowLeftRight, Eye, EyeOff
 } from 'lucide-react';
 
 export default function SubscriptionManagementPage({ user, apiUrl }) {
@@ -15,6 +15,39 @@ export default function SubscriptionManagementPage({ user, apiUrl }) {
     // UI 篩選狀態
     const [selectedBuilding, setSelectedBuilding] = useState('ALL');
     const [searchQuery, setSearchQuery] = useState('');
+    
+    // 隱藏大樓與行政區過濾 (連動社區設定頁 admin_hidden_buildings)
+    const [hiddenBuildings, setHiddenBuildings] = useState(() => {
+        try {
+            const saved = localStorage.getItem('admin_hidden_buildings');
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            return [];
+        }
+    });
+    const [showHidden, setShowHidden] = useState(false);
+
+    // 自動計算並過濾出「實體社區/大樓」(隱藏 台南市xx區、高雄市xx區、測試、與黑名單大樓)
+    const visibleBuildings = React.useMemo(() => {
+        const list = Array.isArray(buildings) ? buildings : [];
+        const activeSubBuildings = new Set(subscriptions.map(s => s.building).filter(Boolean));
+
+        return list.filter(b => {
+            const name = (b.building || '').trim();
+            if (!name) return false;
+            if (showHidden) return true;
+            if (activeSubBuildings.has(name)) return true; // 有定期配資料的大樓保留顯示
+
+            // 自動隱藏純行政區 (台南市xx區、高雄市xx區)
+            const isDistrict = (name.startsWith('台南市') || name.startsWith('高雄市')) && name.endsWith('區');
+            if (isDistrict) return false;
+
+            if (name === '測試' || name === '線上下單') return false;
+            if (hiddenBuildings.includes(name)) return false;
+
+            return true;
+        });
+    }, [buildings, subscriptions, hiddenBuildings, showHidden]);
     
     // 編輯/新增 Modal 狀態
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -197,39 +230,72 @@ export default function SubscriptionManagementPage({ user, apiUrl }) {
                 </div>
             </div>
 
-            {/* Filter Bar */}
-            <div className="bg-[var(--bg-secondary)] rounded-2xl p-4 border border-[var(--border-primary)] shadow-sm flex flex-col md:flex-row gap-4 items-center mb-6">
-                {/* 搜尋 */}
-                <div className="relative w-full md:w-72">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} />
-                    <input
-                        type="text"
-                        placeholder="搜尋客戶姓名、電話..."
-                        className="input-field text-xs pl-9 pr-4 py-2.5 w-full"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
+            {/* Filter Bar - 整合與清理大樓標籤列 */}
+            <div className="bg-[var(--bg-secondary)] rounded-2xl p-4 border border-[var(--border-primary)] shadow-sm space-y-3 mb-6">
+                <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
+                    {/* 搜尋 */}
+                    <div className="relative w-full md:w-72">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} />
+                        <input
+                            type="text"
+                            placeholder="搜尋客戶姓名、電話..."
+                            className="input-field text-xs pl-9 pr-4 py-2.5 w-full"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end">
+                        {/* 大樓下拉選單快選 */}
+                        <select
+                            value={selectedBuilding}
+                            onChange={(e) => setSelectedBuilding(e.target.value)}
+                            className="input-field text-xs py-2 px-3 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)] font-bold text-[var(--text-primary)] cursor-pointer max-w-[200px]"
+                        >
+                            <option value="ALL">🏢 全部大樓 ({visibleBuildings.length})</option>
+                            {visibleBuildings.map(b => (
+                                <option key={b.building} value={b.building}>
+                                    {b.building}
+                                </option>
+                            ))}
+                        </select>
+
+                        {/* 切換是否顯示隱藏的行政區 / 社區 */}
+                        <button
+                            type="button"
+                            onClick={() => setShowHidden(!showHidden)}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border ${
+                                showHidden
+                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                                    : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] border-[var(--border-primary)] hover:text-[var(--text-secondary)]'
+                            }`}
+                            title={showHidden ? "已顯示隱藏行政區與大樓 (點擊隱藏)" : "隱藏行政區中 (點擊顯示全數區塊)"}
+                        >
+                            {showHidden ? <Eye size={14} /> : <EyeOff size={14} />}
+                            <span>{showHidden ? '已含隱藏區' : '已過濾行政區'}</span>
+                        </button>
+                    </div>
                 </div>
-                
-                {/* 大樓分類 */}
-                <div className="flex flex-wrap gap-1.5 w-full md:w-auto">
+
+                {/* 精美橫向捲動標籤列 (Scrollable Pills Bar) */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 no-scrollbar max-w-full">
                     <button
                         onClick={() => setSelectedBuilding('ALL')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all flex-shrink-0 ${
                             selectedBuilding === 'ALL'
-                                ? 'bg-blue-500 text-white shadow-md'
+                                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
                                 : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                         }`}
                     >
                         全部大樓
                     </button>
-                    {buildings.map(b => (
+                    {visibleBuildings.map(b => (
                         <button
                             key={b.building}
                             onClick={() => setSelectedBuilding(b.building)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all flex-shrink-0 ${
                                 selectedBuilding === b.building
-                                    ? 'bg-blue-500 text-white shadow-md'
+                                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
                                     : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                             }`}
                         >
@@ -387,7 +453,7 @@ export default function SubscriptionManagementPage({ user, apiUrl }) {
                                     onChange={(e) => setFormBuilding(e.target.value)}
                                     required
                                 >
-                                    {buildings.map(b => (
+                                    {visibleBuildings.map(b => (
                                         <option key={b.building} value={b.building}>{b.building}</option>
                                     ))}
                                 </select>
