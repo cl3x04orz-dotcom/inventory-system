@@ -890,6 +890,18 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         { name: '高雄市路竹區', fee: 200, min: 1000 }
     ];
 
+    const getDisplayGroupName = useCallback((order, settingsList = [], groupBindingsMap = {}) => {
+        if (!order) return '未知群組';
+        const addrRaw = String(order.deliveryAddress || '').trim();
+        const knownNames = Array.from(new Set([
+            ...buildings,
+            ...settingsList.map(s => s.building),
+            ...Object.values(groupBindingsMap)
+        ])).filter(Boolean);
+        const matchedAddrBuilding = knownNames.find(name => name && addrRaw.startsWith(name));
+        return matchedAddrBuilding || groupBindingsMap[order.sourceGroup] || order.sourceGroup || '未知群組';
+    }, [buildings]);
+
     const computeOrderTotals = useCallback((rawOrder, settingsList = [], groupBindingsMap = {}) => {
         if (!rawOrder || !rawOrder.items) return { productTotal: 0, shippingFee: 0, totalAmount: 0 };
         const order = normalizeOrder(rawOrder);
@@ -992,6 +1004,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             groupId: rawGrp,
                             groupName: editingOrder.sourceGroup
                         }, user.token);
+                        setGroupBindings(prev => ({ ...prev, [rawGrp]: editingOrder.sourceGroup }));
                     } catch (gErr) {
                         console.warn('Failed to update group binding mapping:', gErr);
                     }
@@ -1099,10 +1112,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         // 大樓篩選
         if (selectedBuilding !== '全部') {
             const addr = String(order.deliveryAddress || '').trim();
-            const boundBuildingName = groupBindings[order.sourceGroup] || order.sourceGroup || '';
+            const displayGrp = getDisplayGroupName(order, buildingSettingsList, groupBindings);
 
             const matchesAddress = addr.startsWith(selectedBuilding);
-            const matchesGroup = boundBuildingName === selectedBuilding;
+            const matchesGroup = displayGrp === selectedBuilding;
             if (!matchesAddress && !matchesGroup) {
                 return false;
             }
@@ -1156,13 +1169,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     // 排序：同大樓排在一起，大樓相同則依時間新到舊排序
     const sortedFilteredOrders = React.useMemo(() => {
         return filteredOrders.map(order => normalizeOrder(order)).sort((a, b) => {
-            const getBuildingName = (order) => {
-                const boundName = groupBindings[order.sourceGroup];
-                if (boundName) return boundName;
-                const addr = String(order.deliveryAddress || '').trim();
-                const matched = Object.values(groupBindings).find(bName => addr.startsWith(bName));
-                return matched || '一般散客';
-            };
+            const getBuildingName = (order) => getDisplayGroupName(order, buildingSettingsList, groupBindings);
             const bA = getBuildingName(a);
             const bB = getBuildingName(b);
             const comp = bA.localeCompare(bB, 'zh-Hant');
@@ -1515,7 +1522,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         lines.push('----------------------------------------');
 
         finalOrders.forEach((order, idx) => {
-            const groupName = groupBindings[order.sourceGroup] || order.sourceGroup || '未知群組';
+            const groupName = getDisplayGroupName(order, buildingSettingsList, groupBindings);
             const lineNameStr = order.lineDisplayName ? ` [LINE: ${order.lineDisplayName}]` : '';
             lines.push(`${idx + 1}. ${order.customerName}${lineNameStr} (${order.customerPhone})`);
             lines.push(`   群組/大樓：${groupName}`);
@@ -1581,7 +1588,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         lines.push('----------------------------------------');
 
         finalOrders.forEach((order, idx) => {
-            const groupName = groupBindings[order.sourceGroup] || order.sourceGroup || '未知群組';
+            const groupName = getDisplayGroupName(order, buildingSettingsList, groupBindings);
             const lineNameStr = order.lineDisplayName ? ` [LINE: ${order.lineDisplayName}]` : '';
             lines.push(`${idx + 1}. ${order.customerName}${lineNameStr}`);
             lines.push(`   群組/大樓：${groupName}`);
