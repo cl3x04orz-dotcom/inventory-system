@@ -169,6 +169,7 @@ export const ProductService = {
       isActive,
       imageUrl,
       category,
+      capacity,
       expiryDate,
       has_flavor_attributes,
       flavor_choices,

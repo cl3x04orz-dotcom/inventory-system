@@ -148,6 +148,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 isActive: mergedProduct.isActive,
                 imageUrl: mergedProduct.imageUrl,
                 category: mergedProduct.category || '',
+                capacity: mergedProduct.capacity !== undefined ? String(mergedProduct.capacity).trim() : '',
                 expiryDate: mergedProduct.expiryDate,
                 has_flavor_attributes: mergedProduct.has_flavor_attributes,
                 flavor_choices: parsedFlavors,
