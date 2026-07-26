@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, Calendar, Clock, Copy, Save, Plus, Check, RefreshCw, Truck, Edit2, Trash2, ChevronUp, ChevronDown, StickyNote, Eye, EyeOff, Search } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
@@ -56,6 +56,26 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
         }
     });
     const [templateInputText, setTemplateInputText] = useState('');
+    const templateTextareaRef = useRef(null);
+
+    const insertTagAtCursor = (tag) => {
+        const textarea = templateTextareaRef.current;
+        if (!textarea) {
+            setTemplateInputText(prev => prev + tag);
+            return;
+        }
+
+        const start = textarea.selectionStart ?? templateInputText.length;
+        const end = textarea.selectionEnd ?? templateInputText.length;
+
+        const newText = templateInputText.substring(0, start) + tag + templateInputText.substring(end);
+        setTemplateInputText(newText);
+
+        setTimeout(() => {
+            textarea.focus();
+            textarea.setSelectionRange(start + tag.length, start + tag.length);
+        }, 0);
+    };
 
     const getDefaultTemplate = useCallback((bName, url) => {
         return `📢【${bName || '大樓名稱'}】本週團購開跑囉！🎉\n\n各位住戶鄰居大家好，本週團購專屬下單連結已開放：\n👉 點擊下單：${url || ''}\n\n🚚 預計配送時間：請依結單提示為準\n小提醒：下單後可直接選擇付款方式，有任何問題隨時在群組詢問小編喔！❤️`;
@@ -1177,17 +1197,17 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                         <span className="font-bold text-[11px]">快速插入動態變數：</span>
                                                         <button
                                                             type="button"
-                                                            onClick={() => setTemplateInputText(prev => prev + '{building}')}
+                                                            onClick={() => insertTagAtCursor('{building}')}
                                                             className="px-2 py-0.5 bg-white hover:bg-emerald-100 text-emerald-700 rounded text-[11px] font-bold border border-emerald-300 transition-colors cursor-pointer"
-                                                            title="將在複製時自動替換為當前大樓名稱"
+                                                            title="將在游標位置插入當前大樓名稱變數"
                                                         >
                                                             ＋ 大樓名稱 {"{building}"}
                                                         </button>
                                                         <button
                                                             type="button"
-                                                            onClick={() => setTemplateInputText(prev => prev + '{url}')}
+                                                            onClick={() => insertTagAtCursor('{url}')}
                                                             className="px-2 py-0.5 bg-white hover:bg-emerald-100 text-emerald-700 rounded text-[11px] font-bold border border-emerald-300 transition-colors cursor-pointer"
-                                                            title="將在複製時自動替換為當前 LIFF 下單連結"
+                                                            title="將在游標位置插入當前 LIFF 下單連結變數"
                                                         >
                                                             ＋ 下單網址 {"{url}"}
                                                         </button>
@@ -1195,6 +1215,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
 
                                                     {/* 可編輯文案區域 */}
                                                     <textarea
+                                                        ref={templateTextareaRef}
                                                         rows={7}
                                                         className="w-full p-3 rounded-xl border border-emerald-300 bg-white text-xs font-mono text-slate-800 focus:outline-none focus:border-emerald-500 leading-relaxed shadow-inner"
                                                         value={templateInputText}
