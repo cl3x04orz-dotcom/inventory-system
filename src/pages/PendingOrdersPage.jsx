@@ -1192,18 +1192,18 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         return true;
     });
 
-    // 排序：同大樓排在一起，大樓相同則依時間新到舊排序
+    // 排序：嚴格依下單時間排序（最新的在最上面，最舊的在最下面）
     const sortedFilteredOrders = React.useMemo(() => {
         return filteredOrders.map(order => normalizeOrder(order)).sort((a, b) => {
-            const getBuildingName = (order) => getDisplayGroupName(order, buildingSettingsList, groupBindings);
-            const bA = getBuildingName(a);
-            const bB = getBuildingName(b);
-            const comp = bA.localeCompare(bB, 'zh-Hant');
-            if (comp !== 0) return comp;
-            // 相同大樓則依時間新到舊
-            return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            if (timeA !== timeB && !isNaN(timeA) && !isNaN(timeB)) {
+                return timeB - timeA; // 時間由新到舊
+            }
+            // 若時間相同或缺失，依訂單編號（包含時間戳）降序排序
+            return String(b.orderId || '').localeCompare(String(a.orderId || ''));
         });
-    }, [filteredOrders, groupBindings, normalizeOrder]);
+    }, [filteredOrders, normalizeOrder]);
 
     // 商品特化搜尋小卡片統計數據
     const productSearchSummary = React.useMemo(() => {
