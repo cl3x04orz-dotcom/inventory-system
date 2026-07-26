@@ -216,6 +216,19 @@ export const ProductService = {
       }
     }
 
+    const oldProduct = await prisma.product.findUnique({
+      where: { productId: String(productId).trim() },
+      select: { maxTotalQty: true }
+    });
+
+    let shouldResetSoldQty = false;
+    if (parsedMaxTotalQty !== undefined && oldProduct) {
+      const oldLimit = oldProduct.maxTotalQty !== null && oldProduct.maxTotalQty !== undefined ? Number(oldProduct.maxTotalQty) : null;
+      if (parsedMaxTotalQty !== oldLimit) {
+        shouldResetSoldQty = true;
+      }
+    }
+
     await prisma.product.update({
       where: { productId: String(productId).trim() },
       data: {
@@ -240,8 +253,8 @@ export const ProductService = {
         isBundle: isBundle !== undefined ? Boolean(isBundle) : undefined,
         bundleSize: bundleSize !== undefined ? Number(bundleSize) : undefined,
         maxTotalQty: parsedMaxTotalQty,
-        // 每次重新設定活動上限（不論是新值還是清除），soldQty 與白名單都同步重設
-        soldQty: parsedMaxTotalQty !== undefined ? 0 : undefined,
+        // 僅在活動上限實際變更（新值或清除）時，soldQty 才同步重設
+        soldQty: shouldResetSoldQty ? 0 : undefined,
         allowedCommunityIds: parsedAllowedIds,
         communityQuotas: communityQuotas !== undefined ? (communityQuotas || {}) : undefined,
       }
