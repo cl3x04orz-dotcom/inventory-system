@@ -13,9 +13,10 @@ const formatLocalYMD = (date: Date) => {
 export const BillService = {
   // 1. 查詢應收帳款
   async getReceivables(payload: any) {
-    const { startDate, endDate, status } = payload;
+    const { startDate, endDate, status, storeCode } = payload;
     const where: any = {
-      paymentMethod: 'CREDIT'
+      paymentMethod: 'CREDIT',
+      storeCode
     };
 
     if (status === 'PAID') {
@@ -90,10 +91,11 @@ export const BillService = {
 
   // 3. 查詢應付帳款
   async getPayables(payload: any) {
-    const { startDate, endDate } = payload;
+    const { startDate, endDate, storeCode } = payload;
     const where: any = {
       paymentMethod: 'CREDIT',
-      status: 'UNPAID'
+      status: 'UNPAID',
+      storeCode
     };
 
     if (startDate || endDate) {

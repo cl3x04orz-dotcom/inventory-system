@@ -13,10 +13,10 @@ export const GroupBuyService = {
 
   // 1. 取得訂單列表（按狀態篩選）
   async getPendingOrders(payload: any, user: any) {
-    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
-    const { status } = payload || {};
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') throw new Error('權限不足');
+    const { status, storeCode } = payload || {};
 
-    const where: any = {};
+    const where: any = { storeCode };
     if (status === 'UNPAID') {
       where.OR = [
         { paymentStatus: null },
@@ -484,7 +484,9 @@ export const GroupBuyService = {
 
   // 7. 取得大樓設定列表（含對應社區的運費設定）
   async getBuildingSettings(payload: any, user: any) {
+    const { storeCode } = payload;
     const settings = await prisma.buildingSetting.findMany({
+      where: { storeCode },
       orderBy: [
         { sortOrder: 'asc' },
         { building: 'asc' }
@@ -492,6 +494,7 @@ export const GroupBuyService = {
     });
     // 一次查出所有社區的運費設定（依名稱匹配）
     const allComms = await prisma.groupBuyCommunity.findMany({
+      where: { storeCode },
       select: { communityId: true, communityName: true, defaultFreeShipping: true, freeShippingMin: true, shippingFee: true }
     });
     const commMap = new Map(allComms.map((c: any) => [c.communityName, c]));
@@ -695,7 +698,7 @@ export const GroupBuyService = {
 
   // 9. 取得群組綁定列表
   async getGroupBindings(payload: any, user: any) {
-    const bindings = await prisma.groupBinding.findMany();
+    const bindings = await prisma.groupBinding.findMany({ where: { storeCode: payload.storeCode } });
     const result: Record<string, string> = {};
     bindings.forEach((b: any) => {
       result[b.groupId] = b.groupName;
@@ -863,7 +866,7 @@ export const GroupBuyService = {
     }));
 
     // 取得群組綁定對照表
-    const gBindings = await prisma.groupBinding.findMany();
+    const gBindings = await prisma.groupBinding.findMany({ where: { storeCode: payload.storeCode } });
     const groupBindings: Record<string, string> = {};
     gBindings.forEach((b: any) => {
       groupBindings[b.groupId] = b.groupName;
@@ -1413,7 +1416,7 @@ export const GroupBuyService = {
 
   // 定期配相關實作
   async getSubscriptions(payload: any, user: any) {
-    const list = await prisma.subscription.findMany();
+    const list = await prisma.subscription.findMany({ where: { storeCode: payload.storeCode } });
     return list.map((item: any) => ({
       ...item,
       frequency: JSON.parse(item.frequency || '[]')
@@ -1491,7 +1494,7 @@ export const GroupBuyService = {
     }
 
     // 2. 獲取商品定價
-    const products = await prisma.product.findMany();
+    const products = await prisma.product.findMany({ where: { storeCode: payload.storeCode } });
     const prodPriceMap: Record<string, number> = {};
     products.forEach((p: any) => {
       prodPriceMap[p.productId] = Number(p.singlePrice) || Number(p.defaultPrice) || 0;
