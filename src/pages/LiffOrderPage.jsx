@@ -29,10 +29,10 @@ import logoImg from "../assets/logo.png";
 import logoLiff from "../assets/logo_liff.jpg";
 
 // ── 品牌 Logo 元件 ──────────────────────────────────────────────
-const MilkZeroWasteLogo = () => (
+const MilkZeroWasteLogo = ({ setting }) => (
   <img
-    src={logoLiff}
-    alt="米立微 Logo"
+    src={setting?.logoUrl || logoLiff}
+    alt={`${setting?.name || "米立微"} Logo`}
     className="h-10 w-auto flex-shrink-0 object-contain"
     style={{ aspectRatio: "728/197" }}
   />
@@ -71,10 +71,10 @@ const formatTaiwanPhone = (phone) => {
 let isLiffInitStarted = false;
 let isLiffInitialized = false;
 
-export default function LiffOrderPage({ user, apiUrl }) {
+export default function LiffOrderPage({ user, apiUrl, setting }) {
   // ── 鎖定 body / html 避免 iOS 橡皮筋 & 網址列跳動 ──────────────
   useEffect(() => {
-    document.title = "米立微 MilkZeroWaste";
+    document.title = setting?.name || "米立微";
     document.documentElement.classList.add("liff-order-active");
     document.body.classList.add("liff-order-active");
     return () => {
@@ -2383,7 +2383,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
     };
 
     const generateGroupOrderShareText = () => {
-      let text = `📋 【米立微團購】訂單對帳單 (單號: ${orderId})\n`;
+      let text = `📋 【${setting?.name || "米立微"}團購】訂單對帳單 (單號: ${orderId})\n`;
       text += `----------------------------------\n`;
 
       let grandTotalQty = 0;
@@ -2425,7 +2425,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
       }
 
       text += `總計：${grandTotalQty} 件商品，共 $${grandTotalAmount} 元。\n`;
-      text += `(本文字由米立微系統自動產生，請團員確認無誤後向團長繳款)`;
+      text += `(本文字由${setting?.name || "系統"}自動產生，請團員確認無誤後向團長繳款)`;
       return text;
     };
 
@@ -2641,7 +2641,7 @@ export default function LiffOrderPage({ user, apiUrl }) {
                 className="w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 text-white shadow-md shadow-emerald-500/20 hover:opacity-95 active:scale-95 transition-all flex-shrink-0"
                 style={{ background: "#06C755" }}
               >
-                聯繫米立微小編付款 ➔
+                聯繫小編付款 ➔
               </button>
             )}
 
@@ -4445,7 +4445,7 @@ ${freeNote(newFee, newMin)}
         {/* Header */}
         <div className="h-[60px] px-3 flex justify-between items-center">
           <div className="flex-1 flex justify-start items-center gap-3">
-            <MilkZeroWasteLogo />
+            <MilkZeroWasteLogo setting={setting} />
             {isGeneralUser ? (
               <button
                 onClick={() => setShowAreaModal(true)}

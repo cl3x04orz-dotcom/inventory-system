@@ -472,3 +472,33 @@ model Promotion {
   community GroupBuyCommunity?      @relation(fields: [communityId], references: [communityId], onDelete: Cascade)
   prices    CommunityProductPrice[]
 }
+
+model StoreSetting {
+  id             String   @id @default(uuid())
+  storeCode      String   @unique
+  status         String   @default("active")
+  
+  // 品牌
+  name           String
+  logoUrl        String?
+  primaryColor   String?
+  secondaryColor String?
+  
+  // 聯絡資訊
+  phone          String?
+  address        String?
+  
+  // LINE / LIFF
+  lineOA         String?
+  linePay        String?
+  liffId         String?
+  
+  // 營業資訊 / 系統
+  businessHours  String?
+  timezone       String?
+  language       String?
+  currency       String?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}

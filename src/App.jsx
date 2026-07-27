@@ -27,6 +27,7 @@ import LiffOrderPage from './pages/LiffOrderPage';
 import PendingOrdersPage from './pages/PendingOrdersPage';
 import ProductManagementPage from './pages/ProductManagementPage';
 import GroupBuySettingsPage from './pages/GroupBuySettingsPage';
+import StoreSettingsPage from './pages/StoreSettingsPage';
 import MemberManagementPage from './pages/MemberManagementPage';
 import SubscriptionManagementPage from './pages/SubscriptionManagementPage';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -35,12 +36,13 @@ import ThemeToggle from './components/ThemeToggle';
 import SessionManager from './utils/SessionManager';
 import { callGAS } from './utils/api';
 import useActivityLogger from './hooks/useActivityLogger';
+import { useStoreSetting } from './hooks/useStoreSetting';
 import logoImg from './assets/logo.png';
 import {
     LayoutDashboard, ShoppingCart, Archive, LogOut, PackagePlus,
     FileText, ClipboardList, DollarSign, CheckSquare, Wallet, ChevronDown,
     TrendingUp, BarChart2, Users, Activity, PieChart, Shield, WifiOff, Menu,
-    Edit2, Link, Calendar
+    Edit2, Link, Calendar, Store
 } from 'lucide-react';
 
 // Google Apps Script (GAS) API Endpoint
@@ -147,6 +149,8 @@ const MobileNavGroup = ({ label, icon: Icon, children }) => {
 };
 
 function AppContent() {
+    const { setting } = useStoreSetting();
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [user, setUser] = useState(null); // { token, role, name, ... }
     const [page, setPage] = useState('sales');
     const [openDropdown, setOpenDropdown] = useState(null);
@@ -581,7 +585,7 @@ function AppContent() {
         return (
             <div className="splash-screen">
                 <div className="splash-content">
-                    <img src={logoImg} className="breathe-logo" alt="Logo" />
+                    <img src={setting?.logoUrl || logoImg} className="breathe-logo" alt={setting?.name || "Logo"} />
                 </div>
             </div>
         );
@@ -593,11 +597,11 @@ function AppContent() {
                 {isInitializing && (
                     <div className="splash-screen fade-out">
                         <div className="splash-content">
-                            <img src={logoImg} className="breathe-logo" alt="Logo" />
+                            <img src={setting?.logoUrl || logoImg} className="breathe-logo" alt={setting?.name || "Logo"} />
                         </div>
                     </div>
                 )}
-                <LoginPage onLogin={handleLogin} apiUrl={GAS_API_URL} />
+                <LoginPage onLogin={handleLogin} apiUrl={GAS_API_URL} setting={setting} />
             </>
         );
     }
@@ -609,7 +613,7 @@ function AppContent() {
             {isInitializing && (
                 <div className="splash-screen fade-out">
                     <div className="splash-content">
-                        <img src={logoImg} className="breathe-logo" alt="Logo" />
+                        <img src={setting?.logoUrl || logoImg} className="breathe-logo" alt={setting?.name || "Logo"} />
                     </div>
                 </div>
             )}
@@ -628,7 +632,7 @@ function AppContent() {
             {page !== 'liffOrder' && <header className={`h-[76px] border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]/85 backdrop-blur-xl flex justify-between items-center px-6 sticky top-0 z-[60] transition-[transform,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.17,0.67,0.83,0.67)] ${showHeader ? 'translate-y-0' : '-translate-y-full'} ${scrolled ? 'shadow-lg border-transparent' : 'shadow-none'}`}>
 
                 <div className="flex items-center gap-3">
-                    <img src={logoImg} alt="Logo" className="h-11 w-auto object-contain brightness-0 dark:brightness-100 transition-transform hover:scale-105 cursor-pointer" onClick={() => handlePageChange('sales')} />
+                    <img src={setting?.logoUrl || logoImg} alt={setting?.name || "Logo"} className="h-11 w-auto object-contain brightness-0 dark:brightness-100 transition-transform hover:scale-105 cursor-pointer" onClick={() => handlePageChange('sales')} />
                 </div>
 
                 {/* Header Actions (Logout on far right, others spread) */}
@@ -708,6 +712,7 @@ function AppContent() {
                                     {(user.role === 'BOSS' || checkPermission('permissionControl') || checkPermission('activityLog')) && (
                                         <MobileNavGroup label="系統" icon={Shield}>
                                             {checkPermission('permissionControl') && <NavItem label="權限控管表" icon={Shield} onClick={() => handlePageChange('permissionControl')} active={page === 'permissionControl'} />}
+                                            {checkPermission('permissionControl') && <NavItem label="店家基本設定" icon={Store} onClick={() => handlePageChange('storeSettings')} active={page === 'storeSettings'} />}
                                             {checkPermission('activityLog') && <NavItem label="操作紀錄查詢" icon={Activity} onClick={() => handlePageChange('activityLog')} active={page === 'activityLog'} />}
                                         </MobileNavGroup>
                                     )}
@@ -860,9 +865,10 @@ function AppContent() {
                                     icon={Shield}
                                     openDropdown={openDropdown}
                                     setOpenDropdown={setOpenDropdown}
-                                    active={['permissionControl', 'activityLog'].includes(page)}
+                                    active={['permissionControl', 'storeSettings', 'activityLog'].includes(page)}
                                 >
                                     {checkPermission('permissionControl') && <NavItem label="權限控管表" icon={Shield} onClick={() => handlePageChange('permissionControl')} active={page === 'permissionControl'} />}
+                                    {checkPermission('permissionControl') && <NavItem label="店家基本設定" icon={Store} onClick={() => handlePageChange('storeSettings')} active={page === 'storeSettings'} />}
                                     {checkPermission('activityLog') && <NavItem label="操作紀錄查詢" icon={Activity} onClick={() => handlePageChange('activityLog')} active={page === 'activityLog'} />}
                                 </NavDropdown>
                             )}
@@ -926,9 +932,10 @@ function AppContent() {
                         {page === 'expenditureManagement' && <ExpenditureManagementPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'incomeStatement' && <IncomeStatementPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'permissionControl' && <PermissionControlPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
+                        {page === 'storeSettings' && <StoreSettingsPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'payroll' && <PayrollPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'activityLog' && <ActivityLogPage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'liffOrder' && <LiffOrderPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'liffOrder' && <LiffOrderPage user={user} apiUrl={GAS_API_URL} setting={setting} />}
                         {page === 'pendingOrders' && <PendingOrdersPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'groupBuySettings' && <GroupBuySettingsPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'products' && <ProductManagementPage user={user} apiUrl={GAS_API_URL} />}

@@ -9,10 +9,16 @@ import { AnalyticsService } from '../services/analytics.service.js';
 import { PayrollService } from '../services/payroll.service.js';
 import { GroupBuyService } from '../services/groupbuy.service.js';
 import { PromotionService } from '../services/promotion.service.js';
+import { StoreSettingService } from '../services/storesetting.service.js';
 import { callGASFromNode } from '../utils/gasClient.js';
 
 export async function apiRouter(action: string, payload: any, user: any): Promise<any> {
   switch (action) {
+    case 'getStoreSetting':
+      return StoreSettingService.getStoreSetting(payload);
+    case 'saveStoreSetting':
+      return StoreSettingService.saveStoreSetting(payload, user);
+
     // 1. 會員與權限 (User & Authentication)
     case 'login':
       return UserService.login(payload);

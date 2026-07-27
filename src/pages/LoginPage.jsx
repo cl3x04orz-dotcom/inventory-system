@@ -4,7 +4,7 @@ import { Lock, User, ArrowRight } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import logoImg from '../assets/logo.png';
 
-export default function LoginPage({ onLogin, apiUrl }) {
+export default function LoginPage({ onLogin, apiUrl, setting }) {
     const [isRegister, setIsRegister] = useState(false);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -52,7 +52,7 @@ export default function LoginPage({ onLogin, apiUrl }) {
             <div className="bg-white border border-slate-200 p-8 w-full max-w-md rounded-2xl shadow-2xl">
                 <div className="text-center mb-8">
                     <div className="flex justify-center mb-6">
-                        <img src={logoImg} alt="Logo" className="h-20 w-auto object-contain brightness-0 dark:brightness-100" />
+                        <img src={setting?.logoUrl || logoImg} alt={setting?.name || "Logo"} className="h-20 w-auto object-contain brightness-0 dark:brightness-100" />
                     </div>
                     <p className="text-slate-500 font-medium">
                         {isRegister ? '建立您的帳戶' : '請登入系統以開始使用'}
