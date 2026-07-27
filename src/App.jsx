@@ -30,6 +30,7 @@ import GroupBuySettingsPage from './pages/GroupBuySettingsPage';
 import StoreSettingsPage from './pages/StoreSettingsPage';
 import MemberManagementPage from './pages/MemberManagementPage';
 import SubscriptionManagementPage from './pages/SubscriptionManagementPage';
+import SuperAdminPage from './pages/SuperAdminPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './contexts/ThemeContext';
 import ThemeToggle from './components/ThemeToggle';
@@ -42,7 +43,7 @@ import {
     LayoutDashboard, ShoppingCart, Archive, LogOut, PackagePlus,
     FileText, ClipboardList, DollarSign, CheckSquare, Wallet, ChevronDown,
     TrendingUp, BarChart2, Users, Activity, PieChart, Shield, WifiOff, Menu,
-    Edit2, Link, Calendar, Store
+    Edit2, Link, Calendar, Store, Building2
 } from 'lucide-react';
 
 // Google Apps Script (GAS) API Endpoint
@@ -709,11 +710,12 @@ function AppContent() {
                                             {checkPermission('turnoverRate') && <NavItem label="庫存周轉率" icon={Activity} onClick={() => handlePageChange('turnoverRate')} active={page === 'turnoverRate'} />}
                                         </MobileNavGroup>
                                     )}
-                                    {(user.role === 'BOSS' || checkPermission('permissionControl') || checkPermission('activityLog')) && (
+                                    {(user.role === 'BOSS' || user.role === 'SUPER_ADMIN' || checkPermission('permissionControl') || checkPermission('activityLog')) && (
                                         <MobileNavGroup label="系統" icon={Shield}>
                                             {checkPermission('permissionControl') && <NavItem label="權限控管表" icon={Shield} onClick={() => handlePageChange('permissionControl')} active={page === 'permissionControl'} />}
                                             {checkPermission('permissionControl') && <NavItem label="店家基本設定" icon={Store} onClick={() => handlePageChange('storeSettings')} active={page === 'storeSettings'} />}
                                             {checkPermission('activityLog') && <NavItem label="操作紀錄查詢" icon={Activity} onClick={() => handlePageChange('activityLog')} active={page === 'activityLog'} />}
+                                            {user.role === 'SUPER_ADMIN' && <NavItem label="🏢 租戶管理" icon={Building2} onClick={() => handlePageChange('superAdmin')} active={page === 'superAdmin'} />}
                                         </MobileNavGroup>
                                     )}
                                 </div>
@@ -858,18 +860,19 @@ function AppContent() {
 
                         {/* Column 7: 系統 */}
                         <div className="flex justify-center">
-                            {(user.role === 'BOSS' || checkPermission('permissionControl') || checkPermission('activityLog')) && (
+                            {(user.role === 'BOSS' || user.role === 'SUPER_ADMIN' || checkPermission('permissionControl') || checkPermission('activityLog')) && (
                                 <NavDropdown
                                     id="system"
                                     label="系統"
                                     icon={Shield}
                                     openDropdown={openDropdown}
                                     setOpenDropdown={setOpenDropdown}
-                                    active={['permissionControl', 'storeSettings', 'activityLog'].includes(page)}
+                                    active={['permissionControl', 'storeSettings', 'activityLog', 'superAdmin'].includes(page)}
                                 >
                                     {checkPermission('permissionControl') && <NavItem label="權限控管表" icon={Shield} onClick={() => handlePageChange('permissionControl')} active={page === 'permissionControl'} />}
                                     {checkPermission('permissionControl') && <NavItem label="店家基本設定" icon={Store} onClick={() => handlePageChange('storeSettings')} active={page === 'storeSettings'} />}
                                     {checkPermission('activityLog') && <NavItem label="操作紀錄查詢" icon={Activity} onClick={() => handlePageChange('activityLog')} active={page === 'activityLog'} />}
+                                    {user.role === 'SUPER_ADMIN' && <NavItem label="🏢 租戶管理" icon={Building2} onClick={() => handlePageChange('superAdmin')} active={page === 'superAdmin'} />}
                                 </NavDropdown>
                             )}
                         </div>
@@ -941,6 +944,7 @@ function AppContent() {
                         {page === 'products' && <ProductManagementPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'memberManagement' && <MemberManagementPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'subscriptionManagement' && <SubscriptionManagementPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'superAdmin' && user.role === 'SUPER_ADMIN' && <SuperAdminPage user={user} apiUrl={GAS_API_URL} />}
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full text-slate-400">

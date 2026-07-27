@@ -104,8 +104,8 @@ export async function apiRoutes(app: FastifyInstance) {
         return reply.send({ error: 'TokenExpired' }); // Match Apps Script return for client-side auto-renew
       }
 
-      // 2. Perform RBAC validation (BOSS and ADMIN bypass all checks)
-      if (user.role !== 'BOSS' && user.role !== 'ADMIN') {
+      // 2. Perform RBAC validation (SUPER_ADMIN, BOSS, and ADMIN bypass all checks)
+      if (user.role !== 'SUPER_ADMIN' && user.role !== 'BOSS' && user.role !== 'ADMIN') {
         const requiredPerm = actionPermissions[trimmedAction];
         if (requiredPerm) {
           const userPerms = user.permissions || [];

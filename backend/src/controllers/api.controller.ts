@@ -8,6 +8,7 @@ import { BillService } from '../services/bill.service.js';
 import { AnalyticsService } from '../services/analytics.service.js';
 import { PayrollService } from '../services/payroll.service.js';
 import { GroupBuyService } from '../services/groupbuy.service.js';
+import { superadminService } from '../services/superadmin.service.js';
 import { PromotionService } from '../services/promotion.service.js';
 import { StoreSettingService } from '../services/storesetting.service.js';
 import { callGASFromNode } from '../utils/gasClient.js';
@@ -18,6 +19,12 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       return StoreSettingService.getStoreSetting(payload);
     case 'saveStoreSetting':
       return StoreSettingService.saveStoreSetting(payload, user);
+
+    // 0. 超級管理員 (Super Admin)
+    case 'getTenants':
+      return superadminService.getTenants(payload, user);
+    case 'createTenant':
+      return superadminService.createTenant(payload, user);
 
     // 1. 會員與權限 (User & Authentication)
     case 'login':
