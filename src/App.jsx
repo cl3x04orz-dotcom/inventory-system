@@ -447,8 +447,8 @@ function AppContent() {
     const checkPermission = (targetPage) => {
         if (!user) return false;
 
-        // BOSS has god mode
-        if (user.role === 'BOSS') return true;
+        // BOSS and SUPER_ADMIN have god mode
+        if (user.role === 'BOSS' || user.role === 'SUPER_ADMIN') return true;
 
         // Ensure permissions is an array, handle undefined/string cases
         let perms = user.permissions;
