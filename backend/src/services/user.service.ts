@@ -124,8 +124,9 @@ export const UserService = {
     return { list: formatted, cached: false };
   },
 
-  async addUser(payload: any) {
+  async addUser(payload: any, user?: any) {
     const { username, password, role } = payload;
+    const storeCode = payload?.storeCode || user?.storeCode || 'MILI001';
     if (!username) return { error: '請輸入帳號(姓名)' };
 
     const existing = await prisma.user.findUnique({
@@ -144,7 +145,8 @@ export const UserService = {
         passwordHash,
         role: role || 'EMPLOYEE',
         status: 'ACTIVE',
-        permissions: []
+        permissions: [],
+        storeCode
       }
     });
 

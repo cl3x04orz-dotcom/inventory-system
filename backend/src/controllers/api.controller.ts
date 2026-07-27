@@ -36,9 +36,9 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
     case 'login':
       return UserService.login(payload);
     case 'getUsers':
-      return UserService.getUsers();
+      return UserService.getUsers(payload, user);
     case 'addUser':
-      return UserService.addUser(payload);
+      return UserService.addUser(payload, user);
     case 'deleteUser':
       return UserService.deleteUser(payload);
     case 'updateUserPermissions':
