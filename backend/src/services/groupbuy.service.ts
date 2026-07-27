@@ -1594,9 +1594,10 @@ export const GroupBuyService = {
 
   // 17. 取得所有社區列表 (用於後台社區/外送區域管理)
   async getCommunities(payload: any, user: any) {
-    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') throw new Error('權限不足');
+    const { storeCode } = payload;
     const communities = await prisma.groupBuyCommunity.findMany({
-      where: { deletedAt: null },
+      where: { deletedAt: null, storeCode },
       orderBy: { communityName: 'asc' }
     });
     return communities.map((c: any) => ({
@@ -1612,8 +1613,8 @@ export const GroupBuyService = {
 
   // 18. 新增/更新外送區域
   async saveCommunityArea(payload: any, user: any) {
-    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
-    const { communityId, communityName, defaultFreeShipping, freeShippingMin, shippingFee, status } = payload;
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') throw new Error('權限不足');
+    const { communityId, communityName, defaultFreeShipping, freeShippingMin, shippingFee, status, storeCode } = payload;
     if (!communityName) throw new Error('缺少區域名稱');
 
     if (communityId) {
@@ -1641,7 +1642,8 @@ export const GroupBuyService = {
           freeShippingMin: Number(freeShippingMin) || 0,
           shippingFee: Number(shippingFee) || 0,
           status: 'ACTIVE',
-          orderingMode: 'OPEN'
+          orderingMode: 'OPEN',
+          storeCode
         }
       });
     }
