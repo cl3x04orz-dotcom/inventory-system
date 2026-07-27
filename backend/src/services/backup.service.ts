@@ -2,26 +2,28 @@ import { prisma } from '../database/context.js';
 import xlsx from 'xlsx';
 
 export const BackupService = {
-  async exportDatabaseToExcel() {
+  async exportDatabaseToExcel(storeCode: string) {
+    const where = storeCode ? { storeCode } : {};
+
     // 1. 查詢所有資料表內容
-    const users = await prisma.user.findMany();
-    const products = await prisma.product.findMany();
-    const inventories = await prisma.inventory.findMany();
-    const purchases = await prisma.purchase.findMany();
-    const sales = await prisma.sales.findMany();
-    const salesDetails = await prisma.salesDetail.findMany();
-    const expenditures = await prisma.expenditure.findMany();
-    const payrollSettings = await prisma.payrollSetting.findMany();
-    const dailyRecords = await prisma.dailyRecord.findMany();
-    const employeeProfiles = await prisma.employeeProfile.findMany();
-    const groupBuyCommunities = await prisma.groupBuyCommunity.findMany();
-    const groupBuyCampaigns = await prisma.groupBuyCampaign.findMany();
-    const groupBuyAuditLogs = await prisma.groupBuyAuditLog.findMany();
-    const groupBuyOrderStatusHistories = await prisma.groupBuyOrderStatusHistory.findMany();
-    const groupBuyNotifications = await prisma.groupBuyNotification.findMany();
-    const groupBuySystemSettings = await prisma.groupBuySystemSetting.findMany();
-    const vendors = await prisma.vendor.findMany();
-    const activityLogs = await prisma.activityLog.findMany();
+    const users = await prisma.user.findMany({ where });
+    const products = await prisma.product.findMany({ where });
+    const inventories = await prisma.inventory.findMany({ where });
+    const purchases = await prisma.purchase.findMany({ where });
+    const sales = await prisma.sales.findMany({ where });
+    const salesDetails = await prisma.salesDetail.findMany({ where });
+    const expenditures = await prisma.expenditure.findMany({ where });
+    const payrollSettings = await prisma.payrollSetting.findMany({ where });
+    const dailyRecords = await prisma.dailyRecord.findMany({ where });
+    const employeeProfiles = await prisma.employeeProfile.findMany({ where });
+    const groupBuyCommunities = await prisma.groupBuyCommunity.findMany({ where });
+    const groupBuyCampaigns = await prisma.groupBuyCampaign.findMany({ where });
+    const groupBuyAuditLogs = await prisma.groupBuyAuditLog.findMany({ where });
+    const groupBuyOrderStatusHistories = await prisma.groupBuyOrderStatusHistory.findMany({ where });
+    const groupBuyNotifications = await prisma.groupBuyNotification.findMany({ where });
+    const groupBuySystemSettings = await prisma.groupBuySystemSetting.findMany({ where });
+    const vendors = await prisma.vendor.findMany({ where });
+    const activityLogs = await prisma.activityLog.findMany({ where });
 
     // 2. 建立新 Workbook
     const wb = xlsx.utils.book_new();

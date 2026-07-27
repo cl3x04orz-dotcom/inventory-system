@@ -16,7 +16,16 @@ if (process.platform === 'darwin' && !process.env.SSL_CERT_FILE) {
   }
 }
 
-const globalPrisma = new PrismaClient();
+// @ts-ignore
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+const globalPrisma = globalForPrisma.prisma ?? new PrismaClient();
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = globalPrisma;
+}
 
 // Storage to hold the active TransactionClient during a transaction context
 const txStorage = new AsyncLocalStorage<Prisma.TransactionClient>();

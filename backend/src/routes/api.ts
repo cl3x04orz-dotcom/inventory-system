@@ -164,13 +164,14 @@ export async function apiRoutes(app: FastifyInstance) {
 
     const BACKUP_SECRET_KEY = process.env.BACKUP_SECRET_KEY || 'milipack_db_backup_secure_secret_2026_xyz';
     let isAuthorized = false;
+    let currentUser: any = null;
 
     if (secret && secret === BACKUP_SECRET_KEY) {
       isAuthorized = true;
     } else if (token) {
       try {
-        const user = jwt.verify(token, JWT_SECRET) as any;
-        if (user.role === 'BOSS') {
+        currentUser = jwt.verify(token, JWT_SECRET) as any;
+        if (currentUser.role === 'BOSS') {
           isAuthorized = true;
         }
       } catch (err) {
@@ -186,7 +187,8 @@ export async function apiRoutes(app: FastifyInstance) {
 
       // 動態載入 BackupService 避免循環依賴
       const { BackupService } = await import('../services/backup.service.js');
-      const excelBuffer = await BackupService.exportDatabaseToExcel();
+      const storeCode = currentUser && currentUser.role === 'BOSS' && !currentUser.storeCode ? 'MILI001' : (currentUser?.storeCode || 'MILI001');
+      const excelBuffer = await BackupService.exportDatabaseToExcel(storeCode);
 
       const timeStr = new Date().toISOString().replace(/[-:T]/g, '').substring(0, 14);
       const filename = `database_backup_${timeStr}.xlsx`;
