@@ -25,6 +25,12 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       return superadminService.getTenants(payload, user);
     case 'createTenant':
       return superadminService.createTenant(payload, user);
+    case 'updateTenant':
+      return superadminService.updateTenant(payload, user);
+    case 'deleteTenant':
+      return superadminService.deleteTenant(payload, user);
+    case 'impersonateTenant':
+      return superadminService.impersonateTenant(payload, user);
 
     // 1. 會員與權限 (User & Authentication)
     case 'login':
