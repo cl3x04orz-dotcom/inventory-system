@@ -80,6 +80,7 @@ export const PayrollService = {
       where: {
         salesRep: { equals: targetUser, mode: 'insensitive' },
         status: { not: 'VOID' },
+        storeCode: payload.storeCode,
         date: {
           gte: startOfMonth,
           lte: endOfMonth
@@ -129,7 +130,8 @@ export const PayrollService = {
 
     const records = await prisma.dailyRecord.findMany({
       where: {
-        username: { equals: targetUser, mode: 'insensitive' }
+        username: { equals: targetUser, mode: 'insensitive' },
+        storeCode: payload.storeCode
       },
       orderBy: { timestamp: 'asc' }
     });

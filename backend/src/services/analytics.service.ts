@@ -3,10 +3,11 @@ import { prisma } from '../database/context.js';
 export const AnalyticsService = {
   // 1. 利潤/毛利分析
   async getProfitAnalysis(payload: any) {
-    const { startDate, endDate, customer, salesRep } = payload;
+    const { startDate, endDate, customer, salesRep, storeCode } = payload;
 
     const where: any = {
-      status: { not: 'VOID' }
+      status: { not: 'VOID' },
+      storeCode
     };
 
     if (startDate || endDate) {
@@ -52,10 +53,10 @@ export const AnalyticsService = {
 
       sale.details.forEach((d: any) => {
         const pId = d.productId;
-        const pName = d.product.productName || pId;
+        const pName = d.product?.productName || pId;
         const qty = d.sold;
         const revenue = Number(d.subtotal) || 0;
-        const unitCost = Number(d.product.defaultPrice) || 0;
+        const unitCost = Number(d.product?.defaultPrice) || 0;
         const cost = qty * unitCost;
 
         if (!stats[pId]) {
@@ -84,9 +85,10 @@ export const AnalyticsService = {
 
   // 2. 銷售排行
   async getSalesRanking(payload: any) {
-    const { startDate, endDate } = payload;
+    const { startDate, endDate, storeCode } = payload;
     const where: any = {
-      status: { not: 'VOID' }
+      status: { not: 'VOID' },
+      storeCode
     };
 
     if (startDate || endDate) {
@@ -115,7 +117,7 @@ export const AnalyticsService = {
     list.forEach((sale: any) => {
       sale.details.forEach((d: any) => {
         const pId = d.productId;
-        const pName = d.product.productName || pId;
+        const pName = d.product?.productName || pId;
         const qty = d.sold;
         const amount = Number(d.subtotal) || 0;
 
@@ -132,9 +134,10 @@ export const AnalyticsService = {
 
   // 3. 客戶排行
   async getCustomerRanking(payload: any) {
-    const { startDate, endDate } = payload;
+    const { startDate, endDate, storeCode } = payload;
     const where: any = {
-      status: { not: 'VOID' }
+      status: { not: 'VOID' },
+      storeCode
     };
 
     if (startDate || endDate) {
@@ -169,10 +172,9 @@ export const AnalyticsService = {
 
   // 4. 客戶深度對比分析 (RFM + 雙時間段比較)
   async getCustomerAnalytics(payload: any) {
-    const { customer, baseStart, baseEnd, compStart, compEnd, mode } = payload;
-    if (!customer) throw new Error('未選取銀售對象');
+    const { customer, baseStart, baseEnd, compStart, compEnd, mode, storeCode } = payload;
+    if (!customer) throw new Error('未選取銷售對象');
 
-    // 支援 baseMonth/compareMonth 快速模式
     let bStart = baseStart ? new Date(baseStart + 'T00:00:00.000+08:00') : null;
     let bEnd   = baseEnd   ? new Date(baseEnd   + 'T23:59:59.999+08:00') : null;
     let cStart = compStart ? new Date(compStart + 'T00:00:00.000+08:00') : null;
@@ -191,20 +193,22 @@ export const AnalyticsService = {
 
     if (!bStart || !bEnd || !cStart || !cEnd) throw new Error('日期區間參數缺失');
 
-    // 擈出所有此客戶的鈤售單 (+ 明細)
     const salesList = await prisma.sales.findMany({
       where: {
         customer: { equals: customer, mode: 'insensitive' },
-        status: { not: 'VOID' }
+        status: { not: 'VOID' },
+        storeCode
       },
       include: { details: { include: { product: true } } },
       orderBy: { date: 'desc' }
     });
 
-    // 擈出品項排序權重
     const productOrderMap: Record<string, number> = {};
     const productNameMap: Record<string, string> = {};
-    const allProducts = await prisma.product.findMany({ select: { productId: true, productName: true, sortWeight: true } });
+    const allProducts = await prisma.product.findMany({
+      where: { storeCode },
+      select: { productId: true, productName: true, sortWeight: true }
+    });
     allProducts.forEach((p: any) => {
       productNameMap[p.productId] = p.productName || p.productId;
       productOrderMap[p.productId] = p.sortWeight ?? 99999;
@@ -230,7 +234,7 @@ export const AnalyticsService = {
         if (!matchedIds.has(sale.saleId)) return;
         sale.details.forEach((d: any) => {
           const pId = d.productId;
-          const returns = Number(d.picked) || 0;  // 退貨數量
+          const returns = Number(d.picked) || 0;
           const sold = Number(d.sold) || 0;
           const amount = Number(d.subtotal) || 0;
 

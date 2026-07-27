@@ -90,8 +90,10 @@ export const UserService = {
     };
   },
 
-  async getUsers() {
+  async getUsers(payload?: any, user?: any) {
+    const storeCode = payload?.storeCode || user?.storeCode;
     const list = await prisma.user.findMany({
+      where: storeCode ? { storeCode } : undefined,
       select: {
         userId: true,
         username: true,

@@ -527,6 +527,7 @@ export const SalesService = {
       where: {
         status: { not: 'VOID' },
         customer: { notIn: disabledNames },
+        storeCode,
         date: {
           gte: start,
           lte: end
@@ -920,6 +921,7 @@ export const SalesService = {
         where: {
           salary: { gt: 0 },
           paymentMethod: { not: 'TRANSFER' },
+          storeCode,
           paymentDate: {
             gte: expWhere.timestamp.gte,
             lte: expWhere.timestamp.lte
@@ -941,7 +943,8 @@ export const SalesService = {
       const cashFlowSaleIds = cashFlowExpenditures.map(e => e.saleId).filter(Boolean);
       const cashFlowSales = await prisma.sales.findMany({
         where: {
-          saleId: { in: cashFlowSaleIds }
+          saleId: { in: cashFlowSaleIds },
+          storeCode
         },
         select: {
           saleId: true,
@@ -1140,6 +1143,7 @@ export const SalesService = {
       where: {
         status: { not: 'VOID' },
         customer: { not: '' },
+        storeCode,
         date: { gte: since90 }
       },
       select: { customer: true, date: true }
@@ -1159,7 +1163,7 @@ export const SalesService = {
     // 取得系統所有不重複的客戶
     const allCustomerNames = new Set<string>(
       (await prisma.sales.findMany({
-        where: { customer: { not: '' } },
+        where: { customer: { not: '' }, storeCode },
         select: { customer: true },
         distinct: ['customer']
       })).map(s => s.customer).filter(Boolean) as string[]
@@ -1228,6 +1232,7 @@ export const SalesService = {
     let usersList: string[] = [];
     if (isCorrectionMode) {
       const users = await prisma.user.findMany({
+        where: storeCode ? { storeCode } : undefined,
         select: { username: true }
       });
       usersList = users.map(u => u.username);

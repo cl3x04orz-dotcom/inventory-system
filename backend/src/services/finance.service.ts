@@ -15,14 +15,13 @@ const formatLocalDay = (date: Date | null | undefined) => {
 export const FinanceService = {
   // 1. 取得支出歷史
   async getExpenditures(payload: any, user: any) {
-    const { startDate, endDate } = payload;
-    const where: any = {};
+    const { startDate, endDate, storeCode } = payload;
+    const where: any = { storeCode };
 
     // 時間範圍過濾
     if (startDate || endDate) {
       where.timestamp = {};
       if (startDate) {
-        // 前端傳入 2026-07-01，轉為台北時間 00:00:00 的 UTC 毫秒數
         where.timestamp.gte = new Date(startDate + 'T00:00:00.000+08:00');
       }
       if (endDate) {
@@ -31,7 +30,7 @@ export const FinanceService = {
     }
 
     // 權限過濾：非管理員且無財務權限者只能看自己的單
-    const hasFinancePerm = user.role === 'BOSS' ||
+    const hasFinancePerm = user.role === 'BOSS' || user.role === 'SUPER_ADMIN' ||
       (user.permissions && user.permissions.some((p: string) => p === 'finance' || p.startsWith('finance_')));
 
     if (!hasFinancePerm) {
@@ -59,7 +58,7 @@ export const FinanceService = {
       others: Number(item.others) || 0,
       linePay: Number(item.linePay) || 0,
       serviceFee: Number(item.serviceFee) || 0,
-      finalTotal: Number(item.totalDeductions) || 0, // 對應總額
+      finalTotal: Number(item.totalDeductions) || 0,
       customer: item.customer || '',
       salesRep: item.salesRep || '',
       date: formatLocalDate(item.timestamp),
@@ -77,14 +76,13 @@ export const FinanceService = {
   async saveExpenditure(payload: any) {
     try {
       const saleId = 'exp_' + Math.random().toString(36).substring(2, 10);
-      
-      // 計算記帳日期
+      const storeCode = payload.storeCode || 'MILI001';
+
       let timestamp = new Date();
       if (payload.customDate) {
         timestamp = new Date(payload.customDate + 'T12:00:00.000+08:00');
       }
 
-      // 實際付款日期
       let paymentDate = null;
       if (payload.paymentDate) {
         paymentDate = new Date(payload.paymentDate + 'T12:00:00.000+08:00');
@@ -93,6 +91,7 @@ export const FinanceService = {
       await prisma.expenditure.create({
         data: {
           saleId,
+          storeCode,
           stall: Number(payload.stall) || 0,
           cleaning: Number(payload.cleaning) || 0,
           electricity: Number(payload.electricity) || 0,
@@ -124,29 +123,28 @@ export const FinanceService = {
 
   // 3. 將薪資存檔至 Expenditures
   async savePayrollToExpenditure(payload: any, user: any) {
-    if (user.role !== 'BOSS' && user.role !== 'ADMIN') {
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
       throw new Error('權限不足：只有管理員可以存檔薪資');
     }
 
-    const { targetUser, year, month, finalSalary, paymentMethod, paymentDate } = payload;
+    const { targetUser, year, month, finalSalary, paymentMethod, paymentDate, storeCode } = payload;
     if (!targetUser || !year || !month || finalSalary === undefined) {
       throw new Error('缺少必要參數');
     }
 
     const targetNote = `${year}年${month}月薪資結算`;
 
-    // 搜尋是否已有該月同人的薪資記錄
     const existing = await prisma.expenditure.findFirst({
       where: {
         note: targetNote,
-        salesRep: targetUser
+        salesRep: targetUser,
+        storeCode
       }
     });
 
     const parsedPaymentDate = paymentDate ? new Date(paymentDate + 'T12:00:00.000+08:00') : new Date();
 
     if (existing) {
-      // 覆蓋模式 (Update)
       await prisma.expenditure.update({
         where: { saleId: existing.saleId },
         data: {
@@ -154,20 +152,18 @@ export const FinanceService = {
           totalDeductions: Number(finalSalary),
           paymentMethod: paymentMethod || 'CASH',
           paymentDate: parsedPaymentDate,
-          timestamp: new Date() // 更新記帳戳記
+          timestamp: new Date()
         }
       });
       return { success: true, message: `已更新 ${year}/${month} 薪資記錄 (覆蓋舊檔)` };
     } else {
-      // 新增模式
       const saleId = 'exp_' + Math.random().toString(36).substring(2, 10);
-      
-      // 記帳日期 = 該會計月份最後一天 (台北時間中午 12 點，避免跨天 UTC 偏差)
       const lastDayOfMonth = new Date(year, month, 0, 12, 0, 0);
 
       await prisma.expenditure.create({
         data: {
           saleId,
+          storeCode: storeCode || 'MILI001',
           salary: Number(finalSalary),
           totalDeductions: Number(finalSalary),
           paymentMethod: paymentMethod || 'CASH',
@@ -176,7 +172,6 @@ export const FinanceService = {
           customer: targetUser,
           note: targetNote,
           timestamp: lastDayOfMonth,
-          // 其他費用為 0
           stall: 0,
           cleaning: 0,
           electricity: 0,
