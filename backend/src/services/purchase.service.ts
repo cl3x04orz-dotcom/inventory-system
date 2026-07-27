@@ -16,9 +16,10 @@ export const PurchaseService = {
   // 1. 取得進貨建議 (廠商清單 + 廠商-產品 map + 最新單價 + 預設付款)
   //    移植自 getPurchaseSuggestionsService()
   // ============================================================
-  async getPurchaseSuggestions() {
+  async getPurchaseSuggestions(payload: any = {}) {
+    const { storeCode } = payload;
     const purchases = await prisma.purchase.findMany({
-      where: { status: { not: 'VOID' } },
+      where: { status: { not: 'VOID' }, storeCode },
       orderBy: { date: 'asc' }, // asc 讓後面的蓋掉前面（最新）
       select: {
         vendor: true,
@@ -31,6 +32,7 @@ export const PurchaseService = {
 
     // [New] 自動將歷史進貨出現的廠商同步至 Vendor 資料表（避免空表無處設定）
     const dbVendors = await prisma.vendor.findMany({
+      where: { storeCode },
       orderBy: { sortWeight: 'asc' },
       select: { vendorName: true, isActive: true }
     });
@@ -46,12 +48,14 @@ export const PurchaseService = {
         data: Array.from(missingVendors).map(name => ({
           vendorName: name,
           isActive: true,
-          paymentMethod: 'CASH'
+          paymentMethod: 'CASH',
+          storeCode
         })),
         skipDuplicates: true
       });
       // 重新加載最新廠商列表並按 sortWeight 排序
       const updatedVendors = await prisma.vendor.findMany({
+        where: { storeCode },
         orderBy: { sortWeight: 'asc' },
         select: { vendorName: true, isActive: true }
       });
@@ -63,6 +67,7 @@ export const PurchaseService = {
 
     // 取得所有產品名稱（包含已停售的，以防後台篩選時停售商品消失）
     const products = await prisma.product.findMany({
+      where: { storeCode },
       select: { productId: true, productName: true }
     });
     const activeProductNames = new Set(products.map(p => p.productName));
@@ -93,7 +98,7 @@ export const PurchaseService = {
     }
 
     // 廠商預設付款方式（從 VendorDefault 表讀取）
-    const vendorDefaults = await this._getVendorDefaults();
+    const vendorDefaults = await this._getVendorDefaults(storeCode);
 
     const vendorProductMap: Record<string, string[]> = {};
     for (const v in vpMap) {
@@ -102,7 +107,7 @@ export const PurchaseService = {
 
     // [New] 依照資料庫自訂的 sortWeight 順序輸出廠商，不使用強制 alphabet 排序
     const sortedActiveVendors = dbVendors
-      .filter(v => v.isActive && vendors.has(v.vendorName))
+      .filter(v => v.isActive)
       .map(v => v.vendorName);
 
     return {
@@ -118,13 +123,13 @@ export const PurchaseService = {
   // ============================================================
 
   async addPurchase(payload: any, user: any) {
-    const { submissionId, items: rawItems, operator, newProductSettings = {} } = payload;
+    const { submissionId, items: rawItems, operator, newProductSettings = {}, storeCode } = payload;
 
     return runInTransaction(async () => {
       // 防重複提交：用 DB 本身做冪等性檢查
       if (submissionId) {
         const exists = await prisma.purchase.findFirst({
-          where: { status: { in: ['PAID', 'CREDIT', 'ORDERED', 'UNPAID'] }, purchaseId: { contains: submissionId } }
+          where: { status: { in: ['PAID', 'CREDIT', 'ORDERED', 'UNPAID'] }, purchaseId: { contains: submissionId }, storeCode }
         });
       }
 
@@ -134,6 +139,7 @@ export const PurchaseService = {
 
       // 查現有產品 (productName → productId)
       const existingProducts = await prisma.product.findMany({
+        where: { storeCode },
         select: { productId: true, productName: true }
       });
       const nameToId: Record<string, string> = {};
@@ -170,7 +176,8 @@ export const PurchaseService = {
               productName: itemName,
               category: 'General',
               defaultPrice: itemPrice,
-              isActive: false
+              isActive: false,
+              storeCode
             }
           });
         }
@@ -194,7 +201,8 @@ export const PurchaseService = {
             buyer: finalOperator,
             operator: finalOperator,
             paymentMethod: itemMethod,
-            status: itemStatus
+            status: itemStatus,
+            storeCode
           }
         });
 
@@ -208,7 +216,8 @@ export const PurchaseService = {
             expiryDate,
             entryDate,
             type: 'STOCK',
-            cost: itemPrice
+            cost: itemPrice,
+            storeCode
           }
         });
 
@@ -221,15 +230,15 @@ export const PurchaseService = {
   // 3. 廠商預設付款方式
   // ============================================================
   async saveVendorDefault(payload: any) {
-    const { vendor, method } = payload;
+    const { vendor, method, storeCode } = payload;
     if (!vendor) throw new Error('缺乏廠商名稱');
 
     const vName = vendor.trim();
     const mType = (method || 'CASH').trim();
 
     // 更新 Vendor 資料表，使預設付款永久保存
-    await prisma.vendor.update({
-      where: { vendorName: vName },
+    await prisma.vendor.updateMany({
+      where: { vendorName: vName, storeCode },
       data: { paymentMethod: mType }
     });
 
@@ -240,8 +249,9 @@ export const PurchaseService = {
   // ============================================================
   // 內部：取得廠商預設付款
   // ============================================================
-  async _getVendorDefaults(): Promise<Record<string, string>> {
+  async _getVendorDefaults(storeCode?: string): Promise<Record<string, string>> {
     const list = await prisma.vendor.findMany({
+      where: storeCode ? { storeCode } : undefined,
       select: { vendorName: true, paymentMethod: true }
     });
     const defaults: Record<string, string> = {};
@@ -255,9 +265,9 @@ export const PurchaseService = {
   // 4. 進貨查詢
   // ============================================================
   async getPurchaseHistory(payload: any) {
-    const { startDate, endDate, keyword } = payload;
+    const { startDate, endDate, keyword, storeCode } = payload;
 
-    const where: any = { status: { not: 'VOID' } };
+    const where: any = { status: { not: 'VOID' }, storeCode };
 
     if (startDate || endDate) {
       where.date = {};
@@ -318,12 +328,12 @@ export const PurchaseService = {
   // 5. 作廢進貨 (移植自 voidAndFetchPurchaseService())
   // ============================================================
   async voidAndFetchPurchase(payload: any, user: any) {
-    const { id } = payload;
+    const { id, storeCode } = payload;
     if (!id) throw new Error('缺少單據 ID');
 
     return runInTransaction(async () => {
       const purchase = await prisma.purchase.findFirst({
-        where: { purchaseId: id }
+        where: { purchaseId: id, storeCode }
       });
       if (!purchase) throw new Error('找不到進貨紀錄');
       if (purchase.status === 'VOID') throw new Error('此單據已作廢');
@@ -331,8 +341,8 @@ export const PurchaseService = {
       const opName = user ? (user.username || user.displayName || 'Unknown') : 'Unknown';
 
       // 1. 標記 VOID
-      await prisma.purchase.update({
-        where: { purchaseId: id },
+      await prisma.purchase.updateMany({
+        where: { purchaseId: id, storeCode },
         data: { status: 'VOID', operator: `VOID_BY: ${opName}` }
       });
 
@@ -347,7 +357,8 @@ export const PurchaseService = {
             expiryDate: purchase.expiryDate,
             entryDate: new Date(),
             type: 'STOCK',
-            cost: purchase.unitPrice
+            cost: purchase.unitPrice,
+            storeCode
           }
         });
       }
@@ -371,12 +382,12 @@ export const PurchaseService = {
   // 6. 確認進貨到貨 (實收驗收) (移植自 confirmPurchaseReceipt())
   // ============================================================
   async confirmPurchaseReceipt(payload: any, user: any) {
-    const { id, actualQty, actualPrice } = payload;
+    const { id, actualQty, actualPrice, storeCode } = payload;
     if (!id) throw new Error('缺少單據 ID');
 
     return runInTransaction(async () => {
       const purchase = await prisma.purchase.findFirst({
-        where: { purchaseId: id }
+        where: { purchaseId: id, storeCode }
       });
       if (!purchase) throw new Error('找不到該筆在途叫貨紀錄');
       if (purchase.status !== 'ORDERED') throw new Error('此單據非待驗收狀態，或已驗收過');
@@ -395,8 +406,8 @@ export const PurchaseService = {
       const newNote = `[下單:${oldDateStr}] [驗收:${operatorName}] ${oldNote}`.trim();
 
       // 1. 更新 Purchase 狀態與實到數量、單價
-      await prisma.purchase.update({
-        where: { purchaseId: id },
+      await prisma.purchase.updateMany({
+        where: { purchaseId: id, storeCode },
         data: {
           date: verifyDate,
           quantity: finalQty,
@@ -417,13 +428,14 @@ export const PurchaseService = {
             expiryDate: purchase.expiryDate,
             entryDate: verifyDate,
             type: 'STOCK',
-            cost: finalPrice
+            cost: finalPrice,
+            storeCode
           }
         });
 
         // 3. 更新 Product 最新成本
-        await prisma.product.update({
-          where: { productId: purchase.productId },
+        await prisma.product.updateMany({
+          where: { productId: purchase.productId, storeCode },
           data: { defaultPrice: finalPrice }
         });
       }
@@ -432,14 +444,16 @@ export const PurchaseService = {
     });
   },
 
-  async getVendors() {
+  async getVendors(payload: any = {}) {
+    const { storeCode } = payload;
     return await prisma.vendor.findMany({
+      where: { storeCode },
       orderBy: { sortWeight: 'asc' }
     });
   },
 
   async updateVendorSortOrder(payload: any) {
-    const { vendorNames } = payload;
+    const { vendorNames, storeCode } = payload;
     if (!vendorNames || !Array.isArray(vendorNames) || vendorNames.length === 0) {
       throw new Error('缺少廠商排序名單');
     }
@@ -450,7 +464,7 @@ export const PurchaseService = {
       UPDATE "Vendor" AS v
       SET "sortWeight" = val.weight
       FROM (VALUES ${values}) AS val(name, weight)
-      WHERE v."vendorName" = val.name
+      WHERE v."vendorName" = val.name AND v."storeCode" = '${storeCode || 'MILI001'}'
     `;
 
     await prisma.$executeRawUnsafe(sql);
@@ -458,10 +472,10 @@ export const PurchaseService = {
   },
 
   async updateVendorStatus(payload: any) {
-    const { vendorName, isActive } = payload;
+    const { vendorName, isActive, storeCode } = payload;
     if (!vendorName) throw new Error('廠商名稱為必填');
-    await prisma.vendor.update({
-      where: { vendorName },
+    await prisma.vendor.updateMany({
+      where: { vendorName, storeCode },
       data: { isActive }
     });
     return { success: true };

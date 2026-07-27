@@ -71,7 +71,7 @@ export const PayrollService = {
 
     // 撈出批發客戶名單
     const wholesaleCustomers = await prisma.customer.findMany({
-      where: { category: '批發' },
+      where: { category: '批發', storeCode: payload.storeCode },
       select: { customerName: true }
     });
     const wholesaleSet = new Set(wholesaleCustomers.map((c: any) => c.customerName.trim().toLowerCase()));

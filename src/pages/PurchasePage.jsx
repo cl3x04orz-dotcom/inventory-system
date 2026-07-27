@@ -104,7 +104,11 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
                 }
             })
         );
-        return Array.from(allProducts);
+        // 如果有歷史產品，顯示歷史產品；否則直接顯示全部產品
+        if (allProducts.size > 0) {
+            return Array.from(allProducts);
+        }
+        return Array.from(activeSet);
     };
 
     const handleItemChange = (id, field, value) => {

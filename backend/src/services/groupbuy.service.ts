@@ -949,7 +949,7 @@ export const GroupBuyService = {
     // 如果使用錢包扣抵
     if (useWalletDeduction && lineUserId) {
       await prisma.$transaction(async (tx) => {
-        const member = await tx.member.findUnique({ where: { memberId: lineUserId } });
+        const member = await tx.member.findUnique({ where: { memberId_storeCode: { memberId: lineUserId, storeCode: payload.storeCode || 'MILI001' } } });
         if (member) {
           const balance = Number(member.walletBalance);
           const maxDeduction = Math.min(balance, totalAmount);
@@ -957,7 +957,7 @@ export const GroupBuyService = {
             deductionApplied = maxDeduction;
             // 扣除餘額
             await tx.member.update({
-              where: { memberId: lineUserId },
+              where: { memberId_storeCode: { memberId: lineUserId, storeCode: payload.storeCode || 'MILI001' } },
               data: {
                 walletBalance: {
                   decrement: maxDeduction
@@ -968,6 +968,7 @@ export const GroupBuyService = {
             await tx.walletTransaction.create({
               data: {
                 memberId: lineUserId,
+                storeCode: payload.storeCode || 'MILI001',
                 amount: -maxDeduction,
                 type: 'ORDER_PAY',
                 description: `消費扣抵 訂單 ${orderId}`
@@ -1106,12 +1107,12 @@ export const GroupBuyService = {
 
   // 13. LIFF V1 取得個人訂單列表
   async v1_getOrders(payload: any, user: any) {
-    const { userId } = payload;
+    const { userId, storeCode } = payload;
     if (!userId) throw new Error('缺少 userId');
 
     // 1. 查找該 LINE 使用者在 Member 資料庫中的資料
     const member = await prisma.member.findUnique({
-      where: { memberId: String(userId).trim() }
+      where: { memberId_storeCode: { memberId: String(userId).trim(), storeCode: storeCode || 'MILI001' } }
     });
 
     const conditions: any[] = [
@@ -1225,7 +1226,7 @@ export const GroupBuyService = {
 
   // 14. LIFF V1 重新下單 (取得舊單資訊)
   async v1_reorder(payload: any, user: any) {
-    const { orderId, userId } = payload;
+    const { orderId, userId, storeCode } = payload;
     if (!orderId) throw new Error('缺少 orderId');
 
     const o = await prisma.groupBuyOrder.findUnique({
@@ -1253,7 +1254,7 @@ export const GroupBuyService = {
       }));
     } else {
       const member = await prisma.member.findUnique({
-        where: { memberId: String(userId).trim() }
+        where: { memberId_storeCode: { memberId: String(userId).trim(), storeCode: storeCode || 'MILI001' } }
       });
       const names = member ? [member.receiverName, member.displayName].filter(Boolean) as string[] : [];
       const myRecipient = o.recipients?.find((r: any) => names.includes(r.recipientName));
@@ -1279,17 +1280,18 @@ export const GroupBuyService = {
 
   // 15. LIFF V1 取得/註冊會員資料
   async v1_getMember(payload: any, user: any) {
-    const { userId, displayName, pictureUrl } = payload;
+    const { userId, displayName, pictureUrl, storeCode } = payload;
     if (!userId) throw new Error('缺少 userId');
 
     const m = await prisma.member.upsert({
-      where: { memberId: userId },
+      where: { memberId_storeCode: { memberId: userId, storeCode: storeCode || 'MILI001' } },
       update: {
         displayName: displayName || undefined,
         pictureUrl: pictureUrl || undefined
       },
       create: {
         memberId: userId,
+        storeCode: storeCode || 'MILI001',
         displayName: displayName || '',
         pictureUrl: pictureUrl || '',
         walletBalance: 0,
@@ -1313,11 +1315,11 @@ export const GroupBuyService = {
 
   // 16. LIFF V1 保存會員基本資料
   async v1_saveMember(payload: any, user: any) {
-    const { userId, receiverName, phone } = payload;
+    const { userId, receiverName, phone, storeCode } = payload;
     if (!userId) throw new Error('缺少 userId');
 
     await prisma.member.update({
-      where: { memberId: userId },
+      where: { memberId_storeCode: { memberId: userId, storeCode: storeCode || 'MILI001' } },
       data: {
         receiverName: receiverName || undefined,
         phone: phone || undefined
@@ -1329,9 +1331,11 @@ export const GroupBuyService = {
 
   // 17. 後台管理員獲取所有會員列表
   async admin_getMembers(payload: any, user: any) {
+    const { storeCode } = payload;
     if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
 
     const members = await prisma.member.findMany({
+      where: { storeCode: storeCode || 'MILI001' },
       orderBy: { createdAt: 'desc' },
       include: {
         transactions: {
@@ -1342,7 +1346,7 @@ export const GroupBuyService = {
 
     const list = await Promise.all(members.map(async (m) => {
       const orderStats = await prisma.groupBuyOrder.aggregate({
-        where: { customerLineId: m.memberId },
+        where: { customerLineId: m.memberId, storeCode: storeCode || 'MILI001' },
         _count: { orderId: true },
         _sum: { totalAmount: true }
       });
@@ -1374,18 +1378,18 @@ export const GroupBuyService = {
   // 18. 後台管理員調整餘額/手動儲值
   async admin_adjustWallet(payload: any, user: any) {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
-    const { memberId, amount, description } = payload;
+    const { memberId, amount, description, storeCode } = payload;
     if (!memberId) throw new Error('缺少 memberId');
 
     const adjustAmount = Number(amount);
     if (isNaN(adjustAmount)) throw new Error('金額格式不正確');
 
     await prisma.$transaction(async (tx) => {
-      const m = await tx.member.findUnique({ where: { memberId } });
+      const m = await tx.member.findUnique({ where: { memberId_storeCode: { memberId, storeCode: storeCode || 'MILI001' } } });
       if (!m) throw new Error('找不到該會員');
 
       await tx.member.update({
-        where: { memberId },
+        where: { memberId_storeCode: { memberId, storeCode: storeCode || 'MILI001' } },
         data: {
           walletBalance: {
             increment: adjustAmount
@@ -1396,6 +1400,7 @@ export const GroupBuyService = {
       await tx.walletTransaction.create({
         data: {
           memberId,
+          storeCode: storeCode || 'MILI001',
           amount: adjustAmount,
           type: adjustAmount >= 0 ? 'DEPOSIT' : 'ADJUST',
           description: description || (adjustAmount >= 0 ? '管理員手動儲值' : '管理員扣抵調整')

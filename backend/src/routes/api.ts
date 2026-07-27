@@ -122,8 +122,26 @@ export async function apiRoutes(app: FastifyInstance) {
     }
 
     try {
-      // 3. Inject operator and metadata into payload (from Code.gs)
+      // 3. Store Middleware (Store Resolver)
+      // 解析目前的 storeCode，這將作為後續所有 DB 查詢的隔離邊界
+      let currentStoreCode = 'MILI001';
+      
+      if (user && user.storeCode) {
+        // 未來：從 JWT 取得 storeCode (最安全)
+        currentStoreCode = user.storeCode;
+      } else if (payload && payload.storeCode) {
+        // 過渡期或公開 API：從 payload 取得 (例如登入或點餐頁)
+        currentStoreCode = payload.storeCode;
+      }
+
+      // 確保傳給 Controller 的 user 與 payload 絕對帶有 storeCode
+      if (user) {
+        user.storeCode = currentStoreCode;
+      }
+
+      // 4. Inject operator and metadata into payload
       const enrichedPayload = payload ? { ...payload } : {};
+      enrichedPayload.storeCode = currentStoreCode;
       enrichedPayload.serverTimestamp = new Date();
       if (!enrichedPayload.operator) {
         enrichedPayload.operator = user ? (user.displayName || user.name || user.username || 'Unknown') : 'System';
@@ -131,7 +149,7 @@ export async function apiRoutes(app: FastifyInstance) {
       enrichedPayload.userRole = user ? user.role : 'Guest';
       enrichedPayload.rawToken = token;
 
-      // 4. Route to Controller
+      // 5. Route to Controller
       const result = await apiRouter(trimmedAction, enrichedPayload, user);
       return result;
     } catch (error: any) {

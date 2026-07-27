@@ -31,8 +31,8 @@ function formatExpiryDate(val: string | null | undefined): string {
 
 export const ProductService = {
   async getProducts(payload: any = {}) {
-    const { activeOnly, purchasableOnly } = payload;
-    const whereClause: any = {};
+    const { activeOnly, purchasableOnly, storeCode } = payload;
+    const whereClause: any = { storeCode }; // 強制隔離
     if (activeOnly) {
       whereClause.isActive = true;
     }
@@ -49,6 +49,7 @@ export const ProductService = {
     // 2. Perform GroupBy on Inventory to calculate stock levels
     const stockAgg = await prisma.inventory.groupBy({
       by: ['productId', 'type'],
+      where: { storeCode }, // 強制隔離庫存計算
       _sum: {
         quantity: true
       }
@@ -117,10 +118,17 @@ export const ProductService = {
     });
   },
 
-  async getProductStock(productId: string) {
-    if (!productId) throw new Error('缺少 productId');
-    const p = await prisma.product.findUnique({
-      where: { productId: String(productId).trim() },
+  async getProductStock(payload: any) {
+    const { productId, id, storeCode } = payload;
+    const targetId = productId || id;
+    if (!targetId) throw new Error('缺少 productId');
+    
+    // 改用 findFirst 以支援非 unique 的 storeCode 過濾
+    const p = await prisma.product.findFirst({
+      where: { 
+        productId: String(targetId).trim(),
+        storeCode: storeCode
+      },
       select: { productId: true, productName: true, maxTotalQty: true, soldQty: true }
     });
     if (!p) throw new Error('商品不存在');
@@ -153,7 +161,7 @@ export const ProductService = {
       UPDATE "Product" AS p
       SET "sortWeight" = temp.weight
       FROM (VALUES ${valuesClause}) AS temp(id, weight)
-      WHERE p."productId" = temp.id
+      WHERE p."productId" = temp.id AND p."storeCode" = '${String(payload.storeCode).replace(/'/g, "''")}'
     `);
 
     return { success: true, updateCount: productIds.length };
@@ -216,8 +224,8 @@ export const ProductService = {
       }
     }
 
-    const oldProduct = await prisma.product.findUnique({
-      where: { productId: String(productId).trim() },
+    const oldProduct = await prisma.product.findFirst({
+      where: { productId: String(productId).trim(), storeCode: payload.storeCode },
       select: { maxTotalQty: true }
     });
 
@@ -229,8 +237,8 @@ export const ProductService = {
       }
     }
 
-    await prisma.product.update({
-      where: { productId: String(productId).trim() },
+    await prisma.product.updateMany({
+      where: { productId: String(productId).trim(), storeCode: payload.storeCode },
       data: {
         isActive: isActive !== undefined ? Boolean(isActive) : undefined,
         imageUrl: imageUrl !== undefined ? String(imageUrl) : undefined,
@@ -270,8 +278,8 @@ export const ProductService = {
     const { productId, isPurchasable } = payload;
     if (!productId) throw new Error('缺少 productId');
 
-    await prisma.product.update({
-      where: { productId: String(productId).trim() },
+    await prisma.product.updateMany({
+      where: { productId: String(productId).trim(), storeCode: payload.storeCode },
       data: { isPurchasable: Boolean(isPurchasable) }
     });
 
@@ -283,7 +291,8 @@ export async function verifyAndDeductProductQuota(
   tx: any,
   items: Array<{ productId: string; qty: number }>,
   communityId?: string,
-  communityName?: string
+  communityName?: string,
+  storeCode?: string
 ) {
   if (!items || !Array.isArray(items)) return;
 
@@ -294,8 +303,11 @@ export async function verifyAndDeductProductQuota(
     const requestedQty = Number(item.qty || 0);
     if (requestedQty <= 0) continue;
 
-    const prod = await tx.product.findUnique({
-      where: { productId: pid },
+    const prod = await tx.product.findFirst({
+      where: { 
+        productId: pid,
+        ...(storeCode ? { storeCode } : {})
+      },
       select: { productId: true, productName: true, maxTotalQty: true, soldQty: true, communityQuotas: true }
     });
 
@@ -320,8 +332,11 @@ export async function verifyAndDeductProductQuota(
         soldQty: currentSold + requestedQty
       };
 
-      await tx.product.update({
-        where: { productId: pid },
+      await tx.product.updateMany({
+        where: { 
+          productId: pid,
+          ...(storeCode ? { storeCode } : {})
+        },
         data: {
           communityQuotas: cQuotas,
           soldQty: { increment: requestedQty }
@@ -333,8 +348,11 @@ export async function verifyAndDeductProductQuota(
 
     // B. 全局無上限商品
     if (prod.maxTotalQty === null || prod.maxTotalQty === undefined) {
-      await tx.product.update({
-        where: { productId: pid },
+      await tx.product.updateMany({
+        where: { 
+          productId: pid,
+          ...(storeCode ? { storeCode } : {})
+        },
         data: { soldQty: { increment: requestedQty } }
       });
       continue;
@@ -352,7 +370,8 @@ export async function verifyAndDeductProductQuota(
     const upd = await tx.product.updateMany({
       where: {
         productId: pid,
-        soldQty: { lte: limit - requestedQty }
+        soldQty: { lte: limit - requestedQty },
+        ...(storeCode ? { storeCode } : {})
       },
       data: {
         soldQty: { increment: requestedQty }

@@ -75,7 +75,8 @@ export const UserService = {
       username: user.username,
       role: user.role,
       permissions,
-      gasToken
+      gasToken,
+      storeCode: user.storeCode
     };
 
     const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '12h' });
@@ -227,7 +228,8 @@ export const UserService = {
       username: dbUser.username,
       role: dbUser.role,
       permissions,
-      gasToken: user.gasToken || '' // 保留舊 gasToken
+      gasToken: user.gasToken || '', // 保留舊 gasToken
+      storeCode: dbUser.storeCode
     };
 
     const newToken = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '12h' });

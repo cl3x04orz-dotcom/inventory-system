@@ -39,7 +39,8 @@ export const SalesService = {
       submissionId,
       originalDate,
       workHours,
-      weather
+      weather,
+      storeCode
     } = payload;
 
     // 業務人員與操作人員決定 (與 Apps Script 一致)
@@ -73,7 +74,8 @@ export const SalesService = {
           paymentMethod: method,
           status: status,
           workHours: Number(workHours || 0),
-          cashCounts: payload.cashCounts || {}
+          cashCounts: payload.cashCounts || {},
+          storeCode
         }
       });
 
@@ -113,7 +115,8 @@ export const SalesService = {
           reserve: Number(expenseData.reserveFund || expenseData.reserve || 0),
           note: finalNote,
           paymentMethod: 'CASH',
-          paymentDate: today
+          paymentDate: today,
+          storeCode
         }
       });
 
@@ -137,7 +140,8 @@ export const SalesService = {
             returnQty: returns,
             sold,
             unitPrice: Number(item.unitPrice || 0),
-            subtotal: sold * Number(item.unitPrice || 0)
+            subtotal: sold * Number(item.unitPrice || 0),
+            storeCode
           }
         });
 
@@ -145,13 +149,12 @@ export const SalesService = {
         let consumedBatches: Array<{ expiryDate: Date | null; quantity: number }> = [];
 
         if (picked > 0) {
-          consumedBatches = await deductInventory(item.productId, picked, 'STOCK');
+          consumedBatches = await deductInventory(item.productId, picked, 'STOCK', storeCode);
         }
         if (original > 0) {
-          await deductInventory(item.productId, original, 'ORIGINAL');
-        }
-
-        // 處理退貨 (寫入回原批次的退回紀錄)
+          const cb = await deductInventory(item.productId, original, 'ORIGINAL', storeCode);
+          consumedBatches.push(...cb);
+        }// 處理退貨 (寫入回原批次的退回紀錄)
         if (returns > 0) {
           let remainingReturn = returns;
 
@@ -206,18 +209,18 @@ export const SalesService = {
 
   // 獲取單據明細用於修正/複製
   async getSaleToClone(payload: any) {
-    const { saleId } = payload;
+    const { saleId, storeCode } = payload;
     if (!saleId) throw new Error('缺少銷售編號');
 
-    const sale = await prisma.sales.findUnique({
-      where: { saleId },
+    const sale = await prisma.sales.findFirst({
+      where: { saleId, storeCode },
       include: { details: { include: { product: true } } }
     });
 
     if (!sale) throw new Error('找不到銷售紀錄');
 
-    const expenditure = await prisma.expenditure.findUnique({
-      where: { saleId }
+    const expenditure = await prisma.expenditure.findFirst({
+      where: { saleId, storeCode }
     });
 
     let goodsVendor = '';
@@ -308,14 +311,14 @@ export const SalesService = {
 
   // 銷售作廢
   async voidAndFetchSale(payload: any, user: any) {
-    const { saleId } = payload;
+    const { saleId, storeCode } = payload;
     if (!saleId) throw new Error('缺少銷售編號');
 
     const isAdmin = user && (user.role === 'BOSS' || user.role === 'ADMIN');
 
     return runInTransaction(async () => {
-      const sale = await prisma.sales.findUnique({
-        where: { saleId },
+      const sale = await prisma.sales.findFirst({
+        where: { saleId, storeCode },
         include: { details: { include: { product: true } } }
       });
 
@@ -332,16 +335,16 @@ export const SalesService = {
       }
 
       // 1. 將 Sales 狀態改為 VOID
-      await prisma.sales.update({
-        where: { saleId },
+      await prisma.sales.updateMany({
+        where: { saleId, storeCode },
         data: { status: 'VOID' }
       });
 
       // 2. 將 Expenditure 備註加上 [VOID]
-      const expenditure = await prisma.expenditure.findUnique({ where: { saleId } });
+      const expenditure = await prisma.expenditure.findFirst({ where: { saleId, storeCode } });
       if (expenditure) {
-        await prisma.expenditure.update({
-          where: { saleId },
+        await prisma.expenditure.updateMany({
+          where: { saleId, storeCode },
           data: { note: `[VOID] ${expenditure.note || ''}` }
         });
       }
@@ -365,7 +368,8 @@ export const SalesService = {
               entryDate: today,
               type: 'STOCK',
               cost: 0,
-              productName: d.product.productName
+              productName: d.product.productName,
+              storeCode
             }
           });
         }
@@ -379,14 +383,15 @@ export const SalesService = {
               entryDate: today,
               type: 'ORIGINAL',
               cost: 0,
-              productName: d.product.productName
+              productName: d.product.productName,
+              storeCode
             }
           });
         }
 
         // 退貨作廢扣回
         if (d.returnQty > 0) {
-          await deductInventory(d.productId, d.returnQty, 'ORIGINAL');
+          await deductInventory(d.productId, d.returnQty, 'ORIGINAL', storeCode);
         }
       }
 
@@ -396,7 +401,7 @@ export const SalesService = {
 
   // 獲取歷史紀錄 (終極優化：原生 Raw SQL 關聯查詢，全資料一鍵秒開)
   async getSalesHistory(payload: any, user: any = null) {
-    const { startDate, endDate } = payload;
+    const { startDate, endDate, storeCode } = payload;
     
     let query = `
       SELECT 
@@ -418,11 +423,11 @@ export const SalesService = {
       FROM "SalesDetail" d
       JOIN "Sales" s ON d."saleId" = s."saleId"
       JOIN "Product" p ON d."productId" = p."productId"
-      WHERE s.status <> 'VOID'
+      WHERE s.status <> 'VOID' AND s."storeCode" = $1
     `;
 
-    const params: any[] = [];
-    let paramIdx = 1;
+    const params: any[] = [storeCode];
+    let paramIdx = 2;
 
     let start: Date | null = null;
     let end: Date | null = null;
@@ -503,7 +508,7 @@ export const SalesService = {
 
   // 獲取指定日期範圍的銷售紀錄 (用於合併列印)
   async getSalesByDateRange(payload: any) {
-    const { startDate, endDate } = payload;
+    const { startDate, endDate, storeCode } = payload;
     if (!startDate || !endDate) return [];
 
     const start = new Date(startDate);
@@ -513,7 +518,7 @@ export const SalesService = {
     end.setHours(23, 59, 59, 999);
 
     const disabledCustomers = await prisma.customer.findMany({
-      where: { isAiEnabled: false },
+      where: { isAiEnabled: false, storeCode },
       select: { customerName: true }
     });
     const disabledNames = disabledCustomers.map(c => c.customerName || '');
@@ -575,13 +580,13 @@ export const SalesService = {
 
   // AI 智慧補貨建議 (移植自 Sales_AI.gs - 支援箱數進位與發貨階梯)
   async getSmartPickSuggestion(payload: any) {
-    const { customer, dayOfWeek, weather, currentOriginals = {} } = payload;
+    const { customer, dayOfWeek, weather, currentOriginals = {}, storeCode } = payload;
     const PICK_ROUND_THRESHOLD = 99; // 預設進位門檻
 
     // 1. 查倉庫庫存 (STOCK 類型加總)
     const stockAgg = await prisma.inventory.groupBy({
       by: ['productId'],
-      where: { type: 'STOCK' },
+      where: { type: 'STOCK', storeCode },
       _sum: { quantity: true }
     });
     const warehouseStockMap: Record<string, number> = {};
@@ -614,7 +619,8 @@ export const SalesService = {
       where: {
         customer: customer,
         status: { not: 'VOID' },
-        date: { gte: since }
+        date: { gte: since },
+        storeCode
       },
       select: { saleId: true, date: true },
       orderBy: { date: 'desc' }
@@ -759,23 +765,35 @@ export const SalesService = {
 
   // 更新客戶 AI 送貨排程與設定 (地點排程後台)
   async updateCustomerSettings(payload: any) {
-    const { customerName, isAiEnabled, schedule, category } = payload;
+    const { customerName, isAiEnabled, schedule, category, storeCode } = payload;
     if (!customerName) throw new Error('缺少客戶/地點名稱');
 
-    const updated = await prisma.customer.upsert({
-      where: { customerName: String(customerName).trim() },
-      update: {
-        isAiEnabled: isAiEnabled !== undefined ? Boolean(isAiEnabled) : undefined,
-        schedule: schedule !== undefined ? schedule : undefined,
-        category: category !== undefined ? String(category) : undefined
-      },
-      create: {
-        customerName: String(customerName).trim(),
-        isAiEnabled: isAiEnabled !== undefined ? Boolean(isAiEnabled) : false,
-        schedule: schedule !== undefined ? schedule : [],
-        category: category !== undefined ? String(category) : '市場'
-      }
+    const existing = await prisma.customer.findFirst({
+      where: { customerName: String(customerName).trim(), storeCode }
     });
+
+    let updated;
+    if (existing) {
+      await prisma.customer.updateMany({
+        where: { customerName: String(customerName).trim(), storeCode },
+        data: {
+          isAiEnabled: isAiEnabled !== undefined ? Boolean(isAiEnabled) : undefined,
+          schedule: schedule !== undefined ? schedule : undefined,
+          category: category !== undefined ? String(category) : undefined
+        }
+      });
+      updated = await prisma.customer.findFirst({ where: { customerName: String(customerName).trim(), storeCode } });
+    } else {
+      updated = await prisma.customer.create({
+        data: {
+          customerName: String(customerName).trim(),
+          isAiEnabled: isAiEnabled !== undefined ? Boolean(isAiEnabled) : false,
+          schedule: schedule !== undefined ? schedule : [],
+          category: category !== undefined ? String(category) : '市場',
+          storeCode
+        }
+      });
+    }
 
     return { success: true, updated };
   },
@@ -783,8 +801,8 @@ export const SalesService = {
 
 
   async getReportDataBatch(payload: any, user: any) {
-    const { startDate, endDate, fetchPivotData } = payload;
-    const historyPayload = { startDate, endDate };
+    const { startDate, endDate, fetchPivotData, storeCode } = payload;
+    const historyPayload = { startDate, endDate, storeCode };
 
     const sales = await this.getSalesHistory(historyPayload, user);
 
@@ -812,7 +830,8 @@ export const SalesService = {
           date: {
             gte: expWhere.timestamp.gte,
             lte: expWhere.timestamp.lte
-          }
+          },
+          storeCode
         },
         select: {
           saleId: true,
@@ -833,6 +852,7 @@ export const SalesService = {
     if (!hasFinancePerm && user && user.username) {
       expWhere.salesRep = user.username.trim();
     }
+    expWhere.storeCode = storeCode;
 
     // 1. 撈取記帳日期在範圍內的支出 (Primary Items)
     const expenditures = await prisma.expenditure.findMany({
@@ -989,19 +1009,21 @@ export const SalesService = {
         }
       }
       purchases = await prisma.purchase.findMany({
-        where: purWhere,
+        where: { ...purWhere, storeCode },
         orderBy: { date: 'desc' }
       });
 
       // Get current inventory levels
       inventory = await prisma.inventory.findMany({
+        where: { storeCode },
         orderBy: { entryDate: 'desc' }
       });
 
       // Adjustments (inventory type changes that aren't sales)
       adjustments = await prisma.inventory.findMany({
         where: {
-          type: { notIn: ['STOCK', 'ORIGINAL'] }
+          type: { notIn: ['STOCK', 'ORIGINAL'] },
+          storeCode
         },
         orderBy: { entryDate: 'desc' }
       });
@@ -1020,14 +1042,17 @@ export const SalesService = {
   async initSalesPageData(payload: any, user: any) {
     const targetUser = payload?.targetUser || user?.username;
     const isCorrectionMode = payload?.isCorrectionMode || false;
+    const storeCode = payload?.storeCode;
 
     // 1. 取得商品與庫存
     const products = await prisma.product.findMany({
+      where: { storeCode },
       orderBy: { sortWeight: 'asc' }
     });
 
     const stockAgg = await prisma.inventory.groupBy({
       by: ['productId', 'type'],
+      where: { storeCode },
       _sum: {
         quantity: true
       }
@@ -1084,7 +1109,9 @@ export const SalesService = {
 
     // 2. 獲取與初始化客戶 AI 送貨排程與設定 (與原 Customers sheet 行為一致)
     // 讀取 DB 中已有的 Customer 設定
-    const dbCustomers = await prisma.customer.findMany();
+    const dbCustomers = await prisma.customer.findMany({
+      where: { storeCode }
+    });
     const dbCustomerMap: Record<string, { isAiEnabled: boolean; schedule: number[]; category: string }> = {};
     dbCustomers.forEach(c => {
       let scheduleArr: number[] = [];
@@ -1169,7 +1196,8 @@ export const SalesService = {
             customerName: name,
             isAiEnabled: false,
             schedule: schedule,
-            category: '市場'
+            category: '市場',
+            storeCode
           }
         }).catch(err => console.error(`Failed to initialize customer setting for ${name}:`, err));
 
@@ -1226,7 +1254,7 @@ export const SalesService = {
 };
 
 // FIFO 庫存扣除邏輯 helper
-export async function deductInventory(productId: string, qtyToDeduct: number, targetType: string) {
+export async function deductInventory(productId: string, qtyToDeduct: number, targetType: string, storeCode?: string) {
   let remaining = qtyToDeduct;
   const consumed: Array<{ expiryDate: Date | null; quantity: number }> = [];
 
@@ -1235,7 +1263,8 @@ export async function deductInventory(productId: string, qtyToDeduct: number, ta
     where: {
       productId,
       quantity: { gt: 0 },
-      type: targetType === 'STOCK' ? 'STOCK' : { not: 'STOCK' }
+      type: targetType === 'STOCK' ? 'STOCK' : { not: 'STOCK' },
+      ...(storeCode ? { storeCode } : {})
     },
     orderBy: { expiryDate: 'asc' }
   });
@@ -1247,8 +1276,8 @@ export async function deductInventory(productId: string, qtyToDeduct: number, ta
     const deduct = Math.min(batch.quantity, remaining);
     remaining -= deduct;
 
-    await prisma.inventory.update({
-      where: { batchId: batch.batchId },
+    await prisma.inventory.updateMany({
+      where: { batchId: batch.batchId, ...(storeCode ? { storeCode } : {}) },
       data: { quantity: batch.quantity - deduct }
     });
 

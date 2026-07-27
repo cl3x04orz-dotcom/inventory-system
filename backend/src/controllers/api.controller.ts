@@ -47,7 +47,7 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
     case 'updateProductPurchasable':
       return ProductService.updateProductPurchasable(payload, user);
     case 'getProductStock':
-      return ProductService.getProductStock(payload.productId || payload.id);
+      return ProductService.getProductStock(payload);
 
     // 3. 銷售與收支 (Sales & Report)
     case 'saveSales':
@@ -78,11 +78,11 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
 
     // 4. 進貨作業與管理 (Purchases)
     case 'getPurchaseSuggestions':
-      return PurchaseService.getPurchaseSuggestions();
+      return PurchaseService.getPurchaseSuggestions(payload);
     case 'addPurchase':
       return PurchaseService.addPurchase(payload, user);
     case 'getVendors':
-      return PurchaseService.getVendors();
+      return PurchaseService.getVendors(payload);
     case 'updateVendorStatus':
       return PurchaseService.updateVendorStatus(payload);
     case 'updateVendorSortOrder':
@@ -98,9 +98,9 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
 
     // 5. 庫存作業與盤點 (Inventory & Stocktake)
     case 'getInventory':
-      return InventoryService.getInventory();
+      return InventoryService.getInventory(payload);
     case 'getInventoryWithSafety':
-      return InventoryService.getInventoryWithSafety();
+      return InventoryService.getInventoryWithSafety(payload);
     case 'updateSafetyStock':
       return InventoryService.updateSafetyStock(payload);
     case 'adjustInventory':
@@ -108,13 +108,13 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
     case 'getAdjustmentHistory':
       return InventoryService.getAdjustmentHistory(payload);
     case 'getInventoryForStocktake':
-      return InventoryService.getInventoryForStocktake();
+      return InventoryService.getInventoryForStocktake(payload);
     case 'saveStocktake':
       return InventoryService.saveStocktake(payload);
     case 'getStocktakeHistory':
       return InventoryService.getStocktakeHistory(payload);
     case 'getInventoryValuation':
-      return InventoryService.getInventoryValuation();
+      return InventoryService.getInventoryValuation(payload);
 
     // 6. 財務與支出管理 (Finance & Expenditures)
     case 'getExpenditures':

@@ -18,9 +18,10 @@ const formatLocalDay = (date: Date | null | undefined) => {
 
 export const InventoryService = {
   // 1. 取得批次庫存 (quantity != 0)
-  async getInventory() {
+  async getInventory(payload: any = {}) {
+    const { storeCode } = payload;
     const invList = await prisma.inventory.findMany({
-      where: { quantity: { not: 0 } },
+      where: { quantity: { not: 0 }, storeCode },
       include: { product: { select: { sortWeight: true, productName: true } } }
     });
 
@@ -39,9 +40,11 @@ export const InventoryService = {
   },
 
   // 2. 取得安全庫存
-  async getInventoryWithSafety() {
-    const inv = await this.getInventory();
+  async getInventoryWithSafety(payload: any = {}) {
+    const { storeCode } = payload;
+    const inv = await this.getInventory(payload);
     const productsList = await prisma.product.findMany({
+      where: { storeCode },
       select: { productName: true, safetyStock: true }
     });
     const safetyStocks: Record<string, number> = {};
@@ -53,19 +56,19 @@ export const InventoryService = {
 
   // 3. 更新安全庫存
   async updateSafetyStock(payload: any) {
-    const { productName, level } = payload;
+    const { productName, level, storeCode } = payload;
     const targetLvl = Number(level) || 0;
 
     const product = await prisma.product.findFirst({
-      where: { productName }
+      where: { productName, storeCode }
     });
 
     if (!product) {
       throw new Error('找不到該產品: ' + productName);
     }
 
-    await prisma.product.update({
-      where: { productId: product.productId },
+    await prisma.product.updateMany({
+      where: { productId: product.productId, storeCode },
       data: { safetyStock: targetLvl }
     });
 
@@ -74,11 +77,11 @@ export const InventoryService = {
 
   // 4. 庫存調整
   async adjustInventory(payload: any, user: any) {
-    const { batchId, quantity, type, note } = payload;
+    const { batchId, quantity, type, note, storeCode } = payload;
     const subQty = Number(quantity) || 0;
 
-    const inv = await prisma.inventory.findUnique({
-      where: { batchId },
+    const inv = await prisma.inventory.findFirst({
+      where: { batchId, storeCode },
       include: { product: true }
     });
 
@@ -86,8 +89,8 @@ export const InventoryService = {
       throw new Error('找不到該庫存批次: ' + batchId);
     }
 
-    await prisma.inventory.update({
-      where: { batchId },
+    await prisma.inventory.updateMany({
+      where: { batchId, storeCode },
       data: { quantity: inv.quantity - subQty }
     });
 
@@ -98,7 +101,8 @@ export const InventoryService = {
         type: type || 'ADJUST',
         quantity: subQty,
         operator: user.username || user.userId || 'system',
-        note: note || ''
+        note: note || '',
+        storeCode
       }
     });
 
@@ -107,8 +111,8 @@ export const InventoryService = {
 
   // 5. 取得庫存調整歷史
   async getAdjustmentHistory(payload: any) {
-    const { startDate, endDate, type, productName } = payload;
-    const where: any = {};
+    const { startDate, endDate, type, productName, storeCode } = payload;
+    const where: any = { storeCode };
 
     if (startDate || endDate) {
       where.date = {};
@@ -146,10 +150,12 @@ export const InventoryService = {
   },
 
   // 6. 取得盤點基礎資料
-  async getInventoryForStocktake() {
+  async getInventoryForStocktake(payload: any = {}) {
+    const { storeCode } = payload;
     const invList = await prisma.inventory.findMany({
       where: {
-        type: { in: ['STOCK', 'VOID_REFUND'] }
+        type: { in: ['STOCK', 'VOID_REFUND'] },
+        storeCode
       },
       include: { product: { select: { productName: true } } }
     });
@@ -173,7 +179,7 @@ export const InventoryService = {
 
   // 7. 保存盤點紀錄
   async saveStocktake(payload: any) {
-    const { items, operator } = payload;
+    const { items, operator, storeCode } = payload;
     if (!items || !Array.isArray(items)) {
       throw new Error('缺少盤點項目');
     }
@@ -189,7 +195,8 @@ export const InventoryService = {
         diff: Number(item.diff) || 0,
         reason: item.reason || '',
         accountability: item.accountability || '',
-        operator: op
+        operator: op,
+        storeCode
       }))
     });
 
@@ -198,8 +205,8 @@ export const InventoryService = {
 
   // 8. 盤點紀錄歷史
   async getStocktakeHistory(payload: any) {
-    const { startDate, endDate, productName, diffOnly } = payload;
-    const where: any = {};
+    const { startDate, endDate, productName, diffOnly, storeCode } = payload;
+    const where: any = { storeCode };
 
     if (startDate || endDate) {
       where.date = {};
@@ -241,8 +248,10 @@ export const InventoryService = {
   },
 
   // 9. 庫存估值
-  async getInventoryValuation() {
+  async getInventoryValuation(payload: any = {}) {
+    const { storeCode } = payload;
     const invList = await prisma.inventory.findMany({
+      where: { storeCode },
       include: { product: { select: { sortWeight: true, productName: true, defaultPrice: true } } }
     });
 
