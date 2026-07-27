@@ -141,7 +141,11 @@ export async function apiRoutes(app: FastifyInstance) {
 
       // 4. Inject operator and metadata into payload
       const enrichedPayload = payload ? { ...payload } : {};
-      enrichedPayload.storeCode = currentStoreCode;
+      // Super Admin 跨店操作不能被覆蓋 storeCode
+      const superAdminActions = ['getTenants', 'createTenant', 'updateTenant', 'deleteTenant', 'impersonateTenant'];
+      if (!superAdminActions.includes(trimmedAction)) {
+        enrichedPayload.storeCode = currentStoreCode;
+      }
       enrichedPayload.serverTimestamp = new Date();
       if (!enrichedPayload.operator) {
         enrichedPayload.operator = user ? (user.displayName || user.name || user.username || 'Unknown') : 'System';
