@@ -715,7 +715,7 @@ function AppContent() {
                                             {checkPermission('permissionControl') && <NavItem label="權限控管表" icon={Shield} onClick={() => handlePageChange('permissionControl')} active={page === 'permissionControl'} />}
                                             {checkPermission('permissionControl') && <NavItem label="店家基本設定" icon={Store} onClick={() => handlePageChange('storeSettings')} active={page === 'storeSettings'} />}
                                             {checkPermission('activityLog') && <NavItem label="操作紀錄查詢" icon={Activity} onClick={() => handlePageChange('activityLog')} active={page === 'activityLog'} />}
-                                            {user.role === 'SUPER_ADMIN' && <NavItem label="🏢 租戶管理" icon={Building2} onClick={() => handlePageChange('superAdmin')} active={page === 'superAdmin'} />}
+                                            {(user.role === 'SUPER_ADMIN' || user.role === 'BOSS') && <NavItem label="🏢 租戶管理" icon={Building2} onClick={() => handlePageChange('superAdmin')} active={page === 'superAdmin'} />}
                                         </MobileNavGroup>
                                     )}
                                 </div>
@@ -872,7 +872,7 @@ function AppContent() {
                                     {checkPermission('permissionControl') && <NavItem label="權限控管表" icon={Shield} onClick={() => handlePageChange('permissionControl')} active={page === 'permissionControl'} />}
                                     {checkPermission('permissionControl') && <NavItem label="店家基本設定" icon={Store} onClick={() => handlePageChange('storeSettings')} active={page === 'storeSettings'} />}
                                     {checkPermission('activityLog') && <NavItem label="操作紀錄查詢" icon={Activity} onClick={() => handlePageChange('activityLog')} active={page === 'activityLog'} />}
-                                    {user.role === 'SUPER_ADMIN' && <NavItem label="🏢 租戶管理" icon={Building2} onClick={() => handlePageChange('superAdmin')} active={page === 'superAdmin'} />}
+                                    {(user.role === 'SUPER_ADMIN' || user.role === 'BOSS') && <NavItem label="🏢 租戶管理" icon={Building2} onClick={() => handlePageChange('superAdmin')} active={page === 'superAdmin'} />}
                                 </NavDropdown>
                             )}
                         </div>
@@ -944,7 +944,7 @@ function AppContent() {
                         {page === 'products' && <ProductManagementPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'memberManagement' && <MemberManagementPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'subscriptionManagement' && <SubscriptionManagementPage user={user} apiUrl={GAS_API_URL} />}
-                        {page === 'superAdmin' && user.role === 'SUPER_ADMIN' && <SuperAdminPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'superAdmin' && (user.role === 'SUPER_ADMIN' || user.role === 'BOSS') && <SuperAdminPage user={user} apiUrl={GAS_API_URL} />}
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full text-slate-400">

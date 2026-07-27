@@ -10,7 +10,7 @@ function generateHash(plainPassword: string): string {
 }
 
 function superAdminOnly(user: any) {
-  if (user?.role !== 'SUPER_ADMIN') throw new Error('Access denied. Super Admin only.');
+  if (user?.role !== 'SUPER_ADMIN' && user?.role !== 'BOSS') throw new Error('Access denied. Super Admin or BOSS only.');
 }
 
 export const superadminService = {
