@@ -2290,7 +2290,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                             <div className="text-xs uppercase font-extrabold text-[var(--text-tertiary)] tracking-wider">👤 團員代訂分配明細</div>
                                                             <div className="space-y-2">
                                                                 {order.recipients.map((r, rIdx) => {
-                                                                    const recipientTotal = r.items.reduce((sum, ri) => sum + (ri.subtotal != null && Number(ri.subtotal) > 0 ? Number(ri.subtotal) : calculateItemSubtotal(ri.productId, ri.qty, ri.price)), 0);
+                                                                    const recipientTotal = r.items.reduce((sum, ri) => sum + (ri.subtotal != null && ri.subtotal !== undefined ? Number(ri.subtotal) : calculateItemSubtotal(ri.productId, ri.qty, ri.price)), 0);
                                                                     return (
                                                                         <div key={rIdx} className="bg-[var(--bg-secondary)] p-3 rounded-lg border border-[var(--border-primary)]">
                                                                             <div className="flex justify-between items-center text-sm font-bold text-[var(--text-primary)]">
@@ -2299,7 +2299,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                                             </div>
                                                                             <div className="pl-3 mt-1.5 space-y-0.5 text-xs text-[var(--text-secondary)]">
                                                                                 {r.items.map((ri, riIdx) => {
-                                                                                    const sub = ri.subtotal != null && Number(ri.subtotal) > 0 ? Number(ri.subtotal) : calculateItemSubtotal(ri.productId, ri.qty, ri.price);
+                                                                                    const sub = ri.subtotal != null && ri.subtotal !== undefined ? Number(ri.subtotal) : calculateItemSubtotal(ri.productId, ri.qty, ri.price);
                                                                                     const cleanName = String(ri.productName || '')
                                                                                         .replace(/\s*\(\s*【?口味備註：[^】)]+】?\s*\)/g, '')
                                                                                         .replace(/\s*【口味備註：[^】]+】/g, '')
