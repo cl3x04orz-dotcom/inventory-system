@@ -38,13 +38,50 @@ export const FinanceService = {
       where.salesRep = currentUserDisplay;
     }
 
+    // 1. 查出所有已作廢的 Sales saleId
+    const voidedSales = await prisma.sales.findMany({
+      where: { storeCode, status: 'VOID' },
+      select: { saleId: true }
+    });
+    const voidedSaleIds = new Set(voidedSales.map(s => s.saleId));
+
+    // 2. 如果資料庫中有已被作廢 Sales 的舊 Expenditure 金額未清零，自動同步歸零
+    if (voidedSaleIds.size > 0) {
+      await prisma.expenditure.updateMany({
+        where: {
+          storeCode,
+          saleId: { in: Array.from(voidedSaleIds) }
+        },
+        data: {
+          stall: 0,
+          cleaning: 0,
+          electricity: 0,
+          gas: 0,
+          parking: 0,
+          goods: 0,
+          bags: 0,
+          others: 0,
+          linePay: 0,
+          serviceFee: 0,
+          totalDeductions: 0,
+          vehicleMaintenance: 0,
+          salary: 0,
+          reserve: 0
+        }
+      });
+    }
+
     const list = await prisma.expenditure.findMany({
       where,
       orderBy: { timestamp: 'desc' }
     });
 
-    // 排除標記為 [VOID] 的備註紀錄 (對齊 GAS 的邏輯)
-    const activeList = list.filter((item: any) => !item.note || !item.note.includes('[VOID]'));
+    // 3. 雙重過濾：排除標記為 [VOID] 的備註紀錄，以及對應 Sales 已作廢的單據
+    const activeList = list.filter((item: any) => {
+      if (item.note && item.note.includes('[VOID]')) return false;
+      if (item.saleId && voidedSaleIds.has(item.saleId)) return false;
+      return true;
+    });
 
     return activeList.map((item: any) => ({
       saleId: item.saleId,
