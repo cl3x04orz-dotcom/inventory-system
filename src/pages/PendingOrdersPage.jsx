@@ -48,7 +48,14 @@ const calculateTotalQtyFromFlavorMap = (flavorMap = {}) => {
     return Object.values(flavorMap).reduce((sum, q) => sum + (Number(q) || 0), 0);
 };
 
-const stripTrailingQty = (str) => str.replace(/x1$/i, '').trim();
+const stripTrailingQty = (str) => {
+    if (!str) return '';
+    const trimmed = String(str).trim();
+    if (/[,，+]/.test(trimmed)) {
+        return trimmed;
+    }
+    return trimmed.replace(/x1$/i, '').trim();
+};
 
 const formatDetailItemLine = (item, prod) => {
     let rawName = item.productName || item.productId || '';
@@ -1597,7 +1604,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         const unitStr = isBundle ? `組 (共 ${ri.qty * bundleSize} 瓶)` : '瓶';
 
                         const sub = ri.subtotal != null && ri.subtotal !== undefined ? Number(ri.subtotal) : 0;
-                        lines.push(`         - ${cleanRiName} x ${ri.qty} ${unitStr}${remarkStr} = $${sub}`);
+                        lines.push(`         - ${cleanRiName} x ${ri.qty} ${unitStr}${remarkStr}= $${sub}`);
                     });
                 });
             }
@@ -1668,6 +1675,44 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 lines.push(formatDetailItemLine(item, prod));
             });
             
+            // 團員代訂分配明細
+            if (order.recipients && order.recipients.length > 0) {
+                lines.push('   👥 團員分配：');
+                order.recipients.forEach(r => {
+                    const rTotal = r.items.reduce((sum, ri) => sum + (ri.subtotal != null && ri.subtotal !== undefined ? Number(ri.subtotal) : 0), 0);
+                    lines.push(`      👤 ${r.recipientName}（$${rTotal}）`);
+                    r.items.forEach(ri => {
+                        // 解析口味備註
+                        const rawRem = String(ri.remark || '').trim();
+                        let flavorStr = '';
+                        if (rawRem.includes('【口味備註：')) {
+                            flavorStr = rawRem.replace(/.*?【口味備註：(.*?)】.*/, '$1').trim();
+                        } else if (rawRem.includes('【') && rawRem.includes('】')) {
+                            flavorStr = rawRem.replace(/.*?【(.*?)】.*/, '$1').trim();
+                        } else if (rawRem && rawRem !== '贈品') {
+                            flavorStr = rawRem;
+                        }
+                        flavorStr = stripTrailingQty(flavorStr);
+                        const remarkStr = flavorStr ? `【${flavorStr}】` : (rawRem === '贈品' ? '【贈品】' : '');
+
+                        // 清理商品名稱
+                        const cleanRiName = String(ri.productName || '')
+                            .replace(/\s*【.*?】/g, '')
+                            .replace(/\s*\(.*?\)/g, '')
+                            .trim();
+
+                        // 組合/瓶 格式
+                        const prod = products.find(p => p.id === ri.productId || p.name === cleanRiName);
+                        const isBundle = prod ? prod.isBundle : false;
+                        const bundleSize = prod ? prod.bundleSize : 1;
+                        const unitStr = isBundle ? `組 (共 ${ri.qty * bundleSize} 瓶)` : '瓶';
+
+                        const sub = ri.subtotal != null && ri.subtotal !== undefined ? Number(ri.subtotal) : 0;
+                        lines.push(`         - ${cleanRiName} x ${ri.qty} ${unitStr}${remarkStr}= $${sub}`);
+                    });
+                });
+            }
+
             lines.push(`   合計金額：$${order.totalAmount}`);
             lines.push('----------------------------------------');
         });
@@ -2297,12 +2342,11 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                                 );
                                                             })()}
                                                             {item.remark && (() => {
-                                                                const flavorTag = String(item.remark || '')
+                                                                const rawTag = String(item.remark || '')
                                                                     .replace(/【?口味備註：?/g, '')
                                                                     .replace(/】/g, '')
-                                                                    .trim()
-                                                                    .replace(/x1$/i, '')
                                                                     .trim();
+                                                                const flavorTag = stripTrailingQty(rawTag);
                                                                 if (!flavorTag) return null;
                                                                 return (
                                                                     <div className="text-xs text-blue-600 dark:text-blue-400 font-bold mt-1 ml-1">
@@ -2346,12 +2390,11 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                                                         .replace(/\s*\(\s*【?口味備註：[^】)]+】?\s*\)/g, '')
                                                                                         .replace(/\s*【口味備註：[^】]+】/g, '')
                                                                                         .trim();
-                                                                                    const cleanRemark = String(ri.remark || '')
+                                                                                    const rawRem = String(ri.remark || '')
                                                                                         .replace(/【?口味備註：?/g, '')
                                                                                         .replace(/】/g, '')
-                                                                                        .trim()
-                                                                                        .replace(/x1$/i, '')
                                                                                         .trim();
+                                                                                    const cleanRemark = stripTrailingQty(rawRem);
                                                                                     const pNameDisplay = cleanName + (cleanRemark ? ` 【${cleanRemark}】` : '');
                                                                                     const freeQty = calculateFreeQtyFromTotal(ri.productId, ri.qty);
                                                                                     const paidQty = ri.qty - freeQty;
