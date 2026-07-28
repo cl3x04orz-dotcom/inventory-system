@@ -9,6 +9,7 @@ import { sortProducts } from '../utils/constants';
 import { evaluateFormula } from '../utils/mathUtils';
 import MergePrintModal from '../components/MergePrintModal';
 import HistoryImportModal from '../components/HistoryImportModal';
+import ProductSortModal from '../components/ProductSortModal';
 import PrintTemplate from './PrintTemplate';
 
 const getSafeNum = (v) => {
@@ -118,6 +119,49 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const [historyImportRecords, setHistoryImportRecords] = useState([]);
     const [selectedImportIds, setSelectedImportIds] = useState([]);
     const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
+    // [New] Product Sort Modal State
+    const [showSortModal, setShowSortModal] = useState(false);
+    const [isSavingSortOrder, setIsSavingSortOrder] = useState(false);
+
+    const handleSaveSortOrder = async (productIds) => {
+        setIsSavingSortOrder(true);
+        try {
+            const res = await callGAS(apiUrl, 'updateProductSortOrder', { productIds }, user.token);
+            if (res.success) {
+                const weightMap = {};
+                productIds.forEach((id, idx) => {
+                    weightMap[id] = (idx + 1) * 10;
+                });
+
+                setAllAvailableProducts(prev => {
+                    const updated = prev.map(p => ({
+                        ...p,
+                        sortWeight: weightMap[p.id] !== undefined ? weightMap[p.id] : (p.sortWeight || 0)
+                    }));
+                    return sortProducts(updated, 'name');
+                });
+
+                setRows(prevRows => {
+                    const updated = prevRows.map(r => ({
+                        ...r,
+                        sortWeight: weightMap[r.id] !== undefined ? weightMap[r.id] : (r.sortWeight || 0)
+                    }));
+                    return sortProducts(updated, 'name');
+                });
+
+                setShowSortModal(false);
+                alert('商品順序已成功儲存！');
+            } else {
+                alert('排序儲存失敗：' + (res.error || '未知錯誤'));
+            }
+        } catch (error) {
+            console.error('Failed to sync sort order:', error);
+            alert('排序儲存失敗：' + error.message);
+        } finally {
+            setIsSavingSortOrder(false);
+        }
+    };
 
 
 
@@ -2045,6 +2089,15 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     </div>
                 </div>
             )}
+
+            {/* Product Drag & Drop Sorting Modal */}
+            <ProductSortModal
+                isOpen={showSortModal}
+                onClose={() => setShowSortModal(false)}
+                products={allAvailableProducts}
+                onSaveSortOrder={handleSaveSortOrder}
+                isSaving={isSavingSortOrder}
+            />
         </>
     );
 }
