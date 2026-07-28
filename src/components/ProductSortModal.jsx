@@ -59,8 +59,8 @@ export default function ProductSortModal({ isOpen, onClose, products = [], onSav
     const isSearching = searchTerm.trim().length > 0;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-            <div className="bg-[var(--bg-primary)] border border-[var(--border-primary)] w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pt-16 md:pt-20 bg-black/60 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-[var(--bg-primary)] border border-[var(--border-primary)] w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[82vh] overflow-hidden my-auto">
                 
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-[var(--border-primary)] flex items-center justify-between bg-[var(--bg-secondary)]">

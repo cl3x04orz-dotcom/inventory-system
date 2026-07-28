@@ -1481,14 +1481,11 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
                                 {/* Sort */}
                                 <button
-                                    onClick={toggleSorting}
-                                    className={`flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${isSorting
-                                        ? 'bg-indigo-500 text-white border-indigo-500'
-                                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
-                                        }`}
+                                    onClick={() => setShowSortModal(true)}
+                                    className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold rounded-lg border whitespace-nowrap transition-all bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-indigo-500 hover:text-indigo-600 font-extrabold"
                                 >
-                                    <ListOrdered size={16} className="shrink-0" />
-                                    <span>{isSorting ? '儲存順序' : '更改順序'}</span>
+                                    <ListOrdered size={16} className="shrink-0 text-indigo-500" />
+                                    <span>更改順序</span>
                                 </button>
 
                                 {/* Merge Print */}
