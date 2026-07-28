@@ -340,26 +340,12 @@ export const SalesService = {
         data: { status: 'VOID' }
       });
 
-      // 2. 將對應的 Expenditure 作廢：金額全數歸零，並加上 [VOID] 備註
+      // 2. 將對應的 Expenditure 加上 [VOID] 備註 (保留原始金額以供日後查驗)
       const expenditure = await prisma.expenditure.findFirst({ where: { saleId, storeCode } });
       if (expenditure) {
         await prisma.expenditure.updateMany({
           where: { saleId, storeCode },
           data: {
-            stall: 0,
-            cleaning: 0,
-            electricity: 0,
-            gas: 0,
-            parking: 0,
-            goods: 0,
-            bags: 0,
-            others: 0,
-            linePay: 0,
-            serviceFee: 0,
-            totalDeductions: 0,
-            vehicleMaintenance: 0,
-            salary: 0,
-            reserve: 0,
             note: expenditure.note && expenditure.note.includes('[VOID]') ? expenditure.note : `[VOID] ${expenditure.note || ''}`
           }
         });

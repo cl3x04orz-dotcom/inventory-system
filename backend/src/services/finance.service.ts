@@ -15,7 +15,7 @@ const formatLocalDay = (date: Date | null | undefined) => {
 export const FinanceService = {
   // 1. 取得支出歷史
   async getExpenditures(payload: any, user: any) {
-    const { startDate, endDate, storeCode } = payload;
+    const { startDate, endDate, storeCode, includeVoid } = payload;
     const where: any = { storeCode };
 
     // 時間範圍過濾
@@ -45,39 +45,13 @@ export const FinanceService = {
     });
     const voidedSaleIds = new Set(voidedSales.map(s => s.saleId));
 
-    // 2. 如果資料庫中有已被作廢 Sales 的舊 Expenditure 金額未清零，自動同步歸零
-    if (voidedSaleIds.size > 0) {
-      await prisma.expenditure.updateMany({
-        where: {
-          storeCode,
-          saleId: { in: Array.from(voidedSaleIds) }
-        },
-        data: {
-          stall: 0,
-          cleaning: 0,
-          electricity: 0,
-          gas: 0,
-          parking: 0,
-          goods: 0,
-          bags: 0,
-          others: 0,
-          linePay: 0,
-          serviceFee: 0,
-          totalDeductions: 0,
-          vehicleMaintenance: 0,
-          salary: 0,
-          reserve: 0
-        }
-      });
-    }
-
     const list = await prisma.expenditure.findMany({
       where,
       orderBy: { timestamp: 'desc' }
     });
 
-    // 3. 雙重過濾：排除標記為 [VOID] 的備註紀錄，以及對應 Sales 已作廢的單據
-    const activeList = list.filter((item: any) => {
+    // 2. 雙重過濾：除非顯式指定 includeVoid=true，否則排除 [VOID] 備註與已作廢 Sales 的支出 (避免疊加計算)
+    const activeList = includeVoid ? list : list.filter((item: any) => {
       if (item.note && item.note.includes('[VOID]')) return false;
       if (item.saleId && voidedSaleIds.has(item.saleId)) return false;
       return true;
