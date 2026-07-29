@@ -2,6 +2,7 @@ import { safeLocalStorage, safeSessionStorage } from './utils/storage';
 import React, { useState, useEffect } from 'react';
 import LoginPage from './pages/LoginPage';
 import SalesPage from './pages/SalesPage';
+import POSPage from './pages/POSPage';
 import InventoryPage from './pages/InventoryPage';
 import PurchasePage from './pages/PurchasePage';
 import ReportPage from './pages/ReportPage';
@@ -468,6 +469,10 @@ function AppContent() {
         switch (targetPage) {
             case 'liffOrder':
                 return true; // 點餐頁面所有人（包括一般員工或訪客）都可以存取
+            case 'pos':
+                return perms.includes('sales_entry') || perms.includes('sales');
+            case 'sales':
+                return perms.includes('sales_entry') || perms.includes('sales');
             case 'pendingOrders':
                 return perms.includes('sales_pending') || user.role === 'BOSS';
             case 'groupBuySettings':
@@ -478,8 +483,6 @@ function AppContent() {
                 return perms.includes('sales_pending') || user.role === 'BOSS';
             case 'products':
                 return perms.includes('products') || user.role === 'BOSS';
-            case 'sales':
-                return perms.includes('sales_entry') || perms.includes('sales');
             case 'report':
                 return perms.includes('sales_report') || perms.includes('sales');
             case 'purchase':
@@ -656,8 +659,9 @@ function AppContent() {
                             <div className="fixed top-20 left-0 right-0 mx-auto w-[94%] max-w-md bg-[var(--bg-secondary)] backdrop-blur-xl border border-[var(--border-primary)] rounded-2xl shadow-2xl overflow-y-auto max-h-[80vh] animate-in fade-in slide-in-from-top-4 duration-200 z-[100]">
                                 <div className="p-2.5 flex flex-col gap-1.5">
                                     {/* 銷售管理 Group */}
-                                    {(user.role === 'BOSS' || checkPermission('sales') || checkPermission('report')) && (
+                                    {(user.role === 'BOSS' || checkPermission('pos') || checkPermission('sales') || checkPermission('report')) && (
                                         <MobileNavGroup label="銷售" icon={ShoppingCart}>
+                                            {checkPermission('pos') && <NavItem label="門市 POS 結帳" icon={DollarSign} onClick={() => handlePageChange('pos')} active={page === 'pos'} />}
                                             {checkPermission('sales') && <NavItem label="商品銷售登錄" icon={ShoppingCart} onClick={() => handlePageChange('sales')} active={page === 'sales'} />}
                                             {checkPermission('report') && <NavItem label="銷售查詢報表" icon={FileText} onClick={() => handlePageChange('report')} active={page === 'report'} />}
                                         </MobileNavGroup>
@@ -728,15 +732,16 @@ function AppContent() {
                         {/* Column 1: 銷售 */}
                         <div className="flex justify-center">
                             {/* 銷售管理 Group */}
-                            {(user.role === 'BOSS' || checkPermission('sales') || checkPermission('report')) && (
+                            {(user.role === 'BOSS' || checkPermission('pos') || checkPermission('sales') || checkPermission('report')) && (
                                 <NavDropdown
                                     id="sales"
                                     label="銷售"
                                     icon={ShoppingCart}
                                     openDropdown={openDropdown}
                                     setOpenDropdown={setOpenDropdown}
-                                    active={['sales', 'report'].includes(page)}
+                                    active={['pos', 'sales', 'report'].includes(page)}
                                 >
+                                    {checkPermission('pos') && <NavItem label="門市 POS 結帳" icon={DollarSign} onClick={() => handlePageChange('pos')} active={page === 'pos'} />}
                                     {checkPermission('sales') && <NavItem label="商品銷售登錄" icon={ShoppingCart} onClick={() => handlePageChange('sales')} active={page === 'sales'} />}
                                     {checkPermission('report') && <NavItem label="銷售查詢報表" icon={FileText} onClick={() => handlePageChange('report')} active={page === 'report'} />}
                                 </NavDropdown>
@@ -903,10 +908,15 @@ function AppContent() {
 
 
             {/* Main Content */}
-            <main className={`flex-1 overflow-y-auto ${page === 'liffOrder' ? '' : 'p-4 md:p-6'}`}>
+            <main className={`flex-1 overflow-y-auto ${['liffOrder', 'pos'].includes(page) ? '' : 'p-4 md:p-6'}`}>
 
                 {checkPermission(page) ? (
                     <>
+                        {page === 'pos' && (
+                            <ErrorBoundary>
+                                <POSPage user={user} apiUrl={GAS_API_URL} />
+                            </ErrorBoundary>
+                        )}
                         {page === 'sales' && (
                             <ErrorBoundary>
                                 <SalesPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />

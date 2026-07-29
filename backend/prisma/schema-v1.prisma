@@ -1,0 +1,159 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  userId       String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String
+  role         String   @default("EMPLOYEE")
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now())
+  permissions  Json     @default("[]")
+  storeCode    String   @default("MILI001")
+}
+
+model Product {
+  productId             String                  @id
+  productName           String
+  category              String?
+  defaultPrice          Decimal                 @default(0)
+  reserve               Decimal                 @default(0)
+  safetyStock           Int                     @default(0)
+  sortWeight            Int                     @default(0)
+  isActive              Boolean                 @default(true)
+  isPurchasable         Boolean                 @default(true)
+  imageUrl              String?
+  capacity              String?
+  expiryDate            String?
+  hasFlavorAttributes   Boolean                 @default(false)
+  flavorChoices         Json                    @default("[]")
+  singlePrice           Decimal                 @default(0)
+  hasVolumePricing      Boolean                 @default(false)
+  volumePricingSettings Json?
+  packSize              Int                     @default(1)
+  dispatchSteps         Json                    @default("[]")
+  roundThreshold        Int?
+  autoSuppress          Boolean                 @default(false)
+  maxSuggestion         Int                     @default(0)
+  isBundle              Boolean                 @default(false)
+  bundleSize            Int                     @default(1)
+  maxTotalQty           Int?
+  soldQty               Int                     @default(0)
+  allowedCommunityIds   String[]                @default([])
+  communityQuotas       Json?                   @default("{}")
+  inventories           Inventory[]
+  salesDetails          SalesDetail[]
+  customPrices          CommunityProductPrice[]
+  storeCode             String                  @default("MILI001")
+}
+
+model Customer {
+  customerName String  @id
+  isAiEnabled  Boolean @default(false)
+  schedule     Json    @default("[]")
+  category     String  @default("市場")
+  storeCode    String  @default("MILI001")
+}
+
+model Inventory {
+  batchId     String    @id @default(uuid())
+  productId   String
+  quantity    Int
+  expiryDate  DateTime?
+  entryDate   DateTime  @default(now())
+  type        String
+  cost        Decimal   @default(0)
+  productName String?
+  product     Product   @relation(fields: [productId], references: [productId])
+  storeCode   String    @default("MILI001")
+}
+
+model Purchase {
+  purchaseId    String    @id
+  date          DateTime
+  vendor        String?
+  productId     String
+  quantity      Int
+  unitPrice     Decimal
+  expiryDate    DateTime?
+  buyer         String?
+  paymentMethod String?
+  status        String    @default("ORDERED")
+  operator      String
+  productName   String?
+  storeCode     String    @default("MILI001")
+
+  @@index([date])
+}
+
+model Sales {
+  saleId              String        @id
+  date                DateTime
+  salesRep            String
+  totalCash           Decimal       @default(0)
+  reserve             Decimal       @default(0)
+  finalTotal          Decimal       @default(0)
+  customer            String?
+  operator            String
+  paymentMethod       String?
+  status              String        @default("COMPLETED")
+  workHours           Decimal       @default(0)
+  paymentDate         DateTime?
+  actualPaymentMethod String?
+  cashCounts          Json?
+  details             SalesDetail[]
+  storeCode           String        @default("MILI001")
+
+  @@index([date])
+}
+
+model SalesDetail {
+  id        String  @id @default(uuid())
+  saleId    String
+  productId String
+  picked    Int     @default(0)
+  original  Int     @default(0)
+  returnQty Int     @default(0)
+  sold      Int     @default(0)
+  unitPrice Decimal
+  subtotal  Decimal
+  product   Product @relation(fields: [productId], references: [productId])
+  sale      Sales   @relation(fields: [saleId], references: [saleId], onDelete: Cascade)
+  storeCode String  @default("MILI001")
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+model Expenditure {
+  saleId             String    @id
+  stall              Decimal   @default(0)
+  cleaning           Decimal   @default(0)
+  electricity        Decimal   @default(0)
+  gas                Decimal   @default(0)
+  parking            Decimal   @default(0)
+  goods              Decimal   @default(0)
+  bags               Decimal   @default(0)
+  others             Decimal   @default(0)
+  linePay            Decimal   @default(0)
+  serviceFee         Decimal   @default(0)
+  totalDeductions    Decimal   @default(0)
+  customer           String?
+  salesRep           String?
+  timestamp          DateTime  @default(now())
+  vehicleMaintenance Decimal   @default(0)
+  salary             Decimal   @default(0)
+  reserve            Decimal   @default(0)
+  note               String?
+  paymentMethod      String?
+  paymentDate        DateTime?
+  storeCode          String    @default("MILI001")
+
+  @@index([timestamp])
+}

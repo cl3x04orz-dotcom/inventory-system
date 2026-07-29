@@ -50,7 +50,22 @@ model Product {
   inventories           Inventory[]
   salesDetails          SalesDetail[]
   customPrices          CommunityProductPrice[]
+  barcodes              ProductBarcode[]
   storeCode             String                  @default("MILI001")
+}
+
+model ProductBarcode {
+  id        String  @id @default(uuid())
+  productId String
+  barcode   String
+  type      String  @default("EAN13") // EAN13, STORE, CASE
+  isDefault Boolean @default(false)
+  storeCode String  @default("MILI001")
+
+  product Product @relation(fields: [productId], references: [productId], onDelete: Cascade)
+
+  @@index([barcode])
+  @@index([productId])
 }
 
 model Customer {
@@ -72,6 +87,32 @@ model Inventory {
   productName String?
   product     Product   @relation(fields: [productId], references: [productId])
   storeCode   String    @default("MILI001")
+}
+
+model InventorySnapshot {
+  id           String @id @default(uuid())
+  productId    String
+  storeCode    String @default("MILI001")
+  onHandQty    Int    @default(0)
+  reservedQty  Int    @default(0)
+  availableQty Int    @default(0)
+
+  @@unique([productId, storeCode])
+}
+
+model InventoryMovement {
+  id        String   @id @default(uuid())
+  productId String
+  storeCode String   @default("MILI001")
+  type      String   // PURCHASE, SALE, RETURN, ADJUSTMENT, TRANSFER, VOID_SALE
+  qty       Int      // 正數: 增加, 負數: 減少
+  refId     String?
+  operator  String?
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([productId, storeCode])
+  @@index([createdAt])
 }
 
 model Purchase {
@@ -107,28 +148,83 @@ model Sales {
   paymentDate         DateTime?
   actualPaymentMethod String?
   cashCounts          Json?
+  
+  // Phase 0 POS Extensions
+  saleType            String        @default("WHOLESALE") // WHOLESALE, RETAIL, ONLINE
+  receiptNo           String?       @unique
+  subtotal            Decimal       @default(0)
+  discount            Decimal       @default(0)
+  tax                 Decimal       @default(0)
+  terminalId          String?
+  cashierId           String?
+  
   details             SalesDetail[]
+  payments            SalePayment[]
   storeCode           String        @default("MILI001")
 
   @@index([date])
 }
 
 model SalesDetail {
-  id        String  @id @default(uuid())
-  saleId    String
-  productId String
-  picked    Int     @default(0)
-  original  Int     @default(0)
-  returnQty Int     @default(0)
-  sold      Int     @default(0)
-  unitPrice Decimal
-  subtotal  Decimal
-  product   Product @relation(fields: [productId], references: [productId])
-  sale      Sales   @relation(fields: [saleId], references: [saleId], onDelete: Cascade)
-  storeCode String  @default("MILI001")
+  id             String  @id @default(uuid())
+  saleId         String
+  productId      String
+  picked         Int     @default(0)
+  original       Int     @default(0)
+  returnQty      Int     @default(0)
+  sold           Int     @default(0)
+  unitPrice      Decimal
+  subtotal       Decimal
+  
+  // Phase 0 POS Extensions
+  productName    String?
+  unitCost       Decimal @default(0)
+  discountAmount Decimal @default(0)
+  taxAmount      Decimal @default(0)
+
+  product Product @relation(fields: [productId], references: [productId])
+  sale    Sales   @relation(fields: [saleId], references: [saleId], onDelete: Cascade)
+  storeCode String @default("MILI001")
 
   @@index([saleId])
   @@index([productId])
+}
+
+model SalePayment {
+  id             String   @id @default(uuid())
+  saleId         String
+  method         String   // CASH, CARD, LINE_PAY, JKOPAY, APPLE_PAY, BANK_TRANSFER, OTHER
+  amount         Decimal
+  receivedAmount Decimal  @default(0)
+  changeAmount   Decimal  @default(0)
+  transactionNo  String?
+  gateway        String?
+  approvalCode   String?
+  cardLast4      String?
+  createdAt      DateTime @default(now())
+  storeCode      String   @default("MILI001")
+  sale           Sales    @relation(fields: [saleId], references: [saleId], onDelete: Cascade)
+
+  @@index([saleId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  storeCode  String?  @default("MILI001")
+  terminalId String?
+  userId     String?
+  ip         String?
+  device     String?
+  action     String
+  entity     String
+  entityId   String?
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+
+  @@index([storeCode])
+  @@index([action])
+  @@index([createdAt])
 }
 
 model Expenditure {
@@ -207,8 +303,8 @@ model GroupBuyCommunity {
   closeMessage          String?
   defaultDeliveryTime   String?
   defaultFreeShipping   Boolean                 @default(false)
-  freeShippingMin       Decimal                 @default(0) // 免運門檻金額（0 = 無門檻，直接免運）
-  shippingFee           Decimal                 @default(0) // 未達門檻時加收的運費
+  freeShippingMin       Decimal                 @default(0)
+  shippingFee           Decimal                 @default(0)
   defaultPaymentMethods Json                    @default("[]")
   defaultRoute          String?
   deliveryInstruction   String?
@@ -234,7 +330,7 @@ model GroupBuyOrder {
   sourceGroup          String?
   note                 String?
   totalAmount          Decimal                  @default(0)
-  shippingFee          Decimal                  @default(0) // 此筆訂單實收運費
+  shippingFee          Decimal                  @default(0)
   paymentMethod        String?
   transferLastFive     String?
   paymentStatus        String?
@@ -247,7 +343,7 @@ model GroupBuyOrder {
   updatedAt            DateTime                 @updatedAt
   details              GroupBuyOrderDetail[]
   recipients           GroupBuyOrderRecipient[]
-  storeCode String @default("MILI001") // Phase 3 isolation
+  storeCode            String                   @default("MILI001")
 }
 
 model GroupBuyOrderDetail {
@@ -260,20 +356,20 @@ model GroupBuyOrderDetail {
   subtotal    Decimal       @default(0)
   remark      String?
   order       GroupBuyOrder @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
-  storeCode String @default("MILI001") // Phase 3 isolation
+  storeCode   String        @default("MILI001")
 }
 
 model GroupBuyOrderRecipient {
   recipientId   String                       @id @default(uuid())
   orderId       String
-  recipientName String // 團員姓名（例如 "王小明"）
-  note          String? // 該團員備註
+  recipientName String
+  note          String?
   createdAt     DateTime                     @default(now())
   order         GroupBuyOrder                @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
   items         GroupBuyOrderRecipientItem[]
 
   @@index([orderId])
-  storeCode String @default("MILI001") // Phase 3 isolation
+  storeCode     String                       @default("MILI001")
 }
 
 model GroupBuyOrderRecipientItem {
@@ -282,13 +378,13 @@ model GroupBuyOrderRecipientItem {
   productId   String
   productName String
   qty         Int
-  price       Int // 商品單價
-  subtotal    Int?                   @default(0) // 商品小計 (精準多件優惠與促銷價)
-  remark      String? // 口味備註
+  price       Int
+  subtotal    Int?                   @default(0)
+  remark      String?
   recipient   GroupBuyOrderRecipient @relation(fields: [recipientId], references: [recipientId], onDelete: Cascade)
 
   @@index([recipientId])
-  storeCode String @default("MILI001") // Phase 3 isolation
+  storeCode   String                 @default("MILI001")
 }
 
 model GroupBuyCampaign {
@@ -314,7 +410,7 @@ model GroupBuyCampaign {
   updatedBy          String?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
-  storeCode String @default("MILI001") // Phase 3 isolation
+  storeCode          String    @default("MILI001")
 }
 
 model GroupBuyAuditLog {
@@ -329,7 +425,7 @@ model GroupBuyAuditLog {
   ipAddress String?
   device    String?
   createdAt DateTime @default(now())
-  storeCode String @default("MILI001") // Phase 3 isolation
+  storeCode String   @default("MILI001")
 }
 
 model GroupBuyOrderStatusHistory {
@@ -339,7 +435,7 @@ model GroupBuyOrderStatusHistory {
   remark    String?
   operator  String
   createdAt DateTime @default(now())
-  storeCode String @default("MILI001") // Phase 3 isolation
+  storeCode String   @default("MILI001")
 }
 
 model GroupBuyNotification {
@@ -353,13 +449,13 @@ model GroupBuyNotification {
   content        String
   status         String   @default("PENDING")
   createdAt      DateTime @default(now())
-  storeCode String @default("MILI001") // Phase 3 isolation
+  storeCode      String   @default("MILI001")
 }
 
 model GroupBuySystemSetting {
   settingKey   String @id
   settingValue String
-  storeCode String @default("MILI001") // Phase 3 isolation
+  storeCode    String @default("MILI001")
 }
 
 model Vendor {
@@ -371,7 +467,7 @@ model Vendor {
   isActive      Boolean @default(true)
   sortWeight    Int     @default(0)
   @@id([vendorName, storeCode])
-  storeCode String @default("MILI001") // Phase 3 isolation
+  storeCode     String  @default("MILI001")
 }
 
 model ActivityLog {
@@ -384,7 +480,7 @@ model ActivityLog {
   userAgent        String?
   screenResolution String?
   ipAddress        String?
-  storeCode String @default("MILI001") // Phase 3 isolation
+  storeCode        String   @default("MILI001")
 }
 
 model Stocktake {
@@ -398,7 +494,7 @@ model Stocktake {
   reason         String?
   accountability String?
   operator       String
-  storeCode String @default("MILI001") // Phase 3 isolation
+  storeCode      String   @default("MILI001")
 }
 
 model InventoryAdjustment {
@@ -410,7 +506,7 @@ model InventoryAdjustment {
   quantity    Int
   operator    String
   note        String?
-  storeCode String @default("MILI001") // Phase 3 isolation
+  storeCode   String   @default("MILI001")
 }
 
 model BuildingSetting {
@@ -420,18 +516,18 @@ model BuildingSetting {
   sortOrder Int      @default(0)
   adminNote String?
   updatedAt DateTime @updatedAt
-  storeCode String @default("MILI001") // Phase 3 isolation
+  storeCode String   @default("MILI001")
 }
 
 model GroupBinding {
   groupId   String   @id
   groupName String
   updatedAt DateTime @updatedAt
-  storeCode String @default("MILI001") // Phase 3 isolation
+  storeCode String   @default("MILI001")
 }
 
 model Member {
-  memberId      String              // LINE userId
+  memberId      String
   displayName   String?
   pictureUrl    String?
   receiverName  String?
@@ -441,7 +537,7 @@ model Member {
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
   transactions  WalletTransaction[]
-  storeCode     String              @default("MILI001") // Phase 3 isolation
+  storeCode     String              @default("MILI001")
 
   @@id([memberId, storeCode])
 }
@@ -450,10 +546,10 @@ model WalletTransaction {
   transactionId String   @id @default(uuid())
   memberId      String
   amount        Decimal
-  type          String // e.g. "ORDER_PAY", "DEPOSIT"
+  type          String
   description   String?
   createdAt     DateTime @default(now())
-  storeCode     String   @default("MILI001") // Phase 3 isolation
+  storeCode     String   @default("MILI001")
   member        Member   @relation(fields: [memberId, storeCode], references: [memberId, storeCode], onDelete: Cascade)
 }
 
@@ -465,7 +561,7 @@ model Subscription {
   productId      String
   productName    String
   quantity       Int
-  frequency      String // 例如 "[1,3,5]"
+  frequency      String
   paymentMethod  String   @default("奶包金")
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
@@ -486,18 +582,18 @@ model CommunityProductPrice {
   promotion   Promotion?        @relation(fields: [promoId], references: [promoId], onDelete: SetNull)
 
   @@id([communityId, productId])
-  storeCode String @default("MILI001") // Phase 3 isolation
+  storeCode   String            @default("MILI001")
 }
 
 model Promotion {
   promoId             String   @id @default(uuid())
   name                String
-  promoType           String   @default("BUY_X_GET_Y") // e.g. BUY_X_GET_Y, BUNDLE_PRICE
+  promoType           String   @default("BUY_X_GET_Y")
   buyQty              Int      @default(0)
   freeQty             Int      @default(0)
   bundlePrice         Decimal?
   isActive            Boolean  @default(true)
-  communityId         String? // null means global promotion
+  communityId         String?
   rewardSelectionMode String   @default("AUTO_LOWEST_PRICE")
   tiers               Json?
   createdAt           DateTime @default(now())
@@ -505,7 +601,7 @@ model Promotion {
 
   community GroupBuyCommunity?      @relation(fields: [communityId], references: [communityId], onDelete: Cascade)
   prices    CommunityProductPrice[]
-  storeCode String @default("MILI001") // Phase 3 isolation
+  storeCode String                  @default("MILI001")
 }
 
 model StoreSetting {
@@ -513,22 +609,18 @@ model StoreSetting {
   storeCode String @unique
   status    String @default("active")
 
-  // 品牌
   name           String
   logoUrl        String?
   primaryColor   String?
   secondaryColor String?
 
-  // 聯絡資訊
   phone   String?
   address String?
 
-  // LINE / LIFF
   lineOA  String?
   linePay String?
   liffId  String?
 
-  // 營業資訊 / 系統
   businessHours String?
   timezone      String?
   language      String?

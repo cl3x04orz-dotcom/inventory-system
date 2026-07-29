@@ -404,7 +404,7 @@ export const SalesService = {
   // 獲取歷史紀錄 (終極優化：原生 Raw SQL 關聯查詢，全資料一鍵秒開)
   async getSalesHistory(payload: any, user: any = null) {
     const { startDate, endDate, storeCode } = payload;
-    
+
     let query = `
       SELECT 
         s.date,
@@ -760,7 +760,7 @@ export const SalesService = {
       }
     }
 
-    const fallbackLevel = 'DOW_ONLY'; 
+    const fallbackLevel = 'DOW_ONLY';
     const message = `已根據過去同一星期的平均銷售量為您預估${hasStockShortage ? ' (⚠️ 部分品項庫存不足)' : ''}。`;
 
     return { success: true, suggestions, fallbackLevel, message };

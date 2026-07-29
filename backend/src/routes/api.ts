@@ -11,6 +11,7 @@ const publicActions = ['getStoreSetting', 'login', 'register', 'checkInit', 'log
 const actionPermissions: Record<string, string> = {
   saveStoreSetting: 'system_config',
   saveSales: 'sales_entry',
+  createRetailSale: 'sales_entry',
   getSalesHistory: 'sales_report',
   getReportDataBatch: 'sales_report',
   getRecentSalesToday: 'sales_entry',

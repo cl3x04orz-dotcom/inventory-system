@@ -11,6 +11,7 @@ import { GroupBuyService } from '../services/groupbuy.service.js';
 import { superadminService } from '../services/superadmin.service.js';
 import { PromotionService } from '../services/promotion.service.js';
 import { StoreSettingService } from '../services/storesetting.service.js';
+import { SaleCommandService } from '../services/sale.command.service.js';
 import { callGASFromNode } from '../utils/gasClient.js';
 
 export async function apiRouter(action: string, payload: any, user: any): Promise<any> {
@@ -65,6 +66,11 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
     // 3. 銷售與收支 (Sales & Report)
     case 'saveSales':
       return SalesService.saveSales(payload, user);
+    case 'createRetailSale':
+      return SaleCommandService.createRetailSale({
+        ...payload,
+        cashierId: user?.username || user?.userId || 'admin'
+      });
     case 'getSaleToClone':
       return SalesService.getSaleToClone(payload);
     case 'voidAndFetchSale':

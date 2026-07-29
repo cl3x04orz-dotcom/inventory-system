@@ -1,47 +1,102 @@
-import { prisma } from '../database/context.js';
-
-const getUuid = () => {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-};
-
-const formatLocalDate = (date: Date | null | undefined) => {
-  if (!date) return '';
-  const local = new Date(date.getTime() + 8 * 60 * 60 * 1000);
-  return local.toISOString().replace('T', ' ').substring(0, 16);
-};
-
-const formatLocalDay = (date: Date | null | undefined) => {
-  if (!date) return '';
-  const local = new Date(date.getTime() + 8 * 60 * 60 * 1000);
-  return local.toISOString().split('T')[0];
-};
+import { prisma, runInTransaction } from '../database/context.js';
+import { deductInventory } from './sales.service.js';
 
 export const InventoryService = {
+  // ── Phase 1 新增：庫存異動與快照方法 ──
+
+  /**
+   * 記錄庫存異動並同步更新 Snapshot & 舊批次庫存 (prisma.inventory)
+   */
+  async recordMovement(params: {
+    productId: string;
+    storeCode?: string;
+    type: 'PURCHASE' | 'SALE' | 'RETURN' | 'ADJUSTMENT' | 'TRANSFER' | 'VOID_SALE';
+    qty: number;
+    refId?: string;
+    operator?: string;
+    note?: string;
+  }) {
+    const { productId, storeCode = 'MILI001', type, qty, refId, operator, note } = params;
+
+    return await runInTransaction(async () => {
+      // 1. 寫入流水帳
+      const movement = await prisma.inventoryMovement.create({
+        data: {
+          productId,
+          storeCode,
+          type,
+          qty,
+          refId,
+          operator,
+          note
+        }
+      });
+
+      // 2. 更新或新增庫存快照
+      await prisma.inventorySnapshot.upsert({
+        where: {
+          productId_storeCode: { productId, storeCode }
+        },
+        create: {
+          productId,
+          storeCode,
+          onHandQty: qty,
+          availableQty: qty
+        },
+        update: {
+          onHandQty: { increment: qty },
+          availableQty: { increment: qty }
+        }
+      });
+
+      // 3. 🔑 同步扣除舊系統的批次庫存 (prisma.inventory)，確保舊版庫存檢視與作廢邏輯一致
+      if (type === 'SALE' && qty < 0) {
+        await deductInventory(productId, Math.abs(qty), 'STOCK', storeCode);
+      }
+
+      return movement;
+    });
+  },
+
+  /**
+   * 讀取某商品的庫存快照
+   */
+  async getStock(productId: string, storeCode: string = 'MILI001'): Promise<number> {
+    const snapshot = await prisma.inventorySnapshot.findUnique({
+      where: { productId_storeCode: { productId, storeCode } }
+    });
+    return snapshot?.availableQty ?? 0;
+  },
+
+  /**
+   * 查詢某商品的異動流水帳
+   */
+  async getMovements(productId: string, storeCode: string = 'MILI001') {
+    return await prisma.inventoryMovement.findMany({
+      where: { productId, storeCode },
+      orderBy: { createdAt: 'desc' }
+    });
+  },
+
+  // ── 原有舊版相容方法 (避免 API Controller 斷裂) ──
+
   // 1. 取得批次庫存 (quantity != 0)
   async getInventory(payload: any = {}) {
-    const { storeCode } = payload;
+    const { storeCode = 'MILI001' } = payload;
     const invList = await prisma.inventory.findMany({
       where: { quantity: { not: 0 }, storeCode },
       include: { product: { select: { sortWeight: true, productName: true } } }
     });
 
-    const result = invList.map((item: any) => ({
-      batchId: item.batchId,
-      productId: item.productId,
-      productName: item.product.productName || item.productName || 'Unknown',
-      quantity: item.quantity,
-      expiry: formatLocalDay(item.expiryDate),
-      type: item.type,
-      sortWeight: item.product.sortWeight ?? 999999
+    return invList.map((item: any) => ({
+      ...item,
+      productName: item.product?.productName || item.productName || item.productId
     }));
-
-    result.sort((a: any, b: any) => (a.sortWeight - b.sortWeight) || a.productName.localeCompare(b.productName, 'zh-TW'));
-    return result;
   },
 
   // 2. 取得安全庫存
   async getInventoryWithSafety(payload: any = {}) {
-    const { storeCode } = payload;
+    const { storeCode = 'MILI001' } = payload;
     const inv = await this.getInventory(payload);
     const productsList = await prisma.product.findMany({
       where: { storeCode },
@@ -51,12 +106,16 @@ export const InventoryService = {
     productsList.forEach((p: any) => {
       safetyStocks[p.productName] = p.safetyStock;
     });
-    return { inventory: inv, safetyStocks };
+
+    return inv.map((item: any) => ({
+      ...item,
+      safetyStock: safetyStocks[item.productName] || 0
+    }));
   },
 
   // 3. 更新安全庫存
   async updateSafetyStock(payload: any) {
-    const { productName, level, storeCode } = payload;
+    const { productName, level, storeCode = 'MILI001' } = payload;
     const targetLvl = Number(level) || 0;
 
     const product = await prisma.product.findFirst({
@@ -72,86 +131,60 @@ export const InventoryService = {
       data: { safetyStock: targetLvl }
     });
 
-    return { success: true, message: `已成功校正庫存` };
+    return { success: true };
   },
 
   // 4. 庫存調整
   async adjustInventory(payload: any, user: any) {
-    const { batchId, quantity, type, note, storeCode } = payload;
-    const subQty = Number(quantity) || 0;
+    const { productId, productName, type, quantity, note, storeCode = 'MILI001' } = payload;
+    const qty = Number(quantity) || 0;
+    const operator = user?.username || user?.userId || 'system';
 
-    const inv = await prisma.inventory.findFirst({
-      where: { batchId, storeCode },
-      include: { product: true }
-    });
-
-    if (!inv) {
-      throw new Error('找不到該庫存批次: ' + batchId);
-    }
-
-    await prisma.inventory.updateMany({
-      where: { batchId, storeCode },
-      data: { quantity: inv.quantity - subQty }
-    });
-
-    await prisma.inventoryAdjustment.create({
+    const adj = await prisma.inventoryAdjustment.create({
       data: {
-        productId: inv.productId,
-        productName: inv.productName || inv.product.productName || 'Unknown',
-        type: type || 'ADJUST',
-        quantity: subQty,
-        operator: user.username || user.userId || 'system',
-        note: note || '',
+        productId,
+        productName,
+        type,
+        quantity: qty,
+        operator,
+        note,
         storeCode
       }
     });
 
-    return { success: true };
+    // 寫入 InventoryMovement 留底
+    await this.recordMovement({
+      productId,
+      storeCode,
+      type: 'ADJUSTMENT',
+      qty: type === 'ADD' ? qty : -qty,
+      operator,
+      note: `庫存手動調整 (${type}): ${note || ''}`
+    });
+
+    return adj;
   },
 
-  // 5. 取得庫存調整歷史
-  async getAdjustmentHistory(payload: any) {
-    const { startDate, endDate, type, productName, storeCode } = payload;
+  // 5. 取得調整歷史
+  async getAdjustmentHistory(payload: any = {}) {
+    const { startDate, endDate, storeCode = 'MILI001' } = payload;
     const where: any = { storeCode };
 
     if (startDate || endDate) {
       where.date = {};
-      if (startDate) {
-        where.date.gte = new Date(startDate);
-      }
-      if (endDate) {
-        const e = new Date(endDate);
-        e.setHours(23, 59, 59, 999);
-        where.date.lte = e;
-      }
+      if (startDate) where.date.gte = new Date(startDate);
+      if (endDate) where.date.lte = new Date(endDate);
     }
 
-    if (type) {
-      where.type = type;
-    }
-
-    if (productName) {
-      where.productName = { contains: productName, mode: 'insensitive' };
-    }
-
-    const list = await prisma.inventoryAdjustment.findMany({
+    return await prisma.inventoryAdjustment.findMany({
       where,
       orderBy: { date: 'desc' }
     });
-
-    return list.map((item: any) => ({
-      date: formatLocalDate(item.date),
-      productName: item.productName,
-      type: item.type,
-      quantity: item.quantity,
-      operator: item.operator,
-      note: item.note || ''
-    }));
   },
 
   // 6. 取得盤點基礎資料
   async getInventoryForStocktake(payload: any = {}) {
-    const { storeCode } = payload;
+    const { storeCode = 'MILI001' } = payload;
     const invList = await prisma.inventory.findMany({
       where: {
         type: { in: ['STOCK', 'VOID_REFUND'] },
@@ -163,7 +196,7 @@ export const InventoryService = {
     const totals: Record<string, { name: string; qty: number }> = {};
     invList.forEach((item: any) => {
       const pId = item.productId;
-      const name = item.product.productName || item.productName || pId;
+      const name = item.product?.productName || item.productName || pId;
       if (!totals[pId]) {
         totals[pId] = { name, qty: 0 };
       }
@@ -179,7 +212,7 @@ export const InventoryService = {
 
   // 7. 保存盤點紀錄
   async saveStocktake(payload: any) {
-    const { items, operator, storeCode } = payload;
+    const { items, operator, storeCode = 'MILI001' } = payload;
     if (!items || !Array.isArray(items)) {
       throw new Error('缺少盤點項目');
     }
@@ -204,52 +237,31 @@ export const InventoryService = {
   },
 
   // 8. 盤點紀錄歷史
-  async getStocktakeHistory(payload: any) {
-    const { startDate, endDate, productName, diffOnly, storeCode } = payload;
+  async getStocktakeHistory(payload: any = {}) {
+    const { startDate, endDate, productName, diffOnly, storeCode = 'MILI001' } = payload;
     const where: any = { storeCode };
 
     if (startDate || endDate) {
       where.date = {};
-      if (startDate) {
-        where.date.gte = new Date(startDate);
-      }
-      if (endDate) {
-        const e = new Date(endDate);
-        e.setHours(23, 59, 59, 999);
-        where.date.lte = e;
-      }
+      if (startDate) where.date.gte = new Date(startDate);
+      if (endDate) where.date.lte = new Date(endDate);
     }
-
     if (productName) {
-      where.productName = { contains: productName, mode: 'insensitive' };
+      where.productName = { contains: productName };
     }
-
     if (diffOnly) {
       where.diff = { not: 0 };
     }
 
-    const list = await prisma.stocktake.findMany({
+    return await prisma.stocktake.findMany({
       where,
       orderBy: { date: 'desc' }
     });
-
-    return list.map((item: any) => ({
-      id: item.id,
-      date: formatLocalDate(item.date),
-      productId: item.productId,
-      productName: item.productName,
-      bookQty: item.bookQty,
-      physicalQty: item.physicalQty,
-      diff: item.diff,
-      reason: item.reason || '',
-      accountability: item.accountability || '',
-      operator: item.operator
-    }));
   },
 
   // 9. 庫存估值
   async getInventoryValuation(payload: any = {}) {
-    const { storeCode } = payload;
+    const { storeCode = 'MILI001' } = payload;
     const invList = await prisma.inventory.findMany({
       where: { storeCode },
       include: { product: { select: { sortWeight: true, productName: true, defaultPrice: true } } }
@@ -259,10 +271,10 @@ export const InventoryService = {
 
     invList.forEach((item: any) => {
       const pId = item.productId;
-      const pName = item.product.productName || item.productName || pId;
+      const pName = item.product?.productName || item.productName || pId;
       const qty = item.quantity;
-      const type = item.type.toUpperCase();
-      const price = Number(item.cost) || Number(item.product.defaultPrice) || 0;
+      const type = (item.type || '').toUpperCase();
+      const price = Number(item.cost) || Number(item.product?.defaultPrice) || 0;
 
       if (!valuations[pName]) {
         valuations[pName] = {
@@ -274,7 +286,7 @@ export const InventoryService = {
           totalQty: 0,
           totalValue: 0,
           productId: pId,
-          sortWeight: item.product.sortWeight ?? 999999
+          sortWeight: item.product?.sortWeight ?? 999999
         };
       }
 

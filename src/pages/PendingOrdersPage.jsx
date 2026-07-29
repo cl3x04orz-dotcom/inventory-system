@@ -57,6 +57,88 @@ const stripTrailingQty = (str) => {
     return trimmed.replace(/x1$/i, '').trim();
 };
 
+const SearchableProductSelect = ({ products = [], onSelect, placeholder = "-- 新增商品 --", className = "" }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [search, setSearch] = useState('');
+
+    const filteredProducts = React.useMemo(() => {
+        if (!search.trim()) return products;
+        const q = search.toLowerCase().trim();
+        return products.filter(p => 
+            (p.name && p.name.toLowerCase().includes(q)) || 
+            (p.id && p.id.toLowerCase().includes(q))
+        );
+    }, [products, search]);
+
+    return (
+        <div className={`relative inline-block text-left ${className}`}>
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className="flex items-center gap-1.5 text-xs py-1.5 px-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)] rounded-lg font-bold text-[var(--text-primary)] shadow-sm transition-all active:scale-95"
+            >
+                <Plus size={14} className="text-blue-500" />
+                <span>{placeholder}</span>
+                <ChevronDown size={13} className={`text-[var(--text-secondary)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isOpen && (
+                <>
+                    <div 
+                        className="fixed inset-0 z-[110]" 
+                        onClick={() => { setIsOpen(false); setSearch(''); }} 
+                    />
+                    <div className="absolute right-0 top-full mt-1.5 w-64 md:w-72 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl shadow-2xl z-[120] p-2 animate-in fade-in slide-in-from-top-2 duration-150">
+                        <div className="relative mb-2">
+                            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
+                            <input
+                                type="text"
+                                autoFocus
+                                placeholder="搜尋商品名稱或編號..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="w-full pl-8 pr-2 py-1.5 text-xs bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-lg text-[var(--text-primary)] focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            />
+                        </div>
+                        <div className="max-h-56 overflow-y-auto space-y-1 divide-y divide-[var(--border-primary)]/40">
+                            {filteredProducts.length === 0 ? (
+                                <div className="p-3 text-center text-xs text-[var(--text-secondary)]">
+                                    找不到符合的商品
+                                </div>
+                            ) : (
+                                filteredProducts.map(p => (
+                                    <button
+                                        key={p.id}
+                                        type="button"
+                                        onClick={() => {
+                                            onSelect(p.id);
+                                            setIsOpen(false);
+                                            setSearch('');
+                                        }}
+                                        className="w-full text-left p-2 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg flex justify-between items-center transition-colors group"
+                                    >
+                                        <div className="min-w-0 pr-2">
+                                            <div className="text-xs font-bold text-[var(--text-primary)] group-hover:text-blue-600 truncate">
+                                                {p.name}
+                                            </div>
+                                            <div className="text-[10px] text-[var(--text-secondary)] font-mono">
+                                                {p.id}
+                                            </div>
+                                        </div>
+                                        <span className="text-xs font-mono font-bold text-blue-600 shrink-0">
+                                            ${p.single_price || p.price}
+                                        </span>
+                                    </button>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+};
+
 const formatDetailItemLine = (item, prod) => {
     let rawName = item.productName || item.productId || '';
     let cleanName = rawName.replace(/\s*\([\s\S]*?\)\s*$/, '').trim();
@@ -2640,21 +2722,11 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                         </div>
                                                         <div className="flex items-center gap-2">
                                                             {/* 新增商品到此成員 */}
-                                                            <select
-                                                                className="input-field text-[11px] py-0.5 px-2 bg-[var(--bg-secondary)] border-[var(--border-primary)] rounded-md max-w-[150px]"
-                                                                defaultValue=""
-                                                                onChange={(e) => {
-                                                                    if (e.target.value) {
-                                                                        handleAddRecipientItemInModal(r.recipientId, e.target.value);
-                                                                        e.target.value = "";
-                                                                    }
-                                                                }}
-                                                            >
-                                                                <option value="" disabled>+ 新增商品</option>
-                                                                {products.map(p => (
-                                                                    <option key={p.id} value={p.id}>{p.name}</option>
-                                                                ))}
-                                                            </select>
+                                                            <SearchableProductSelect
+                                                                products={products}
+                                                                placeholder="+ 新增商品"
+                                                                onSelect={(productId) => handleAddRecipientItemInModal(r.recipientId, productId)}
+                                                            />
                                                             {/* 刪除此成員 */}
                                                             <button
                                                                 type="button"
@@ -2752,27 +2824,12 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                             訂單品項與數量
                                         </span>
 
-                                        {/* 新增商品選單 */}
-                                        <div className="flex gap-1.5 items-center">
-                                            <select
-                                                id="add-item-select"
-                                                className="input-field text-xs py-1.5 px-2 bg-[var(--bg-tertiary)] border-[var(--border-primary)] rounded-lg max-w-[180px]"
-                                                defaultValue=""
-                                                onChange={(e) => {
-                                                    if (e.target.value) {
-                                                        handleAddItem(e.target.value);
-                                                        e.target.value = ""; // 重設選單
-                                                    }
-                                                }}
-                                            >
-                                                <option value="" disabled>-- 新增商品到訂單 --</option>
-                                                {products.map(p => (
-                                                    <option key={p.id} value={p.id}>
-                                                        {p.name} (${p.single_price || p.price})
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
+                                        {/* 新增商品選單 (可搜尋) */}
+                                        <SearchableProductSelect
+                                            products={products}
+                                            placeholder="新增商品到訂單"
+                                            onSelect={(productId) => handleAddItem(productId)}
+                                        />
                                     </div>
 
                                     <div className="divide-y divide-[var(--border-primary)] bg-[var(--bg-tertiary)] rounded-xl border border-[var(--border-primary)] overflow-hidden">
