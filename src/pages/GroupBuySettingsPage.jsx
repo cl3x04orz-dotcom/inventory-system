@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Link, Calendar, Clock, Copy, Save, Plus, Check, RefreshCw, Truck, Edit2, Trash2, ChevronUp, ChevronDown, StickyNote, Eye, EyeOff, Search } from 'lucide-react';
+import { Link, Calendar, Clock, Copy, Save, Plus, Check, RefreshCw, Truck, Edit2, Trash2, ChevronUp, ChevronDown, StickyNote, Eye, EyeOff, Search, LayoutGrid, List } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import { copyToClipboard } from '../utils/clipboard';
 
@@ -12,6 +12,8 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
     const [newBuildingName, setNewBuildingName] = useState('');
     const [buildingSearchTerm, setBuildingSearchTerm] = useState(''); // 大樓搜尋關鍵字
     const [deliveryAreaSearchTerm, setDeliveryAreaSearchTerm] = useState(''); // 散客外送區域搜尋關鍵字
+    const [deliveryAreaViewMode, setDeliveryAreaViewMode] = useState('grid'); // 外送區域顯示模式 (grid/table)
+    const [productSearchTerm, setProductSearchTerm] = useState(''); // 專屬定價商品搜尋關鍵字
     
     // 隱藏/顯示大樓控制狀態 (持久化儲存在 localStorage)
     const [hiddenBuildings, setHiddenBuildings] = useState(() => {
@@ -573,26 +575,27 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
         }
     };
 
-    // 儲存運費設定
-    const handleSaveShipping = async () => {
+    // 儲存運費設定 (自動儲存)
+    const handleSaveShipping = async (overrideState = {}) => {
         const targetBuilding = isAddingNew ? newBuildingName.trim() : selectedBuilding;
-        if (!targetBuilding || targetBuilding === '__new__') {
-            alert('請先選擇或建立大樓！');
-            return;
-        }
+        if (!targetBuilding || targetBuilding === '__new__') return;
+
+        const currentIsFree = overrideState.isFreeShipping !== undefined ? overrideState.isFreeShipping : isFreeShipping;
+        const currentMin = overrideState.freeShippingMin !== undefined ? overrideState.freeShippingMin : freeShippingMin;
+        const currentFee = overrideState.shippingFee !== undefined ? overrideState.shippingFee : shippingFee;
+
         setIsSavingShipping(true);
         try {
             const res = await callGAS(apiUrl, 'saveCommunityShipping', {
                 building: targetBuilding,
-                default_free_shipping: isFreeShipping,
-                free_shipping_min: isFreeShipping ? 0 : (Number(freeShippingMin) || 0),
-                shipping_fee: isFreeShipping ? 0 : (Number(shippingFee) || 0),
+                default_free_shipping: currentIsFree,
+                free_shipping_min: currentIsFree ? 0 : (Number(currentMin) || 0),
+                shipping_fee: currentIsFree ? 0 : (Number(currentFee) || 0),
             }, user.token);
             if (res && res.error) throw new Error(res.error);
-            alert(`「${targetBuilding}」運費設定儲存成功！`);
-            await fetchSettings();
+            // 靜默儲存，不跳出 alert 或 fetchSettings
         } catch (error) {
-            alert('儲存運費設定失敗: ' + error.message);
+            console.error('儲存運費設定失敗: ' + error.message);
         } finally {
             setIsSavingShipping(false);
         }
@@ -634,13 +637,18 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
     return (
         <div className="max-w-6xl mx-auto min-h-screen flex flex-col p-4 gap-4 pb-24">
             {/* Header Area */}
-            <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shadow-sm gap-4">
+            <div className="flex items-center justify-between bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-primary)] shadow-sm">
                 <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
                     <Link className="text-blue-600" />
                     開團管理
                 </h2>
-                <button onClick={fetchSettings} className="btn-secondary px-3 py-1.5 rounded-lg text-xs font-bold" disabled={loading}>
-                    {loading ? '載入中...' : '重新整理'}
+                <button
+                    onClick={fetchSettings}
+                    disabled={loading}
+                    className="p-2 text-[var(--text-secondary)] hover:text-blue-600 hover:bg-[var(--bg-tertiary)] rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                    title="重新整理"
+                >
+                    <RefreshCw className={loading ? "animate-spin text-blue-500" : ""} size={20} />
                 </button>
             </div>
 
@@ -889,8 +897,8 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                 {activeTab === 'SCHEDULE' && (
                                     <>
                                         {/* Auto Settings Card */}
-                                        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
-                                            <div className="flex justify-between items-center pb-2.5 border-b border-[var(--border-primary)]">
+                                        <div className="bg-[var(--bg-secondary)] p-4 sm:p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
+                                            <div className="flex justify-between items-center">
                                                 <h3 className="font-extrabold text-base text-[var(--text-primary)] flex items-center gap-1.5">
                                                     <span className="flex items-center justify-center bg-blue-500 text-white rounded-full w-5 h-5 text-xs font-black">2</span>
                                                     每週定期自動開關團設定
@@ -908,8 +916,8 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                 </label>
                                             </div>
 
-                                            {isAuto ? (
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in duration-200">
+                                            {isAuto && (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in duration-200 pt-3 border-t border-[var(--border-primary)]">
                                                     {/* Auto Open Time */}
                                                     <div className="space-y-3 p-4 bg-emerald-50/10 dark:bg-emerald-950/10 rounded-2xl border border-emerald-500/20">
                                                         <label className="text-base font-extrabold text-emerald-600 flex items-center gap-1.5">
@@ -970,32 +978,40 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                         </div>
                                                     </div>
                                                 </div>
-                                            ) : (
-                                                <p className="text-sm text-[var(--text-tertiary)] italic">
-                                                    💡 啟用後，大樓每週將在指定星期與時間「自動開關團」，不需每次手動設定。
-                                                </p>
                                             )}
                                         </div>
 
                                         {/* Manual Settings Card */}
-                                        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
+                                        <div className="bg-[var(--bg-secondary)] p-4 sm:p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4 max-w-full overflow-hidden">
                                             <h3 className="font-extrabold text-base text-[var(--text-primary)] pb-2.5 border-b border-[var(--border-primary)] flex items-center gap-1.5">
                                                 <span className="flex items-center justify-center bg-blue-500 text-white rounded-full w-5 h-5 text-xs font-black">3</span>
                                                 手動臨時加開時段設定
                                             </h3>
 
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 w-full box-border">
                                                 {/* Start Time */}
-                                                <div className="space-y-3 p-4 bg-[var(--bg-tertiary)] rounded-2xl border border-[var(--border-primary)] flex flex-col justify-between">
-                                                    <div className="space-y-2">
-                                                        <label className="text-sm font-extrabold text-[var(--text-primary)] flex items-center gap-1.5">
+                                                <div className="p-3.5 sm:p-4 bg-[var(--bg-tertiary)]/60 rounded-2xl border border-[var(--border-primary)] flex flex-col gap-3 w-full max-w-full box-border overflow-hidden">
+                                                    <div className="flex items-center justify-between">
+                                                        <label className="text-xs sm:text-sm font-extrabold text-[var(--text-primary)] flex items-center gap-1.5">
                                                             <Calendar className="text-amber-500" size={16} />
                                                             加開：開始時間
                                                         </label>
+                                                        {(startDate || startTime) && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => { setStartDate(''); setStartTime(''); }}
+                                                                className="text-xs text-rose-500 hover:text-rose-700 font-extrabold hover:underline cursor-pointer"
+                                                            >
+                                                                ✕ 清除
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex flex-col sm:flex-row gap-2.5 w-full overflow-hidden">
                                                         <input
                                                             type="date"
                                                             id="startDate"
-                                                            className="input-field w-full p-3 text-sm rounded-lg border bg-[var(--bg-secondary)] font-bold focus:border-blue-500"
+                                                            className="input-field flex-1 min-w-0 appearance-none px-3 py-2.5 text-xs sm:text-sm rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] font-bold text-[var(--text-primary)] focus:border-blue-500 box-border w-full"
                                                             value={startDate}
                                                             onChange={(e) => setStartDate(e.target.value)}
                                                             onKeyDown={(e) => handleKeyDown(e, 'startTime', null)}
@@ -1003,32 +1019,37 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                         <input
                                                             type="time"
                                                             id="startTime"
-                                                            className="input-field w-full p-3 text-sm rounded-lg border bg-[var(--bg-secondary)] font-bold focus:border-blue-500"
+                                                            className="input-field flex-1 min-w-0 appearance-none px-3 py-2.5 text-xs sm:text-sm rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] font-bold text-[var(--text-primary)] focus:border-blue-500 box-border w-full"
                                                             value={startTime}
                                                             onChange={(e) => setStartTime(e.target.value)}
                                                             onKeyDown={(e) => handleKeyDown(e, 'endDate', 'startDate')}
                                                         />
                                                     </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => { setStartDate(''); setStartTime(''); }}
-                                                        className="text-xs text-red-500 font-bold hover:underline self-start mt-2"
-                                                    >
-                                                        清除開始時間
-                                                    </button>
                                                 </div>
 
                                                 {/* End Time */}
-                                                <div className="space-y-3 p-4 bg-[var(--bg-tertiary)] rounded-2xl border border-[var(--border-primary)] flex flex-col justify-between">
-                                                    <div className="space-y-2">
-                                                        <label className="text-sm font-extrabold text-[var(--text-primary)] flex items-center gap-1.5">
+                                                <div className="p-3.5 sm:p-4 bg-[var(--bg-tertiary)]/60 rounded-2xl border border-[var(--border-primary)] flex flex-col gap-3 w-full max-w-full box-border overflow-hidden">
+                                                    <div className="flex items-center justify-between">
+                                                        <label className="text-xs sm:text-sm font-extrabold text-[var(--text-primary)] flex items-center gap-1.5">
                                                             <Clock className="text-rose-500" size={16} />
                                                             加開：結束時間
                                                         </label>
+                                                        {(endDate || endTime) && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => { setEndDate(''); setEndTime(''); }}
+                                                                className="text-xs text-rose-500 hover:text-rose-700 font-extrabold hover:underline cursor-pointer"
+                                                            >
+                                                                ✕ 清除
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex flex-col sm:flex-row gap-2.5 w-full overflow-hidden">
                                                         <input
                                                             type="date"
                                                             id="endDate"
-                                                            className="input-field w-full p-3 text-sm rounded-lg border bg-[var(--bg-secondary)] font-bold focus:border-blue-500"
+                                                            className="input-field flex-1 min-w-0 appearance-none px-3 py-2.5 text-xs sm:text-sm rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] font-bold text-[var(--text-primary)] focus:border-blue-500 box-border w-full"
                                                             value={endDate}
                                                             onChange={(e) => setEndDate(e.target.value)}
                                                             onKeyDown={(e) => handleKeyDown(e, 'endTime', 'startTime')}
@@ -1036,19 +1057,12 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                         <input
                                                             type="time"
                                                             id="endTime"
-                                                            className="input-field w-full p-3 text-sm rounded-lg border bg-[var(--bg-secondary)] font-bold focus:border-blue-500"
+                                                            className="input-field flex-1 min-w-0 appearance-none px-3 py-2.5 text-xs sm:text-sm rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] font-bold text-[var(--text-primary)] focus:border-blue-500 box-border w-full"
                                                             value={endTime}
                                                             onChange={(e) => setEndTime(e.target.value)}
                                                             onKeyDown={(e) => handleKeyDown(e, 'saveBtn', 'endDate')}
                                                         />
                                                     </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => { setEndDate(''); setEndTime(''); }}
-                                                        className="text-xs text-red-500 font-bold hover:underline self-start mt-2"
-                                                    >
-                                                        清除結束時間
-                                                    </button>
                                                 </div>
                                             </div>
 
@@ -1221,10 +1235,10 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                         {/* Shipping Settings Card */}
                                         {!isAddingNew && selectedBuilding && (
                                             <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
-                                                <div className="flex justify-between items-center pb-2.5 border-b border-[var(--border-primary)]">
+                                                <div className={`flex justify-between items-center gap-2 ${!isFreeShipping ? 'pb-2.5 border-b border-[var(--border-primary)]' : ''}`}>
                                                     <h3 className="font-extrabold text-base text-[var(--text-primary)] flex items-center gap-1.5">
-                                                        <Truck size={18} className="text-emerald-500" />
-                                                        【{selectedBuilding}】運費規則設定
+                                                        <Truck size={18} className="text-emerald-500 shrink-0" />
+                                                        <span>【{selectedBuilding}】</span>
                                                     </h3>
                                                     {/* 免運切換 */}
                                                     <label className="inline-flex items-center cursor-pointer gap-2 select-none">
@@ -1234,19 +1248,19 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                                 type="checkbox"
                                                                 className="sr-only peer"
                                                                 checked={isFreeShipping}
-                                                                onChange={(e) => setIsFreeShipping(e.target.checked)}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.checked;
+                                                                    setIsFreeShipping(val);
+                                                                    handleSaveShipping({ isFreeShipping: val });
+                                                                }}
                                                             />
                                                             <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
                                                         </div>
                                                     </label>
                                                 </div>
 
-                                                {isFreeShipping ? (
-                                                    <p className="text-sm text-emerald-600 font-semibold bg-emerald-50 rounded-xl p-3 flex items-center gap-2">
-                                                        ✅ 此社區永久免運，不加收任何運費。
-                                                    </p>
-                                                ) : (
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                {!isFreeShipping && (
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in duration-200">
                                                         {/* 免運門檻 */}
                                                         <div className="flex flex-col gap-1.5">
                                                             <label className="text-sm font-extrabold text-[var(--text-primary)]">
@@ -1262,6 +1276,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                                     placeholder="例：500"
                                                                     value={freeShippingMin}
                                                                     onChange={(e) => setFreeShippingMin(e.target.value)}
+                                                                    onBlur={(e) => handleSaveShipping({ freeShippingMin: e.target.value })}
                                                                 />
                                                             </div>
                                                         </div>
@@ -1280,22 +1295,12 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                                     placeholder="例：60"
                                                                     value={shippingFee}
                                                                     onChange={(e) => setShippingFee(e.target.value)}
+                                                                    onBlur={(e) => handleSaveShipping({ shippingFee: e.target.value })}
                                                                 />
                                                             </div>
                                                         </div>
                                                     </div>
                                                 )}
-
-                                                <div className="flex justify-end border-t border-[var(--border-primary)]/50 pt-3">
-                                                    <button
-                                                        onClick={handleSaveShipping}
-                                                        disabled={isSavingShipping}
-                                                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
-                                                    >
-                                                        <Truck size={14} />
-                                                        {isSavingShipping ? '儲存中...' : '儲存運費設定'}
-                                                    </button>
-                                                </div>
                                             </div>
                                         )}
 
@@ -1414,10 +1419,34 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
 
                                                 {/* 社區專屬定價管理區塊 */}
                                                 <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4">
-                                                    <h3 className="font-extrabold text-base text-[var(--text-primary)] pb-2.5 border-b border-[var(--border-primary)] flex items-center gap-1.5">
-                                                        <span className="text-base flex-shrink-0">🏷️</span>
-                                                        【{selectedBuilding}】專屬商品定價與促銷綁定
-                                                    </h3>
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2.5 border-b border-[var(--border-primary)]">
+                                                        <h3 className="font-extrabold text-base text-[var(--text-primary)] flex items-start sm:items-center gap-1.5">
+                                                            <span className="text-base flex-shrink-0 mt-0.5 sm:mt-0">🏷️</span>
+                                                            <div className="flex flex-col sm:flex-row sm:items-center">
+                                                                <span>【{selectedBuilding}】</span>
+                                                                <span>專屬商品定價與促銷綁定</span>
+                                                            </div>
+                                                        </h3>
+                                                        <div className="relative min-w-[160px] sm:min-w-[200px]">
+                                                            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                            <input
+                                                                type="text"
+                                                                placeholder="搜尋商品..."
+                                                                value={productSearchTerm}
+                                                                onChange={(e) => setProductSearchTerm(e.target.value)}
+                                                                className="w-full pl-7 pr-6 py-1.5 text-xs rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500 font-medium"
+                                                            />
+                                                            {productSearchTerm && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setProductSearchTerm('')}
+                                                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                     <p className="text-xs text-[var(--text-tertiary)]">
                                                         在此設定專屬售價並綁定促銷活動引擎。若無設定則採用預設原價。
                                                     </p>
@@ -1425,99 +1454,114 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                     {loadingCustomPrices ? (
                                                         <div className="text-center py-6 text-xs text-[var(--text-secondary)]">載入客製化價格中...</div>
                                                     ) : (
-                                                        <div className="border border-[var(--border-primary)] rounded-xl overflow-hidden max-h-[500px] overflow-y-auto">
-                                                            <table className="w-full text-left text-xs">
-                                                                <thead className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] font-bold sticky top-0 z-10">
-                                                                    <tr className="border-b border-[var(--border-primary)]">
-                                                                        <th className="p-3 w-40">商品名稱</th>
-                                                                        <th className="p-3 text-right w-24">原價</th>
-                                                                        <th className="p-3 w-28">專屬定價</th>
-                                                                        <th className="p-3 w-40">促銷活動引擎</th>
-                                                                        <th className="p-3 text-center w-20">操作</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody className="divide-y divide-[var(--border-primary)]">
-                                                                    {allProducts.map(p => {
-                                                                        const customData = customPrices[p.id] || { price: '', promotions: [] };
-                                                                        const priceVal = customData.price !== undefined ? customData.price : '';
-                                                                        const hasCustom = customPrices[p.id] !== undefined;
+                                                        <div className="border border-[var(--border-primary)] rounded-xl overflow-hidden max-h-[500px] overflow-y-auto bg-[var(--bg-secondary)] shadow-inner">
+                                                            {/* Desktop Header */}
+                                                            <div className="hidden md:grid grid-cols-12 gap-3 p-3 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs font-bold sticky top-0 z-10 border-b border-[var(--border-primary)]">
+                                                                <div className="col-span-4">商品名稱</div>
+                                                                <div className="col-span-2 text-right pr-4">原價</div>
+                                                                <div className="col-span-2">專屬定價</div>
+                                                                <div className="col-span-3">促銷活動引擎</div>
+                                                                <div className="col-span-1 text-center">操作</div>
+                                                            </div>
+                                                            <div className="flex flex-col divide-y divide-[var(--border-primary)] text-xs">
+                                                                {allProducts
+                                                                    .filter(p => !productSearchTerm.trim() || p.name.toLowerCase().includes(productSearchTerm.trim().toLowerCase()))
+                                                                    .map(p => {
+                                                                    const customData = customPrices[p.id] || { price: '', promotions: [] };
+                                                                    const priceVal = customData.price !== undefined ? customData.price : '';
+                                                                    const hasCustom = customPrices[p.id] !== undefined;
 
-                                                                        const saveNow = (newData) => {
-                                                                            handleSaveCustomPrice(p.id, newData);
-                                                                        };
+                                                                    const saveNow = (newData) => {
+                                                                        handleSaveCustomPrice(p.id, newData);
+                                                                    };
 
-                                                                        const handlePriceChange = (val) => {
-                                                                            setCustomPrices(prev => ({
-                                                                                ...prev,
-                                                                                [p.id]: {
-                                                                                    ...(prev[p.id] || { price: '', promotions: [] }),
-                                                                                    price: val !== '' ? Number(val) : ''
-                                                                                }
-                                                                            }));
-                                                                        };
+                                                                    const handlePriceChange = (val) => {
+                                                                        setCustomPrices(prev => ({
+                                                                            ...prev,
+                                                                            [p.id]: {
+                                                                                ...(prev[p.id] || { price: '', promotions: [] }),
+                                                                                price: val !== '' ? Number(val) : ''
+                                                                            }
+                                                                        }));
+                                                                    };
 
-                                                                        return (
-                                                                            <tr key={p.id} className="hover:bg-slate-50/60 transition-colors align-top">
-                                                                                <td className="p-3 font-bold text-slate-800 leading-snug pt-4">{p.name}</td>
-                                                                                <td className="p-3 text-right font-mono font-bold text-slate-400 pt-4">${p.single_price}</td>
-                                                                                <td className="p-3 pt-4">
-                                                                                    <div className="relative w-24">
-                                                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
-                                                                                        <input
-                                                                                            type="number"
-                                                                                            min="0"
-                                                                                            placeholder="預設"
-                                                                                            className="input-field pl-5 p-1.5 w-full text-xs font-bold text-slate-800"
-                                                                                            value={priceVal}
-                                                                                            onChange={(e) => handlePriceChange(e.target.value)}
-                                                                                            onBlur={() => saveNow(customPrices[p.id] || { price: '', promotions: [] })}
-                                                                                        />
-                                                                                    </div>
-                                                                                </td>
-                                                                                <td className="p-3 pt-4">
-                                                                                    <div className="flex flex-col gap-1.5">
-                                                                                        <select
-                                                                                            className="input-field p-1.5 w-full text-xs font-bold text-slate-800 bg-white"
-                                                                                            value={customData.promoId || ''}
-                                                                                            onChange={(e) => {
-                                                                                                const val = e.target.value;
-                                                                                                setCustomPrices(prev => {
-                                                                                                    const current = prev[p.id] || { price: '', promotions: [], promoId: '' };
-                                                                                                    const newData = { ...current, promoId: val };
-                                                                                                    handleSaveCustomPrice(p.id, newData);
-                                                                                                    return { ...prev, [p.id]: newData };
-                                                                                                });
-                                                                                            }}
-                                                                                        >
-                                                                                            <option value="">無促銷活動</option>
-                                                                                            {allPromotions.map(promo => (
-                                                                                                <option key={promo.promoId} value={promo.promoId}>
-                                                                                                    {promo.name} ({promo.promoType === 'BUY_X_GET_Y' ? `買${promo.buyQty}送${promo.freeQty}` : `任${promo.buyQty}件$${promo.bundlePrice}`})
-                                                                                                </option>
-                                                                                            ))}
-                                                                                        </select>
-                                                                                    </div>
-                                                                                </td>
-                                                                                <td className="p-3 text-center pt-4">
-                                                                                    {savingPriceProductId === p.id ? (
-                                                                                        <span className="text-blue-500 font-semibold animate-pulse text-[10px]">儲存中...</span>
-                                                                                    ) : hasCustom ? (
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={() => handleDeleteCustomPrice(p.id)}
-                                                                                            className="px-2 py-1 bg-red-100 hover:bg-red-500 text-red-600 hover:text-white rounded text-[10px] font-bold active:scale-95 transition-all cursor-pointer"
-                                                                                        >
-                                                                                            移除專屬
-                                                                                        </button>
-                                                                                    ) : (
-                                                                                        <span className="text-slate-300 text-[10px]">—</span>
-                                                                                    )}
-                                                                                </td>
-                                                                            </tr>
-                                                                        );
-                                                                    })}
-                                                                </tbody>
-                                                            </table>
+                                                                    return (
+                                                                        <div key={p.id} className="flex flex-col md:grid md:grid-cols-12 gap-3 p-4 md:p-3 hover:bg-slate-50/60 transition-colors items-start md:items-center">
+                                                                            {/* 商品名稱與手機版原價 */}
+                                                                            <div className="md:col-span-4 font-bold text-slate-800 text-sm md:text-xs w-full flex justify-between md:block leading-snug">
+                                                                                <span>{p.name}</span>
+                                                                                <span className="md:hidden font-mono text-slate-400 font-bold">${p.single_price}</span>
+                                                                            </div>
+                                                                            
+                                                                            {/* 桌面版原價 */}
+                                                                            <div className="hidden md:block md:col-span-2 text-right pr-4 font-mono font-bold text-slate-400">
+                                                                                ${p.single_price}
+                                                                            </div>
+                                                                            
+                                                                            {/* 專屬定價 */}
+                                                                            <div className="md:col-span-2 w-full flex items-center justify-between md:block">
+                                                                                <span className="md:hidden font-bold text-slate-500 text-xs">專屬定價</span>
+                                                                                <div className="relative w-28 md:w-11/12">
+                                                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        min="0"
+                                                                                        placeholder="預設"
+                                                                                        className="input-field pl-5 p-1.5 w-full text-xs font-bold text-slate-800"
+                                                                                        value={priceVal}
+                                                                                        onChange={(e) => handlePriceChange(e.target.value)}
+                                                                                        onBlur={() => saveNow(customPrices[p.id] || { price: '', promotions: [] })}
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+                                                                            
+                                                                            {/* 促銷綁定 */}
+                                                                            <div className="md:col-span-3 w-full flex items-center justify-between md:block">
+                                                                                <span className="md:hidden font-bold text-slate-500 text-xs">促銷綁定</span>
+                                                                                <div className="flex-1 ml-4 md:ml-0 md:w-full">
+                                                                                    <select
+                                                                                        className="input-field p-1.5 w-full text-xs font-bold text-slate-800 bg-white truncate"
+                                                                                        value={customData.promoId || ''}
+                                                                                        onChange={(e) => {
+                                                                                            const val = e.target.value;
+                                                                                            setCustomPrices(prev => {
+                                                                                                const current = prev[p.id] || { price: '', promotions: [], promoId: '' };
+                                                                                                const newData = { ...current, promoId: val };
+                                                                                                handleSaveCustomPrice(p.id, newData);
+                                                                                                return { ...prev, [p.id]: newData };
+                                                                                            });
+                                                                                        }}
+                                                                                    >
+                                                                                        <option value="">無促銷活動</option>
+                                                                                        {allPromotions.map(promo => (
+                                                                                            <option key={promo.promoId} value={promo.promoId}>
+                                                                                                {promo.name} ({promo.promoType === 'BUY_X_GET_Y' ? `買${promo.buyQty}送${promo.freeQty}` : `任${promo.buyQty}件$${promo.bundlePrice}`})
+                                                                                            </option>
+                                                                                        ))}
+                                                                                    </select>
+                                                                                </div>
+                                                                            </div>
+                                                                            
+                                                                            {/* 操作按鈕 */}
+                                                                            <div className="md:col-span-1 w-full flex justify-end md:justify-center mt-1 md:mt-0">
+                                                                                {savingPriceProductId === p.id ? (
+                                                                                    <span className="text-blue-500 font-semibold animate-pulse text-[10px]">儲存中...</span>
+                                                                                ) : hasCustom ? (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleDeleteCustomPrice(p.id)}
+                                                                                        className="px-3 md:px-2 py-1.5 md:py-1 bg-red-100 hover:bg-red-500 text-red-600 hover:text-white rounded md:rounded text-xs md:text-[10px] font-bold active:scale-95 transition-all cursor-pointer"
+                                                                                    >
+                                                                                        移除專屬
+                                                                                    </button>
+                                                                                ) : (
+                                                                                    <span className="hidden md:inline text-slate-300 text-[10px]">—</span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>
@@ -1536,24 +1580,15 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                 <div>
                                     <h3 className="font-extrabold text-lg text-[var(--text-primary)] flex items-center gap-2">
                                         <Truck className="text-emerald-500" />
-                                        線上下單外送區域與運費管理 (散客專用)
+                                        運費管理
                                     </h3>
-                                    <p className="text-xs text-[var(--text-secondary)] mt-1">針對「一般常態線上下單」的散客，依據台南不同行政區(如東區、永康、白河)設定各自的配送運費與免運門檻。</p>
                                 </div>
-                                <button
-                                    onClick={fetchCommunities}
-                                    className="btn-secondary px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-                                    disabled={loadingCommunities}
-                                >
-                                    <RefreshCw size={12} className={loadingCommunities ? 'animate-spin' : ''} />
-                                    重新整理
-                                </button>
                             </div>
 
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                                 {/* 新增/編輯區域區 */}
-                                <div className="lg:col-span-1 border-r border-[var(--border-primary)]/50 pr-0 lg:pr-6 space-y-4">
-                                    <h4 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-1.5">
+                                <div className="lg:col-span-1 bg-[var(--bg-tertiary)] p-4 rounded-2xl border border-[var(--border-primary)] flex flex-col gap-4 h-fit">
+                                    <h4 className="font-extrabold text-sm text-[var(--text-primary)] flex items-center gap-1.5 pb-2 border-b border-[var(--border-primary)]">
                                         {editingAreaId ? '📝 編輯外送區域' : '➕ 新增外送區域'}
                                     </h4>
                                     
@@ -1646,37 +1681,128 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                 </div>
 
                                 {/* 已設定區域列表 */}
-                                <div className="lg:col-span-2 space-y-3">
-                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                                        <h4 className="font-bold text-sm text-[var(--text-primary)]">📦 目前已設定的外送區域列表</h4>
+                                <div className="lg:col-span-2 bg-[var(--bg-tertiary)] p-4 rounded-2xl border border-[var(--border-primary)] flex flex-col gap-4">
+                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-2 border-b border-[var(--border-primary)]">
+                                        <h4 className="font-extrabold text-sm text-[var(--text-primary)]">📦 外送區域列表</h4>
                                         
-                                        {/* 🔍 散客外送區域搜尋框 */}
-                                        <div className="relative w-full sm:w-56">
-                                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                            <input
-                                                type="text"
-                                                placeholder="搜尋外送區域名稱..."
-                                                value={deliveryAreaSearchTerm}
-                                                onChange={(e) => setDeliveryAreaSearchTerm(e.target.value)}
-                                                className="w-full pl-8 pr-8 py-1.5 text-xs rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500 font-bold placeholder:font-normal placeholder:text-slate-400 transition-colors"
-                                            />
-                                            {deliveryAreaSearchTerm && (
+                                        {/* 🔍 散客外送區域搜尋框與視圖切換 */}
+                                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                                            <div className="relative flex-1 sm:w-56">
+                                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="搜尋外送區域名稱..."
+                                                    value={deliveryAreaSearchTerm}
+                                                    onChange={(e) => setDeliveryAreaSearchTerm(e.target.value)}
+                                                    className="w-full pl-8 pr-8 py-1.5 text-xs rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500 font-bold placeholder:font-normal placeholder:text-slate-400 transition-colors"
+                                                />
+                                                {deliveryAreaSearchTerm && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setDeliveryAreaSearchTerm('')}
+                                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold w-4 h-4 rounded-full hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                )}
+                                            </div>
+                                            
+                                            {/* 視圖切換按鈕 */}
+                                            <div className="flex items-center bg-[var(--bg-primary)] p-0.5 rounded-lg border border-[var(--border-primary)] shrink-0">
                                                 <button
-                                                    type="button"
-                                                    onClick={() => setDeliveryAreaSearchTerm('')}
-                                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold w-4 h-4 rounded-full hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer"
+                                                    onClick={() => setDeliveryAreaViewMode('grid')}
+                                                    className={`p-1.5 rounded-md transition-all text-xs font-bold flex items-center gap-1 cursor-pointer ${
+                                                        deliveryAreaViewMode === 'grid'
+                                                            ? 'bg-[var(--bg-secondary)] text-blue-600 dark:text-blue-400 shadow-sm border border-[var(--border-primary)]'
+                                                            : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] border border-transparent'
+                                                    }`}
+                                                    title="卡片視圖"
                                                 >
-                                                    ✕
+                                                    <LayoutGrid size={14} />
                                                 </button>
-                                            )}
+                                                <button
+                                                    onClick={() => setDeliveryAreaViewMode('table')}
+                                                    className={`p-1.5 rounded-md transition-all text-xs font-bold flex items-center gap-1 cursor-pointer ${
+                                                        deliveryAreaViewMode === 'table'
+                                                            ? 'bg-[var(--bg-secondary)] text-blue-600 dark:text-blue-400 shadow-sm border border-[var(--border-primary)]'
+                                                            : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] border border-transparent'
+                                                    }`}
+                                                    title="列表視圖"
+                                                >
+                                                    <List size={14} />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                     
                                     {loadingCommunities && communities.length === 0 ? (
                                         <div className="text-center py-10 text-xs text-[var(--text-secondary)]">載入外送區域中...</div>
+                                    ) : deliveryAreaViewMode === 'grid' ? (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {communities
+                                                .filter(c => !deliveryAreaSearchTerm.trim() || c.communityName.toLowerCase().includes(deliveryAreaSearchTerm.trim().toLowerCase()))
+                                                .length > 0 ? (
+                                                communities
+                                                    .filter(c => !deliveryAreaSearchTerm.trim() || c.communityName.toLowerCase().includes(deliveryAreaSearchTerm.trim().toLowerCase()))
+                                                    .map((c) => (
+                                                        <div key={c.communityId} className="bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-primary)] p-4 flex flex-col gap-4 shadow-sm hover:shadow-md hover:border-blue-500/40 transition-all relative overflow-hidden group">
+                                                            <div className="flex justify-between items-start">
+                                                                <div className="font-black text-lg text-[var(--text-primary)] tracking-tight">{c.communityName}</div>
+                                                            </div>
+                                                            
+                                                            <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)]/60 rounded-xl p-3 flex items-center justify-between">
+                                                                <div>
+                                                                    <div className="text-[11px] text-[var(--text-tertiary)] font-extrabold flex items-center gap-1 uppercase tracking-wider">
+                                                                        運費
+                                                                    </div>
+                                                                    <div className={`text-xl font-black font-mono mt-0.5 tracking-tight ${c.defaultFreeShipping ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-500'}`}>
+                                                                        {c.defaultFreeShipping ? '免運' : `$${c.shippingFee}`}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-right border-l border-[var(--border-primary)] pl-3">
+                                                                    <div className="text-[10px] text-[var(--text-tertiary)] font-bold">免運門檻</div>
+                                                                    <div className="text-sm font-black text-[var(--text-primary)] font-mono mt-0.5">
+                                                                        {c.defaultFreeShipping ? '-' : (c.freeShippingMin > 0 ? `滿 $${c.freeShippingMin}` : '無門檻')}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-[var(--border-primary)]/50 mt-auto">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setEditingAreaId(c.communityId);
+                                                                        setAreaName(c.communityName);
+                                                                        setAreaFreeShipping(c.defaultFreeShipping);
+                                                                        setAreaFee(c.shippingFee || '');
+                                                                        setAreaFreeMin(c.freeShippingMin || '');
+                                                                    }}
+                                                                    className="py-2 px-3 bg-[var(--bg-tertiary)] hover:bg-amber-500/10 hover:text-amber-600 text-[var(--text-primary)] rounded-xl text-xs font-bold border border-[var(--border-primary)] hover:border-amber-500/30 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+                                                                >
+                                                                    編輯
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDeleteArea(c.communityId, c.communityName)}
+                                                                    className="py-2 px-3 bg-[var(--bg-tertiary)] hover:bg-rose-500/10 hover:text-rose-600 text-[var(--text-primary)] rounded-xl text-xs font-bold border border-[var(--border-primary)] hover:border-rose-500/30 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+                                                                >
+                                                                    刪除
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                            ) : (
+                                                <div className="col-span-full text-center p-10 text-[var(--text-tertiary)] bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-primary)]">
+                                                    <Truck className="mx-auto mb-3 opacity-30" size={36} />
+                                                    <p className="font-bold text-sm text-[var(--text-secondary)]">
+                                                        {deliveryAreaSearchTerm ? `查無符合「${deliveryAreaSearchTerm}」的外送區域` : '目前尚無外送區域，請在左側表單建立第一個區域！'}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
                                     ) : (
-                                        <div className="border border-[var(--border-primary)] rounded-xl overflow-hidden">
-                                            <table className="w-full text-left text-xs">
+                                        <div className="border border-[var(--border-primary)] rounded-xl overflow-hidden overflow-x-auto w-full">
+                                            <table className="w-full text-left text-xs whitespace-nowrap min-w-[500px]">
                                                 <thead className="bg-[var(--bg-secondary)] text-[var(--text-secondary)] font-bold">
                                                     <tr className="border-b border-[var(--border-primary)]">
                                                         <th className="p-3">區域名稱</th>
@@ -1698,7 +1824,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                                         {c.defaultFreeShipping ? '免運' : `$${c.shippingFee}`}
                                                                     </td>
                                                                     <td className="p-3 font-mono font-bold text-slate-600">
-                                                                        {c.defaultFreeShipping ? '-' : (c.freeShippingMin > 0 ? `滿 $${c.freeShippingMin} 免運` : '無免運門檻')}
+                                                                        {c.defaultFreeShipping ? '-' : (c.freeShippingMin > 0 ? `滿 $${c.freeShippingMin}` : '無門檻')}
                                                                     </td>
                                                                     <td className="p-3 text-center space-x-1.5">
                                                                         <button
