@@ -286,7 +286,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                             const status = savingStatus[product.id];
                             
                             return (
-                                <div key={product.id} className={`flex flex-col rounded-2xl border transition-all duration-300 bg-[var(--bg-secondary)] shadow-sm ${
+                                <div key={product.id} className={`flex flex-col rounded-2xl border transition-all duration-300 bg-[var(--bg-secondary)] shadow-sm overflow-hidden ${
                                     isExpanded 
                                         ? 'border-[var(--border-primary)] shadow-md' 
                                         : 'border-[var(--border-primary)] hover:border-[var(--border-primary)]/80 hover:shadow-md'
@@ -345,16 +345,16 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                 
                                                 {/* 📅 有效日期 + 儲存狀態 */}
                                                 <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700 hidden sm:inline" />
-                                                <span className="inline-flex items-center gap-1.5 text-[var(--text-secondary)] font-medium" onClick={(e) => e.stopPropagation()}>
-                                                    <span>有效日期：</span>
+                                                <span className="inline-flex flex-wrap items-center gap-1.5 text-[var(--text-secondary)] font-medium max-w-full" onClick={(e) => e.stopPropagation()}>
+                                                    <span className="whitespace-nowrap shrink-0">有效日期：</span>
                                                     <input
                                                         type="date"
-                                                        className="input-field text-xs px-2 py-0.5 w-28 sm:w-32 font-semibold bg-[var(--bg-primary)] border-[var(--border-primary)] rounded-lg text-[var(--text-primary)]"
+                                                        className="input-field text-[11px] sm:text-xs px-1.5 py-0.5 w-[125px] sm:w-[132px] font-semibold bg-[var(--bg-primary)] border-[var(--border-primary)] rounded-lg text-[var(--text-primary)] shrink-0"
                                                         value={product.expiryDate || ''}
                                                         onChange={(e) => {
                                                             const val = e.target.value || '';
                                                             handleFieldChange(product.id, 'expiryDate', val);
-                                                            handleSaveProduct(product.id, { expiryDate: val });
+                                                            handleSaveProduct(product.id, { isActive: product.isActive, expiryDate: val });
                                                         }}
                                                     />
                                                     {product.expiryDate && (
@@ -364,7 +364,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 handleFieldChange(product.id, 'expiryDate', '');
                                                                 handleSaveProduct(product.id, { expiryDate: '' });
                                                             }}
-                                                            className="text-[10px] text-rose-500 hover:text-rose-700 font-bold px-1 rounded hover:bg-rose-50 cursor-pointer"
+                                                            className="text-[10px] text-rose-500 hover:text-rose-700 font-bold px-1 rounded hover:bg-rose-50 cursor-pointer whitespace-nowrap shrink-0"
                                                             title="清除日期 (設為無日期)"
                                                         >
                                                             ✕ 清除
