@@ -919,14 +919,14 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                             {isAuto && (
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in duration-200 pt-3 border-t border-[var(--border-primary)]">
                                                     {/* Auto Open Time */}
-                                                    <div className="space-y-3 p-4 bg-emerald-50/10 dark:bg-emerald-950/10 rounded-2xl border border-emerald-500/20">
+                                                    <div className="space-y-3 p-4 bg-[var(--bg-tertiary)] rounded-2xl border border-[var(--border-primary)] shadow-sm">
                                                         <label className="text-base font-extrabold text-emerald-600 flex items-center gap-1.5">
                                                             <Clock size={18} />
                                                             自動開團時間 (每週)
                                                         </label>
-                                                        <div className="grid grid-cols-2 gap-2">
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
                                                             <select
-                                                                className="input-field p-3 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)]"
+                                                                className="input-field w-full min-w-0 p-3 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)]"
                                                                 value={autoOpenDay}
                                                                 onChange={(e) => setAutoOpenDay(e.target.value)}
                                                             >
@@ -941,7 +941,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                             </select>
                                                             <input
                                                                 type="time"
-                                                                className="input-field p-3 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)]"
+                                                                className="input-field w-full min-w-0 p-3 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)] appearance-none"
                                                                 value={autoOpenTime}
                                                                 onChange={(e) => setAutoOpenTime(e.target.value)}
                                                             />
@@ -949,14 +949,14 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                     </div>
 
                                                     {/* Auto Close Time */}
-                                                    <div className="space-y-3 p-4 bg-rose-50/10 dark:bg-rose-950/10 rounded-2xl border border-rose-500/20">
+                                                    <div className="space-y-3 p-4 bg-[var(--bg-tertiary)] rounded-2xl border border-[var(--border-primary)] shadow-sm">
                                                         <label className="text-base font-extrabold text-rose-600 flex items-center gap-1.5">
                                                             <Clock size={18} />
                                                             自動結單時間 (每週)
                                                         </label>
-                                                        <div className="grid grid-cols-2 gap-2">
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
                                                             <select
-                                                                className="input-field p-3 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)]"
+                                                                className="input-field w-full min-w-0 p-3 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)]"
                                                                 value={autoCloseDay}
                                                                 onChange={(e) => setAutoCloseDay(e.target.value)}
                                                             >
@@ -971,7 +971,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                             </select>
                                                             <input
                                                                 type="time"
-                                                                className="input-field p-3 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)]"
+                                                                className="input-field w-full min-w-0 p-3 text-sm bg-[var(--bg-secondary)] border-[var(--border-primary)] appearance-none"
                                                                 value={autoCloseTime}
                                                                 onChange={(e) => setAutoCloseTime(e.target.value)}
                                                             />
