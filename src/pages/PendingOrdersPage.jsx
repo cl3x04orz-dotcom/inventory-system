@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Package, ClipboardList, Eye, Edit, Trash2, CheckCircle, RefreshCw, X, User, Users, Phone, MapPin, FileText, Plus, Minus, Save, Calendar, Clock, Check, Search, Copy, PackageSearch, ChevronDown, ChevronUp, Building2 } from 'lucide-react';
 import { callGAS } from '../utils/api';
+import { copyToClipboard } from '../utils/clipboard';
 
 // --- 🎨 口味備註解析與格式化輔助函數 ---
 const parseRemarkToFlavorMap = (remarkStr, flavorChoices = [], currentTotalQty = 0) => {
@@ -1381,15 +1382,14 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     }, [sortedFilteredOrders]);
 
     // 一鍵複製小工具
-    const handleCopyText = (text, typeLabel) => {
+    const handleCopyText = async (text, typeLabel) => {
         if (!text) return;
-        navigator.clipboard.writeText(text)
-            .then(() => {
-                alert(`${typeLabel}已複製：${text}`);
-            })
-            .catch(err => {
-                console.error('Copy failed:', err);
-            });
+        const ok = await copyToClipboard(text);
+        if (ok) {
+            alert(`${typeLabel}已複製：${text}`);
+        } else {
+            alert(`複製失敗，請手動複製：\n${text}`);
+        }
     };
 
     // 一鍵標記已付款快捷功能
@@ -1550,7 +1550,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         });
     };
 
-    const handleCopyShipmentSummary = () => {
+    const handleCopyShipmentSummary = async () => {
         const targetOrders = selectedOrderIds.length > 0
             ? sortedFilteredOrders.filter(o => selectedOrderIds.includes(o.orderId))
             : sortedFilteredOrders;
@@ -1596,31 +1596,16 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
         const textToCopy = lines.join('\n');
 
-        navigator.clipboard.writeText(textToCopy)
-            .then(() => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-            })
-            .catch(err => {
-                console.error('Failed to copy text: ', err);
-                const textArea = document.createElement('textarea');
-                textArea.value = textToCopy;
-                textArea.style.position = 'fixed';
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                try {
-                    document.execCommand('copy');
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                } catch (e) {
-                    alert('複製失敗，請手動複製：\n\n' + textToCopy);
-                }
-                document.body.removeChild(textArea);
-            });
+        const ok = await copyToClipboard(textToCopy);
+        if (ok) {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } else {
+            alert('複製失敗，請手動複製：\n\n' + textToCopy);
+        }
     };
 
-    const handleCopyDetailSummary = () => {
+    const handleCopyDetailSummary = async () => {
         const targetOrders = selectedOrderIds.length > 0
             ? sortedFilteredOrders.filter(o => selectedOrderIds.includes(o.orderId))
             : sortedFilteredOrders;
@@ -1660,7 +1645,6 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     const rTotal = r.items.reduce((sum, ri) => sum + (ri.subtotal != null && ri.subtotal !== undefined ? Number(ri.subtotal) : 0), 0);
                     lines.push(`      👤 ${r.recipientName}（$${rTotal}）`);
                     r.items.forEach(ri => {
-                        // 解析口味備註
                         const rawRem = String(ri.remark || '').trim();
                         let flavorStr = '';
                         if (rawRem.includes('【口味備註：')) {
@@ -1673,13 +1657,11 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         flavorStr = stripTrailingQty(flavorStr);
                         const remarkStr = flavorStr ? `【${flavorStr}】` : (rawRem === '贈品' ? '【贈品】' : '');
 
-                        // 清理商品名稱
                         const cleanRiName = String(ri.productName || '')
                             .replace(/\s*【.*?】/g, '')
                             .replace(/\s*\(.*?\)/g, '')
                             .trim();
 
-                        // 組合/瓶 格式
                         const prod = products.find(p => p.id === ri.productId || p.name === cleanRiName);
                         const isBundle = prod ? prod.isBundle : false;
                         const bundleSize = prod ? prod.bundleSize : 1;
@@ -1700,31 +1682,16 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
         const textToCopy = lines.join('\n');
 
-        navigator.clipboard.writeText(textToCopy)
-            .then(() => {
-                setDetailCopied(true);
-                setTimeout(() => setDetailCopied(false), 2000);
-            })
-            .catch(err => {
-                console.error('Failed to copy text: ', err);
-                const textArea = document.createElement('textarea');
-                textArea.value = textToCopy;
-                textArea.style.position = 'fixed';
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                try {
-                    document.execCommand('copy');
-                    setDetailCopied(true);
-                    setTimeout(() => setDetailCopied(false), 2000);
-                } catch (e) {
-                    alert('複製失敗，請手動複製：\n\n' + textToCopy);
-                }
-                document.body.removeChild(textArea);
-            });
+        const ok = await copyToClipboard(textToCopy);
+        if (ok) {
+            setDetailCopied(true);
+            setTimeout(() => setDetailCopied(false), 2000);
+        } else {
+            alert('複製失敗，請手動複製：\n\n' + textToCopy);
+        }
     };
 
-    const handleCopyClientDetailSummary = () => {
+    const handleCopyClientDetailSummary = async () => {
         const targetOrders = selectedOrderIds.length > 0
             ? sortedFilteredOrders.filter(o => selectedOrderIds.includes(o.orderId))
             : sortedFilteredOrders;
@@ -1737,7 +1704,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
         const lines = [];
         const isSelectedStr = selectedOrderIds.length > 0 && finalOrders.length === targetOrders.length ? ` (已選取 ${finalOrders.length} 筆)` : '';
-        lines.push(`📋 物流分貨明細 (客戶) (${selectedBuilding === '全部' ? '全部大樓' : selectedBuilding})${isSelectedStr}`);
+        lines.push(`📱 顧客對帳清單 (${selectedBuilding === '全部' ? '全部大樓' : selectedBuilding})${isSelectedStr}`);
         lines.push(`彙整時間：${new Date().toLocaleString('zh-TW')}`);
         lines.push(`訂單總數：${finalOrders.length} 筆`);
         lines.push('----------------------------------------');
@@ -1756,44 +1723,6 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
                 lines.push(formatDetailItemLine(item, prod));
             });
-            
-            // 團員代訂分配明細
-            if (order.recipients && order.recipients.length > 0) {
-                lines.push('   👥 團員分配：');
-                order.recipients.forEach(r => {
-                    const rTotal = r.items.reduce((sum, ri) => sum + (ri.subtotal != null && ri.subtotal !== undefined ? Number(ri.subtotal) : 0), 0);
-                    lines.push(`      👤 ${r.recipientName}（$${rTotal}）`);
-                    r.items.forEach(ri => {
-                        // 解析口味備註
-                        const rawRem = String(ri.remark || '').trim();
-                        let flavorStr = '';
-                        if (rawRem.includes('【口味備註：')) {
-                            flavorStr = rawRem.replace(/.*?【口味備註：(.*?)】.*/, '$1').trim();
-                        } else if (rawRem.includes('【') && rawRem.includes('】')) {
-                            flavorStr = rawRem.replace(/.*?【(.*?)】.*/, '$1').trim();
-                        } else if (rawRem && rawRem !== '贈品') {
-                            flavorStr = rawRem;
-                        }
-                        flavorStr = stripTrailingQty(flavorStr);
-                        const remarkStr = flavorStr ? `【${flavorStr}】` : (rawRem === '贈品' ? '【贈品】' : '');
-
-                        // 清理商品名稱
-                        const cleanRiName = String(ri.productName || '')
-                            .replace(/\s*【.*?】/g, '')
-                            .replace(/\s*\(.*?\)/g, '')
-                            .trim();
-
-                        // 組合/瓶 格式
-                        const prod = products.find(p => p.id === ri.productId || p.name === cleanRiName);
-                        const isBundle = prod ? prod.isBundle : false;
-                        const bundleSize = prod ? prod.bundleSize : 1;
-                        const unitStr = isBundle ? `組 (共 ${ri.qty * bundleSize} 瓶)` : '瓶';
-
-                        const sub = ri.subtotal != null && ri.subtotal !== undefined ? Number(ri.subtotal) : 0;
-                        lines.push(`         - ${cleanRiName} x ${ri.qty} ${unitStr}${remarkStr}= $${sub}`);
-                    });
-                });
-            }
 
             lines.push(`   合計金額：$${order.totalAmount}`);
             lines.push('----------------------------------------');
@@ -1801,28 +1730,13 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
         const textToCopy = lines.join('\n');
 
-        navigator.clipboard.writeText(textToCopy)
-            .then(() => {
-                setClientDetailCopied(true);
-                setTimeout(() => setClientDetailCopied(false), 2000);
-            })
-            .catch(err => {
-                console.error('Failed to copy text: ', err);
-                const textArea = document.createElement('textarea');
-                textArea.value = textToCopy;
-                textArea.style.position = 'fixed';
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                try {
-                    document.execCommand('copy');
-                    setClientDetailCopied(true);
-                    setTimeout(() => setClientDetailCopied(false), 2000);
-                } catch (e) {
-                    alert('複製失敗，請手動複製：\n\n' + textToCopy);
-                }
-                document.body.removeChild(textArea);
-            });
+        const ok = await copyToClipboard(textToCopy);
+        if (ok) {
+            setClientDetailCopied(true);
+            setTimeout(() => setClientDetailCopied(false), 2000);
+        } else {
+            alert('複製失敗，請手動複製：\n\n' + textToCopy);
+        }
     };
 
     const unnamedGroups = React.useMemo(() => {
@@ -2028,8 +1942,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 </div>
             )}
 
-            {/* 批次操作列 (限待確認與未付款 tab 下) */}
-            {(activeTab === 'PENDING' || activeTab === 'UNPAID') && sortedFilteredOrders.length > 0 && (
+            {/* 批次操作列 (適用全狀態 tab) */}
+            {sortedFilteredOrders.length > 0 && (
                 <div className="bg-slate-50 dark:bg-slate-900/10 border border-[var(--border-primary)] rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-inner">
                     <div className="flex items-center gap-2">
                         <input
@@ -2040,7 +1954,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             id="selectAllCheckbox"
                         />
                         <label htmlFor="selectAllCheckbox" className="text-sm font-bold text-[var(--text-secondary)] cursor-pointer select-none">
-                            全選本頁面{activeTab === 'UNPAID' ? '未付款' : '待審核'}訂單
+                            全選本頁面{activeTab === 'UNPAID' ? '未付款' : activeTab === 'CONFIRMED' ? '已出貨/確認' : '待審核'}訂單
                         </label>
                         <span className="text-xs text-[var(--text-tertiary)] ml-1">
                             (已選取 {selectedOrderIds.length} 筆)
@@ -2086,7 +2000,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-[var(--border-primary)] pb-1.5 gap-2 w-full max-w-full">
                 <div className="grid grid-cols-3 w-full sm:flex sm:w-auto items-center gap-1 sm:gap-2">
                     <button
-                        onClick={() => { setActiveTab('PENDING'); }}
+                        onClick={() => { setActiveTab('PENDING'); setSelectedOrderIds([]); }}
                         className={`px-1 sm:px-4 py-2 font-bold text-xs sm:text-sm text-center transition-colors border-b-2 whitespace-nowrap ${activeTab === 'PENDING'
                                 ? 'border-blue-500 text-blue-600'
                                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -2095,7 +2009,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         <span>待確認訂單</span><span className="hidden md:inline text-[11px] opacity-80"> (PENDING)</span>
                     </button>
                     <button
-                        onClick={() => { setActiveTab('CONFIRMED'); }}
+                        onClick={() => { setActiveTab('CONFIRMED'); setSelectedOrderIds([]); }}
                         className={`px-1 sm:px-4 py-2 font-bold text-xs sm:text-sm text-center transition-colors border-b-2 whitespace-nowrap ${activeTab === 'CONFIRMED'
                                 ? 'border-blue-500 text-blue-600'
                                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -2104,7 +2018,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         <span>已出貨/確認</span><span className="hidden md:inline text-[11px] opacity-80"> (CONFIRMED)</span>
                     </button>
                     <button
-                        onClick={() => { setActiveTab('UNPAID'); }}
+                        onClick={() => { setActiveTab('UNPAID'); setSelectedOrderIds([]); }}
                         className={`px-1 sm:px-4 py-2 font-bold text-xs sm:text-sm text-center transition-colors border-b-2 whitespace-nowrap ${activeTab === 'UNPAID'
                                 ? 'border-amber-500 text-amber-600'
                                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -2204,18 +2118,16 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                         {/* 第一列：顧客姓名 + 深灰總金額 + 灰底/藍觸發按鈕 [📦 商品明細 ∨] */}
                                         <div className="flex items-center justify-between gap-3 flex-wrap">
                                             <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                {(activeTab === 'PENDING' || activeTab === 'UNPAID') && (
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedOrderIds.includes(order.orderId)}
-                                                        onChange={(e) => {
-                                                            e.stopPropagation();
-                                                            handleToggleSelectOrder(order.orderId);
-                                                        }}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer flex-shrink-0"
-                                                    />
-                                                )}
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedOrderIds.includes(order.orderId)}
+                                                    onChange={(e) => {
+                                                        e.stopPropagation();
+                                                        handleToggleSelectOrder(order.orderId);
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer flex-shrink-0"
+                                                />
                                                 <div className="flex flex-col min-w-0">
                                                     <span className="font-extrabold text-[var(--text-primary)] text-lg md:text-xl flex items-center gap-1.5 leading-tight">
                                                         <User size={18} className="text-slate-400 dark:text-slate-500 shrink-0" />

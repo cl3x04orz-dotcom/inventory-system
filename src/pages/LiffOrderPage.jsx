@@ -25,6 +25,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { callGAS, memberApi } from "../utils/api";
+import { copyToClipboard } from '../utils/clipboard';
 import logoImg from "../assets/logo.png";
 import logoLiff from "../assets/logo_liff.jpg";
 
@@ -178,14 +179,13 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   const [orderTime, setOrderTime] = useState("");
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = (text) => {
+  const handleCopy = async (text) => {
     if (!text) return;
-    navigator.clipboard.writeText(text).then(() => {
+    const ok = await copyToClipboard(text);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    }).catch(err => {
-      console.error("Failed to copy:", err);
-    });
+    }
   };
 
   // ── 大樓群組綁定與管理員 State ──────────────────────────────

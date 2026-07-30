@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, Calendar, Clock, Copy, Save, Plus, Check, RefreshCw, Truck, Edit2, Trash2, ChevronUp, ChevronDown, StickyNote, Eye, EyeOff, Search } from 'lucide-react';
 import { callGAS } from '../utils/api';
+import { copyToClipboard } from '../utils/clipboard';
 
 export default function GroupBuySettingsPage({ user, apiUrl }) {
     const [activeTab, setActiveTab] = useState('SCHEDULE'); // SCHEDULE | PROMOTION_LINK | PRICING_SHIPPING | DELIVERY_ZONES
@@ -605,31 +606,16 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
         return `https://liff.line.me/${LIFF_ID}?building=${encodeURIComponent(targetBuilding)}`;
     };
 
-    const handleCopy = () => {
+    const handleCopy = async () => {
         const url = getGeneratedUrl();
         if (!url) return;
-
-        navigator.clipboard.writeText(url)
-            .then(() => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-            })
-            .catch(() => {
-                const textArea = document.createElement('textarea');
-                textArea.value = url;
-                textArea.style.position = 'fixed';
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                try {
-                    document.execCommand('copy');
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                } catch (e) {
-                    alert('複製失敗，請手動複製網址');
-                }
-                document.body.removeChild(textArea);
-            });
+        const ok = await copyToClipboard(url);
+        if (ok) {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } else {
+            alert('複製失敗，請手動複製：\n' + url);
+        }
     };
 
     const activeUrl = getGeneratedUrl();
@@ -722,164 +708,63 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                 <>
                     {/* 大樓專屬三大頁籤 (SCHEDULE / PROMOTION_LINK / PRICING_SHIPPING) */}
                     {activeTab !== 'DELIVERY_ZONES' && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pb-6">
-                            {/* Left: Building Selection Card */}
-                            <div className="md:col-span-1 bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-4 h-auto md:h-full overflow-hidden">
-                                <div className="flex flex-col gap-2 pb-2.5 border-b border-[var(--border-primary)] flex-shrink-0">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="font-extrabold text-base text-[var(--text-primary)] flex items-center gap-1.5">
-                                            <span className="flex items-center justify-center bg-blue-500 text-white rounded-full w-5 h-5 text-xs font-black">1</span>
+                        <div className="flex flex-col gap-5 pb-6">
+                            {/* 🏢 大樓 / 社區 橫向左右滑動選擇器 */}
+                            <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-primary)] shadow-sm space-y-3">
+                                {/* 頂欄：標題、搜尋框與輔助按鈕 */}
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border-primary)] pb-2.5">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <h3 className="font-extrabold text-sm md:text-base text-[var(--text-primary)] flex items-center gap-1.5 whitespace-nowrap">
+                                            <span className="flex items-center justify-center bg-blue-600 text-white rounded-full w-5 h-5 text-xs font-black">1</span>
                                             選擇大樓 / 社區
                                         </h3>
+                                        <span className="text-xs text-[var(--text-tertiary)] hidden sm:inline">
+                                            (← 左右滑動切換社區 →)
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        {/* 🔍 大樓搜尋框 */}
+                                        <div className="relative min-w-[160px] sm:min-w-[200px]">
+                                            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="搜尋大樓..."
+                                                value={buildingSearchTerm}
+                                                onChange={(e) => setBuildingSearchTerm(e.target.value)}
+                                                className="w-full pl-7 pr-6 py-1 text-xs rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500 font-medium"
+                                            />
+                                            {buildingSearchTerm && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setBuildingSearchTerm('')}
+                                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* 隱藏 / 顯示按鈕 */}
                                         <button
                                             type="button"
                                             onClick={() => setShowHidden(prev => !prev)}
-                                            className={`text-[11px] font-bold px-2 py-1 rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
+                                            className={`text-xs font-bold px-2.5 py-1 rounded-xl border transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap ${
                                                 showHidden 
-                                                    ? 'bg-amber-500/10 text-amber-600 border-amber-500/30 hover:bg-amber-500 hover:text-white'
-                                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-200'
+                                                    ? 'bg-amber-500/10 text-amber-600 border-amber-500/30'
+                                                    : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:bg-[var(--bg-hover)]'
                                             }`}
-                                            title={showHidden ? '隱藏已關閉的項目' : '顯示包含已隱藏的項目'}
+                                            title={showHidden ? '隱藏已關閉項目' : '顯示全數'}
                                         >
-                                            {showHidden ? <Eye size={12} /> : <EyeOff size={12} />}
-                                            {showHidden ? '隱藏關閉' : `顯示全數 (${hiddenBuildings.length}已隱藏)`}
+                                            {showHidden ? <Eye size={13} /> : <EyeOff size={13} />}
+                                            <span>{showHidden ? '隱藏關閉' : `全數 (${hiddenBuildings.length})`}</span>
                                         </button>
                                     </div>
-
-                                    {/* 🔍 大樓快速搜尋框 */}
-                                    <div className="relative">
-                                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                        <input
-                                            type="text"
-                                            placeholder="搜尋大樓 / 社區名稱..."
-                                            value={buildingSearchTerm}
-                                            onChange={(e) => setBuildingSearchTerm(e.target.value)}
-                                            className="w-full pl-8 pr-8 py-2 text-xs rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500 font-bold placeholder:font-normal placeholder:text-slate-400 transition-colors"
-                                        />
-                                        {buildingSearchTerm && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setBuildingSearchTerm('')}
-                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold w-4 h-4 rounded-full hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer"
-                                            >
-                                                ✕
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    {/* 快速一鍵隱藏全台行政區輔助按鈕 */}
-                                    {settings.some(s => (s.building.startsWith('台南市') || s.building.startsWith('高雄市')) && s.building.endsWith('區') && !hiddenBuildings.includes(s.building)) && (
-                                        <button
-                                            type="button"
-                                            onClick={hideAllDistricts}
-                                            className="text-[10px] text-blue-600 hover:text-blue-800 font-bold underline text-left self-start"
-                                        >
-                                            ⚡ 一鍵隱藏選單中的所有散客行政區 (如台南市永康區等)
-                                        </button>
-                                    )}
                                 </div>
-                                
-                                {/* 大樓清單區 */}
-                                <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 max-h-[500px] md:max-h-none">
-                                    {settings
-                                        .filter(s => showHidden || !hiddenBuildings.includes(s.building))
-                                        .filter(s => !buildingSearchTerm.trim() || s.building.toLowerCase().includes(buildingSearchTerm.trim().toLowerCase()))
-                                        .map((s, idx) => {
-                                            const isHidden = hiddenBuildings.includes(s.building);
-                                            const isSelected = selectedBuilding === s.building && !isAddingNew;
-                                            return (
-                                                <button
-                                                    key={s.building}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setIsAddingNew(false);
-                                                        setSelectedBuilding(s.building);
-                                                        updateFormFields(s.building);
-                                                    }}
-                                                    className={`w-full text-left p-3 rounded-xl border flex items-center justify-between transition-all duration-200 ${
-                                                        isHidden
-                                                            ? 'bg-slate-100/60 dark:bg-slate-900/40 border-dashed border-slate-300 text-slate-400 opacity-60'
-                                                            : isSelected 
-                                                                ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm font-extrabold' 
-                                                                : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:text-slate-900'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                                                        <span className="text-base flex-shrink-0">{isHidden ? '🙈' : '🏢'}</span>
-                                                        <div className="flex flex-col min-w-0">
-                                                            <div className="flex items-center gap-1.5">
-                                                                <span className={`text-base font-bold tracking-wide truncate ${isHidden ? 'line-through text-slate-400' : ''}`}>
-                                                                    {s.building}
-                                                                </span>
-                                                                {isHidden && (
-                                                                    <span className="text-[10px] bg-slate-200 text-slate-600 px-1 py-0.2 rounded font-normal">已隱藏</span>
-                                                                )}
-                                                            </div>
-                                                            {s.admin_note && (
-                                                                <span className="text-xs text-amber-600 font-medium truncate leading-tight mt-0.5">
-                                                                    {s.admin_note}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                                                        {/* 👁️ 隱藏 / 顯示切換按鈕 */}
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => toggleHideBuilding(s.building)}
-                                                            className={`p-1 rounded transition-colors ${
-                                                                isHidden
-                                                                    ? 'hover:bg-emerald-100 text-emerald-600'
-                                                                    : 'hover:bg-slate-200 text-slate-400 hover:text-slate-600'
-                                                            }`}
-                                                            title={isHidden ? '取消隱藏 (重新顯示)' : '隱藏此大樓'}
-                                                        >
-                                                            {isHidden ? <Eye size={15} /> : <EyeOff size={15} />}
-                                                        </button>
 
-                                                        {isSelected && (
-                                                            <>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleMoveBuilding(idx, -1)}
-                                                                    disabled={idx === 0}
-                                                                    className="p-1 hover:bg-blue-100 rounded text-blue-400 disabled:opacity-30 transition-colors"
-                                                                    title="上移"
-                                                                >
-                                                                    <ChevronUp size={14} />
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleMoveBuilding(idx, 1)}
-                                                                    disabled={idx === settings.length - 1}
-                                                                    className="p-1 hover:bg-blue-100 rounded text-blue-400 disabled:opacity-30 transition-colors"
-                                                                    title="下移"
-                                                                >
-                                                                    <ChevronDown size={14} />
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleRenameClick(s.building)}
-                                                                    className="p-1 hover:bg-blue-150 rounded text-blue-600 transition-colors"
-                                                                    title="修改名稱"
-                                                                >
-                                                                    <Edit2 size={15} />
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleDeleteClick(s.building)}
-                                                                    className="p-1 hover:bg-red-50 rounded text-red-500 transition-colors"
-                                                                    title="刪除大樓"
-                                                                >
-                                                                    <Trash2 size={15} />
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
-                                    
+                                {/* ↔️ 大樓標籤列 (左右滑動) */}
+                                <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700">
+                                    {/* + 新增大樓按鈕 */}
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -896,23 +781,93 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                             setAutoCloseDay('');
                                             setAutoCloseTime('');
                                         }}
-                                        className={`w-full text-left p-3 rounded-xl border-2 border-dashed flex items-center gap-2 transition-all duration-200 ${
+                                        className={`px-3 py-1.5 rounded-xl border-2 border-dashed flex items-center gap-1.5 shrink-0 transition-all font-bold text-xs cursor-pointer ${
                                             isAddingNew 
-                                                ? 'bg-blue-50 border-blue-300 text-blue-600 font-extrabold' 
-                                                : 'bg-transparent border-slate-300 hover:border-slate-400 text-slate-500 hover:text-slate-700'
+                                                ? 'bg-blue-600 border-blue-600 text-white shadow-sm' 
+                                                : 'bg-blue-50 dark:bg-blue-950/30 border-blue-300 hover:border-blue-500 text-blue-600 dark:text-blue-400'
                                         }`}
                                     >
-                                        <Plus size={20} />
-                                        <span className="text-lg font-bold">新增大樓 / 社區</span>
+                                        <Plus size={14} />
+                                        <span>新增大樓/社區</span>
                                     </button>
+
+                                    {settings
+                                        .filter(s => showHidden || !hiddenBuildings.includes(s.building))
+                                        .filter(s => !buildingSearchTerm.trim() || s.building.toLowerCase().includes(buildingSearchTerm.trim().toLowerCase()))
+                                        .map((s, idx) => {
+                                            const isHidden = hiddenBuildings.includes(s.building);
+                                            const isSelected = selectedBuilding === s.building && !isAddingNew;
+                                            return (
+                                                <div
+                                                    key={s.building}
+                                                    onClick={() => {
+                                                        setIsAddingNew(false);
+                                                        setSelectedBuilding(s.building);
+                                                        updateFormFields(s.building);
+                                                    }}
+                                                    className={`px-3.5 py-1.5 rounded-xl border flex items-center gap-2 shrink-0 transition-all duration-150 cursor-pointer select-none font-bold text-xs ${
+                                                        isHidden
+                                                            ? 'bg-slate-100 dark:bg-slate-900/40 border-dashed border-slate-300 text-slate-400 opacity-60'
+                                                            : isSelected 
+                                                                ? 'bg-blue-600 border-blue-600 text-white shadow-md' 
+                                                                : 'bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)]'
+                                                    }`}
+                                                >
+                                                    <span>{isHidden ? '🙈' : '🏢'}</span>
+                                                    <span className={`whitespace-nowrap ${isHidden ? 'line-through' : ''}`}>
+                                                        {s.building}
+                                                    </span>
+                                                    {s.admin_note && (
+                                                        <span className={`text-[10px] px-1.5 py-0.2 rounded font-medium ${isSelected ? 'bg-blue-500 text-blue-100' : 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300'}`}>
+                                                            {s.admin_note}
+                                                        </span>
+                                                    )}
+
+                                                    {/* 動作小圖示：隱藏/重命名/刪除 */}
+                                                    <div className="flex items-center gap-1 ml-0.5" onClick={(e) => e.stopPropagation()}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleHideBuilding(s.building)}
+                                                            className={`p-0.5 rounded transition-colors ${
+                                                                isSelected ? 'hover:bg-blue-500 text-blue-200' : 'hover:bg-slate-200 text-slate-400'
+                                                            }`}
+                                                            title={isHidden ? '取消隱藏' : '隱藏'}
+                                                        >
+                                                            {isHidden ? <Eye size={12} /> : <EyeOff size={12} />}
+                                                        </button>
+                                                        {isSelected && (
+                                                            <>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleRenameClick(s.building)}
+                                                                    className="p-0.5 hover:bg-blue-500 rounded text-blue-100 transition-colors"
+                                                                    title="修改名稱"
+                                                                >
+                                                                    <Edit2 size={12} />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDeleteClick(s.building)}
+                                                                    className="p-0.5 hover:bg-blue-500 rounded text-rose-200 transition-colors"
+                                                                    title="刪除"
+                                                                >
+                                                                    <Trash2 size={12} />
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                 </div>
 
+                                {/* 新增大樓輸入欄 */}
                                 {isAddingNew && (
-                                    <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150 p-3 bg-blue-50/30 border border-blue-100 rounded-xl flex-shrink-0">
-                                        <label className="text-sm font-extrabold text-blue-600">自訂新大樓名稱</label>
+                                    <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-150 p-2.5 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 rounded-xl">
+                                        <label className="text-xs font-extrabold text-blue-600 whitespace-nowrap">自訂新大樓名稱：</label>
                                         <input
                                             type="text"
-                                            className="input-field w-full p-3 rounded-xl border border-blue-200 bg-white text-base font-bold focus:outline-none focus:border-blue-500"
+                                            className="input-field flex-1 px-3 py-1.5 rounded-lg border border-blue-300 bg-white text-xs font-bold focus:outline-none focus:border-blue-500"
                                             placeholder="例如：遠雄富源大樓"
                                             value={newBuildingName}
                                             onChange={(e) => setNewBuildingName(e.target.value)}
@@ -927,8 +882,8 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                 )}
                             </div>
 
-                            {/* Right Column Content Panel */}
-                            <div className="md:col-span-2 flex flex-col gap-5">
+                            {/* Content Panel */}
+                            <div className="flex flex-col gap-5">
                                 
                                 {/* 📅 頁籤一：開團與時程控制面板 */}
                                 {activeTab === 'SCHEDULE' && (
@@ -1235,10 +1190,14 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
 
                                                         <button
                                                             type="button"
-                                                            onClick={() => {
+                                                            onClick={async () => {
                                                                 const textToCopy = templateInputText.replace(/\{building\}/g, selectedBuilding).replace(/\{url\}/g, activeUrl);
-                                                                navigator.clipboard.writeText(textToCopy);
-                                                                alert(`已成功複製【${selectedBuilding}】LINE 開團發文文案！`);
+                                                                const ok = await copyToClipboard(textToCopy);
+                                                                if (ok) {
+                                                                    alert(`已成功複製【${selectedBuilding}】LINE 開團發文文案！`);
+                                                                } else {
+                                                                    alert(`複製失敗，請手動複製：\n${textToCopy}`);
+                                                                }
                                                             }}
                                                             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
                                                         >
