@@ -225,15 +225,15 @@ export default function ProductManagementPage({ user, apiUrl }) {
     return (
         <div className="max-w-6xl mx-auto h-[calc(100vh-6rem)] flex flex-col p-4 gap-4">
             {/* Header Area */}
-            <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shadow-sm gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shadow-sm gap-3">
                 <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
                     <Package className="text-blue-600" />
                     商品屬性
                 </h2>
 
-                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
                     {/* Style A Custom Dropdown Selector */}
-                    <div className="relative inline-block w-44">
+                    <div className="relative w-full sm:w-44">
                         <Package size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                         <select
                             value={stockFilter}
@@ -249,19 +249,21 @@ export default function ProductManagementPage({ user, apiUrl }) {
                         <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
 
-                    <div className="relative flex-1 md:flex-none">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
-                        <input
-                            type="text"
-                            placeholder="搜尋商品名稱或ID..."
-                            className="input-field pl-10 w-full md:w-80"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
+                    <div className="flex items-center gap-2 flex-1 w-full sm:w-auto">
+                        <div className="relative flex-1 sm:w-64">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} />
+                            <input
+                                type="text"
+                                placeholder="搜尋商品名稱或ID..."
+                                className="input-field pl-9 py-2 text-xs w-full"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
+                        <button onClick={fetchProducts} className="btn-secondary p-2 rounded-xl shrink-0" title="重新整理">
+                            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                        </button>
                     </div>
-                    <button onClick={fetchProducts} className="btn-secondary p-2 rounded-lg" title="重新整理">
-                        <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-                    </button>
                 </div>
             </div>
 
@@ -289,99 +291,110 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                         ? 'border-[var(--border-primary)] shadow-md' 
                                         : 'border-[var(--border-primary)] hover:border-[var(--border-primary)]/80 hover:shadow-md'
                                 }`}>
-                                    {/* 1. 商品標頭：主圖與基本資訊（點擊切換展開/折疊） */}
+                                    {/* 1. 商品標頭：主圖與基本資訊（點擊整張卡片切換展開/折疊） */}
                                     <div 
                                         onClick={() => toggleExpand(product.id)}
-                                        className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 cursor-pointer hover:bg-[var(--bg-tertiary)]/20 transition-all rounded-t-2xl"
+                                        className="flex items-center gap-3 md:gap-4 p-4 md:p-5 hover:bg-[var(--bg-tertiary)]/20 transition-all rounded-t-2xl cursor-pointer select-none"
                                     >
-                                        <div className="flex items-center gap-4 flex-1 min-w-0">
-                                            {/* 商品大圖 */}
-                                            <div className="w-16 h-16 rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] overflow-hidden flex items-center justify-center flex-shrink-0 shadow-inner">
-                                                {product.imageUrl ? (
-                                                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; }} />
-                                                ) : (
-                                                    <Image size={24} className="text-[var(--text-tertiary)]" />
-                                                )}
-                                            </div>
-                                             {/* 名稱與ID */}
-                                            <div className="min-w-0 flex-1">
-                                                <div className="font-extrabold text-base md:text-lg text-[var(--text-primary)] truncate">{product.name}</div>
-                                                <div className="text-xs text-[var(--text-tertiary)] font-mono mt-0.5 flex items-center gap-1.5">
-                                                    <span className="bg-[var(--bg-tertiary)] px-1.5 py-0.2 rounded border border-[var(--border-primary)] text-[10px]">ID</span> 
-                                                    <span className="truncate max-w-[120px] md:max-w-none">{product.id}</span>
-                                                </div>
-                                                <div className="text-xs font-bold text-blue-600 mt-1 flex flex-wrap items-center gap-3">
-                                                    <span>銷售原價：<span className="font-mono text-sm text-[var(--text-primary)] font-bold">${product.single_price || '-'}</span></span>
-                                                    <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700" />
-                                                    <span>庫存成本(進價)：<span className="font-mono text-sm text-amber-600">${product.price || '-'}</span></span>
-                                                    <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700" />
-                                                    <span>當前庫存：<span className={`font-mono text-sm ${ (stockMap[product.name] || 0) > 0 ? 'text-emerald-600 font-extrabold' : 'text-slate-400' }`}>{stockMap[product.name] || 0}</span></span>
-                                                    {product.maxTotalQty !== null && product.maxTotalQty !== undefined && (
-                                                        <>
-                                                            <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700" />
-                                                            <span className="text-purple-600 dark:text-purple-400 font-extrabold">活動限額：<span className="font-mono text-sm">{product.soldQty || 0} / {product.maxTotalQty}</span> (剩餘 {Math.max(0, Number(product.maxTotalQty) - Number(product.soldQty || 0))})</span>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </div>
+                                        {/* 商品大圖 */}
+                                        <div 
+                                            className="w-14 h-14 md:w-16 md:h-16 rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] overflow-hidden flex items-center justify-center flex-shrink-0 shadow-inner"
+                                        >
+                                            {product.imageUrl ? (
+                                                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; }} />
+                                            ) : (
+                                                <Image size={22} className="text-[var(--text-tertiary)]" />
+                                            )}
                                         </div>
-
-                                        {/* 右側操控區 (有效日期, 上架, 儲存狀態, 箭頭) */}
-                                        <div className="flex items-center gap-4 flex-shrink-0 self-end md:self-auto">
-                                            {/* 有效日期 */}
-                                            <div className="flex flex-col gap-0.5" onClick={(e) => e.stopPropagation()}>
-                                                <span className="text-[9px] uppercase font-bold text-[var(--text-secondary)]">有效日期</span>
-                                                <input
-                                                    type="date"
-                                                    className="input-field text-xs px-2 py-1 w-32 font-semibold"
-                                                    value={product.expiryDate || ''}
-                                                    onChange={(e) => {
-                                                        handleFieldChange(product.id, 'expiryDate', e.target.value);
-                                                        handleSaveProduct(product.id, { expiryDate: e.target.value });
-                                                    }}
-                                                />
+                                         {/* 名稱與ID */}
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="font-extrabold text-base md:text-lg text-[var(--text-primary)] truncate">
+                                                    {product.name}
+                                                </div>
+                                                
+                                                {/* 上架開關 (商品名稱同列最右側靠右對齊) */}
+                                                <div className="flex items-center gap-1.5 bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-lg border border-[var(--border-primary)] shadow-2xs" onClick={(e) => e.stopPropagation()}>
+                                                    <span className={`text-[11px] font-bold whitespace-nowrap ${product.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                                                        {product.isActive ? '🟢 已上架' : '🔴 已下架'}
+                                                    </span>
+                                                    <label className="relative inline-flex items-center cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="sr-only peer"
+                                                            checked={!!product.isActive}
+                                                            onChange={(e) => {
+                                                                handleFieldChange(product.id, 'isActive', e.target.checked);
+                                                                handleSaveProduct(product.id, { isActive: e.target.checked });
+                                                            }}
+                                                        />
+                                                        <div className="w-7 h-4 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                                                    </label>
+                                                </div>
                                             </div>
-                                            <div className="h-6 w-[1px] bg-[var(--border-primary)]" />
-                                            {/* 上架 */}
-                                            <div className="flex flex-col gap-0.5 items-center" onClick={(e) => e.stopPropagation()}>
-                                                <span className="text-[9px] uppercase font-bold text-[var(--text-secondary)]">上架</span>
-                                                <label className="relative inline-flex items-center cursor-pointer mt-0.5">
+                                            <div className="text-[11px] text-[var(--text-tertiary)] font-mono mt-0.5 flex items-center gap-1.5">
+                                                <span className="bg-[var(--bg-tertiary)] px-1.5 py-0.2 rounded border border-[var(--border-primary)] text-[10px]">ID</span> 
+                                                <span className="truncate max-w-[120px] md:max-w-none">{product.id}</span>
+                                            </div>
+                                            <div className="text-xs font-bold text-blue-600 mt-1 flex flex-wrap items-center gap-2 md:gap-3">
+                                                <span>銷售原價：<span className="font-mono text-sm text-[var(--text-primary)] font-bold">${product.single_price || '-'}</span></span>
+                                                <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700 hidden sm:inline" />
+                                                <span>庫存成本(進價)：<span className="font-mono text-sm text-amber-600">${product.price || '-'}</span></span>
+                                                <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700 hidden sm:inline" />
+                                                <span>當前庫存：<span className={`font-mono text-sm ${ (stockMap[product.name] || 0) > 0 ? 'text-emerald-600 font-extrabold' : 'text-slate-400' }`}>{stockMap[product.name] || 0}</span></span>
+                                                
+                                                {/* 📅 有效日期 + 儲存狀態 */}
+                                                <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700 hidden sm:inline" />
+                                                <span className="inline-flex items-center gap-1.5 text-[var(--text-secondary)] font-medium" onClick={(e) => e.stopPropagation()}>
+                                                    <span>有效日期：</span>
                                                     <input
-                                                        type="checkbox"
-                                                        className="sr-only peer"
-                                                        checked={!!product.isActive}
+                                                        type="date"
+                                                        className="input-field text-xs px-2 py-0.5 w-28 sm:w-32 font-semibold bg-[var(--bg-primary)] border-[var(--border-primary)] rounded-lg text-[var(--text-primary)]"
+                                                        value={product.expiryDate || ''}
                                                         onChange={(e) => {
-                                                            handleFieldChange(product.id, 'isActive', e.target.checked);
-                                                            handleSaveProduct(product.id, { isActive: e.target.checked });
+                                                            const val = e.target.value || '';
+                                                            handleFieldChange(product.id, 'expiryDate', val);
+                                                            handleSaveProduct(product.id, { expiryDate: val });
                                                         }}
                                                     />
-                                                    <div className="w-9 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                                                </label>
-                                            </div>
-                                            <div className="h-6 w-[1px] bg-[var(--border-primary)]" />
-                                            
-                                            {/* 自動儲存狀態 */}
-                                            <div className="min-w-[65px] flex justify-end">
-                                                {status === 'saving' && (
-                                                    <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-bold text-[10px] bg-blue-500/10 px-2 py-0.5 rounded-full">
-                                                        <RefreshCw size={10} className="animate-spin" /> 儲存中
-                                                    </span>
-                                                )}
-                                                {status === 'saved' && (
-                                                    <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded-full animate-fade-in">
-                                                        <Check size={10} /> 已儲存
-                                                    </span>
-                                                )}
-                                                {status === 'error' && (
-                                                    <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400 font-bold text-[10px] bg-rose-500/10 px-2 py-0.5 rounded-full" title={lastError[product.id]}>
-                                                        <AlertCircle size={10} /> 失敗
-                                                    </span>
-                                                )}
-                                            </div>
+                                                    {product.expiryDate && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                handleFieldChange(product.id, 'expiryDate', '');
+                                                                handleSaveProduct(product.id, { expiryDate: '' });
+                                                            }}
+                                                            className="text-[10px] text-rose-500 hover:text-rose-700 font-bold px-1 rounded hover:bg-rose-50 cursor-pointer"
+                                                            title="清除日期 (設為無日期)"
+                                                        >
+                                                            ✕ 清除
+                                                        </button>
+                                                    )}
 
-                                            {/* 展開 Chevron */}
-                                            <div className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors pl-1">
-                                                {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                                    {/* 自動儲存狀態 */}
+                                                    {status === 'saving' && (
+                                                        <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-bold text-[10px] bg-blue-500/10 px-2 py-0.5 rounded-full">
+                                                            <RefreshCw size={10} className="animate-spin" /> 儲存中
+                                                        </span>
+                                                    )}
+                                                    {status === 'saved' && (
+                                                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded-full animate-fade-in">
+                                                            <Check size={10} /> 已儲存
+                                                        </span>
+                                                    )}
+                                                    {status === 'error' && (
+                                                        <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400 font-bold text-[10px] bg-rose-500/10 px-2 py-0.5 rounded-full" title={lastError[product.id]}>
+                                                            <AlertCircle size={10} /> 失敗
+                                                        </span>
+                                                    )}
+                                                </span>
+
+                                                {product.maxTotalQty !== null && product.maxTotalQty !== undefined && (
+                                                    <>
+                                                        <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700 hidden sm:inline" />
+                                                        <span className="text-purple-600 dark:text-purple-400 font-extrabold">活動限額：<span className="font-mono text-sm">{product.soldQty || 0} / {product.maxTotalQty}</span> (剩餘 {Math.max(0, Number(product.maxTotalQty) - Number(product.soldQty || 0))})</span>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
