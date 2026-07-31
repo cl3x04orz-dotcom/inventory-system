@@ -1070,10 +1070,15 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             }
         }
 
+        const rMatch = String(order.note || '').match(/【滿額折抵\s*-\$?(\d+)/);
+        const rewardDiscount = rMatch ? Number(rMatch[1]) : (Number(order.rewardDiscountAmount) || 0);
+        const netProductTotal = Math.max(0, productTotal - rewardDiscount);
+
         return {
             productTotal,
+            rewardDiscount,
             shippingFee: fee,
-            totalAmount: productTotal + fee
+            totalAmount: netProductTotal + fee
         };
     }, []);
 
@@ -2353,12 +2358,21 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                 </div>
                                                     {(() => {
                                                         const totals = computeOrderTotals(order, buildingSettingsList, groupBindings);
-                                                        if (totals.shippingFee <= 0) return null;
                                                         return (
-                                                            <div className="flex justify-between items-center text-sm pt-2 border-t border-dashed border-[var(--border-primary)] text-amber-600 dark:text-amber-400 font-bold">
-                                                                <span>🚚 外送運費</span>
-                                                                <span className="font-mono">+${totals.shippingFee}</span>
-                                                            </div>
+                                                            <>
+                                                                {totals.rewardDiscount > 0 && (
+                                                                    <div className="flex justify-between items-center text-sm pt-2 border-t border-dashed border-[var(--border-primary)] text-emerald-600 dark:text-emerald-400 font-bold">
+                                                                        <span>🎁 滿額自選折抵</span>
+                                                                        <span className="font-mono">-${totals.rewardDiscount}</span>
+                                                                    </div>
+                                                                )}
+                                                                {totals.shippingFee > 0 && (
+                                                                    <div className="flex justify-between items-center text-sm pt-2 border-t border-dashed border-[var(--border-primary)] text-amber-600 dark:text-amber-400 font-bold">
+                                                                        <span>🚚 外送運費</span>
+                                                                        <span className="font-mono">+${totals.shippingFee}</span>
+                                                                    </div>
+                                                                )}
+                                                            </>
                                                         );
                                                     })()}
                                                     <div className="flex justify-between items-center border-t border-[var(--border-primary)] mt-3.5 pt-2.5 font-bold text-lg md:text-xl">

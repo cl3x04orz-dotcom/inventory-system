@@ -216,6 +216,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   const [successCartTotal, setSuccessCartTotal] = useState(0);
   const [successShippingFee, setSuccessShippingFee] = useState(0);
   const [successWalletDeduction, setSuccessWalletDeduction] = useState(0);
+  const [successRewardDiscount, setSuccessRewardDiscount] = useState(0);
   const [successDeliveryDate, setSuccessDeliveryDate] = useState("");
   const [successDeliveryTime, setSuccessDeliveryTime] = useState("");
   const [isDetailExpanded, setIsDetailExpanded] = useState(true);
@@ -2297,6 +2298,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
       setSuccessCartTotal(cartTotal);
       setSuccessShippingFee(shippingFee);
       setSuccessWalletDeduction(useWallet ? maxDeduction : 0);
+      setSuccessRewardDiscount(rewardDiscountAmount);
       setSuccessDeliveryDate(activeCampaign?.DeliveryDate || "");
       setSuccessDeliveryTime(
         activeCampaign?.DeliveryStartTime && activeCampaign?.DeliveryEndTime
@@ -2583,6 +2585,12 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
               <span>商品金額</span>
               <span className="font-mono">${successCartTotal}</span>
             </div>
+            {successRewardDiscount > 0 && (
+              <div className="flex justify-between text-emerald-600 font-bold">
+                <span>滿額自選折抵</span>
+                <span className="font-mono font-black">-${successRewardDiscount}</span>
+              </div>
+            )}
             <div className="flex justify-between text-[var(--text-secondary)] font-medium">
               <span>運費</span>
               {successShippingFee > 0 ? (
@@ -2727,6 +2735,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                   setSuccessCartTotal(0);
                   setSuccessShippingFee(0);
                   setSuccessWalletDeduction(0);
+                  setSuccessRewardDiscount(0);
                   setSuccessDeliveryDate("");
                   setSuccessDeliveryTime("");
                   setIsDetailExpanded(true);
@@ -2750,6 +2759,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                   setSuccessCartTotal(0);
                   setSuccessShippingFee(0);
                   setSuccessWalletDeduction(0);
+                  setSuccessRewardDiscount(0);
                   setSuccessDeliveryDate("");
                   setSuccessDeliveryTime("");
                   setIsDetailExpanded(true);
