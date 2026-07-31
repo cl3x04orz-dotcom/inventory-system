@@ -1849,7 +1849,13 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     return fee;
   }, [isGeneralUser, currentCommunity, selectedCommunityId, allCommunities, cartTotal]);
 
-  const orderTotal = cartTotal + shippingFee;
+  const rewardDiscountAmount = useMemo(() => {
+    if (!selectedRewardRule) return 0;
+    return Number(selectedRewardRule.discount) || 0;
+  }, [selectedRewardRule]);
+
+  const netCartTotal = Math.max(0, cartTotal - rewardDiscountAmount);
+  const orderTotal = netCartTotal + shippingFee;
 
   // (已移至元件頂部)
 
@@ -2043,6 +2049,11 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
     } catch (_) { }
 
+    if (selectedRewardRule && cartTotal < selectedRewardRule.discount) {
+      alert(`⚠️ 您的購物車商品小計 ($${cartTotal}) 低於滿額折抵金額 ($${selectedRewardRule.discount})！\n折抵金額無法分次退現或保留，請回到選單加購商品滿 $${selectedRewardRule.discount} 元後方可進行下一步結帳！`);
+      return;
+    }
+
     // 💡 團購模式 Clean Up：只保留有購買商品的成員
     if (isGroupOrder) {
       setGroupCart((prev) => {
@@ -2064,6 +2075,12 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
   // ── 送出訂單 ─────────────────────────────────────────────────
   const handleSubmitOrder = async () => {
+    if (selectedRewardRule && cartTotal < selectedRewardRule.discount) {
+      setIsSubmitting(false);
+      alert(`⚠️ 您的購物車商品小計 ($${cartTotal}) 低於滿額折抵金額 ($${selectedRewardRule.discount})！\n折抵金額無法分次退現或保留，請回到選單加購商品滿 $${selectedRewardRule.discount} 元後方可完成下單！`);
+      return;
+    }
+
     // 🛡️ 強制雙向贈品防呆檢查（少選與多選溢額均自動攔截）
     if (isGroupOrder) {
       for (const [memberName, mCredits] of Object.entries(memberGiftCredits)) {
@@ -2236,10 +2253,14 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
       if (res?.error) throw new Error(res.error);
 
-      if (useWallet && memberProfile) {
+      if (memberProfile) {
         setMemberProfile(prev => prev ? {
           ...prev,
-          WalletBalance: Math.max(0, Number(prev.WalletBalance) - maxDeduction)
+          WalletBalance: useWallet ? Math.max(0, Number(prev.WalletBalance) - maxDeduction) : Number(prev.WalletBalance),
+          RedeemableSpendBalance: selectedRewardRule 
+            ? Math.max(0, Number(prev.RedeemableSpendBalance || 0) - selectedRewardRule.spendMin + netCartTotal) 
+            : Number(prev.RedeemableSpendBalance || 0) + netCartTotal,
+          TotalLifetimeSpend: Number(prev.TotalLifetimeSpend || 0) + netCartTotal
         } : null);
       }
 
@@ -3422,7 +3443,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
     // 奶包金抵扣計算（以含運費的 orderTotal 為基準，但運費不可折抵）
     const hasWallet = memberProfile?.WalletBalance > 0;
-    const maxDeduction = hasWallet ? Math.min(Number(memberProfile.WalletBalance), cartTotal) : 0;
+    const maxDeduction = hasWallet ? Math.min(Number(memberProfile.WalletBalance), netCartTotal) : 0;
     const payAmount = useWallet ? Math.max(0, orderTotal - maxDeduction) : orderTotal;
     const isFullyCovered = useWallet && payAmount === 0;
 
@@ -3916,8 +3937,15 @@ ${freeNote(newFee, newMin)}
                         </div>
 
                         {isUnlocked && isSelected && (
-                          <div className="text-[10px] text-emerald-600 mt-1 pl-6 font-bold">
-                            使用後剩餘累積額度：${remBalance.toLocaleString()} 元
+                          <div className="space-y-1 mt-1 pl-6">
+                            <div className="text-[10px] text-emerald-600 font-bold">
+                              使用後剩餘累積額度：${remBalance.toLocaleString()} 元
+                            </div>
+                            {cartTotal < rule.discount && (
+                              <div className="text-[11px] text-rose-600 font-black flex items-center gap-1 mt-1 bg-rose-50 p-2 rounded-xl border border-rose-200">
+                                ⚠️ 購物車商品小計 (${cartTotal}) 低於滿額折抵金額 (${rule.discount})！折抵金無法分次退現或保留，請加購商品滿 ${rule.discount} 元後方可下單結帳。
+                              </div>
+                            )}
                           </div>
                         )}
                       </label>
@@ -3971,6 +3999,10 @@ ${freeNote(newFee, newMin)}
                 <div className="border-t border-amber-200/50 pt-2.5 grid grid-cols-2 gap-y-1 text-xs">
                   <div className="text-amber-700">商品小計：</div>
                   <div className="text-right font-mono font-bold text-slate-700">${cartTotal}</div>
+                  {selectedRewardRule && rewardDiscountAmount > 0 && (<>
+                    <div className="text-amber-700">滿額自選折抵：</div>
+                    <div className="text-right font-mono font-bold text-emerald-600">-${rewardDiscountAmount}</div>
+                  </>)}
                   {shippingFee > 0 && (<>
                     <div className="text-amber-700">運費：</div>
                     <div className="text-right font-mono font-bold text-orange-500">+${shippingFee}</div>
@@ -5275,7 +5307,13 @@ ${freeNote(newFee, newMin)}
                   </div>
                 </div>
                 <button
-                  onClick={() => setStep("confirm")}
+                  onClick={() => {
+                    if (selectedRewardRule && cartTotal < selectedRewardRule.discount) {
+                      alert(`⚠️ 您的購物車商品小計 ($${cartTotal}) 低於滿額折抵金額 ($${selectedRewardRule.discount})！\n折抵金額無法分次退現或保留，請回到選單加購商品滿 $${selectedRewardRule.discount} 元後方可進行下一步結帳！`);
+                      return;
+                    }
+                    setStep("confirm");
+                  }}
                   className="btn-primary px-5 py-2.5 rounded-xl font-bold flex items-center gap-1 shadow-md shadow-blue-500/20"
                 >
                   前往結帳 <ArrowRight size={16} />

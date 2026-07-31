@@ -963,6 +963,9 @@ export const GroupBuyService = {
           where: { memberId_storeCode: { memberId: lineUserId, storeCode: payload.storeCode || 'MILI001' } }
         });
         if (member && Number(member.redeemableSpendBalance) >= requestedThreshold) {
+          if (productTotal < requestedDiscount) {
+            throw new Error(`購物車商品金額 ($${productTotal}) 低於折抵金 ($${requestedDiscount})，請加購商品滿 $${requestedDiscount} 後方可折抵與結帳`);
+          }
           appliedRewardDiscount = Math.min(requestedDiscount, productTotal);
           appliedRewardThreshold = requestedThreshold;
         }
