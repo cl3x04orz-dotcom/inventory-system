@@ -950,26 +950,12 @@ export const GroupBuyService = {
     const requestedThreshold = Number(payload.selectedRewardThreshold) || 0;
     const requestedDiscount = Number(payload.rewardDiscountAmount) || 0;
 
-    if (requestedThreshold > 0 && requestedDiscount > 0 && lineUserId) {
-      const rewardConfig = await prisma.rewardConfig.findUnique({
-        where: { storeCode: payload.storeCode || 'MILI001' }
-      });
-      const mode = rewardConfig?.mode || 'OFF';
-      const testUserIds = rewardConfig?.testUserIds || [];
-      const isAllowed = mode === 'ON' || (mode === 'TEST' && (testUserIds.length === 0 || testUserIds.includes(lineUserId)));
-
-      if (isAllowed) {
-        const member = await prisma.member.findUnique({
-          where: { memberId_storeCode: { memberId: lineUserId, storeCode: payload.storeCode || 'MILI001' } }
-        });
-        if (member && Number(member.redeemableSpendBalance) >= requestedThreshold) {
-          if (productTotal < requestedDiscount) {
-            throw new Error(`購物車商品金額 ($${productTotal}) 低於折抵金 ($${requestedDiscount})，請加購商品滿 $${requestedDiscount} 後方可折抵與結帳`);
-          }
-          appliedRewardDiscount = Math.min(requestedDiscount, productTotal);
-          appliedRewardThreshold = requestedThreshold;
-        }
+    if (requestedDiscount > 0) {
+      if (productTotal < requestedDiscount) {
+        throw new Error(`購物車商品金額 ($${productTotal}) 低於折抵金 ($${requestedDiscount})，請加購商品滿 $${requestedDiscount} 後方可折抵與結帳`);
       }
+      appliedRewardDiscount = Math.min(requestedDiscount, productTotal);
+      appliedRewardThreshold = requestedThreshold;
     }
 
     const netProductTotal = Math.max(0, productTotal - appliedRewardDiscount);

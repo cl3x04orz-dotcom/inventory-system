@@ -80,7 +80,11 @@ function v2_createOrderService(payload) {
         }
     }
     const orderNo = `GB${dateStr}${String(seq).padStart(4, '0')}`;
-    const totalAmount = items.reduce((sum, item) => sum + (item.subtotal !== undefined && item.subtotal !== null ? Number(item.subtotal) : (item.unitPrice * item.qty)), 0);
+    const rewardDiscount = Number(payload.rewardDiscountAmount) || 0;
+    const shipping = Number(payload.shippingFee) || 0;
+    const itemsTotal = items.reduce((sum, item) => sum + (item.subtotal !== undefined && item.subtotal !== null ? Number(item.subtotal) : (item.unitPrice * item.qty)), 0);
+    const netProductTotal = Math.max(0, itemsTotal - rewardDiscount);
+    const totalAmount = netProductTotal + shipping;
     const combinedNote = [note, transferLastFive ? `後五碼:${transferLastFive}` : ""].filter(Boolean).join(" | ");
 
     const newOrderRow = new Array(GB_HEADERS.length).fill("");
