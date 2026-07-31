@@ -23,6 +23,7 @@ import {
   Wallet,
   Calendar,
   Trash2,
+  Gift,
 } from "lucide-react";
 import { callGAS, memberApi } from "../utils/api";
 import { copyToClipboard } from '../utils/clipboard';
