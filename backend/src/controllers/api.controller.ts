@@ -271,6 +271,12 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       return GroupBuyService.admin_getMembers(payload, user);
     case 'admin_adjustWallet':
       return GroupBuyService.admin_adjustWallet(payload, user);
+    case 'admin_adjustMemberSpend':
+      return GroupBuyService.admin_adjustMemberSpend(payload, user);
+    case 'getRewardConfig':
+      return GroupBuyService.getRewardConfig(payload, user);
+    case 'saveRewardConfig':
+      return GroupBuyService.saveRewardConfig(payload, user);
 
     default:
       console.warn(`[Controller] 未移植或不支援的 Action: ${action}`);

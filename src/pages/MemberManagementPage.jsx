@@ -35,6 +35,12 @@ export default function MemberManagementPage({ user, apiUrl }) {
   // Modals state
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showSpendModal, setShowSpendModal] = useState(false);
+  
+  // Spend Adjust Form state
+  const [targetRedeemableBalance, setTargetRedeemableBalance] = useState("");
+  const [targetTotalSpend, setTargetTotalSpend] = useState("");
+  const [spendSubmitting, setSpendSubmitting] = useState(false);
   
   // Wallet Adjust Form state
   const [adjustAmount, setAdjustAmount] = useState("");
@@ -108,6 +114,41 @@ export default function MemberManagementPage({ user, apiUrl }) {
       alert("網路連線錯誤");
     } finally {
       setAdjustSubmitting(false);
+    }
+  };
+
+  const handleAdjustMemberSpend = async (e) => {
+    e.preventDefault();
+    if (!selectedMember) return;
+
+    setSpendSubmitting(true);
+    try {
+      const res = await callGAS(
+        apiUrl,
+        "admin_adjustMemberSpend",
+        {
+          memberId: selectedMember.memberId,
+          redeemableSpendBalance: Number(targetRedeemableBalance) || 0,
+          totalLifetimeSpend: Number(targetTotalSpend) || 0
+        },
+        user.token
+      );
+
+      if (res && res.success) {
+        setSuccessMessage(`已更新 ${selectedMember.displayName || "該會員"} 的可用累積額度為 $${Number(targetRedeemableBalance).toLocaleString()}`);
+        fetchMembers();
+        setTimeout(() => {
+          setSuccessMessage("");
+          setShowSpendModal(false);
+          setSelectedMember(null);
+        }, 1500);
+      } else {
+        alert(res?.error || "設定失敗");
+      }
+    } catch (err) {
+      alert("連線錯誤");
+    } finally {
+      setSpendSubmitting(false);
     }
   };
 
@@ -299,8 +340,8 @@ export default function MemberManagementPage({ user, apiUrl }) {
           <p className="text-xs mt-1">請嘗試變更搜尋關鍵字或清除過濾條件。</p>
         </div>
       ) : viewMode === "grid" ? (
-        /* 🎴 視圖一：大尺寸卡片網格 (Grid View) - 極清晰易讀 */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* 🎴 視圖一：大尺寸卡片網格 (Grid View) - 極清晰易讀 */}
           {filteredMembers.map((m) => {
             const isVIP = m.memberLevel?.toUpperCase() === "VIP";
             const isVVIP = m.memberLevel?.toUpperCase() === "VVIP";
@@ -358,12 +399,12 @@ export default function MemberManagementPage({ user, apiUrl }) {
                     </div>
 
                     <div className="text-right border-l border-emerald-500/20 pl-3">
-                      <div className="text-[10px] text-[var(--text-tertiary)] font-bold">累計消費額</div>
-                      <div className="text-sm font-black text-[var(--text-primary)] font-mono mt-0.5">
-                        ${m.totalAmount.toLocaleString()}
+                      <div className="text-[10px] text-[var(--text-tertiary)] font-bold">可用累積金額</div>
+                      <div className="text-sm font-black text-blue-600 dark:text-blue-400 font-mono mt-0.5">
+                        ${(m.redeemableSpendBalance || 0).toLocaleString()}
                       </div>
-                      <div className="text-[10px] text-blue-600 dark:text-blue-400 font-bold mt-0.2">
-                        {m.totalOrders} 筆訂單
+                      <div className="text-[10px] text-[var(--text-tertiary)] font-bold mt-0.5">
+                        歷史總額: ${(m.totalLifetimeSpend || m.totalAmount || 0).toLocaleString()}
                       </div>
                     </div>
                   </div>
@@ -429,8 +470,8 @@ export default function MemberManagementPage({ user, apiUrl }) {
           })}
         </div>
       ) : (
-        /* 📋 視圖二：大清晰度表格 (Table View) */
         <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-primary)] overflow-hidden shadow-sm">
+          {/* 📋 視圖二：大清晰度表格 (Table View) */}
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -488,18 +529,33 @@ export default function MemberManagementPage({ user, apiUrl }) {
                       ${m.walletBalance.toLocaleString()}
                     </td>
                     <td className="py-3.5 px-5 text-right font-mono">
-                      <div className="text-[var(--text-primary)] font-extrabold text-base">${m.totalAmount.toLocaleString()}</div>
-                      <div className="text-xs text-[var(--text-tertiary)] mt-0.5">{m.totalOrders} 筆訂單</div>
+                      <div className="font-extrabold text-base text-blue-600 dark:text-blue-400">
+                        ${(m.redeemableSpendBalance || 0).toLocaleString()}
+                      </div>
+                      <div className="text-[11px] text-[var(--text-tertiary)] font-bold mt-0.5">
+                        歷史總額: ${(m.totalLifetimeSpend || m.totalAmount || 0).toLocaleString()}
+                      </div>
                     </td>
                     <td className="py-3.5 px-5">
-                      <div className="flex items-center justify-center gap-2">
+                      <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                        <button
+                          onClick={() => {
+                            setSelectedMember(m);
+                            setTargetRedeemableBalance(m.redeemableSpendBalance || 0);
+                            setTargetTotalSpend(m.totalLifetimeSpend || m.totalAmount || 0);
+                            setShowSpendModal(true);
+                          }}
+                          className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-xl text-xs font-extrabold border border-blue-500/30 flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <TrendingUp size={13} /> 測試改累積額度
+                        </button>
                         <button
                           onClick={() => {
                             setSelectedMember(m);
                             setAdjustType("add");
                             setShowAdjustModal(true);
                           }}
-                          className="px-3 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-xs font-extrabold flex items-center gap-1 transition-colors cursor-pointer"
+                          className="px-2.5 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-xs font-extrabold flex items-center gap-1 transition-colors cursor-pointer"
                         >
                           <Plus size={13} /> 儲值/調整
                         </button>
@@ -508,7 +564,7 @@ export default function MemberManagementPage({ user, apiUrl }) {
                             setSelectedMember(m);
                             setShowHistoryModal(true);
                           }}
-                          className="px-3 py-1.5 bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                          className="px-2.5 py-1 bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
                         >
                           <History size={13} /> 交易歷史
                         </button>
@@ -763,6 +819,92 @@ export default function MemberManagementPage({ user, apiUrl }) {
                 關閉視窗
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* MODAL 3: 測試手動修改會員累積金額 */}
+      {showSpendModal && selectedMember && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-primary)] shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-5 py-4 border-b border-[var(--border-primary)] flex justify-between items-center bg-[var(--bg-tertiary)]">
+              <div>
+                <h3 className="font-black text-base text-[var(--text-primary)] flex items-center gap-1.5">
+                  <TrendingUp size={18} className="text-blue-500" /> 調整滿額累積額度 (測試專用)
+                </h3>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-bold">
+                  對象：<span className="text-blue-600 dark:text-blue-400">{selectedMember.displayName || "LINE 用戶"}</span> (ID: {selectedMember.memberId})
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  if (!spendSubmitting) {
+                    setShowSpendModal(false);
+                    setSelectedMember(null);
+                  }
+                }}
+                className="text-[var(--text-secondary)] hover:text-rose-500 p-1.5 rounded-lg hover:bg-[var(--bg-primary)] cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAdjustMemberSpend} className="p-5 space-y-4 bg-[var(--bg-secondary)]">
+              {successMessage ? (
+                <div className="py-6 flex flex-col items-center justify-center text-emerald-600 dark:text-emerald-400 space-y-2">
+                  <div className="w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center border-2 border-emerald-500">
+                    <Check size={28} className="stroke-[3]" />
+                  </div>
+                  <div className="font-extrabold text-base text-center px-4">{successMessage}</div>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-extrabold text-[var(--text-secondary)]">可用累積金額 (Redeemable Spend Balance)：</label>
+                    <input
+                      type="number"
+                      value={targetRedeemableBalance}
+                      onChange={(e) => setTargetRedeemableBalance(e.target.value)}
+                      placeholder="例如: 5000 或 10000"
+                      className="w-full p-3 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-xl text-sm font-mono font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500"
+                      required
+                    />
+                    <p className="text-[11px] text-[var(--text-tertiary)]">這是在 LIFF 下單時可用來觸發滿額折抵的剩餘額度。</p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-extrabold text-[var(--text-secondary)]">歷史總消費金額 (Total Lifetime Spend)：</label>
+                    <input
+                      type="number"
+                      value={targetTotalSpend}
+                      onChange={(e) => setTargetTotalSpend(e.target.value)}
+                      placeholder="例如: 12000"
+                      className="w-full p-3 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-xl text-sm font-mono font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500"
+                      required
+                    />
+                  </div>
+
+                  <div className="pt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowSpendModal(false);
+                        setSelectedMember(null);
+                      }}
+                      className="flex-1 py-2.5 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-primary)] text-[var(--text-secondary)] font-bold rounded-xl text-xs border border-[var(--border-primary)]"
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={spendSubmitting}
+                      className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-xl text-xs shadow-md disabled:opacity-50"
+                    >
+                      {spendSubmitting ? "更新中..." : "儲存新額度"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </form>
           </div>
         </div>
       )}

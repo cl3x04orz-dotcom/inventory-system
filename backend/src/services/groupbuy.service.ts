@@ -943,7 +943,34 @@ export const GroupBuyService = {
     const productTotal = items.reduce((sum: number, item: any) =>
       sum + (item.subtotal !== undefined && item.subtotal !== null ? Number(item.subtotal) : (Number(item.unitPrice) * Number(item.qty))), 0);
     const appliedShippingFee = Number(shippingFee) || 0;
-    const totalAmount = productTotal + appliedShippingFee;
+    
+    // 檢查與套用階梯滿額折抵
+    let appliedRewardDiscount = 0;
+    let appliedRewardThreshold = 0;
+    const requestedThreshold = Number(payload.selectedRewardThreshold) || 0;
+    const requestedDiscount = Number(payload.rewardDiscountAmount) || 0;
+
+    if (requestedThreshold > 0 && requestedDiscount > 0 && lineUserId) {
+      const rewardConfig = await prisma.rewardConfig.findUnique({
+        where: { storeCode: payload.storeCode || 'MILI001' }
+      });
+      const mode = rewardConfig?.mode || 'OFF';
+      const testUserIds = rewardConfig?.testUserIds || [];
+      const isAllowed = mode === 'ON' || (mode === 'TEST' && (testUserIds.length === 0 || testUserIds.includes(lineUserId)));
+
+      if (isAllowed) {
+        const member = await prisma.member.findUnique({
+          where: { memberId_storeCode: { memberId: lineUserId, storeCode: payload.storeCode || 'MILI001' } }
+        });
+        if (member && Number(member.redeemableSpendBalance) >= requestedThreshold) {
+          appliedRewardDiscount = Math.min(requestedDiscount, productTotal);
+          appliedRewardThreshold = requestedThreshold;
+        }
+      }
+    }
+
+    const netProductTotal = Math.max(0, productTotal - appliedRewardDiscount);
+    const totalAmount = netProductTotal + appliedShippingFee;
 
     let finalNote = note || '';
     let deductionApplied = 0;
@@ -982,6 +1009,9 @@ export const GroupBuyService = {
       }, { maxWait: 15000, timeout: 30000 });
     }
 
+    if (appliedRewardDiscount > 0) {
+      finalNote = `【滿額折抵 -$${appliedRewardDiscount} (門檻 $${appliedRewardThreshold})】` + (finalNote ? ` | ${finalNote}` : '');
+    }
     if (deductionApplied > 0) {
       finalNote = `【奶包金扣抵: $${deductionApplied}】` + (finalNote ? ` | ${finalNote}` : '');
     }
@@ -1103,6 +1133,31 @@ export const GroupBuyService = {
           recipients: recipientsInput
         }
       });
+
+      // 訂單成立後，更新會員的可用累積額度與歷史總消費
+      if (lineUserId) {
+        await tx.member.upsert({
+          where: { memberId_storeCode: { memberId: lineUserId, storeCode: payload.storeCode || 'MILI001' } },
+          update: {
+            redeemableSpendBalance: {
+              increment: netProductTotal - appliedRewardThreshold
+            },
+            totalLifetimeSpend: {
+              increment: netProductTotal
+            },
+            displayName: lineDisplayName || undefined
+          },
+          create: {
+            memberId: lineUserId,
+            storeCode: payload.storeCode || 'MILI001',
+            displayName: lineDisplayName || '',
+            walletBalance: 0,
+            redeemableSpendBalance: Math.max(0, netProductTotal - appliedRewardThreshold),
+            totalLifetimeSpend: netProductTotal,
+            memberLevel: 'General'
+          }
+        });
+      }
     }, { maxWait: 15000, timeout: 30000 });
 
     return { success: true, orderId, orderNo: orderId };
@@ -1308,6 +1363,8 @@ export const GroupBuyService = {
         ReceiverName: m.receiverName || '',
         Phone: m.phone || '',
         WalletBalance: Number(m.walletBalance),
+        RedeemableSpendBalance: Number(m.redeemableSpendBalance || 0),
+        TotalLifetimeSpend: Number(m.totalLifetimeSpend || 0),
         MemberLevel: m.memberLevel,
         DisplayName: m.displayName || '',
         PictureUrl: m.pictureUrl || '',
@@ -1361,6 +1418,8 @@ export const GroupBuyService = {
         receiverName: m.receiverName || '',
         phone: m.phone || '',
         walletBalance: Number(m.walletBalance),
+        redeemableSpendBalance: Number(m.redeemableSpendBalance || 0),
+        totalLifetimeSpend: Number(m.totalLifetimeSpend || 0),
         memberLevel: m.memberLevel,
         createdAt: m.createdAt.toISOString(),
         totalOrders: orderStats._count.orderId || 0,
@@ -1562,6 +1621,8 @@ export const GroupBuyService = {
             paymentMethod: group.paymentMethod,
             paymentStatus: group.paymentMethod === '奶包金' ? '已付款(扣餘額)' : '待確認',
             source: 'SUBSCRIPTION',
+            rewardDiscountAmount: 0,
+            rewardTierThreshold: 0,
             createdAt: now,
             updatedAt: now
           }
@@ -1756,5 +1817,100 @@ export const GroupBuyService = {
     }
 
     return { success: true };
+  },
+
+  // 18. 取得滿額折抵設定
+  async getRewardConfig(payload: any, user: any) {
+    const storeCode = payload?.storeCode || 'MILI001';
+    let config = await prisma.rewardConfig.findUnique({
+      where: { storeCode }
+    });
+
+    if (!config) {
+      config = await prisma.rewardConfig.create({
+        data: {
+          storeCode,
+          mode: 'OFF',
+          testUserIds: [],
+          tierRulesJson: JSON.stringify([
+            { spendMin: 5000, discount: 150 },
+            { spendMin: 10000, discount: 350 },
+            { spendMin: 15000, discount: 600 }
+          ])
+        }
+      });
+    }
+
+    let tierRules = [];
+    try {
+      tierRules = JSON.parse(config.tierRulesJson || '[]');
+    } catch (e) {
+      tierRules = [
+        { spendMin: 5000, discount: 150 },
+        { spendMin: 10000, discount: 350 },
+        { spendMin: 15000, discount: 600 }
+      ];
+    }
+
+    return {
+      success: true,
+      config: {
+        mode: config.mode,
+        testUserIds: config.testUserIds || [],
+        tierRules
+      }
+    };
+  },
+
+  // 19. 保存滿額折抵設定 (後台管理)
+  async saveRewardConfig(payload: any, user: any) {
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
+    const storeCode = payload?.storeCode || 'MILI001';
+    const { mode, testUserIds, tierRules } = payload;
+
+    const updated = await prisma.rewardConfig.upsert({
+      where: { storeCode },
+      update: {
+        mode: mode || 'OFF',
+        testUserIds: Array.isArray(testUserIds) ? testUserIds : [],
+        tierRulesJson: JSON.stringify(Array.isArray(tierRules) ? tierRules : [])
+      },
+      create: {
+        storeCode,
+        mode: mode || 'OFF',
+        testUserIds: Array.isArray(testUserIds) ? testUserIds : [],
+        tierRulesJson: JSON.stringify(Array.isArray(tierRules) ? tierRules : [])
+      }
+    });
+
+    return {
+      success: true,
+      config: {
+        mode: updated.mode,
+        testUserIds: updated.testUserIds,
+        tierRules: JSON.parse(updated.tierRulesJson)
+      }
+    };
+  },
+
+  // 20. 手動調整會員累積消費額度 (後台測試與人工修正用)
+  async admin_adjustMemberSpend(payload: any, user: any) {
+    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
+    const { memberId, redeemableSpendBalance, totalLifetimeSpend, storeCode } = payload;
+    if (!memberId) throw new Error('缺少 memberId');
+
+    const updated = await prisma.member.update({
+      where: { memberId_storeCode: { memberId, storeCode: storeCode || 'MILI001' } },
+      data: {
+        redeemableSpendBalance: redeemableSpendBalance !== undefined ? Number(redeemableSpendBalance) : undefined,
+        totalLifetimeSpend: totalLifetimeSpend !== undefined ? Number(totalLifetimeSpend) : undefined
+      }
+    });
+
+    return {
+      success: true,
+      redeemableSpendBalance: Number(updated.redeemableSpendBalance),
+      totalLifetimeSpend: Number(updated.totalLifetimeSpend)
+    };
   }
 };

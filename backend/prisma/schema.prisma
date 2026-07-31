@@ -339,6 +339,8 @@ model GroupBuyOrder {
   confirmedAt          DateTime?
   confirmedBy          String?
   expectedDeliveryDate String?
+  rewardDiscountAmount Decimal                  @default(0)
+  rewardTierThreshold  Decimal                  @default(0)
   createdAt            DateTime                 @default(now())
   updatedAt            DateTime                 @updatedAt
   details              GroupBuyOrderDetail[]
@@ -532,12 +534,14 @@ model Member {
   pictureUrl    String?
   receiverName  String?
   phone         String?
-  walletBalance Decimal             @default(0)
-  memberLevel   String              @default("General")
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  transactions  WalletTransaction[]
-  storeCode     String              @default("MILI001")
+  walletBalance          Decimal             @default(0)
+  redeemableSpendBalance Decimal             @default(0)
+  totalLifetimeSpend     Decimal             @default(0)
+  memberLevel            String              @default("General")
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  transactions           WalletTransaction[]
+  storeCode              String              @default("MILI001")
 
   @@id([memberId, storeCode])
 }
@@ -602,6 +606,14 @@ model Promotion {
   community GroupBuyCommunity?      @relation(fields: [communityId], references: [communityId], onDelete: Cascade)
   prices    CommunityProductPrice[]
   storeCode String                  @default("MILI001")
+}
+
+model RewardConfig {
+  storeCode     String   @id @default("MILI001")
+  mode          String   @default("OFF")
+  testUserIds   String[] @default([])
+  tierRulesJson String   @default("[{\"spendMin\":5000,\"discount\":150},{\"spendMin\":10000,\"discount\":350},{\"spendMin\":15000,\"discount\":600}]")
+  updatedAt     DateTime @updatedAt
 }
 
 model StoreSetting {

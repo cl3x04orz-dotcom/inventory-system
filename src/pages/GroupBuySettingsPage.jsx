@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Link, Calendar, Clock, Copy, Save, Plus, Check, RefreshCw, Truck, Edit2, Trash2, ChevronUp, ChevronDown, StickyNote, Eye, EyeOff, Search, LayoutGrid, List } from 'lucide-react';
+import { Link, Calendar, Clock, Copy, Save, Plus, Check, RefreshCw, Truck, Edit2, Trash2, ChevronUp, ChevronDown, StickyNote, Eye, EyeOff, Search, LayoutGrid, List, Gift, Sparkles, User, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import { copyToClipboard } from '../utils/clipboard';
 
@@ -14,6 +14,35 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
     const [deliveryAreaSearchTerm, setDeliveryAreaSearchTerm] = useState(''); // 散客外送區域搜尋關鍵字
     const [deliveryAreaViewMode, setDeliveryAreaViewMode] = useState('grid'); // 外送區域顯示模式 (grid/table)
     const [productSearchTerm, setProductSearchTerm] = useState(''); // 專屬定價商品搜尋關鍵字
+
+    // 滿額折抵設定 state
+    const [rewardMode, setRewardMode] = useState('OFF'); // OFF | TEST | ON
+    const [rewardTestUserIds, setRewardTestUserIds] = useState('');
+    const [rewardTierRules, setRewardTierRules] = useState([
+        { spendMin: 5000, discount: 150 },
+        { spendMin: 10000, discount: 350 },
+        { spendMin: 15000, discount: 600 }
+    ]);
+    const [rewardLoading, setRewardLoading] = useState(false);
+    const [rewardSaving, setRewardSaving] = useState(false);
+
+    const fetchRewardConfig = useCallback(async () => {
+        setRewardLoading(true);
+        try {
+            const res = await callGAS(apiUrl, 'getRewardConfig', {}, user?.token);
+            if (res && res.success && res.config) {
+                setRewardMode(res.config.mode || 'OFF');
+                setRewardTestUserIds((res.config.testUserIds || []).join(', '));
+                if (Array.isArray(res.config.tierRules) && res.config.tierRules.length > 0) {
+                    setRewardTierRules(res.config.tierRules);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to fetch reward config:', e);
+        } finally {
+            setRewardLoading(false);
+        }
+    }, [apiUrl, user]);
     
     // 隱藏/顯示大樓控制狀態 (持久化儲存在 localStorage)
     const [hiddenBuildings, setHiddenBuildings] = useState(() => {
@@ -704,6 +733,22 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                 >
                     <Truck size={16} />
                     <span>🛵 散客外送區域</span>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        setActiveTab('REWARD_SETTINGS');
+                        fetchRewardConfig();
+                    }}
+                    className={`px-4 py-2.5 rounded-xl font-extrabold text-xs md:text-sm flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+                        activeTab === 'REWARD_SETTINGS'
+                            ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                            : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)]'
+                    }`}
+                >
+                    <Gift size={16} />
+                    <span>🎁 線上會員滿額折抵</span>
                 </button>
             </div>
 
@@ -1861,6 +1906,183 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                             </table>
                                         </div>
                                     )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {activeTab === 'REWARD_SETTINGS' && (
+                        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-sm space-y-6">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-[var(--border-primary)] pb-4">
+                                <div>
+                                    <h3 className="font-black text-lg text-[var(--text-primary)] flex items-center gap-2">
+                                        <Gift className="text-emerald-500" /> 線上會員滿額折抵設定 (LIFF)
+                                    </h3>
+                                    <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+                                        顧客下單時可自選套用已解鎖之滿額折抵，使用後將自動扣除對應門檻額度。
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        setRewardSaving(true);
+                                        try {
+                                            const ids = rewardTestUserIds.split(',').map(s => s.trim()).filter(Boolean);
+                                            const res = await callGAS(apiUrl, 'saveRewardConfig', {
+                                                mode: rewardMode,
+                                                testUserIds: ids,
+                                                tierRules: rewardTierRules
+                                            }, user?.token);
+                                            if (res && res.success) {
+                                                alert('成功儲存滿額折抵設定！');
+                                            } else {
+                                                alert(res?.error || '儲存失敗');
+                                            }
+                                        } catch (e) {
+                                            alert('儲存出錯');
+                                        } finally {
+                                            setRewardSaving(false);
+                                        }
+                                    }}
+                                    disabled={rewardSaving}
+                                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                                >
+                                    <Save size={16} />
+                                    {rewardSaving ? '儲存中...' : '儲存設定'}
+                                </button>
+                            </div>
+
+                            {/* 1. 功能模式設定 */}
+                            <div className="bg-[var(--bg-tertiary)] p-4 rounded-xl border border-[var(--border-primary)] space-y-3">
+                                <label className="text-xs font-black text-[var(--text-primary)] flex items-center gap-1.5">
+                                    <ShieldCheck size={16} className="text-blue-500" />
+                                    功能運行狀態模式：
+                                </label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setRewardMode('OFF')}
+                                        className={`py-3 px-3 rounded-xl text-xs font-black flex flex-col items-center gap-1 cursor-pointer transition-all border ${
+                                            rewardMode === 'OFF'
+                                                ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/40 shadow-sm'
+                                                : 'bg-[var(--bg-primary)] text-[var(--text-tertiary)] border-[var(--border-primary)]'
+                                        }`}
+                                    >
+                                        <span className="text-sm">🔴 關閉 (OFF)</span>
+                                        <span className="text-[10px] font-normal">全站顧客皆無法使用</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setRewardMode('TEST')}
+                                        className={`py-3 px-3 rounded-xl text-xs font-black flex flex-col items-center gap-1 cursor-pointer transition-all border ${
+                                            rewardMode === 'TEST'
+                                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/40 shadow-sm'
+                                                : 'bg-[var(--bg-primary)] text-[var(--text-tertiary)] border-[var(--border-primary)]'
+                                        }`}
+                                    >
+                                        <span className="text-sm">🟡 測試模式 (TEST)</span>
+                                        <span className="text-[10px] font-normal">僅下方指定的 LINE UserID 能測試</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setRewardMode('ON')}
+                                        className={`py-3 px-3 rounded-xl text-xs font-black flex flex-col items-center gap-1 cursor-pointer transition-all border ${
+                                            rewardMode === 'ON'
+                                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/40 shadow-sm'
+                                                : 'bg-[var(--bg-primary)] text-[var(--text-tertiary)] border-[var(--border-primary)]'
+                                        }`}
+                                    >
+                                        <span className="text-sm">🟢 全站正式開啟 (ON)</span>
+                                        <span className="text-[10px] font-normal">所有 LIFF 下單顧客全面啟用</span>
+                                    </button>
+                                </div>
+
+                                {rewardMode === 'TEST' && (
+                                    <div className="pt-2 space-y-1 animate-in fade-in duration-150">
+                                        <label className="text-[11px] font-bold text-[var(--text-secondary)]">允許測試的 LINE User ID (用逗號隔開)：</label>
+                                        <input
+                                            type="text"
+                                            value={rewardTestUserIds}
+                                            onChange={(e) => setRewardTestUserIds(e.target.value)}
+                                            placeholder="留空代表允許所有管理員測試，或貼入 U123456..."
+                                            className="w-full p-2.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl text-xs font-mono"
+                                        />
+                                        <p className="text-[10px] text-[var(--text-tertiary)]">可在「會員管理」頁面複製您自己的 LINE UserID。</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 2. 階梯門檻規則管理 */}
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <h4 className="font-extrabold text-sm text-[var(--text-primary)] flex items-center gap-1.5">
+                                        <Sparkles size={16} className="text-amber-500" />
+                                        階梯門檻與對應折抵金額
+                                    </h4>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const lastRule = rewardTierRules[rewardTierRules.length - 1] || { spendMin: 0, discount: 0 };
+                                            setRewardTierRules([
+                                                ...rewardTierRules,
+                                                { spendMin: lastRule.spendMin + 5000, discount: lastRule.discount + 200 }
+                                            ]);
+                                        }}
+                                        className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-xl text-xs font-bold border border-blue-500/30 flex items-center gap-1 cursor-pointer"
+                                    >
+                                        <Plus size={14} /> 新增門檻
+                                    </button>
+                                </div>
+
+                                <div className="space-y-2">
+                                    {rewardTierRules.map((rule, idx) => (
+                                        <div key={idx} className="flex items-center gap-2 bg-[var(--bg-tertiary)] p-3 rounded-xl border border-[var(--border-primary)]">
+                                            <span className="font-extrabold text-xs text-[var(--text-tertiary)] w-12">階梯 {idx + 1}</span>
+                                            <div className="flex-1 flex items-center gap-2">
+                                                <div className="flex items-center gap-1 text-xs font-bold text-[var(--text-secondary)]">
+                                                    <span>滿 $</span>
+                                                    <input
+                                                        type="number"
+                                                        value={rule.spendMin}
+                                                        onChange={(e) => {
+                                                            const newRules = [...rewardTierRules];
+                                                            newRules[idx].spendMin = Number(e.target.value) || 0;
+                                                            setRewardTierRules(newRules);
+                                                        }}
+                                                        className="w-24 p-1.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-xs font-mono font-black"
+                                                    />
+                                                </div>
+
+                                                <span className="text-xs text-[var(--text-tertiary)] font-bold">折抵 ➔</span>
+
+                                                <div className="flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                                    <span>$</span>
+                                                    <input
+                                                        type="number"
+                                                        value={rule.discount}
+                                                        onChange={(e) => {
+                                                            const newRules = [...rewardTierRules];
+                                                            newRules[idx].discount = Number(e.target.value) || 0;
+                                                            setRewardTierRules(newRules);
+                                                        }}
+                                                        className="w-20 p-1.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-xs font-mono font-black text-emerald-600 dark:text-emerald-400"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setRewardTierRules(rewardTierRules.filter((_, i) => i !== idx));
+                                                }}
+                                                className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-lg cursor-pointer"
+                                                title="刪除此階梯"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         </div>

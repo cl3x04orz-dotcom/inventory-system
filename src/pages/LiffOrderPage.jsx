@@ -229,6 +229,10 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   const [lineUserId, setLineUserId] = useState("");
   const [linePictureUrl, setLinePictureUrl] = useState("");
 
+  // 滿額折抵設定
+  const [rewardConfig, setRewardConfig] = useState(null);
+  const [selectedRewardRule, setSelectedRewardRule] = useState(null); // { spendMin: 5000, discount: 150 } or null
+
   // V2 架構狀態
   const [currentCommunity, setCurrentCommunity] = useState(null);
   const [allCommunities, setAllCommunities] = useState([]);
@@ -365,6 +369,16 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
             if (savedObj.building) buildingParam = savedObj.building;
           }
         } catch (_) {}
+      }
+
+      // 載入滿額折抵設定
+      try {
+        const rRes = await callGAS(apiUrl, "getRewardConfig", {});
+        if (rRes && rRes.success && rRes.config) {
+          setRewardConfig(rRes.config);
+        }
+      } catch (rErr) {
+        console.warn("Failed to load reward config:", rErr);
       }
 
       const initData = await callGAS(
@@ -2154,6 +2168,8 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
           lineUserId: finalLineUserId,
           useWalletDeduction: useWallet,
           walletDeductionAmount: maxDeduction,
+          selectedRewardThreshold: selectedRewardRule?.spendMin || 0,
+          rewardDiscountAmount: selectedRewardRule ? Math.min(selectedRewardRule.discount, cartTotal) : 0,
           shippingFee,
           isGroupOrder,
           groupCart: isGroupOrder ? groupCart : undefined,
@@ -3807,6 +3823,109 @@ ${freeNote(newFee, newMin)}
               />
             </div>
           </div>
+
+          {/* 🎁 線上滿額自選折抵卡片 */}
+          {(() => {
+            if (!rewardConfig || rewardConfig.mode === "OFF") return null;
+            if (rewardConfig.mode === "TEST") {
+              const testIds = rewardConfig.testUserIds || [];
+              if (testIds.length > 0 && (!lineUserId || !testIds.includes(lineUserId))) return null;
+            }
+
+            const currentSpend = Number(memberProfile?.RedeemableSpendBalance || 0);
+            const rules = (rewardConfig.tierRules || []).sort((a, b) => a.spendMin - b.spendMin);
+            const unlockedRules = rules.filter(r => currentSpend >= r.spendMin);
+
+            return (
+              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4 space-y-3 shadow-sm">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                      <Gift size={16} />
+                    </div>
+                    <div>
+                      <div className="text-sm font-black text-emerald-900 flex items-center gap-1.5">
+                        滿額消費折抵
+                        <span className="text-[10px] bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded-full font-bold">
+                          可用額度 ${currentSpend.toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-emerald-700/80 mt-0.5 font-medium">
+                        滿額即可自由選擇折抵，使用後將扣除對應門檻。
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 pt-1">
+                  <label
+                    className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-extrabold cursor-pointer transition-all ${
+                      selectedRewardRule === null
+                        ? "bg-white border-emerald-500 text-emerald-900 shadow-xs"
+                        : "bg-white/60 border-emerald-200/80 text-slate-600 hover:bg-white"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="rewardRuleSelect"
+                        checked={selectedRewardRule === null}
+                        onChange={() => setSelectedRewardRule(null)}
+                        className="accent-emerald-600"
+                      />
+                      <span>不使用折抵 (繼續累積更高等級)</span>
+                    </div>
+                  </label>
+
+                  {rules.map((rule, rIdx) => {
+                    const isUnlocked = currentSpend >= rule.spendMin;
+                    const isSelected = selectedRewardRule?.spendMin === rule.spendMin;
+                    const remBalance = Math.max(0, currentSpend - rule.spendMin);
+
+                    return (
+                      <label
+                        key={rIdx}
+                        className={`flex flex-col p-2.5 rounded-xl border text-xs transition-all ${
+                          !isUnlocked
+                            ? "opacity-55 bg-slate-100/60 border-slate-200 text-slate-400 cursor-not-allowed"
+                            : isSelected
+                            ? "bg-white border-emerald-500 text-emerald-900 shadow-xs cursor-pointer"
+                            : "bg-white/60 border-emerald-200/80 text-slate-700 hover:bg-white cursor-pointer"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between font-extrabold">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="rewardRuleSelect"
+                              disabled={!isUnlocked}
+                              checked={isSelected}
+                              onChange={() => setSelectedRewardRule(rule)}
+                              className="accent-emerald-600"
+                            />
+                            <span className={isUnlocked ? "text-emerald-700 font-black" : ""}>
+                              滿 ${rule.spendMin.toLocaleString()} 門檻 ➔ 現折 ${rule.discount} 元
+                            </span>
+                          </div>
+                          {!isUnlocked && (
+                            <span className="text-[10px] text-orange-500 font-bold">
+                              還差 ${(rule.spendMin - currentSpend).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+
+                        {isUnlocked && isSelected && (
+                          <div className="text-[10px] text-emerald-600 mt-1 pl-6 font-bold">
+                            使用後剩餘累積額度：${remBalance.toLocaleString()} 元
+                          </div>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* 奶包金抵扣小卡 */}
           {hasWallet && (

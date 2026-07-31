@@ -5,11 +5,13 @@ import { apiRouter } from '../controllers/api.controller.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'your-jwt-secret';
 
 // Actions that do not require authentication
-const publicActions = ['getStoreSetting', 'login', 'register', 'checkInit', 'loginAdminByPassword', 'v2_getLiffInitData', 'v2_createOrder', 'v1_getMember', 'v1_saveMember', 'v1_getOrders', 'v1_reorder', 'getProductStock'];
+const publicActions = ['getStoreSetting', 'login', 'register', 'checkInit', 'loginAdminByPassword', 'v2_getLiffInitData', 'v2_createOrder', 'v1_getMember', 'v1_saveMember', 'v1_getOrders', 'v1_reorder', 'getProductStock', 'getRewardConfig'];
 
 // Action to Permission mapping (from Code.gs)
 const actionPermissions: Record<string, string> = {
   saveStoreSetting: 'system_config',
+  saveRewardConfig: 'system_config',
+  admin_adjustMemberSpend: 'sales_pending',
   saveSales: 'sales_entry',
   createRetailSale: 'sales_entry',
   getSalesHistory: 'sales_report',
