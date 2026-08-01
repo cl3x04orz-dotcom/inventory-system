@@ -2026,7 +2026,13 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                             const lastRule = rewardTierRules[rewardTierRules.length - 1] || { spendMin: 0, discount: 0 };
                                             setRewardTierRules([
                                                 ...rewardTierRules,
-                                                { spendMin: lastRule.spendMin + 5000, discount: lastRule.discount + 200 }
+                                                { 
+                                                    spendMin: lastRule.spendMin + 5000, 
+                                                    discount: lastRule.discount + 200,
+                                                    name: '新階梯奶箱',
+                                                    subtitle: '✨ 專屬優惠',
+                                                    image: ''
+                                                }
                                             ]);
                                         }}
                                         className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-xl text-xs font-bold border border-blue-500/30 flex items-center gap-1 cursor-pointer"
@@ -2035,13 +2041,54 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                     </button>
                                 </div>
 
-                                <div className="space-y-2">
+                                <div className="space-y-4 mt-4">
                                     {rewardTierRules.map((rule, idx) => (
-                                        <div key={idx} className="flex items-center gap-2 bg-[var(--bg-tertiary)] p-3 rounded-xl border border-[var(--border-primary)]">
-                                            <span className="font-extrabold text-xs text-[var(--text-tertiary)] w-12">階梯 {idx + 1}</span>
-                                            <div className="flex-1 flex items-center gap-2">
-                                                <div className="flex items-center gap-1 text-xs font-bold text-[var(--text-secondary)]">
-                                                    <span>滿 $</span>
+                                        <div key={idx} className="bg-[var(--bg-tertiary)] p-4 rounded-xl border border-[var(--border-primary)] flex flex-col gap-3">
+                                            <div className="flex justify-between items-center pb-2 border-b border-[var(--border-primary)]">
+                                                <span className="font-extrabold text-sm text-[var(--text-primary)]">階梯 {idx + 1}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setRewardTierRules(rewardTierRules.filter((_, i) => i !== idx));
+                                                    }}
+                                                    className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-lg cursor-pointer transition-colors"
+                                                    title="刪除此階梯"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                <div className="flex flex-col gap-1">
+                                                    <label className="text-[11px] font-bold text-[var(--text-secondary)]">奶箱名稱</label>
+                                                    <input
+                                                        type="text"
+                                                        value={rule.name || ''}
+                                                        placeholder="例如: 迷你奶箱"
+                                                        onChange={(e) => {
+                                                            const newRules = [...rewardTierRules];
+                                                            newRules[idx].name = e.target.value;
+                                                            setRewardTierRules(newRules);
+                                                        }}
+                                                        className="w-full p-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-xs"
+                                                    />
+                                                </div>
+                                                <div className="flex flex-col gap-1">
+                                                    <label className="text-[11px] font-bold text-[var(--text-secondary)]">副標題 / 優惠標語</label>
+                                                    <input
+                                                        type="text"
+                                                        value={rule.subtitle || ''}
+                                                        placeholder="例如: 💙 入門小確幸"
+                                                        onChange={(e) => {
+                                                            const newRules = [...rewardTierRules];
+                                                            newRules[idx].subtitle = e.target.value;
+                                                            setRewardTierRules(newRules);
+                                                        }}
+                                                        className="w-full p-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-xs"
+                                                    />
+                                                </div>
+                                                <div className="flex flex-col gap-1">
+                                                    <label className="text-[11px] font-bold text-[var(--text-secondary)]">解鎖門檻 ($)</label>
                                                     <input
                                                         type="number"
                                                         value={rule.spendMin}
@@ -2050,14 +2097,11 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                             newRules[idx].spendMin = Number(e.target.value) || 0;
                                                             setRewardTierRules(newRules);
                                                         }}
-                                                        className="w-24 p-1.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-xs font-mono font-black"
+                                                        className="w-full p-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-xs font-mono font-black"
                                                     />
                                                 </div>
-
-                                                <span className="text-xs text-[var(--text-tertiary)] font-bold">折抵 ➔</span>
-
-                                                <div className="flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                                                    <span>$</span>
+                                                <div className="flex flex-col gap-1">
+                                                    <label className="text-[11px] font-bold text-emerald-600">折扣金額 ($)</label>
                                                     <input
                                                         type="number"
                                                         value={rule.discount}
@@ -2066,21 +2110,32 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                             newRules[idx].discount = Number(e.target.value) || 0;
                                                             setRewardTierRules(newRules);
                                                         }}
-                                                        className="w-20 p-1.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-xs font-mono font-black text-emerald-600 dark:text-emerald-400"
+                                                        className="w-full p-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-xs font-mono font-black text-emerald-600"
                                                     />
                                                 </div>
                                             </div>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setRewardTierRules(rewardTierRules.filter((_, i) => i !== idx));
-                                                }}
-                                                className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-lg cursor-pointer"
-                                                title="刪除此階梯"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
+                                            
+                                            <div className="flex flex-col gap-1">
+                                                <label className="text-[11px] font-bold text-[var(--text-secondary)]">圖片網址 (Image URL)</label>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={rule.image || ''}
+                                                        placeholder="貼上網址或上傳至圖床 (支援 .png, .webp, .jpg)"
+                                                        onChange={(e) => {
+                                                            const newRules = [...rewardTierRules];
+                                                            newRules[idx].image = e.target.value;
+                                                            setRewardTierRules(newRules);
+                                                        }}
+                                                        className="flex-1 p-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-xs"
+                                                    />
+                                                    {rule.image && (
+                                                        <div className="w-9 h-9 rounded bg-white border border-[var(--border-primary)] shrink-0 flex items-center justify-center p-0.5 overflow-hidden shadow-2xs">
+                                                            <img src={rule.image} alt="Preview" className="w-full h-full object-contain" onError={(e) => {e.target.style.display='none'}} />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

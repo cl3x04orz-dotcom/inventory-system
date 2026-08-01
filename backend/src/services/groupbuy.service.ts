@@ -1844,6 +1844,22 @@ export const GroupBuyService = {
       ];
     }
 
+    const defaultData = [
+      { name: "迷你奶箱", subtitle: "💙 入門小確幸", image: "/assets/milk_box_mini.png" },
+      { name: "經典奶箱", subtitle: "🌿 人氣首選", image: "/assets/milk_box_classic.png" },
+      { name: "豪華奶箱", subtitle: "👑 尊榮限定", image: "/assets/milk_box_luxury.png" }
+    ];
+
+    tierRules = tierRules.map((rule, idx) => ({
+      ...rule,
+      id: rule.id || `box_${Date.now()}_${idx}`,
+      name: rule.name || (defaultData[idx]?.name || `優惠箱 ${idx + 1}`),
+      subtitle: rule.subtitle || (defaultData[idx]?.subtitle || "探索專屬優惠"),
+      image: rule.image || (defaultData[idx]?.image || ""),
+      isActive: rule.isActive !== false,
+      sortOrder: rule.sortOrder ?? idx
+    }));
+
     return {
       success: true,
       config: {

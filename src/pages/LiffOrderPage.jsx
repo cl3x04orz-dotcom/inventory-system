@@ -3881,29 +3881,11 @@ ${freeNote(newFee, newMin)}
             }
 
             const currentSpend = Number(memberProfile?.RedeemableSpendBalance || 0);
-            const rules = (rewardConfig.tierRules || []).sort((a, b) => a.spendMin - b.spendMin);
+            const rules = (rewardConfig.tierRules || [])
+              .filter(r => r.isActive !== false)
+              .sort((a, b) => (a.sortOrder ?? a.spendMin) - (b.sortOrder ?? b.spendMin));
+
             const unlockedRules = rules.filter(r => currentSpend >= r.spendMin);
-
-            const getBoxName = (idx, spendMin) => {
-              if (idx === 0) return "迷你奶箱";
-              if (idx === 1) return "經典奶箱";
-              if (idx === 2) return "豪華奶箱";
-              return `尊榮奶箱 ($${spendMin.toLocaleString()})`;
-            };
-
-            const getBoxImg = (idx) => {
-              if (idx === 0) return milkBoxMini;
-              if (idx === 1) return milkBoxClassic;
-              if (idx === 2) return milkBoxLuxury;
-              return milkBoxMini;
-            };
-
-            const getBoxSubtitle = (idx) => {
-              if (idx === 0) return "入門小確幸";
-              if (idx === 1) return "人氣首選";
-              if (idx === 2) return "尊榮限定";
-              return "探索專屬優惠";
-            };
 
             return (
               <div className="bg-[#F9FFFC] border border-[#D5F5E7] rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
@@ -3959,12 +3941,12 @@ ${freeNote(newFee, newMin)}
                     const isSelected = selectedRewardRule?.spendMin === rule.spendMin;
                     const isExpanded = expandedBoxIdx === rIdx;
                     const remBalance = Math.max(0, currentSpend - rule.spendMin);
-                    const boxName = getBoxName(rIdx, rule.spendMin);
-                    const boxImg = getBoxImg(rIdx);
+                    const boxName = rule.name || `尊榮奶箱 ($${rule.spendMin.toLocaleString()})`;
+                    const boxImg = rule.image || milkBoxMini;
 
                     return (
                       <div
-                        key={rIdx}
+                        key={rule.id || rIdx}
                         onClick={() => {
                           setExpandedBoxIdx(isExpanded ? null : rIdx);
                           if (isUnlocked) {
@@ -3994,6 +3976,7 @@ ${freeNote(newFee, newMin)}
                               src={boxImg}
                               alt={boxName}
                               className="w-16 h-16 sm:w-20 sm:h-20 object-contain shrink-0 drop-shadow-sm p-1"
+                              onError={(e) => { e.target.onerror = null; e.target.src = milkBoxMini; }}
                             />
                             <div className="flex flex-col min-w-0 gap-1 flex-1">
                               <span className={isUnlocked ? "text-base font-black text-slate-900 truncate" : "text-sm font-bold text-slate-500 truncate"}>
@@ -4005,7 +3988,7 @@ ${freeNote(newFee, newMin)}
                                 rIdx === 1 ? "text-emerald-600/90" : 
                                 "text-yellow-600/90"
                               }`}>
-                                {rIdx === 0 ? "💙" : rIdx === 1 ? "🌿" : "👑"} {getBoxSubtitle(rIdx)}
+                                {rule.subtitle}
                               </span>
                               
                               <span className="text-[11px] font-medium mt-1">
