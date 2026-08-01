@@ -1008,9 +1008,12 @@ export const GroupBuyService = {
     const combinedNote = [finalNote, transferLastFive ? `後五碼:${transferLastFive}` : ''].filter(Boolean).join(' | ');
 
     let paymentStatus = '';
-    if (deductionApplied === totalAmount) {
+    if (deductionApplied > 0 && deductionApplied === totalAmount) {
       paymentStatus = '已付款';
       actualPaymentMethod = '奶包金扣抵';
+    } else if (appliedRewardDiscount > 0 && totalAmount === 0) {
+      paymentStatus = '已付款';
+      actualPaymentMethod = '滿額消費折抵';
     } else {
       if (paymentMethod === '現金') paymentStatus = '貨到付款';
       else if (paymentMethod === '轉帳') paymentStatus = '待對帳';

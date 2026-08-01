@@ -100,7 +100,15 @@ function v2_createOrderService(payload) {
     newOrderRow[headers.indexOf('CampaignTypeSnapshot')] = campTypeSnap;
     newOrderRow[headers.indexOf('DeliveryDateSnapshot')] = deliveryDateSnap;
     newOrderRow[headers.indexOf('DeliveryTimeSnapshot')] = deliveryTimeSnap;
-    newOrderRow[headers.indexOf('PaymentMethodSnapshot')] = paymentMethod;
+    let actualPaymentMethod = paymentMethod;
+    if (totalAmount === 0) {
+      if (rewardDiscount > 0 && (!payload.useWalletDeduction || Number(payload.walletDeductionAmount) === 0)) {
+        actualPaymentMethod = '滿額消費折抵';
+      } else if (Number(payload.walletDeductionAmount) > 0) {
+        actualPaymentMethod = '奶包金扣抵';
+      }
+    }
+    newOrderRow[headers.indexOf('PaymentMethodSnapshot')] = actualPaymentMethod;
     newOrderRow[headers.indexOf('DeliveryInstructionSnapshot')] = "";
     newOrderRow[headers.indexOf('Status')] = '未確認';
     newOrderRow[headers.indexOf('DeliveryStatus')] = Enums.DeliveryStatus.ORDER_RECEIVED;

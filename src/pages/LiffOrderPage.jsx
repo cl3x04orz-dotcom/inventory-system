@@ -2186,7 +2186,9 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
             return selectedBuilding === "其它" ? otherBuildingText.trim() : (selectedBuilding || "一般散客");
           })(),
           note,
-          paymentMethod,
+          paymentMethod: (payAmount === 0 && selectedRewardRule && (!useWallet || maxDeduction === 0))
+            ? "滿額消費折抵"
+            : paymentMethod,
           transferLastFive,
           lineDisplayName,
           lineUserId: finalLineUserId,

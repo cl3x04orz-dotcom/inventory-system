@@ -2167,8 +2167,14 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                             })()}
 
                                             {order.paymentMethod && (
-                                                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-primary)]">
-                                                    💳 {order.paymentMethod}
+                                                <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold border ${
+                                                    order.paymentMethod === '滿額消費折抵' || order.paymentMethod === '滿額折抵'
+                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                        : order.paymentMethod === '奶包金扣抵'
+                                                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)]'
+                                                }`}>
+                                                    {order.paymentMethod === '滿額消費折抵' || order.paymentMethod === '滿額折抵' ? '🎁 滿額消費折抵' : order.paymentMethod === '奶包金扣抵' ? '💳 奶包金扣抵' : `💳 ${order.paymentMethod}`}
                                                 </span>
                                             )}
 
