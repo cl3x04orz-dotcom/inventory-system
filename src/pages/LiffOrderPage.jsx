@@ -2058,12 +2058,6 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
     } catch (_) { }
 
-    if (selectedRewardRule && cartTotal < selectedRewardRule.discount) {
-      alert(`⚠️ 您的購物車商品小計 ($${cartTotal}) 低於滿額折抵金額 ($${selectedRewardRule.discount})！\n折抵金額無法分次退現或保留，將自動帶您回選單加購商品滿 $${selectedRewardRule.discount} 元。`);
-      setStep("shop");
-      return;
-    }
-
     // 💡 團購模式 Clean Up：只保留有購買商品的成員
     if (isGroupOrder) {
       setGroupCart((prev) => {
@@ -2087,7 +2081,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   const handleSubmitOrder = async () => {
     if (selectedRewardRule && cartTotal < selectedRewardRule.discount) {
       setIsSubmitting(false);
-      alert(`⚠️ 您的購物車商品小計 ($${cartTotal}) 低於滿額折抵金額 ($${selectedRewardRule.discount})！\n折抵金額無法分次退現或保留，將自動帶您回選單加購商品滿 $${selectedRewardRule.discount} 元。`);
+      alert(`⚠️ 您的購物車商品小計 ($${cartTotal}) \n低於滿額折抵金額 ($${selectedRewardRule.discount})！\n折抵金額無法分次退現或保留，\n將自動帶您回選單加購商品滿 $${selectedRewardRule.discount} 元。`);
       setStep("shop");
       return;
     }
@@ -3980,9 +3974,9 @@ ${freeNote(newFee, newMin)}
                               <span>元</span>
                             </div>
                             {cartTotal < rule.discount && (
-                              <div className="text-[11px] text-rose-600 font-black flex flex-col items-center justify-center text-center mt-1.5 bg-rose-50/90 p-2.5 rounded-xl border border-rose-200/80 leading-relaxed shadow-2xs">
+                              <div className="text-[11px] text-rose-600 font-black flex flex-col items-center justify-center text-center mt-1.5 bg-rose-50/90 p-2.5 rounded-xl border border-rose-200/80 leading-snug shadow-2xs">
                                 <div>⚠️ 購物車商品小計 (${cartTotal}) 低於滿額折抵金額 (${rule.discount})！</div>
-                                <div>折抵金無法分次退現或保留，請加購商品滿 ${rule.discount} 元後方可下單結帳。</div>
+                                <div>折抵金無法分次退現或保留，請加購滿 ${rule.discount} 元後下單。</div>
                               </div>
                             )}
                           </div>
