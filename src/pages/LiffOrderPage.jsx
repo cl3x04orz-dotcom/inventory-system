@@ -2167,7 +2167,11 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         }
       }
 
-      const maxDeduction = Math.min(memberProfile?.WalletBalance || 0, cartTotal);
+      const rewardDiscountAmount = selectedRewardRule ? Math.min(selectedRewardRule.discount, cartTotal) : 0;
+      const netCartTotal = Math.max(0, cartTotal - rewardDiscountAmount);
+      const maxDeduction = Math.min(memberProfile?.WalletBalance || 0, netCartTotal);
+      const currentOrderTotal = netCartTotal + shippingFee;
+      const currentPayAmount = useWallet ? Math.max(0, currentOrderTotal - maxDeduction) : currentOrderTotal;
 
       const res = await callGAS(
         apiUrl,
@@ -2186,7 +2190,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
             return selectedBuilding === "其它" ? otherBuildingText.trim() : (selectedBuilding || "一般散客");
           })(),
           note,
-          paymentMethod: (payAmount === 0 && selectedRewardRule && (!useWallet || maxDeduction === 0))
+          paymentMethod: (currentPayAmount === 0 && selectedRewardRule && (!useWallet || maxDeduction === 0))
             ? "滿額消費折抵"
             : paymentMethod,
           transferLastFive,
