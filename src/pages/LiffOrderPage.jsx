@@ -3894,7 +3894,7 @@ ${freeNote(newFee, newMin)}
                     <img
                       src={rewardConfig.headerImage || milkBoxClassic}
                       alt="奶箱"
-                      className="w-[48px] h-[48px] sm:w-[52px] sm:h-[52px] object-contain shrink-0 drop-shadow-md"
+                      className="w-[64px] h-[64px] object-contain shrink-0 drop-shadow-md scale-110"
                       onError={(e) => { e.target.onerror = null; e.target.src = milkBoxClassic; }}
                     />
                     <div>
@@ -3976,11 +3976,11 @@ ${freeNote(newFee, newMin)}
                             <img
                               src={boxImg}
                               alt={boxName}
-                              className="w-[52px] h-[52px] sm:w-[56px] sm:h-[56px] object-contain shrink-0 drop-shadow-md scale-110"
+                              className="w-[64px] h-[64px] object-contain shrink-0 drop-shadow-md scale-125"
                               onError={(e) => { e.target.onerror = null; e.target.src = milkBoxMini; }}
                             />
-                            <div className="flex flex-col min-w-0 gap-1 flex-1 pl-1">
-                              <span className={isUnlocked ? "text-[18px] font-black text-slate-900 truncate" : "text-base font-bold text-slate-500 truncate"}>
+                            <div className="flex flex-col min-w-0 gap-1 flex-1 pl-2">
+                              <span className={isUnlocked ? "text-[20px] font-black text-slate-900 truncate" : "text-[18px] font-bold text-slate-500 truncate"}>
                                 {boxName}
                               </span>
                               <span className={`text-[11px] font-black tracking-widest flex items-center gap-1 ${
