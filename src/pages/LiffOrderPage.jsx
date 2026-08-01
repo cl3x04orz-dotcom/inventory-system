@@ -3878,26 +3878,28 @@ ${freeNote(newFee, newMin)}
                   </div>
                 </div>
 
-                <div className="space-y-1.5 pt-1">
+                <div className="space-y-2 pt-1">
+                  {/* 不使用折抵 */}
                   <label
-                    className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-extrabold cursor-pointer transition-all ${
+                    className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-extrabold cursor-pointer transition-all ${
                       selectedRewardRule === null
-                        ? "bg-white border-emerald-500 text-emerald-900 shadow-xs"
-                        : "bg-white/60 border-emerald-200/80 text-slate-600 hover:bg-white"
+                        ? "bg-white border-2 border-emerald-500 text-emerald-950 shadow-sm"
+                        : "bg-white/70 border-emerald-100 text-slate-600 hover:bg-white"
                     }`}
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5">
                       <input
                         type="radio"
                         name="rewardRuleSelect"
                         checked={selectedRewardRule === null}
                         onChange={() => setSelectedRewardRule(null)}
-                        className="accent-emerald-600"
+                        className="accent-emerald-600 w-4 h-4 cursor-pointer"
                       />
                       <span>不使用折抵 (繼續累積更高等級)</span>
                     </div>
                   </label>
 
+                  {/* 各階梯門檻選項 */}
                   {rules.map((rule, rIdx) => {
                     const isUnlocked = currentSpend >= rule.spendMin;
                     const isSelected = selectedRewardRule?.spendMin === rule.spendMin;
@@ -3906,42 +3908,55 @@ ${freeNote(newFee, newMin)}
                     return (
                       <label
                         key={rIdx}
-                        className={`flex flex-col p-2.5 rounded-xl border text-xs transition-all ${
+                        className={`flex flex-col p-3 rounded-2xl border text-xs transition-all ${
                           !isUnlocked
-                            ? "opacity-55 bg-slate-100/60 border-slate-200 text-slate-400 cursor-not-allowed"
+                            ? "opacity-55 bg-slate-100/70 border-slate-200 text-slate-400 cursor-not-allowed"
                             : isSelected
-                            ? "bg-white border-emerald-500 text-emerald-900 shadow-xs cursor-pointer"
-                            : "bg-white/60 border-emerald-200/80 text-slate-700 hover:bg-white cursor-pointer"
+                            ? "bg-white border-2 border-emerald-500 text-emerald-950 shadow-md ring-2 ring-emerald-500/10 cursor-pointer"
+                            : "bg-white/80 border-emerald-200/70 text-slate-800 hover:bg-white hover:border-emerald-300 cursor-pointer"
                         }`}
                       >
-                        <div className="flex items-center justify-between font-extrabold">
-                          <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-between font-extrabold gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
                             <input
                               type="radio"
                               name="rewardRuleSelect"
                               disabled={!isUnlocked}
                               checked={isSelected}
                               onChange={() => setSelectedRewardRule(rule)}
-                              className="accent-emerald-600"
+                              className="accent-emerald-600 w-4 h-4 cursor-pointer shrink-0"
                             />
-                            <span className={isUnlocked ? "text-emerald-700 font-black" : ""}>
-                              滿 ${rule.spendMin.toLocaleString()} 門檻 ➔ 現折 ${rule.discount} 元
+                            <span className={isUnlocked ? "text-slate-800 font-bold text-sm truncate" : "text-slate-400 text-sm"}>
+                              滿 ${rule.spendMin.toLocaleString()} 門檻
                             </span>
                           </div>
-                          {!isUnlocked && (
-                            <span className="text-[10px] text-orange-500 font-bold">
-                              還差 ${(rule.spendMin - currentSpend).toLocaleString()}
-                            </span>
-                          )}
+
+                          <div className="shrink-0 flex items-center gap-1.5">
+                            {isUnlocked ? (
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-black tracking-tight ${
+                                isSelected
+                                  ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-xs"
+                                  : "bg-emerald-100 text-emerald-700"
+                              }`}>
+                                現折 ${rule.discount.toLocaleString()} 元
+                              </span>
+                            ) : (
+                              <span className="text-[11px] bg-orange-50 text-orange-600 border border-orange-200/80 px-2 py-0.5 rounded-full font-bold">
+                                還差 ${(rule.spendMin - currentSpend).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         {isUnlocked && isSelected && (
-                          <div className="space-y-1 mt-1 text-center">
-                            <div className="text-[10px] text-emerald-600 font-bold">
-                              使用後剩餘累積額度：${remBalance.toLocaleString()} 元
+                          <div className="space-y-1.5 mt-2.5 pt-2 border-t border-emerald-100 text-center">
+                            <div className="text-[11px] text-emerald-700 font-extrabold flex items-center justify-center gap-1">
+                              <span>使用後剩餘累積額度：</span>
+                              <span className="font-mono text-emerald-800 font-black">${remBalance.toLocaleString()}</span>
+                              <span>元</span>
                             </div>
                             {cartTotal < rule.discount && (
-                              <div className="text-[11px] text-rose-600 font-black flex flex-col items-center justify-center text-center mt-1.5 bg-rose-50 p-2.5 rounded-xl border border-rose-200 leading-relaxed shadow-2xs">
+                              <div className="text-[11px] text-rose-600 font-black flex flex-col items-center justify-center text-center mt-1.5 bg-rose-50/90 p-2.5 rounded-xl border border-rose-200/80 leading-relaxed shadow-2xs">
                                 <div>⚠️ 購物車商品小計 (${cartTotal}) 低於滿額折抵金額 (${rule.discount})！</div>
                                 <div>折抵金無法分次退現或保留，請加購商品滿 ${rule.discount} 元後方可下單結帳。</div>
                               </div>
