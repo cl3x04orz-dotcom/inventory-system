@@ -3897,6 +3897,13 @@ ${freeNote(newFee, newMin)}
               return milkBoxMini;
             };
 
+            const getBoxSubtitle = (idx) => {
+              if (idx === 0) return "入門小確幸";
+              if (idx === 1) return "經典美味・滿滿幸福";
+              if (idx === 2) return "尊榮獨享・極致獎勵";
+              return "探索專屬優惠";
+            };
+
             return (
               <div className="bg-[#F9FFFC] border border-[#D5F5E7] rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
                 <div className="flex justify-between items-center pb-1 border-b border-[#E6F7F0]">
@@ -3904,7 +3911,7 @@ ${freeNote(newFee, newMin)}
                     <img
                       src={milkBoxHeader}
                       alt="奶箱"
-                      className="w-10 h-10 object-contain shrink-0 rounded-lg drop-shadow-xs"
+                      className="w-12 h-12 object-contain shrink-0 drop-shadow-sm p-0.5"
                     />
                     <div>
                       <div className="text-sm font-black text-slate-900 flex items-center gap-2">
@@ -3978,11 +3985,19 @@ ${freeNote(newFee, newMin)}
                             <img
                               src={boxImg}
                               alt={boxName}
-                              className="w-16 h-16 sm:w-20 sm:h-20 object-contain shrink-0 rounded-xl drop-shadow-sm"
+                              className="w-16 h-16 sm:w-20 sm:h-20 object-contain shrink-0 drop-shadow-sm p-1"
                             />
                             <div className="flex flex-col min-w-0">
                               <span className={isUnlocked ? "text-base font-black text-slate-900 truncate" : "text-sm font-bold text-slate-400 truncate"}>
                                 {boxName}
+                              </span>
+                              <span className={`text-[10px] font-black tracking-widest mt-0.5 mb-1.5 flex items-center gap-1 ${
+                                !isUnlocked ? "text-slate-400" :
+                                rIdx === 0 ? "text-blue-500/90" : 
+                                rIdx === 1 ? "text-emerald-600/90" : 
+                                "text-yellow-600/90"
+                              }`}>
+                                {rIdx === 0 ? "💙" : rIdx === 1 ? "🌿" : "👑"} {getBoxSubtitle(rIdx)}
                               </span>
                               <span className="text-[11px] text-slate-500 font-medium">
                                 {isUnlocked ? `🔓 累積 $${rule.spendMin.toLocaleString()} 解鎖` : `🔒 累積 $${rule.spendMin.toLocaleString()} 解鎖`}
