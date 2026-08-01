@@ -2082,7 +2082,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     if (selectedRewardRule && cartTotal < selectedRewardRule.discount) {
       setIsSubmitting(false);
       const diff = selectedRewardRule.discount - cartTotal;
-      alert(`⚠️ 購物車商品小計 ($${cartTotal}) 低於折抵金 ($${selectedRewardRule.discount})！\n還差 $${diff} 元！折抵金無法分次退現或保留，\n將自動帶您回到選購頁面加購商品，\n需滿 $${selectedRewardRule.discount} 元後方可完成下單結帳。`);
+      alert(`⚠️ 小計 ($${cartTotal}) 低於折抵 ($${selectedRewardRule.discount})！\n還差 $${diff} 元！折抵金無法退現，\n將自動帶您回到選單頁面加購，\n滿 $${selectedRewardRule.discount} 元後方可下單結帳。`);
       setStep("shop");
       return;
     }
