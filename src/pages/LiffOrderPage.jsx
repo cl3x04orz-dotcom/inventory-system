@@ -29,6 +29,9 @@ import { callGAS, memberApi } from "../utils/api";
 import { copyToClipboard } from '../utils/clipboard';
 import logoImg from "../assets/logo.png";
 import logoLiff from "../assets/logo_liff.jpg";
+import milkBoxMini from "../assets/milk_box_mini.png";
+import milkBoxClassic from "../assets/milk_box_classic.png";
+import milkBoxLuxury from "../assets/milk_box_luxury.png";
 
 // ── 品牌 Logo 元件 ──────────────────────────────────────────────
 const MilkZeroWasteLogo = ({ setting }) => (
@@ -3887,10 +3890,10 @@ ${freeNote(newFee, newMin)}
             };
 
             const getBoxImg = (idx) => {
-              if (idx === 0) return "/assets/milk_box_mini.png";
-              if (idx === 1) return "/assets/milk_box_classic.png";
-              if (idx === 2) return "/assets/milk_box_luxury.png";
-              return "/assets/milk_box_mini.png";
+              if (idx === 0) return milkBoxMini;
+              if (idx === 1) return milkBoxClassic;
+              if (idx === 2) return milkBoxLuxury;
+              return milkBoxMini;
             };
 
             return (
