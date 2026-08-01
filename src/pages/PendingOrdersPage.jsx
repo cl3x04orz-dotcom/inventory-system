@@ -2857,14 +2857,29 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                     {(() => {
                                         const totals = computeOrderTotals(editingOrder, buildingSettingsList, groupBindings);
                                         return (
-                                            <div className="flex justify-between items-center mt-4 p-3 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-xl font-bold text-base">
-                                                <div className="flex flex-col">
-                                                    <span className="text-[var(--text-primary)] font-bold">訂單合計</span>
-                                                    <span className="text-xs text-[var(--text-secondary)] font-normal">
-                                                        商品 ${totals.productTotal} + 運費 ${totals.shippingFee} {totals.shippingFee === 0 ? '(免運)' : ''}
-                                                    </span>
+                                            <div className="mt-4 p-4 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-xl space-y-2 text-sm">
+                                                <div className="flex justify-between text-[var(--text-secondary)] font-medium">
+                                                    <span>商品金額</span>
+                                                    <span className="font-mono">${totals.productTotal}</span>
                                                 </div>
-                                                <span className="text-blue-600 font-mono text-xl">${totals.totalAmount}</span>
+                                                {totals.rewardDiscount > 0 && (
+                                                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
+                                                        <span>🎁 滿額自選折抵</span>
+                                                        <span className="font-mono">-${totals.rewardDiscount}</span>
+                                                    </div>
+                                                )}
+                                                <div className="flex justify-between text-[var(--text-secondary)] font-medium">
+                                                    <span>運費</span>
+                                                    {totals.shippingFee > 0 ? (
+                                                        <span className="font-mono">+${totals.shippingFee}</span>
+                                                    ) : (
+                                                        <span className="text-emerald-600 font-semibold">免運</span>
+                                                    )}
+                                                </div>
+                                                <div className="pt-2 border-t border-[var(--border-primary)] flex justify-between items-center font-bold text-[var(--text-primary)] text-base">
+                                                    <span>訂單合計</span>
+                                                    <span className="text-blue-600 dark:text-blue-400 font-mono text-xl font-extrabold">${totals.totalAmount}</span>
+                                                </div>
                                             </div>
                                         );
                                     })()}
