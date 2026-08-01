@@ -3975,7 +3975,7 @@ ${freeNote(newFee, newMin)}
                             <img
                               src={boxImg}
                               alt={boxName}
-                              className="w-11 h-11 object-contain shrink-0 rounded-lg drop-shadow-xs"
+                              className="w-16 h-16 sm:w-20 sm:h-20 object-contain shrink-0 rounded-xl drop-shadow-sm"
                             />
                             <div className="flex flex-col min-w-0">
                               <span className={isUnlocked ? "text-base font-black text-slate-900 truncate" : "text-sm font-bold text-slate-400 truncate"}>
