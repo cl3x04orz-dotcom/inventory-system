@@ -2050,11 +2050,6 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
     } catch (_) { }
 
-    if (selectedRewardRule && cartTotal < selectedRewardRule.discount) {
-      alert(`⚠️ 您的購物車商品小計 ($${cartTotal}) 低於滿額折抵金額 ($${selectedRewardRule.discount})！\n折抵金額無法分次退現或保留，請回到選單加購商品滿 $${selectedRewardRule.discount} 元後方可進行下一步結帳！`);
-      return;
-    }
-
     // 💡 團購模式 Clean Up：只保留有購買商品的成員
     if (isGroupOrder) {
       setGroupCart((prev) => {
@@ -2076,12 +2071,6 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
   // ── 送出訂單 ─────────────────────────────────────────────────
   const handleSubmitOrder = async () => {
-    if (selectedRewardRule && cartTotal < selectedRewardRule.discount) {
-      setIsSubmitting(false);
-      alert(`⚠️ 您的購物車商品小計 ($${cartTotal}) 低於滿額折抵金額 ($${selectedRewardRule.discount})！\n折抵金額無法分次退現或保留，請回到選單加購商品滿 $${selectedRewardRule.discount} 元後方可完成下單！`);
-      return;
-    }
-
     // 🛡️ 強制雙向贈品防呆檢查（少選與多選溢額均自動攔截）
     if (isGroupOrder) {
       for (const [memberName, mCredits] of Object.entries(memberGiftCredits)) {
@@ -3947,13 +3936,14 @@ ${freeNote(newFee, newMin)}
                         </div>
 
                         {isUnlocked && isSelected && (
-                          <div className="space-y-1 mt-1 pl-6">
+                          <div className="space-y-1 mt-1 text-center">
                             <div className="text-[10px] text-emerald-600 font-bold">
                               使用後剩餘累積額度：${remBalance.toLocaleString()} 元
                             </div>
                             {cartTotal < rule.discount && (
-                              <div className="text-[11px] text-rose-600 font-black flex items-center gap-1 mt-1 bg-rose-50 p-2 rounded-xl border border-rose-200">
-                                ⚠️ 購物車商品小計 (${cartTotal}) 低於滿額折抵金額 (${rule.discount})！折抵金無法分次退現或保留，請加購商品滿 ${rule.discount} 元後方可下單結帳。
+                              <div className="text-[11px] text-rose-600 font-black flex flex-col items-center justify-center text-center mt-1.5 bg-rose-50 p-2.5 rounded-xl border border-rose-200 leading-relaxed shadow-2xs">
+                                <div>⚠️ 購物車商品小計 (${cartTotal}) 低於滿額折抵金額 (${rule.discount})！</div>
+                                <div>折抵金無法分次退現或保留，請加購商品滿 ${rule.discount} 元後方可下單結帳。</div>
                               </div>
                             )}
                           </div>
@@ -5317,13 +5307,7 @@ ${freeNote(newFee, newMin)}
                   </div>
                 </div>
                 <button
-                  onClick={() => {
-                    if (selectedRewardRule && cartTotal < selectedRewardRule.discount) {
-                      alert(`⚠️ 您的購物車商品小計 ($${cartTotal}) 低於滿額折抵金額 ($${selectedRewardRule.discount})！\n折抵金額無法分次退現或保留，請回到選單加購商品滿 $${selectedRewardRule.discount} 元後方可進行下一步結帳！`);
-                      return;
-                    }
-                    setStep("confirm");
-                  }}
+                  onClick={() => setStep("confirm")}
                   className="btn-primary px-5 py-2.5 rounded-xl font-bold flex items-center gap-1 shadow-md shadow-blue-500/20"
                 >
                   前往結帳 <ArrowRight size={16} />
