@@ -2081,7 +2081,8 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   const handleSubmitOrder = async () => {
     if (selectedRewardRule && cartTotal < selectedRewardRule.discount) {
       setIsSubmitting(false);
-      alert(`⚠️ 您的購物車商品小計 ($${cartTotal}) \n低於滿額折抵金額 ($${selectedRewardRule.discount})！\n折抵金額無法分次退現或保留，\n將自動帶您回選單加購商品滿 $${selectedRewardRule.discount} 元。`);
+      const diff = selectedRewardRule.discount - cartTotal;
+      alert(`⚠️ 購物車商品小計 ($${cartTotal}) 低於折抵金 ($${selectedRewardRule.discount})！\n還差 $${diff} 元！折抵金無法分次退現或保留，\n將自動帶您回到選購頁面加購商品，\n需滿 $${selectedRewardRule.discount} 元後方可完成下單結帳。`);
       setStep("shop");
       return;
     }
@@ -3976,7 +3977,7 @@ ${freeNote(newFee, newMin)}
                             {cartTotal < rule.discount && (
                               <div className="text-[11px] text-rose-600 font-black flex flex-col items-center justify-center text-center mt-1.5 bg-rose-50/90 p-2.5 rounded-xl border border-rose-200/80 leading-snug shadow-2xs">
                                 <div>⚠️ 購物車商品小計 (${cartTotal}) 低於滿額折抵金額 (${rule.discount})！</div>
-                                <div>折抵金無法分次退現或保留，請加購滿 ${rule.discount} 元後下單。</div>
+                                <div>還差 ${rule.discount - cartTotal} 元，請加購滿 ${rule.discount} 元後下單。</div>
                               </div>
                             )}
                           </div>
