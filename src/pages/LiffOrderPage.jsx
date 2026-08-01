@@ -3867,7 +3867,7 @@ ${freeNote(newFee, newMin)}
             </div>
           </div>
 
-          {/* 🥛 奶箱福利卡片 */}
+          {/* 🥛 奶箱福利卡片 (Apple + LINE 禮物風格) */}
           {(() => {
             if (!rewardConfig || rewardConfig.mode === "OFF") return null;
             if (rewardConfig.mode === "TEST") {
@@ -3880,52 +3880,52 @@ ${freeNote(newFee, newMin)}
             const unlockedRules = rules.filter(r => currentSpend >= r.spendMin);
 
             const getBoxName = (idx, spendMin) => {
-              if (idx === 0) return "🥛 迷你奶箱";
-              if (idx === 1) return "🥛 經典奶箱";
-              if (idx === 2) return "🥛 豪華奶箱";
-              return `🥛 尊榮奶箱 ($${spendMin.toLocaleString()})`;
+              if (idx === 0) return "迷你奶箱";
+              if (idx === 1) return "經典奶箱";
+              if (idx === 2) return "豪華奶箱";
+              return `尊榮奶箱 ($${spendMin.toLocaleString()})`;
             };
 
             return (
-              <div className="bg-gradient-to-br from-amber-50/80 via-emerald-50/70 to-teal-50 border border-emerald-200/90 rounded-2xl p-4 space-y-3 shadow-sm">
-                <div className="flex justify-between items-start">
+              <div className="bg-[#F9FFFC] border border-[#D5F5E7] rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
+                <div className="flex justify-between items-center pb-1 border-b border-[#E6F7F0]">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center text-xl shrink-0 shadow-2xs">
-                      🥛
+                    <div className="w-8 h-8 rounded-xl bg-[#E6F7F0] flex items-center justify-center text-lg shrink-0">
+                      📦
                     </div>
                     <div>
-                      <div className="text-sm font-black text-emerald-950 flex items-center gap-1.5">
+                      <div className="text-sm font-black text-slate-900 flex items-center gap-2">
                         奶箱
-                        <span className="text-[10px] bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-full font-extrabold">
+                        <span className="text-[10px] bg-[#E6F7F0] text-emerald-800 px-2 py-0.5 rounded-full font-bold">
                           目前累積消費 ${currentSpend.toLocaleString()}
                         </span>
                       </div>
-                      <p className="text-[10px] text-emerald-800/90 mt-0.5 font-bold">
+                      <p className="text-[10px] text-slate-500 font-medium mt-0.5">
                         {unlockedRules.length > 0
-                          ? `🎁 已解鎖 ${unlockedRules.length} 個奶箱，選擇一個開啟獲得優惠！`
-                          : "💡 累積消費解鎖更多專屬奶箱！"}
+                          ? `🎉 已解鎖 ${unlockedRules.length} 個奶箱，可任選一個立即開啟`
+                          : "💡 累積消費解鎖更多專屬奶箱"}
                       </p>
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-2 pt-1">
+                <div className="space-y-2">
                   {/* 保留奶箱，繼續累積更高級的奶箱 */}
                   <div
                     onClick={() => setSelectedRewardRule(null)}
-                    className={`flex items-center justify-between p-3.5 rounded-2xl border text-xs font-extrabold cursor-pointer transition-all ${
+                    className={`flex items-center justify-between p-3 rounded-xl border text-xs font-extrabold cursor-pointer transition-all ${
                       selectedRewardRule === null
-                        ? "bg-white border-2 border-emerald-500 text-emerald-950 shadow-sm"
-                        : "bg-white/70 border-emerald-100 text-slate-600 hover:bg-white"
+                        ? "bg-white border-2 border-emerald-500 text-slate-900 shadow-2xs"
+                        : "bg-white/80 border-slate-200/80 text-slate-600 hover:bg-white"
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-4.5 h-4.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
                         selectedRewardRule === null ? "border-emerald-600 bg-emerald-600" : "border-slate-300 bg-white"
                       }`}>
-                        {selectedRewardRule === null && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        {selectedRewardRule === null && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
                       </div>
-                      <span className="text-sm font-black text-slate-800">🐄 先存著，解鎖更大的奶箱</span>
+                      <span className="text-xs font-black text-slate-800">🐄 先存著，解鎖更大的奶箱</span>
                     </div>
                   </div>
 
@@ -3942,44 +3942,46 @@ ${freeNote(newFee, newMin)}
                         onClick={() => {
                           if (isUnlocked) setSelectedRewardRule(rule);
                         }}
-                        className={`flex flex-col p-3.5 rounded-2xl border text-xs transition-all ${
+                        className={`flex flex-col p-3 rounded-xl border text-xs transition-all ${
                           !isUnlocked
                             ? "opacity-55 bg-slate-100/70 border-slate-200 text-slate-400 cursor-not-allowed"
                             : isSelected
-                            ? "bg-white border-2 border-emerald-500 text-emerald-950 shadow-md ring-2 ring-emerald-500/10 cursor-pointer"
-                            : "bg-white/80 border-emerald-200/70 text-slate-800 hover:bg-white hover:border-emerald-300 cursor-pointer"
+                            ? "bg-white border-2 border-emerald-500 text-slate-900 shadow-xs ring-2 ring-emerald-500/10 cursor-pointer"
+                            : "bg-white border-slate-200/80 text-slate-800 hover:border-emerald-300 cursor-pointer"
                         }`}
                       >
                         <div className="flex items-center justify-between font-extrabold gap-2">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className={`w-4.5 h-4.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
                               !isUnlocked
                                 ? "border-slate-300 bg-slate-100"
                                 : isSelected
                                 ? "border-emerald-600 bg-emerald-600"
                                 : "border-slate-300 bg-white"
                             }`}>
-                              {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                              {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
                             </div>
                             <div className="flex flex-col min-w-0">
-                              <span className={isUnlocked ? "text-slate-900 font-black text-sm truncate" : "text-slate-400 text-sm font-bold truncate"}>
-                                {boxName}
+                              <span className={isUnlocked ? "text-base font-black text-slate-900 truncate" : "text-sm font-bold text-slate-400 truncate"}>
+                                🥛 {boxName}
                               </span>
-                              <span className="text-[10px] text-slate-500 font-medium">
+                              <span className="text-[11px] text-slate-500 font-medium">
                                 {isUnlocked ? `🔓 累積 $${rule.spendMin.toLocaleString()} 解鎖` : `📍 解鎖條件：累積消費 $${rule.spendMin.toLocaleString()}`}
                               </span>
                             </div>
                           </div>
 
-                          <div className="shrink-0 flex items-center gap-1.5">
+                          <div className="shrink-0 text-right">
                             {isUnlocked ? (
-                              <span className={`px-3 py-1 rounded-full text-xs font-black tracking-tight ${
+                              <div className={`px-3 py-1 rounded-full text-xs font-black tracking-tight flex items-center gap-1 ${
                                 isSelected
-                                  ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-xs"
-                                  : "bg-emerald-100 text-emerald-800"
+                                  ? "bg-emerald-600 text-white shadow-2xs"
+                                  : "bg-emerald-50 text-emerald-800 border border-emerald-200/60"
                               }`}>
-                                🎁 內含 ${rule.discount.toLocaleString()} 優惠
-                              </span>
+                                <span>🎁 內含</span>
+                                <span className="font-mono text-sm font-black">${rule.discount.toLocaleString()}</span>
+                                <span>優惠</span>
+                              </div>
                             ) : (
                               <span className="text-[11px] bg-orange-50 text-orange-600 border border-orange-200/80 px-2.5 py-0.5 rounded-full font-bold">
                                 還差 ${(rule.spendMin - currentSpend).toLocaleString()}
@@ -3989,16 +3991,15 @@ ${freeNote(newFee, newMin)}
                         </div>
 
                         {isUnlocked && isSelected && (
-                          <div className="space-y-1.5 mt-2.5 pt-2 border-t border-emerald-100 text-center">
-                            <div className="text-[11px] text-emerald-700 font-extrabold flex items-center justify-center gap-1">
-                              <span>開啟後剩餘累積消費：</span>
-                              <span className="font-mono text-emerald-800 font-black">${remBalance.toLocaleString()}</span>
-                              <span>元</span>
+                          <div className="space-y-1.5 mt-2 pt-2 border-t border-slate-100 text-center">
+                            <div className="text-[11px] text-slate-600 font-bold flex items-center justify-center gap-1">
+                              <span>開啟後累積消費餘額：</span>
+                              <span className="font-mono text-emerald-700 font-black">${remBalance.toLocaleString()}</span>
+                              <span className="text-slate-400 font-normal">(可繼續累積下一個奶箱)</span>
                             </div>
                             {cartTotal < rule.discount && (
-                              <div className="text-[11px] text-rose-600 font-black flex flex-col items-center justify-center text-center mt-1.5 bg-rose-50/90 p-2.5 rounded-xl border border-rose-200/80 leading-snug shadow-2xs">
-                                <div>⚠️ 目前購物車金額 (${cartTotal}) 低於奶箱優惠 (${rule.discount})！</div>
-                                <div>再加購 ${rule.discount - cartTotal} 元即可開啟奶箱享有優惠。</div>
+                              <div className="text-[11px] text-amber-900 font-bold flex flex-col items-center justify-center text-center mt-1 bg-[#FFF9E8] p-2.5 rounded-xl border border-[#FDE68A] leading-relaxed shadow-2xs">
+                                <div>⚠️ 再加購 ${rule.discount - cartTotal}，即可開啟{boxName}，立即折抵 ${rule.discount}。</div>
                               </div>
                             )}
                           </div>
