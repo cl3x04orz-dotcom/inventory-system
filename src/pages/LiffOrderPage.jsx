@@ -3892,9 +3892,10 @@ ${freeNote(newFee, newMin)}
                 <div className="flex justify-between items-center pb-1 border-b border-[#E6F7F0]">
                   <div className="flex items-center gap-2.5">
                     <img
-                      src={milkBoxClassic}
+                      src={rewardConfig.headerImage || milkBoxClassic}
                       alt="奶箱"
                       className="w-[48px] h-[48px] sm:w-[52px] sm:h-[52px] object-contain shrink-0 drop-shadow-md"
+                      onError={(e) => { e.target.onerror = null; e.target.src = milkBoxClassic; }}
                     />
                     <div>
                       <div className="text-sm font-black text-slate-900 flex items-center gap-2">

@@ -612,6 +612,7 @@ model RewardConfig {
   storeCode     String   @id @default("MILI001")
   mode          String   @default("OFF")
   testUserIds   String[] @default([])
+  headerImage   String?
   tierRulesJson String   @default("[{\"spendMin\":5000,\"discount\":150},{\"spendMin\":10000,\"discount\":350},{\"spendMin\":15000,\"discount\":600}]")
   updatedAt     DateTime @updatedAt
 }

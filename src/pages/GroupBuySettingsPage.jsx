@@ -23,6 +23,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
         { spendMin: 10000, discount: 350 },
         { spendMin: 15000, discount: 600 }
     ]);
+    const [rewardHeaderImage, setRewardHeaderImage] = useState('');
     const [rewardLoading, setRewardLoading] = useState(false);
     const [rewardSaving, setRewardSaving] = useState(false);
 
@@ -33,6 +34,9 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
             if (res && res.success && res.config) {
                 setRewardMode(res.config.mode || 'OFF');
                 setRewardTestUserIds((res.config.testUserIds || []).join(', '));
+                if (res.config.headerImage !== undefined) {
+                    setRewardHeaderImage(res.config.headerImage);
+                }
                 if (Array.isArray(res.config.tierRules) && res.config.tierRules.length > 0) {
                     setRewardTierRules(res.config.tierRules);
                 }
@@ -1930,6 +1934,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                             const res = await callGAS(apiUrl, 'saveRewardConfig', {
                                                 mode: rewardMode,
                                                 testUserIds: ids,
+                                                headerImage: rewardHeaderImage,
                                                 tierRules: rewardTierRules
                                             }, user?.token);
                                             if (res && res.success) {
@@ -2013,11 +2018,37 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                 )}
                             </div>
 
-                            {/* 2. 階梯門檻規則管理 */}
+                            {/* 2. 全域設定 */}
+                            <div className="bg-[var(--bg-tertiary)] p-4 rounded-xl border border-[var(--border-primary)] space-y-3">
+                                <h4 className="font-extrabold text-sm text-[var(--text-primary)] flex items-center gap-1.5">
+                                    <Sparkles size={16} className="text-purple-500" />
+                                    滿額贈全域視覺設定
+                                </h4>
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-[11px] font-bold text-[var(--text-secondary)]">標題頂部大圖示 (Header Image URL)</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={rewardHeaderImage}
+                                            onChange={(e) => setRewardHeaderImage(e.target.value)}
+                                            placeholder="請貼上圖片網址 (留空則使用預設經典奶箱)"
+                                            className="flex-1 p-2.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl text-xs"
+                                        />
+                                        {rewardHeaderImage && (
+                                            <div className="w-10 h-10 rounded-lg bg-white border border-[var(--border-primary)] shrink-0 flex items-center justify-center p-0.5 overflow-hidden shadow-2xs">
+                                                <img src={rewardHeaderImage} alt="Header Preview" className="w-full h-full object-contain" onError={(e) => {e.target.style.display='none'}} />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <p className="text-[10px] text-[var(--text-tertiary)] mt-1">顯示在前台下單頁面「奶箱」標題旁邊的主視覺圖示。</p>
+                                </div>
+                            </div>
+
+                            {/* 3. 階梯門檻規則管理 */}
                             <div className="space-y-3">
                                 <div className="flex justify-between items-center">
                                     <h4 className="font-extrabold text-sm text-[var(--text-primary)] flex items-center gap-1.5">
-                                        <Sparkles size={16} className="text-amber-500" />
+                                        <Gift size={16} className="text-amber-500" />
                                         階梯門檻與對應折抵金額
                                     </h4>
                                     <button

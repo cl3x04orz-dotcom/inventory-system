@@ -1865,6 +1865,7 @@ export const GroupBuyService = {
       config: {
         mode: config.mode,
         testUserIds: config.testUserIds || [],
+        headerImage: config.headerImage || "",
         tierRules
       }
     };
@@ -1874,19 +1875,21 @@ export const GroupBuyService = {
   async saveRewardConfig(payload: any, user: any) {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const storeCode = payload?.storeCode || 'MILI001';
-    const { mode, testUserIds, tierRules } = payload;
+    const { mode, testUserIds, headerImage, tierRules } = payload;
 
     const updated = await prisma.rewardConfig.upsert({
       where: { storeCode },
       update: {
         mode: mode || 'OFF',
         testUserIds: Array.isArray(testUserIds) ? testUserIds : [],
+        headerImage: headerImage || "",
         tierRulesJson: JSON.stringify(Array.isArray(tierRules) ? tierRules : [])
       },
       create: {
         storeCode,
         mode: mode || 'OFF',
         testUserIds: Array.isArray(testUserIds) ? testUserIds : [],
+        headerImage: headerImage || "",
         tierRulesJson: JSON.stringify(Array.isArray(tierRules) ? tierRules : [])
       }
     });
@@ -1896,6 +1899,7 @@ export const GroupBuyService = {
       config: {
         mode: updated.mode,
         testUserIds: updated.testUserIds,
+        headerImage: updated.headerImage || "",
         tierRules: JSON.parse(updated.tierRulesJson)
       }
     };
