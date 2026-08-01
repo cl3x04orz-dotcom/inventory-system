@@ -235,6 +235,14 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   const [rewardConfig, setRewardConfig] = useState(null);
   const [selectedRewardRule, setSelectedRewardRule] = useState(null); // { spendMin: 5000, discount: 150 } or null
 
+  // 當累積額度不足以使用目前選定的折抵規則時，自動歸零改為「不使用折抵」
+  useEffect(() => {
+    const currentSpend = Number(memberProfile?.RedeemableSpendBalance || 0);
+    if (selectedRewardRule && currentSpend < selectedRewardRule.spendMin) {
+      setSelectedRewardRule(null);
+    }
+  }, [memberProfile, selectedRewardRule]);
+
   // V2 架構狀態
   const [currentCommunity, setCurrentCommunity] = useState(null);
   const [allCommunities, setAllCommunities] = useState([]);
@@ -2050,6 +2058,12 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
     } catch (_) { }
 
+    if (selectedRewardRule && cartTotal < selectedRewardRule.discount) {
+      alert(`⚠️ 您的購物車商品小計 ($${cartTotal}) 低於滿額折抵金額 ($${selectedRewardRule.discount})！\n折抵金額無法分次退現或保留，將自動帶您回選單加購商品滿 $${selectedRewardRule.discount} 元。`);
+      setStep("shop");
+      return;
+    }
+
     // 💡 團購模式 Clean Up：只保留有購買商品的成員
     if (isGroupOrder) {
       setGroupCart((prev) => {
@@ -2071,6 +2085,13 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
   // ── 送出訂單 ─────────────────────────────────────────────────
   const handleSubmitOrder = async () => {
+    if (selectedRewardRule && cartTotal < selectedRewardRule.discount) {
+      setIsSubmitting(false);
+      alert(`⚠️ 您的購物車商品小計 ($${cartTotal}) 低於滿額折抵金額 ($${selectedRewardRule.discount})！\n折抵金額無法分次退現或保留，將自動帶您回選單加購商品滿 $${selectedRewardRule.discount} 元。`);
+      setStep("shop");
+      return;
+    }
+
     // 🛡️ 強制雙向贈品防呆檢查（少選與多選溢額均自動攔截）
     if (isGroupOrder) {
       for (const [memberName, mCredits] of Object.entries(memberGiftCredits)) {
@@ -3880,24 +3901,23 @@ ${freeNote(newFee, newMin)}
 
                 <div className="space-y-2 pt-1">
                   {/* 不使用折抵 */}
-                  <label
-                    className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-extrabold cursor-pointer transition-all ${
+                  <div
+                    onClick={() => setSelectedRewardRule(null)}
+                    className={`flex items-center justify-between p-3.5 rounded-2xl border text-xs font-extrabold cursor-pointer transition-all ${
                       selectedRewardRule === null
                         ? "bg-white border-2 border-emerald-500 text-emerald-950 shadow-sm"
                         : "bg-white/70 border-emerald-100 text-slate-600 hover:bg-white"
                     }`}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <input
-                        type="radio"
-                        name="rewardRuleSelect"
-                        checked={selectedRewardRule === null}
-                        onChange={() => setSelectedRewardRule(null)}
-                        className="accent-emerald-600 w-4 h-4 cursor-pointer"
-                      />
-                      <span>不使用折抵 (繼續累積更高等級)</span>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-4.5 h-4.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                        selectedRewardRule === null ? "border-emerald-600 bg-emerald-600" : "border-slate-300 bg-white"
+                      }`}>
+                        {selectedRewardRule === null && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      </div>
+                      <span className="text-sm">不使用折抵 (繼續累積更高等級)</span>
                     </div>
-                  </label>
+                  </div>
 
                   {/* 各階梯門檻選項 */}
                   {rules.map((rule, rIdx) => {
@@ -3906,9 +3926,12 @@ ${freeNote(newFee, newMin)}
                     const remBalance = Math.max(0, currentSpend - rule.spendMin);
 
                     return (
-                      <label
+                      <div
                         key={rIdx}
-                        className={`flex flex-col p-3 rounded-2xl border text-xs transition-all ${
+                        onClick={() => {
+                          if (isUnlocked) setSelectedRewardRule(rule);
+                        }}
+                        className={`flex flex-col p-3.5 rounded-2xl border text-xs transition-all ${
                           !isUnlocked
                             ? "opacity-55 bg-slate-100/70 border-slate-200 text-slate-400 cursor-not-allowed"
                             : isSelected
@@ -3917,15 +3940,16 @@ ${freeNote(newFee, newMin)}
                         }`}
                       >
                         <div className="flex items-center justify-between font-extrabold gap-2">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <input
-                              type="radio"
-                              name="rewardRuleSelect"
-                              disabled={!isUnlocked}
-                              checked={isSelected}
-                              onChange={() => setSelectedRewardRule(rule)}
-                              className="accent-emerald-600 w-4 h-4 cursor-pointer shrink-0"
-                            />
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`w-4.5 h-4.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                              !isUnlocked
+                                ? "border-slate-300 bg-slate-100"
+                                : isSelected
+                                ? "border-emerald-600 bg-emerald-600"
+                                : "border-slate-300 bg-white"
+                            }`}>
+                              {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                            </div>
                             <span className={isUnlocked ? "text-slate-800 font-bold text-sm truncate" : "text-slate-400 text-sm"}>
                               滿 ${rule.spendMin.toLocaleString()} 門檻
                             </span>
@@ -3963,7 +3987,7 @@ ${freeNote(newFee, newMin)}
                             )}
                           </div>
                         )}
-                      </label>
+                      </div>
                     );
                   })}
                 </div>
@@ -5322,7 +5346,14 @@ ${freeNote(newFee, newMin)}
                   </div>
                 </div>
                 <button
-                  onClick={() => setStep("confirm")}
+                  onClick={() => {
+                    if (selectedRewardRule && cartTotal < selectedRewardRule.discount) {
+                      alert(`⚠️ 您的購物車商品小計 ($${cartTotal}) 低於滿額折抵金額 ($${selectedRewardRule.discount})！\n折抵金額無法分次退現或保留，將自動帶您回選單加購商品滿 $${selectedRewardRule.discount} 元。`);
+                      setStep("shop");
+                      return;
+                    }
+                    setStep("confirm");
+                  }}
                   className="btn-primary px-5 py-2.5 rounded-xl font-bold flex items-center gap-1 shadow-md shadow-blue-500/20"
                 >
                   前往結帳 <ArrowRight size={16} />
