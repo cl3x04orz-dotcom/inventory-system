@@ -3892,9 +3892,9 @@ ${freeNote(newFee, newMin)}
                 <div className="flex justify-between items-center pb-1 border-b border-[#E6F7F0]">
                   <div className="flex items-center gap-2.5">
                     <img
-                      src={milkBoxHeader}
+                      src={milkBoxClassic}
                       alt="奶箱"
-                      className="w-12 h-12 object-contain shrink-0 drop-shadow-sm p-0.5"
+                      className="w-[48px] h-[48px] sm:w-[52px] sm:h-[52px] object-contain shrink-0 drop-shadow-md"
                     />
                     <div>
                       <div className="text-sm font-black text-slate-900 flex items-center gap-2">
@@ -3975,11 +3975,11 @@ ${freeNote(newFee, newMin)}
                             <img
                               src={boxImg}
                               alt={boxName}
-                              className="w-16 h-16 sm:w-20 sm:h-20 object-contain shrink-0 drop-shadow-sm p-1"
+                              className="w-[52px] h-[52px] sm:w-[56px] sm:h-[56px] object-contain shrink-0 drop-shadow-md scale-110"
                               onError={(e) => { e.target.onerror = null; e.target.src = milkBoxMini; }}
                             />
-                            <div className="flex flex-col min-w-0 gap-1 flex-1">
-                              <span className={isUnlocked ? "text-base font-black text-slate-900 truncate" : "text-sm font-bold text-slate-500 truncate"}>
+                            <div className="flex flex-col min-w-0 gap-1 flex-1 pl-1">
+                              <span className={isUnlocked ? "text-[18px] font-black text-slate-900 truncate" : "text-base font-bold text-slate-500 truncate"}>
                                 {boxName}
                               </span>
                               <span className={`text-[11px] font-black tracking-widest flex items-center gap-1 ${
