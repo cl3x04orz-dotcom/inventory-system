@@ -32,6 +32,7 @@ import logoLiff from "../assets/logo_liff.jpg";
 import milkBoxMini from "../assets/milk_box_mini.png";
 import milkBoxClassic from "../assets/milk_box_classic.png";
 import milkBoxLuxury from "../assets/milk_box_luxury.png";
+import milkBoxHeader from "../assets/milk_box_header.png";
 
 // ── 品牌 Logo 元件 ──────────────────────────────────────────────
 const MilkZeroWasteLogo = ({ setting }) => (
@@ -3900,9 +3901,11 @@ ${freeNote(newFee, newMin)}
               <div className="bg-[#F9FFFC] border border-[#D5F5E7] rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
                 <div className="flex justify-between items-center pb-1 border-b border-[#E6F7F0]">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-[#E6F7F0] flex items-center justify-center text-lg shrink-0">
-                      📦
-                    </div>
+                    <img
+                      src={milkBoxHeader}
+                      alt="奶箱"
+                      className="w-10 h-10 object-contain shrink-0 rounded-lg drop-shadow-xs"
+                    />
                     <div>
                       <div className="text-sm font-black text-slate-900 flex items-center gap-2">
                         奶箱
