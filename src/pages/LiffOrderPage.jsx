@@ -3886,6 +3886,13 @@ ${freeNote(newFee, newMin)}
               return `尊榮奶箱 ($${spendMin.toLocaleString()})`;
             };
 
+            const getBoxImg = (idx) => {
+              if (idx === 0) return "/assets/milk_box_mini.png";
+              if (idx === 1) return "/assets/milk_box_classic.png";
+              if (idx === 2) return "/assets/milk_box_luxury.png";
+              return "/assets/milk_box_mini.png";
+            };
+
             return (
               <div className="bg-[#F9FFFC] border border-[#D5F5E7] rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
                 <div className="flex justify-between items-center pb-1 border-b border-[#E6F7F0]">
@@ -3935,6 +3942,7 @@ ${freeNote(newFee, newMin)}
                     const isSelected = selectedRewardRule?.spendMin === rule.spendMin;
                     const remBalance = Math.max(0, currentSpend - rule.spendMin);
                     const boxName = getBoxName(rIdx, rule.spendMin);
+                    const boxImg = getBoxImg(rIdx);
 
                     return (
                       <div
@@ -3951,7 +3959,7 @@ ${freeNote(newFee, newMin)}
                         }`}
                       >
                         <div className="flex items-center justify-between font-extrabold gap-2">
-                          <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex items-center gap-2.5 min-w-0">
                             <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
                               !isUnlocked
                                 ? "border-slate-300 bg-slate-100"
@@ -3961,12 +3969,17 @@ ${freeNote(newFee, newMin)}
                             }`}>
                               {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
                             </div>
+                            <img
+                              src={boxImg}
+                              alt={boxName}
+                              className="w-11 h-11 object-contain shrink-0 rounded-lg drop-shadow-xs"
+                            />
                             <div className="flex flex-col min-w-0">
                               <span className={isUnlocked ? "text-base font-black text-slate-900 truncate" : "text-sm font-bold text-slate-400 truncate"}>
-                                🥛 {boxName}
+                                {boxName}
                               </span>
                               <span className="text-[11px] text-slate-500 font-medium">
-                                {isUnlocked ? `🔓 累積 $${rule.spendMin.toLocaleString()} 解鎖` : `📍 解鎖條件：累積消費 $${rule.spendMin.toLocaleString()}`}
+                                {isUnlocked ? `🔓 累積 $${rule.spendMin.toLocaleString()} 解鎖` : `🔒 累積 $${rule.spendMin.toLocaleString()} 解鎖`}
                               </span>
                             </div>
                           </div>
