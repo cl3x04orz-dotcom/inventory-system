@@ -5346,14 +5346,7 @@ ${freeNote(newFee, newMin)}
                   </div>
                 </div>
                 <button
-                  onClick={() => {
-                    if (selectedRewardRule && cartTotal < selectedRewardRule.discount) {
-                      alert(`⚠️ 您的購物車商品小計 ($${cartTotal}) 低於滿額折抵金額 ($${selectedRewardRule.discount})！\n折抵金額無法分次退現或保留，將自動帶您回選單加購商品滿 $${selectedRewardRule.discount} 元。`);
-                      setStep("shop");
-                      return;
-                    }
-                    setStep("confirm");
-                  }}
+                  onClick={() => setStep("confirm")}
                   className="btn-primary px-5 py-2.5 rounded-xl font-bold flex items-center gap-1 shadow-md shadow-blue-500/20"
                 >
                   前往結帳 <ArrowRight size={16} />
