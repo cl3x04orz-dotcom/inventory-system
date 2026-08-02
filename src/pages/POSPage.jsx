@@ -121,9 +121,13 @@ export default function POSPage({ user, apiUrl }) {
 
       if (e.key === 'Enter') {
         if (barcodeBuffer.current.length > 2) {
-          const scanned = barcodeBuffer.current;
+          const scanned = barcodeBuffer.current.trim();
           barcodeBuffer.current = '';
-          const match = products.find(p => (p.id || p.productId) === scanned || (p.name || p.productName) === scanned);
+          const match = products.find(p => 
+            (p.id || p.productId) === scanned || 
+            (p.name || p.productName) === scanned ||
+            (p.barcodes && p.barcodes.some(b => b.barcode === scanned))
+          );
           if (match) {
             handleAddToCart(match);
           }

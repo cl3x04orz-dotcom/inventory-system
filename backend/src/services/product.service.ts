@@ -43,7 +43,8 @@ export const ProductService = {
     // 1. Fetch products sorted by sortWeight
     const products = await prisma.product.findMany({
       where: whereClause,
-      orderBy: { sortWeight: 'asc' }
+      orderBy: { sortWeight: 'asc' },
+      include: { barcodes: true }
     });
 
     // 2. Perform GroupBy on Inventory to calculate stock levels
