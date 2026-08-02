@@ -3976,7 +3976,7 @@ ${freeNote(newFee, newMin)}
                             <img
                               src={boxImg}
                               alt={boxName}
-                              className="w-[64px] h-[64px] object-contain shrink-0 drop-shadow-md scale-125"
+                              className="w-[72px] h-[72px] object-contain shrink-0 drop-shadow-md scale-125"
                               onError={(e) => { e.target.onerror = null; e.target.src = milkBoxMini; }}
                             />
                             <div className="flex flex-col min-w-0 gap-1 flex-1 pl-2">
