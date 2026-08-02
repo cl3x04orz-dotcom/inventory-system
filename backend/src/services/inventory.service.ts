@@ -137,30 +137,104 @@ export const InventoryService = {
 
   // 4. 庫存調整
   async adjustInventory(payload: any, user: any) {
-    const { productId, productName, type, quantity, note, storeCode = 'MILI001' } = payload;
-    const qty = Number(quantity) || 0;
+    let { productId, productName, batchId, type, quantity, afterQty, beforeQty, note, storeCode = 'MILI001' } = payload;
     const operator = user?.username || user?.userId || 'system';
 
+    // 1. 若傳入 batchId 補全商品資訊及查詢當前批次
+    let targetBatch: any = null;
+    if (batchId) {
+      targetBatch = await prisma.inventory.findFirst({
+        where: { batchId, storeCode }
+      });
+      if (targetBatch) {
+        if (!productId) productId = targetBatch.productId;
+        if (!productName) productName = targetBatch.productName;
+      }
+    }
+
+    // 2. 若有 productName 補全 productId
+    if (!productId && productName) {
+      const prod = await prisma.product.findFirst({
+        where: { productName, storeCode }
+      });
+      if (prod) productId = prod.productId;
+    }
+
+    // 3. 若有 productId 補全 productName
+    if (productId && !productName) {
+      const prod = await prisma.product.findFirst({
+        where: { productId, storeCode }
+      });
+      if (prod) productName = prod.productName;
+    }
+
+    const finalProductId = productId || batchId || 'UNKNOWN';
+    const finalProductName = productName || '未指定商品';
+
+    // 4. 計算變更數量 changeQty (正數增加，負數減少)
+    let changeQty = 0;
+    let recordQty = 0;
+
+    if (afterQty !== undefined && afterQty !== null && afterQty !== '') {
+      const after = Number(afterQty);
+      const current = targetBatch ? targetBatch.quantity : (Number(beforeQty) || 0);
+      changeQty = after - current;
+      recordQty = Math.abs(changeQty);
+      if (!type) {
+        type = changeQty >= 0 ? 'ADD' : 'ADJUST_REDUCE';
+      }
+    } else {
+      const qty = Math.abs(Number(quantity) || 0);
+      recordQty = qty;
+      const isAdd = (type || '').toUpperCase() === 'ADD';
+      changeQty = isAdd ? qty : -qty;
+    }
+
+    // 5. 確實更新資料庫中的批次庫存 (prisma.inventory)
+    if (targetBatch) {
+      let newBatchQty = targetBatch.quantity + changeQty;
+      if (newBatchQty < 0) newBatchQty = 0;
+      await prisma.inventory.updateMany({
+        where: { batchId: targetBatch.batchId, storeCode },
+        data: { quantity: newBatchQty }
+      });
+    } else if (finalProductId !== 'UNKNOWN') {
+      if (changeQty < 0) {
+        await deductInventory(finalProductId, Math.abs(changeQty), 'STOCK', storeCode);
+      } else if (changeQty > 0) {
+        await prisma.inventory.create({
+          data: {
+            productId: finalProductId,
+            productName: finalProductName,
+            quantity: changeQty,
+            type: 'STOCK',
+            storeCode
+          }
+        });
+      }
+    }
+
+    // 6. 紀錄調整歷史 (prisma.inventoryAdjustment)
     const adj = await prisma.inventoryAdjustment.create({
       data: {
-        productId,
-        productName,
-        type,
-        quantity: qty,
+        productId: finalProductId,
+        productName: finalProductName,
+        type: type || (changeQty >= 0 ? 'ADD' : 'ADJUST_REDUCE'),
+        quantity: recordQty,
         operator,
         note,
         storeCode
       }
     });
 
-    // 寫入 InventoryMovement 留底
+    // 7. 寫入 InventoryMovement 留底與更新 Snapshot
     await this.recordMovement({
-      productId,
+      productId: finalProductId,
       storeCode,
       type: 'ADJUSTMENT',
-      qty: type === 'ADD' ? qty : -qty,
+      qty: changeQty,
       operator,
-      note: `庫存手動調整 (${type}): ${note || ''}`
+      note: `庫存手動調整 (${type || 'ADJUSTMENT'}): ${note || ''}`
     });
 
     return adj;

@@ -5,7 +5,7 @@ import { POSReceiptPrint } from '../components/POSReceiptPrint';
 import { 
   ShoppingCart, Trash2, Plus, Minus, CreditCard, DollarSign, 
   Search, RefreshCw, CheckCircle, Package, Tag, Layers,
-  FileText, Smartphone, Building2, Heart, Receipt
+  FileText, Smartphone, Building2, Heart, Receipt, Delete
 } from 'lucide-react';
 
 /**
@@ -231,10 +231,6 @@ export default function POSPage({ user, apiUrl }) {
         clear();
         setIsCheckoutOpen(false);
         setReceivedAmountInput('');
-        
-        setTimeout(() => {
-          window.print();
-        }, 300);
       }
     } catch (err) {
       console.error('POS Checkout failed:', err);
@@ -417,7 +413,7 @@ export default function POSPage({ user, apiUrl }) {
                       )}
                     </div>
                     <div className="text-xs text-gray-500 mt-0.5">
-                      ${item.unitPrice} {item.isBundle ? `/ 組 (${item.packSize}入)` : (item.capacity ? `• ${item.capacity}` : '')}
+                      ${item.isBundle ? (item.unitPrice * item.packSize).toLocaleString() : item.unitPrice.toLocaleString()} {item.isBundle ? `/組(${item.packSize}入)` : (item.capacity ? `• ${item.capacity}` : '')}
                     </div>
                   </div>
 
@@ -467,7 +463,7 @@ export default function POSPage({ user, apiUrl }) {
           <button
             disabled={cartItems.length === 0}
             onClick={() => {
-              setReceivedAmountInput(subtotal.toString());
+              setReceivedAmountInput('');
               setIsCheckoutOpen(true);
             }}
             className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white font-bold text-base rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
@@ -480,18 +476,15 @@ export default function POSPage({ user, apiUrl }) {
 
       {/* 結帳彈窗 (Checkout Modal) */}
       {isCheckoutOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-5 shadow-2xl space-y-4 border border-gray-100">
-            <div className="flex justify-between items-center border-b border-gray-100 pb-2.5">
-              <h3 className="text-lg font-bold text-gray-800">結帳付款</h3>
-              <button 
-                onClick={() => setIsCheckoutOpen(false)}
-                className="text-gray-400 hover:text-gray-600 text-lg"
-              >
-                ✕
-              </button>
-            </div>
-
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 md:p-4">
+          <div className="bg-white rounded-3xl w-full p-4 md:p-6 shadow-2xl border border-gray-100 flex flex-col md:flex-row transition-all duration-300 max-w-4xl gap-4 md:gap-6 max-h-[95vh] overflow-y-auto">
+            
+            {/* 左側：支付設定與電子發票 */}
+            <div className="flex-1 space-y-4 flex flex-col">
+              <div className="flex justify-between items-center border-b border-gray-100 pb-2.5">
+                <h3 className="text-lg font-bold text-gray-800">結帳付款</h3>
+                <button onClick={() => setIsCheckoutOpen(false)} className="md:hidden text-gray-400 hover:text-gray-600 text-lg">✕</button>
+              </div>
             {/* 支付方式 */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">選擇支付方式</label>
@@ -601,66 +594,96 @@ export default function POSPage({ user, apiUrl }) {
               )}
             </div>
 
-            {/* 金額計算區 */}
-            <div className="bg-gray-50 p-3.5 rounded-xl space-y-2">
-              <div className="flex justify-between text-xs text-gray-600">
-                <span>應收金額</span>
-                <span className="font-bold text-gray-900 text-base">${subtotal.toLocaleString()}</span>
-              </div>
-
-              {paymentMethod === 'CASH' && (
-                <>
-                  <div className="pt-2 border-t border-gray-200 space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-500">實收金額</label>
-                    <input
-                      type="number"
-                      value={receivedAmountInput}
-                      onChange={(e) => setReceivedAmountInput(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-xl font-bold text-lg text-gray-900 focus:ring-2 focus:ring-indigo-500"
-                    />
-
-                    {/* 快捷金額按鈕 */}
-                    <div className="grid grid-cols-4 gap-1 pt-1">
-                      {[subtotal, 100, 500, 1000].map(val => (
-                        <button
-                          key={val}
-                          onClick={() => setReceivedAmountInput(val.toString())}
-                          className="py-1 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 hover:bg-indigo-50 hover:text-indigo-600"
-                        >
-                          ${val}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between text-xs pt-2 border-t border-gray-200">
-                    <span className="font-bold text-gray-700">找零</span>
-                    <span className={`font-extrabold text-lg ${changeAmount > 0 ? 'text-green-600' : 'text-gray-400'}`}>
-                      ${changeAmount.toLocaleString()}
-                    </span>
-                  </div>
-                </>
-              )}
             </div>
 
-            {/* 確認結帳按鈕 */}
-            <button
-              disabled={submitting}
-              onClick={handleCheckoutSubmit}
-              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-base rounded-xl shadow-md transition-all flex items-center justify-center space-x-2"
-            >
-              {submitting ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>處理中...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-4 h-4" />
-                  <span>確認完成結帳</span>
-                </>
-              )}
-            </button>
+            {/* 右側：金額輸入與數字小鍵盤 (固定顯示) */}
+            <div className="flex-1 flex flex-col space-y-4 border-t md:border-t-0 md:border-l border-gray-100 pt-4 md:pt-0 md:pl-6">
+              <div className="hidden md:flex justify-end border-b border-gray-100 pb-2.5">
+                <button onClick={() => setIsCheckoutOpen(false)} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-2xl flex-1 flex flex-col space-y-3">
+                <div className="flex justify-between items-center text-sm mb-3">
+                  <span className="font-bold text-gray-700">找零</span>
+                  <span className={`font-extrabold text-3xl ${changeAmount > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                    ${changeAmount.toLocaleString()}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between items-center text-sm text-gray-600 mb-1 pt-3 border-t border-gray-200">
+                  <span className="font-bold">應收金額</span>
+                  <span className="font-bold text-gray-900 text-2xl">${subtotal.toLocaleString()}</span>
+                </div>
+
+                <div className="pt-3 border-t border-gray-200 space-y-2 flex-1 flex flex-col justify-end">
+                  <div className="flex justify-between items-end">
+                    <label className="text-sm font-semibold text-gray-500">實收金額</label>
+                  </div>
+                  
+                  {/* 模擬輸入框 */}
+                  <div className="w-full px-5 py-3 border-2 border-indigo-200 bg-white rounded-xl font-bold text-3xl text-indigo-900 text-right shadow-inner tracking-wider min-h-[56px] flex items-center justify-end">
+                    {receivedAmountInput ? `$${Number(receivedAmountInput).toLocaleString()}` : '$0'}
+                  </div>
+
+                  {/* 快捷金額按鈕 */}
+                  <div className="grid grid-cols-4 gap-2 pt-1">
+                    {[subtotal, 100, 500, 1000].map(val => (
+                      <button
+                        key={val}
+                        onClick={() => setReceivedAmountInput(val.toString())}
+                        className="py-2.5 bg-indigo-50 border border-indigo-100 rounded-xl text-sm font-bold text-indigo-700 hover:bg-indigo-600 hover:text-white active:scale-95 transition-all shadow-sm"
+                      >
+                        ${val}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* 數字小鍵盤 (Numpad) */}
+                  <div className="grid grid-cols-4 gap-2 mt-1">
+                    {['1', '2', '3'].map(n => (
+                      <button key={n} onClick={() => setReceivedAmountInput(prev => prev + n)} className="py-3 bg-white border border-gray-200 rounded-xl text-2xl font-bold text-gray-700 hover:bg-gray-50 active:scale-95 active:bg-gray-200 shadow-sm transition-transform">{n}</button>
+                    ))}
+                    <button onClick={() => setReceivedAmountInput(prev => prev.slice(0, -1))} className="py-3 bg-red-50 border border-red-100 rounded-xl flex items-center justify-center text-red-500 hover:bg-red-100 active:scale-95 transition-transform shadow-sm row-span-2">
+                      <Delete size={28} />
+                    </button>
+                    
+                    {['4', '5', '6'].map(n => (
+                      <button key={n} onClick={() => setReceivedAmountInput(prev => prev + n)} className="py-3 bg-white border border-gray-200 rounded-xl text-2xl font-bold text-gray-700 hover:bg-gray-50 active:scale-95 active:bg-gray-200 shadow-sm transition-transform">{n}</button>
+                    ))}
+                    
+                    {['7', '8', '9'].map(n => (
+                      <button key={n} onClick={() => setReceivedAmountInput(prev => prev + n)} className="py-3 bg-white border border-gray-200 rounded-xl text-2xl font-bold text-gray-700 hover:bg-gray-50 active:scale-95 active:bg-gray-200 shadow-sm transition-transform">{n}</button>
+                    ))}
+                    <button onClick={() => setReceivedAmountInput('')} className="py-3 bg-gray-100 border border-gray-200 rounded-xl text-xl font-extrabold text-gray-600 hover:bg-gray-200 active:scale-95 transition-transform shadow-sm row-span-2">
+                      C
+                    </button>
+
+                    <button onClick={() => setReceivedAmountInput(prev => prev + '0')} className="py-3 bg-white border border-gray-200 rounded-xl text-2xl font-bold text-gray-700 hover:bg-gray-50 active:scale-95 active:bg-gray-200 shadow-sm transition-transform col-span-2">0</button>
+                    <button onClick={() => setReceivedAmountInput(prev => prev + '00')} className="py-3 bg-white border border-gray-200 rounded-xl text-2xl font-bold text-gray-700 hover:bg-gray-50 active:scale-95 active:bg-gray-200 shadow-sm transition-transform">00</button>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* 確認結帳按鈕 */}
+              <button
+                disabled={submitting}
+                onClick={handleCheckoutSubmit}
+                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-lg rounded-xl shadow-md transition-all flex items-center justify-center space-x-2"
+              >
+                {submitting ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    <span>處理中...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-5 h-5" />
+                    <span>確認完成結帳</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
