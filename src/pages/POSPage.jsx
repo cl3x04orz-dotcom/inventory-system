@@ -4,7 +4,8 @@ import { useCart } from '../hooks/useCart';
 import { POSReceiptPrint } from '../components/POSReceiptPrint';
 import { 
   ShoppingCart, Trash2, Plus, Minus, CreditCard, DollarSign, 
-  Search, RefreshCw, CheckCircle, Package, Tag, Layers
+  Search, RefreshCw, CheckCircle, Package, Tag, Layers,
+  FileText, Smartphone, Building2, Heart, Receipt
 } from 'lucide-react';
 
 /**
@@ -40,6 +41,12 @@ export default function POSPage({ user, apiUrl }) {
   const [receivedAmountInput, setReceivedAmountInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [lastReceipt, setLastReceipt] = useState(null);
+
+  // E-Invoice State
+  const [invoiceType, setInvoiceType] = useState('paper'); // 'paper' | 'mobile' | 'taxId' | 'donate'
+  const [mobileCarrier, setMobileCarrier] = useState('');
+  const [taxId, setTaxId] = useState('');
+  const [donateCode, setDonateCode] = useState('');
 
   // Load Products
   const fetchProducts = async () => {
@@ -197,7 +204,13 @@ export default function POSPage({ user, apiUrl }) {
           receivedAmount: paymentMethod === 'CASH' ? receivedAmount : subtotal,
           changeAmount: paymentMethod === 'CASH' ? changeAmount : 0
         }],
-        receivedAmount: paymentMethod === 'CASH' ? receivedAmount : subtotal
+        receivedAmount: paymentMethod === 'CASH' ? receivedAmount : subtotal,
+        invoice: {
+          type: invoiceType,
+          mobileCarrier: invoiceType === 'mobile' ? mobileCarrier : '',
+          taxId: invoiceType === 'taxId' ? taxId : '',
+          donateCode: invoiceType === 'donate' ? donateCode : ''
+        }
       };
 
       const result = await callGAS(apiUrl, 'createRetailSale', payload, user.token);
@@ -505,6 +518,87 @@ export default function POSPage({ user, apiUrl }) {
                   );
                 })}
               </div>
+            </div>
+
+            {/* 發票類型 */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">電子發票設定</label>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { id: 'paper', label: '印紙本', icon: FileText },
+                  { id: 'mobile', label: '刷載具', icon: Smartphone },
+                  { id: 'taxId', label: '打統編', icon: Building2 },
+                  { id: 'donate', label: '愛心捐贈', icon: Heart }
+                ].map(item => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setInvoiceType(item.id)}
+                      className={`p-2 rounded-xl border flex flex-col items-center justify-center space-y-1 font-bold text-[11px] transition-all ${
+                        invoiceType === item.id
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-600 shadow-sm'
+                          : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 載具輸入框 */}
+              {invoiceType === 'mobile' && (
+                <div className="mt-2 animate-fade-in relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Receipt className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    value={mobileCarrier}
+                    onChange={(e) => setMobileCarrier(e.target.value.toUpperCase())}
+                    placeholder="請刷入手機條碼 (例: /AB12345)"
+                    className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-xl font-bold text-sm text-gray-900 focus:ring-2 focus:ring-indigo-500 uppercase font-mono"
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              {/* 統編輸入框 */}
+              {invoiceType === 'taxId' && (
+                <div className="mt-2 animate-fade-in relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Building2 className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    maxLength={8}
+                    value={taxId}
+                    onChange={(e) => setTaxId(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="請輸入 8 碼統一編號"
+                    className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-xl font-bold text-sm text-gray-900 focus:ring-2 focus:ring-indigo-500 font-mono"
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              {/* 捐贈碼輸入框 */}
+              {invoiceType === 'donate' && (
+                <div className="mt-2 animate-fade-in relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Heart className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    value={donateCode}
+                    onChange={(e) => setDonateCode(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="請輸入捐贈碼"
+                    className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-xl font-bold text-sm text-gray-900 focus:ring-2 focus:ring-indigo-500 font-mono"
+                    autoFocus
+                  />
+                </div>
+              )}
             </div>
 
             {/* 金額計算區 */}
