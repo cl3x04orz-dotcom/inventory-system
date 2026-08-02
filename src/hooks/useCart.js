@@ -13,6 +13,9 @@ export function useCart(storeCode = 'MILI001', terminalId = 'POS01') {
     const retailPrice = Number(product.single_price || product.singlePrice || product.price || product.defaultPrice || 0);
     const costPrice = Number(product.price || product.defaultPrice || 0);
 
+    const isBundle = Boolean(product.isBundle);
+    const addQty = isBundle ? Number(product.packSize || 1) : 1;
+
     setCartItems(prev => {
       const pId = product.productId || product.id;
       const existingIndex = prev.findIndex(item => item.productId === pId);
@@ -20,7 +23,7 @@ export function useCart(storeCode = 'MILI001', terminalId = 'POS01') {
         const updated = [...prev];
         updated[existingIndex] = {
           ...updated[existingIndex],
-          qty: updated[existingIndex].qty + 1
+          qty: updated[existingIndex].qty + addQty
         };
         return updated;
       }
@@ -30,7 +33,7 @@ export function useCart(storeCode = 'MILI001', terminalId = 'POS01') {
         productName: product.productName || product.name || pId,
         unitPrice: retailPrice,
         unitCost: costPrice,
-        qty: 1,
+        qty: addQty,
         discountAmount: 0,
         capacity: product.capacity || '',
         category: product.category || '',
