@@ -1850,7 +1850,7 @@ export const GroupBuyService = {
       { name: "豪華奶箱", subtitle: "👑 尊榮限定", image: "/assets/milk_box_luxury.png" }
     ];
 
-    tierRules = tierRules.map((rule, idx) => ({
+    tierRules = tierRules.map((rule: any, idx: number) => ({
       ...rule,
       id: rule.id || `box_${Date.now()}_${idx}`,
       name: rule.name || (defaultData[idx]?.name || `優惠箱 ${idx + 1}`),
