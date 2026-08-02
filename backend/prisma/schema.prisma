@@ -39,6 +39,7 @@ model Product {
   packSize              Int                     @default(1)
   dispatchSteps         Json                    @default("[]") // e.g. [28, 42, 70]
   roundThreshold        Int?
+  posSettings           Json? // POS 專用設定集 overrides (price, isBundle, isActive, sortWeight, packSize, etc.)
   autoSuppress          Boolean                 @default(false)
   maxSuggestion         Int                     @default(0)
   isBundle              Boolean                 @default(false)

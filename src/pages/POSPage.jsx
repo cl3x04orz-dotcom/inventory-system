@@ -45,9 +45,32 @@ export default function POSPage({ user, apiUrl }) {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const res = await callGAS(apiUrl, 'getProducts', { activeOnly: true }, user.token);
+      const res = await callGAS(apiUrl, 'getProducts', {}, user.token);
       if (Array.isArray(res)) {
-        setProducts(res.filter(p => p.isActive !== false));
+        let mapped = res.map(p => {
+          const pos = p.posSettings || {};
+          return {
+            ...p,
+            isActive: pos.isActive !== undefined ? pos.isActive : p.isActive,
+            single_price: pos.price !== undefined && pos.price !== null ? pos.price : p.single_price,
+            price: pos.price !== undefined && pos.price !== null ? pos.price : p.price,
+            isBundle: pos.isBundle !== undefined ? pos.isBundle : p.isBundle,
+            packSize: pos.packSize !== undefined && pos.packSize !== null ? pos.packSize : p.packSize,
+            sortWeight: pos.sortWeight !== undefined && pos.sortWeight !== null ? pos.sortWeight : p.sortWeight,
+            has_flavor_attributes: pos.has_flavor_attributes !== undefined ? pos.has_flavor_attributes : p.has_flavor_attributes,
+            flavor_choices: pos.flavor_choices !== undefined ? pos.flavor_choices : p.flavor_choices,
+            maxTotalQty: pos.maxTotalQty !== undefined ? pos.maxTotalQty : p.maxTotalQty,
+            has_volume_pricing: pos.has_volume_pricing !== undefined ? pos.has_volume_pricing : p.has_volume_pricing,
+            volume_pricing_settings: pos.volume_pricing_settings !== undefined ? pos.volume_pricing_settings : p.volume_pricing_settings,
+          };
+        }).filter(p => p.isActive !== false);
+
+        mapped.sort((a, b) => {
+          const weightA = a.sortWeight != null ? Number(a.sortWeight) : 999999;
+          const weightB = b.sortWeight != null ? Number(b.sortWeight) : 999999;
+          return weightA - weightB;
+        });
+        setProducts(mapped);
       }
     } catch (err) {
       console.error('Failed to load products for POS:', err);

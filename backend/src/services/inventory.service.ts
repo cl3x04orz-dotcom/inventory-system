@@ -90,7 +90,8 @@ export const InventoryService = {
 
     return invList.map((item: any) => ({
       ...item,
-      productName: item.product?.productName || item.productName || item.productId
+      productName: item.product?.productName || item.productName || item.productId,
+      sortWeight: item.product?.sortWeight ?? null
     }));
   },
 

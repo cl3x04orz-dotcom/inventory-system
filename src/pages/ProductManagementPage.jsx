@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Package, Search, RefreshCw, Save, Image, Edit2, ChevronDown, ChevronUp, Check, AlertCircle } from 'lucide-react';
+import { Package, Search, RefreshCw, Save, Image, Edit2, ChevronDown, ChevronUp, Check, AlertCircle, Store, Barcode, DollarSign, TrendingUp, Zap, X, ScanLine } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
 export default function ProductManagementPage({ user, apiUrl }) {
@@ -167,7 +167,8 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 dispatchSteps: parsedSteps,
                 roundThreshold: (mergedProduct.roundThreshold !== undefined && mergedProduct.roundThreshold !== '' && mergedProduct.roundThreshold !== null) ? Number(mergedProduct.roundThreshold) : null,
                 autoSuppress: Boolean(mergedProduct.autoSuppress),
-                maxSuggestion: Number(mergedProduct.maxSuggestion || 0)
+                maxSuggestion: Number(mergedProduct.maxSuggestion || 0),
+                posSettings: mergedProduct.posSettings
             }, user.token);
             
             if (res && res.error) {
@@ -317,7 +318,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                 {/* 上架開關 (商品名稱同列最右側靠右對齊) */}
                                                 <div className="flex items-center gap-1.5 bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-lg border border-[var(--border-primary)] shadow-2xs" onClick={(e) => e.stopPropagation()}>
                                                     <span className={`text-[11px] font-bold whitespace-nowrap ${product.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
-                                                        {product.isActive ? '🟢 已上架' : '🔴 已下架'}
+                                                        {product.isActive ? '🌐 網購上架' : '❌ 網購下架'}
                                                     </span>
                                                     <label className="relative inline-flex items-center cursor-pointer">
                                                         <input
@@ -443,6 +444,18 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                         }`}
                                                     >
                                                         🏠 開放社區與配額
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setTab('pos')}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                                                            currentTab === 'pos'
+                                                                ? 'bg-[var(--bg-secondary)] text-indigo-600 dark:text-indigo-400 shadow-xs border border-indigo-500/20'
+                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                                        }`}
+                                                    >
+                                                        🏪 門市 POS 設定
                                                     </button>
 
                                                     <button
@@ -834,7 +847,350 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                 )}
 
                                                 {/* ------------------------------------------------------------- */}
-                                                {/* 🤖 TAB 4：AI 補貨參數 */}
+                                                {/* 🏪 TAB 5：門市 POS 設定 */}
+                                                {/* ------------------------------------------------------------- */}
+                                                {currentTab === 'pos' && (
+                                                    <div className="bg-[var(--bg-primary)] rounded-2xl p-4 md:p-5 border border-[var(--border-primary)] text-xs flex flex-col gap-5 animate-fade-in shadow-inner">
+                                                        <div className="flex items-center gap-2 pb-3 border-b border-[var(--border-primary)]/50">
+                                                            <div className="p-1.5 bg-indigo-500/10 rounded-lg text-indigo-600 dark:text-indigo-400">
+                                                                <Store size={18} />
+                                                            </div>
+                                                            <span className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400 tracking-wider">門市 POS 獨立設定</span>
+                                                            <div className="flex-1"></div>
+                                                            <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] px-3 py-1.5 rounded-lg border border-[var(--border-primary)]">
+                                                                <span className={`text-xs font-bold whitespace-nowrap ${product.posSettings?.isActive !== false ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`}>
+                                                                    {product.posSettings?.isActive !== false ? '✅ POS 已啟用' : '❌ POS 已停用'}
+                                                                </span>
+                                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        className="sr-only peer"
+                                                                        checked={product.posSettings?.isActive !== false}
+                                                                        onChange={(e) => {
+                                                                            const val = e.target.checked;
+                                                                            const currentSettings = product.posSettings || {};
+                                                                            const newSettings = { ...currentSettings, isActive: val };
+                                                                            handleFieldChange(product.id, 'posSettings', newSettings);
+                                                                            handleSaveProduct(product.id, { posSettings: newSettings });
+                                                                        }}
+                                                                    />
+                                                                    <div className="w-8 h-4.5 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-indigo-600"></div>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+
+                                                        {product.posSettings?.isActive !== false && (
+                                                            <>
+                                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                                    {/* 獨立售價 */}
+                                                                    <div className="flex flex-col h-full justify-between gap-2 bg-[var(--bg-tertiary)]/50 p-3.5 rounded-xl border border-[var(--border-primary)] hover:border-indigo-500/30 transition-colors">
+                                                                        <div className="flex flex-col gap-2">
+                                                                            <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--text-secondary)]">
+                                                                                <DollarSign size={14} className="text-emerald-500" />
+                                                                                POS 獨立售價
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="text-[var(--text-tertiary)] font-bold">$</span>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    className="input-field text-sm font-mono font-bold flex-1"
+                                                                                    placeholder={`預設: ${product.single_price || '-'}`}
+                                                                                    value={product.posSettings?.price ?? ''}
+                                                                                    onChange={(e) => {
+                                                                                        const val = e.target.value === '' ? null : Number(e.target.value);
+                                                                                        const currentSettings = product.posSettings || {};
+                                                                                        handleFieldChange(product.id, 'posSettings', { ...currentSettings, price: val });
+                                                                                    }}
+                                                                                    onBlur={(e) => {
+                                                                                        const val = e.target.value === '' ? null : Number(e.target.value);
+                                                                                        const currentSettings = product.posSettings || {};
+                                                                                        handleSaveProduct(product.id, { posSettings: { ...currentSettings, price: val } });
+                                                                                    }}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="text-[10px] text-[var(--text-tertiary)] mt-1">留空將繼承線上售價</div>
+                                                                    </div>
+
+                                                                    {/* POS 捆裝 */}
+                                                                    <div className="flex flex-col h-full justify-between gap-2 bg-[var(--bg-tertiary)]/50 p-3.5 rounded-xl border border-[var(--border-primary)] hover:border-indigo-500/30 transition-colors">
+                                                                        <div className="flex flex-col gap-2">
+                                                                            <div className="flex items-center justify-between">
+                                                                                <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--text-secondary)]">
+                                                                                    <Package size={14} className="text-blue-500" />
+                                                                                    POS 預設捆裝
+                                                                                </div>
+                                                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        className="sr-only peer"
+                                                                                        checked={!!product.posSettings?.isBundle}
+                                                                                        onChange={(e) => {
+                                                                                            const val = e.target.checked;
+                                                                                            const currentSettings = product.posSettings || {};
+                                                                                            handleFieldChange(product.id, 'posSettings', { ...currentSettings, isBundle: val });
+                                                                                            handleSaveProduct(product.id, { posSettings: { ...currentSettings, isBundle: val } });
+                                                                                        }}
+                                                                                    />
+                                                                                    <div className="w-7 h-4 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                                                                                </label>
+                                                                            </div>
+                                                                            
+                                                                            {product.posSettings?.isBundle && (
+                                                                                <div className="flex items-center gap-2 mt-1 animate-fade-in">
+                                                                                    <span className="text-[11px] font-bold text-[var(--text-tertiary)] whitespace-nowrap">數量：</span>
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        min="2"
+                                                                                        className="input-field text-sm font-mono flex-1 text-center font-bold"
+                                                                                        placeholder="例如: 6"
+                                                                                        value={product.posSettings?.packSize || ''}
+                                                                                        onChange={(e) => {
+                                                                                            const val = e.target.value === '' ? null : Number(e.target.value);
+                                                                                            const currentSettings = product.posSettings || {};
+                                                                                            handleFieldChange(product.id, 'posSettings', { ...currentSettings, packSize: val });
+                                                                                        }}
+                                                                                        onBlur={(e) => {
+                                                                                            const val = e.target.value === '' ? null : Number(e.target.value);
+                                                                                            const currentSettings = product.posSettings || {};
+                                                                                            handleSaveProduct(product.id, { posSettings: { ...currentSettings, packSize: val } });
+                                                                                        }}
+                                                                                    />
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="text-[10px] text-[var(--text-tertiary)] mt-1">例如：刷條碼即加入 6 瓶</div>
+                                                                    </div>
+                                                                    
+                                                                    {/* POS 排序 */}
+                                                                    <div className="flex flex-col h-full justify-between gap-2 bg-[var(--bg-tertiary)]/50 p-3.5 rounded-xl border border-[var(--border-primary)] hover:border-indigo-500/30 transition-colors">
+                                                                        <div className="flex flex-col gap-2">
+                                                                            <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--text-secondary)]">
+                                                                                <TrendingUp size={14} className="text-purple-500" />
+                                                                                POS 專屬排序
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <input
+                                                                                    type="number"
+                                                                                    className="input-field text-sm font-mono font-bold flex-1 text-center"
+                                                                                    placeholder="權重 (越小越前面)"
+                                                                                    value={product.posSettings?.sortWeight ?? ''}
+                                                                                    onChange={(e) => {
+                                                                                        const val = e.target.value === '' ? null : Number(e.target.value);
+                                                                                        const currentSettings = product.posSettings || {};
+                                                                                        handleFieldChange(product.id, 'posSettings', { ...currentSettings, sortWeight: val });
+                                                                                    }}
+                                                                                    onBlur={(e) => {
+                                                                                        const val = e.target.value === '' ? null : Number(e.target.value);
+                                                                                        const currentSettings = product.posSettings || {};
+                                                                                        handleSaveProduct(product.id, { posSettings: { ...currentSettings, sortWeight: val } });
+                                                                                    }}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="text-[10px] text-[var(--text-tertiary)] mt-1">獨立控制 POS 熱銷排名</div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* 延伸 POS 獨立特惠與活動 */}
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs mt-1">
+                                                                    {/* 多規格口味 */}
+                                                                    <div className="flex flex-col h-full justify-between gap-2 bg-[var(--bg-tertiary)]/50 p-3.5 rounded-xl border border-[var(--border-primary)] hover:border-indigo-500/30 transition-colors">
+                                                                        <div className="flex flex-col gap-2">
+                                                                            <div className="flex justify-between items-center">
+                                                                                <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">POS 專屬多規格口味</span>
+                                                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        className="sr-only peer"
+                                                                                        checked={!!product.posSettings?.has_flavor_attributes}
+                                                                                        onChange={(e) => {
+                                                                                            const currentSettings = product.posSettings || {};
+                                                                                            const newSettings = { ...currentSettings, has_flavor_attributes: e.target.checked };
+                                                                                            handleFieldChange(product.id, 'posSettings', newSettings);
+                                                                                            handleSaveProduct(product.id, { posSettings: newSettings });
+                                                                                        }}
+                                                                                    />
+                                                                                    <div className="w-8 h-4 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-500"></div>
+                                                                                </label>
+                                                                            </div>
+                                                                            <input
+                                                                                type="text"
+                                                                                className="input-field text-xs p-2 mt-auto"
+                                                                                placeholder="例：無糖, 半糖"
+                                                                                disabled={!product.posSettings?.has_flavor_attributes}
+                                                                                value={product.posSettings?.flavor_choices || ''}
+                                                                                onChange={(e) => {
+                                                                                    const currentSettings = product.posSettings || {};
+                                                                                    handleFieldChange(product.id, 'posSettings', { ...currentSettings, flavor_choices: e.target.value });
+                                                                                }}
+                                                                                onBlur={(e) => {
+                                                                                    const currentSettings = product.posSettings || {};
+                                                                                    handleSaveProduct(product.id, { posSettings: { ...currentSettings, flavor_choices: e.target.value } });
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                        <div className="text-[10px] text-[var(--text-tertiary)] mt-1">門市專用，不影響線上</div>
+                                                                    </div>
+
+                                                                    {/* 最大販售上限 */}
+                                                                    <div className="flex flex-col h-full justify-between gap-2 bg-[var(--bg-tertiary)]/50 p-3.5 rounded-xl border border-[var(--border-primary)] hover:border-indigo-500/30 transition-colors">
+                                                                        <div className="flex flex-col gap-2">
+                                                                            <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">POS 活動總限量上限</span>
+                                                                            <input
+                                                                                type="number"
+                                                                                min="1"
+                                                                                className="input-field text-xs p-2 mt-auto font-mono"
+                                                                                placeholder="例：100 (留空無上限)"
+                                                                                value={product.posSettings?.maxTotalQty ?? ''}
+                                                                                onChange={(e) => {
+                                                                                    const val = e.target.value === '' ? null : Number(e.target.value);
+                                                                                    const currentSettings = product.posSettings || {};
+                                                                                    handleFieldChange(product.id, 'posSettings', { ...currentSettings, maxTotalQty: val });
+                                                                                }}
+                                                                                onBlur={(e) => {
+                                                                                    const val = e.target.value === '' ? null : Number(e.target.value);
+                                                                                    const currentSettings = product.posSettings || {};
+                                                                                    handleSaveProduct(product.id, { posSettings: { ...currentSettings, maxTotalQty: val } });
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                        <div className="text-[10px] text-[var(--text-tertiary)] mt-1">僅限門市 POS 可結帳的限量</div>
+                                                                    </div>
+
+                                                                    {/* 滿件特惠 */}
+                                                                    <div className="lg:col-span-2 flex flex-col h-full justify-between gap-2.5 bg-[var(--bg-tertiary)]/50 p-3.5 rounded-xl border border-[var(--border-primary)] hover:border-indigo-500/30 transition-colors">
+                                                                        <div className="flex flex-col gap-2">
+                                                                            <div className="flex justify-between items-center">
+                                                                                <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">POS 滿件特惠設定</span>
+                                                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        className="sr-only peer"
+                                                                                        checked={!!product.posSettings?.has_volume_pricing}
+                                                                                        onChange={(e) => {
+                                                                                            const currentSettings = product.posSettings || {};
+                                                                                            const newSettings = { ...currentSettings, has_volume_pricing: e.target.checked };
+                                                                                            handleFieldChange(product.id, 'posSettings', newSettings);
+                                                                                            handleSaveProduct(product.id, { posSettings: newSettings });
+                                                                                        }}
+                                                                                    />
+                                                                                    <div className="w-8 h-4 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-500"></div>
+                                                                                </label>
+                                                                            </div>
+
+                                                                            <div className={`flex flex-col gap-1 mt-auto ${!product.posSettings?.has_volume_pricing ? 'opacity-40 pointer-events-none select-none' : ''}`}>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="text-xs text-[var(--text-secondary)] whitespace-nowrap font-bold">滿</span>
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        className="input-field text-xs p-2 w-20 text-center font-mono font-bold"
+                                                                                        placeholder="件"
+                                                                                        disabled={!product.posSettings?.has_volume_pricing}
+                                                                                        value={product.posSettings?.volume_pricing_settings?.target_quantity ?? ''}
+                                                                                        onChange={(e) => {
+                                                                                            const currentSettings = product.posSettings || {};
+                                                                                            const vs = currentSettings.volume_pricing_settings || {};
+                                                                                            handleFieldChange(product.id, 'posSettings', { ...currentSettings, volume_pricing_settings: { ...vs, target_quantity: e.target.value !== '' ? Number(e.target.value) : 0 } });
+                                                                                        }}
+                                                                                        onBlur={(e) => {
+                                                                                            const currentSettings = product.posSettings || {};
+                                                                                            const vs = currentSettings.volume_pricing_settings || {};
+                                                                                            handleSaveProduct(product.id, { posSettings: { ...currentSettings, volume_pricing_settings: { ...vs, target_quantity: e.target.value !== '' ? Number(e.target.value) : 0 } } });
+                                                                                        }}
+                                                                                    />
+                                                                                    <span className="text-xs text-[var(--text-secondary)] whitespace-nowrap font-bold">件，優惠總價 共 $</span>
+                                                                                    <div className="relative flex-1 max-w-[180px]">
+                                                                                        <input
+                                                                                            type="number"
+                                                                                            className="input-field text-xs p-2 w-full font-mono font-bold"
+                                                                                            placeholder="組合特價"
+                                                                                            disabled={!product.posSettings?.has_volume_pricing}
+                                                                                            value={product.posSettings?.volume_pricing_settings?.package_price ?? ''}
+                                                                                            onChange={(e) => {
+                                                                                                const currentSettings = product.posSettings || {};
+                                                                                                const vs = currentSettings.volume_pricing_settings || {};
+                                                                                                handleFieldChange(product.id, 'posSettings', { ...currentSettings, volume_pricing_settings: { ...vs, package_price: e.target.value !== '' ? Number(e.target.value) : 0 } });
+                                                                                            }}
+                                                                                            onBlur={(e) => {
+                                                                                                const currentSettings = product.posSettings || {};
+                                                                                                const vs = currentSettings.volume_pricing_settings || {};
+                                                                                                handleSaveProduct(product.id, { posSettings: { ...currentSettings, volume_pricing_settings: { ...vs, package_price: e.target.value !== '' ? Number(e.target.value) : 0 } } });
+                                                                                            }}
+                                                                                        />
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* 條碼管理區塊 */}
+                                                                <div className="mt-2 bg-[var(--bg-secondary)] border border-[var(--border-primary)] p-4 rounded-xl shadow-xs">
+                                                                    <div className="flex items-center justify-between mb-3">
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <Barcode size={16} className="text-slate-600 dark:text-slate-400" />
+                                                                            <span className="font-bold text-sm text-[var(--text-primary)]">國際條碼管理 (支援多組)</span>
+                                                                        </div>
+                                                                        <div className="text-[10px] font-bold px-2 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-md flex items-center gap-1">
+                                                                            <Zap size={10} />
+                                                                            游標點擊下方輸入框，即可使用掃碼槍連續掃入
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <div className="flex flex-wrap gap-2 mb-3">
+                                                                        {(product.barcodes || []).map((b, idx) => (
+                                                                            <div key={idx} className="flex items-center gap-1 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] pl-2 pr-1 py-1 rounded-lg shadow-2xs group">
+                                                                                <span className="font-mono text-xs font-bold text-[var(--text-secondary)]">{typeof b === 'object' ? b.barcode : b}</span>
+                                                                                <button 
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        const newBarcodes = (product.barcodes || []).filter((_, i) => i !== idx);
+                                                                                        handleFieldChange(product.id, 'barcodes', newBarcodes);
+                                                                                        handleSaveProduct(product.id, { barcodes: newBarcodes });
+                                                                                    }}
+                                                                                    className="p-1 rounded hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition-colors"
+                                                                                    title="移除此條碼"
+                                                                                >
+                                                                                    <X size={12} />
+                                                                                </button>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="relative flex-1 max-w-sm">
+                                                                            <input
+                                                                                type="text"
+                                                                                className="input-field w-full pl-9 font-mono font-bold text-sm"
+                                                                                placeholder="在此刷入新條碼，或手動輸入後按 Enter"
+                                                                                onKeyDown={(e) => {
+                                                                                    if (e.key === 'Enter') {
+                                                                                        const val = e.target.value.trim();
+                                                                                        if (val) {
+                                                                                            const currentBarcodes = product.barcodes || [];
+                                                                                            const currentValues = currentBarcodes.map(b => typeof b === 'object' ? b.barcode : b);
+                                                                                            if (!currentValues.includes(val)) {
+                                                                                                const newBarcodes = [...currentBarcodes, val];
+                                                                                                handleFieldChange(product.id, 'barcodes', newBarcodes);
+                                                                                                handleSaveProduct(product.id, { barcodes: newBarcodes });
+                                                                                            }
+                                                                                            e.target.value = '';
+                                                                                        }
+                                                                                    }
+                                                                                }}
+                                                                            />
+                                                                            <ScanLine size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* ------------------------------------------------------------- */}
+                                                {/* 🤖 TAB 6：AI 補貨參數 */}
                                                 {/* ------------------------------------------------------------- */}
                                                 {currentTab === 'ai' && (
                                                     <div className="bg-[var(--bg-primary)] rounded-2xl p-4 border border-[var(--border-primary)] text-xs flex flex-col gap-4 animate-fade-in shadow-inner">
