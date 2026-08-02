@@ -239,6 +239,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   const [rewardConfig, setRewardConfig] = useState(null);
   const [selectedRewardRule, setSelectedRewardRule] = useState(null); // { spendMin: 5000, discount: 150 } or null
   const [expandedBoxIdx, setExpandedBoxIdx] = useState(null);
+  const [previewBox, setPreviewBox] = useState(null); // 用來控制獎品預覽 Bottom Sheet
 
   // 當累積額度不足以使用目前選定的折抵規則時，自動歸零改為「不使用折抵」
   useEffect(() => {
@@ -3887,157 +3888,223 @@ ${freeNote(newFee, newMin)}
 
             const unlockedRules = rules.filter(r => currentSpend >= r.spendMin);
 
+            const getDummyPrizes = (spendMin) => {
+              if (spendMin < 10000) return [{ icon: '🎟️', text: '35元折價券' }, { icon: '🚚', text: '免運券' }];
+              if (spendMin < 15000) return [{ icon: '🎟️', text: '50元折價券' }, { icon: '🥤', text: '免費精選飲品' }];
+              return [{ icon: '🎧', text: 'AirPods (抽獎)' }, { icon: '💰', text: '1000元購物金' }, { icon: '🎟️', text: '100元折價券' }];
+            };
+
+            const getTierDecorations = (idx) => {
+              if (idx === 0) return { stars: '⭐⭐', tag: '' };
+              if (idx === 1) return { stars: '⭐⭐⭐⭐', tag: '🔥 人氣推薦', tagColor: 'text-orange-600 bg-orange-100 border-orange-200' };
+              return { stars: '⭐⭐⭐⭐⭐', tag: '👑 高價值', tagColor: 'text-amber-700 bg-amber-100 border-amber-200' };
+            };
+
             return (
-              <div className="bg-[#F9FFFC] border border-[#D5F5E7] rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
-                <div className="flex justify-between items-center pb-1 border-b border-[#E6F7F0]">
-                  <div className="flex items-center gap-2.5">
-                    <img
-                      src={rewardConfig.headerImage || milkBoxClassic}
-                      alt="奶箱"
-                      className="w-[64px] h-[64px] object-contain shrink-0 drop-shadow-md scale-110"
-                      onError={(e) => { e.target.onerror = null; e.target.src = milkBoxClassic; }}
-                    />
-                    <div>
-                      <div className="text-sm font-black text-slate-900 flex items-center gap-2">
-                        奶箱
-                        <span className="text-[10px] bg-[#E6F7F0] text-emerald-800 px-2 py-0.5 rounded-full font-bold">
-                          目前累積消費 ${currentSpend.toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-slate-500 font-medium mt-0.5">
-                        {unlockedRules.length > 0
-                          ? `🎉 已解鎖 ${unlockedRules.length} 個奶箱，可任選一個立即開啟`
-                          : "💡 累積消費解鎖更多專屬奶箱"}
-                      </p>
-                    </div>
+              <div className="bg-[#F9FFFC] border border-[#D5F5E7] rounded-2xl p-4 space-y-4 shadow-sm relative overflow-hidden">
+                {/* 背景裝飾 */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-100/30 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />
+
+                {/* 第一層：奶箱總覽 */}
+                <div className="relative z-10 flex flex-col items-center text-center space-y-2 border-b border-[#E6F7F0] pb-4">
+                  <div className="flex items-center gap-2 text-emerald-800 font-bold text-sm">
+                    <img src={rewardConfig.headerImage || milkBoxClassic} alt="奶箱" className="w-6 h-6 object-contain drop-shadow-sm" />
+                    奶箱福利
                   </div>
+                  <div className="text-slate-500 text-xs font-bold">目前累積消費</div>
+                  <div className="text-3xl font-black text-slate-900 font-mono tracking-tight">
+                    ${currentSpend.toLocaleString()}
+                  </div>
+                  {unlockedRules.length > 0 ? (
+                    <div className="bg-emerald-600 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-sm animate-pulse flex items-center gap-1.5 mt-1">
+                      <span>🎉 已解鎖 {unlockedRules.length} 個奶箱，請選擇一個立即開啟</span>
+                    </div>
+                  ) : (
+                    <div className="bg-slate-100 text-slate-500 text-xs font-bold px-4 py-1.5 rounded-full mt-1">
+                      💡 累積消費解鎖更多專屬奶箱
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-2">
-                  {/* 保留奶箱，繼續累積更高級的奶箱 */}
-                  <div
-                    onClick={() => {
-                      setSelectedRewardRule(null);
-                      setExpandedBoxIdx(null);
-                    }}
-                    className={`flex items-center justify-between p-3 rounded-xl border text-xs font-extrabold cursor-pointer transition-all ${
-                      selectedRewardRule === null
-                        ? "bg-white border-2 border-emerald-500 text-slate-900 shadow-2xs"
-                        : "bg-white/80 border-slate-200/80 text-slate-600 hover:bg-white"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                        selectedRewardRule === null ? "border-emerald-600 bg-emerald-600" : "border-slate-300 bg-white"
-                      }`}>
-                        {selectedRewardRule === null && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
-                      </div>
-                      <span className="text-xs font-black text-slate-800">🐄 先存著，解鎖更大的奶箱</span>
-                    </div>
-                  </div>
-
-                  {/* 各階梯奶箱選項 */}
+                {/* 第二層：奶箱列表 */}
+                <div className="relative z-10 space-y-2.5">
                   {rules.map((rule, rIdx) => {
                     const isUnlocked = currentSpend >= rule.spendMin;
                     const isSelected = selectedRewardRule?.spendMin === rule.spendMin;
-                    const isExpanded = expandedBoxIdx === rIdx;
                     const remBalance = Math.max(0, currentSpend - rule.spendMin);
                     const boxName = rule.name || `尊榮奶箱 ($${rule.spendMin.toLocaleString()})`;
                     const boxImg = rule.image || milkBoxMini;
+                    const { stars, tag, tagColor } = getTierDecorations(rIdx);
 
                     return (
                       <div
                         key={rule.id || rIdx}
-                        onClick={() => {
-                          setExpandedBoxIdx(isExpanded ? null : rIdx);
-                          if (isUnlocked) {
-                            setSelectedRewardRule(rule);
-                          }
-                        }}
-                        className={`flex flex-col p-3 rounded-xl border text-xs transition-all ${
+                        className={`flex flex-col rounded-xl border transition-all relative overflow-hidden ${
                           !isUnlocked
-                            ? "opacity-75 bg-slate-100/70 border-slate-200 text-slate-500 cursor-pointer"
+                            ? "opacity-80 bg-slate-50/80 border-slate-200"
                             : isSelected
-                            ? "bg-white border-2 border-emerald-500 text-slate-900 shadow-xs ring-2 ring-emerald-500/10 cursor-pointer"
-                            : "bg-white border-slate-200/80 text-slate-800 hover:border-emerald-300 cursor-pointer"
+                            ? "bg-white border-2 border-emerald-500 shadow-md ring-4 ring-emerald-500/10 cursor-pointer"
+                            : "bg-white border-slate-200 hover:border-emerald-300 shadow-sm cursor-pointer"
                         }`}
                       >
-                        <div className="flex items-center justify-between font-extrabold gap-2">
-                          <div className="flex items-center gap-2.5 min-w-0 w-full">
-                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                              !isUnlocked
-                                ? "border-slate-300 bg-slate-100"
-                                : isSelected
-                                ? "border-emerald-600 bg-emerald-600"
-                                : "border-slate-300 bg-white"
-                            }`}>
-                              {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
-                            </div>
-                            <img
-                              src={boxImg}
-                              alt={boxName}
-                              className="w-[72px] h-[72px] object-contain shrink-0 drop-shadow-md scale-125"
-                              onError={(e) => { e.target.onerror = null; e.target.src = milkBoxMini; }}
-                            />
-                            <div className="flex flex-col min-w-0 gap-1 flex-1 pl-2">
-                              <span className={isUnlocked ? "text-[20px] font-black text-slate-900 truncate" : "text-[18px] font-bold text-slate-500 truncate"}>
+                        <div 
+                          className="flex items-center gap-3 p-3 relative"
+                          onClick={() => {
+                            if (isUnlocked) setSelectedRewardRule(rule);
+                          }}
+                        >
+                          {/* Radio Icon */}
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                            !isUnlocked ? "border-slate-300 bg-slate-100" : isSelected ? "border-emerald-600 bg-emerald-600" : "border-slate-300 bg-white"
+                          }`}>
+                            {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                          </div>
+
+                          {/* 奶箱圖片 */}
+                          <img
+                            src={boxImg}
+                            alt={boxName}
+                            className="w-[56px] h-[56px] object-contain shrink-0 drop-shadow-md scale-110"
+                            onError={(e) => { e.target.onerror = null; e.target.src = milkBoxMini; }}
+                          />
+
+                          {/* 奶箱資訊 */}
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <div className="flex items-center justify-between">
+                              <span className={isUnlocked ? "text-base font-black text-slate-900 truncate" : "text-base font-bold text-slate-500 truncate"}>
                                 {boxName}
                               </span>
-                              <span className={`text-[11px] font-black tracking-widest flex items-center gap-1 ${
-                                !isUnlocked ? "text-slate-400" :
-                                rIdx === 0 ? "text-blue-500/90" : 
-                                rIdx === 1 ? "text-emerald-600/90" : 
-                                "text-yellow-600/90"
-                              }`}>
-                                {rule.subtitle}
-                              </span>
-                              
-                              <span className="text-[11px] font-medium mt-1">
-                                {isUnlocked ? (
-                                  <span className="text-emerald-600 font-bold">✨ 已可開啟</span>
-                                ) : (
-                                  <span className="text-slate-500">🔒 累積 ${rule.spendMin.toLocaleString()} 解鎖</span>
-                                )}
-                              </span>
+                              {tag && (
+                                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${tagColor} whitespace-nowrap ml-1`}>
+                                  {tag}
+                                </span>
+                              )}
                             </div>
+                            
+                            <div className="flex items-center justify-between mt-0.5">
+                              <span className="text-[10px] tracking-widest text-slate-400">
+                                {stars}
+                              </span>
+                              {isUnlocked ? (
+                                <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0">
+                                  ✔ 可開啟
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-[10px] font-bold shrink-0">
+                                  🔒 差 ${(rule.spendMin - currentSpend).toLocaleString()} 解鎖
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] font-bold text-slate-500 truncate mt-0.5">{rule.subtitle}</span>
                           </div>
                         </div>
 
-                        {/* 展開後的詳細內容 */}
-                        {isExpanded && (
-                          <div className="mt-3 pt-3 border-t border-slate-100/80">
-                            {isUnlocked ? (
-                              <div className="space-y-2 text-center text-[12px] font-bold">
-                                <div className="text-emerald-700 bg-emerald-50 py-2 rounded-lg border border-emerald-100">
-                                  🎁 可獲得優惠 <br/>
-                                  <span className="text-lg font-black">${rule.discount.toLocaleString()}</span>
-                                </div>
-                                <div className="text-slate-600">
-                                  開啟後剩餘累積：<br/>
-                                  <span className="font-mono font-black">${remBalance.toLocaleString()}</span>
-                                </div>
-                                {cartTotal < rule.discount && (
-                                  <div className="text-amber-900 bg-[#FFF9E8] p-2.5 rounded-xl border border-[#FDE68A] shadow-2xs mt-2 leading-relaxed">
-                                    ⚠️ 再加購 ${rule.discount - cartTotal} <br/> 即可立即折抵 ${rule.discount}
-                                  </div>
-                                )}
+                        {/* 可能獲得預覽按鈕 */}
+                        <div 
+                          className="bg-slate-50 px-3 py-1.5 flex justify-end border-t border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewBox(rule);
+                          }}
+                        >
+                          <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+                            可能獲得獎品 
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </span>
+                        </div>
+
+                        {/* 如果選中，顯示折抵資訊 */}
+                        {isSelected && (
+                          <div className="px-3 pb-3 pt-2 border-t border-slate-100 bg-emerald-50/30">
+                            <div className="space-y-1.5 text-center text-[12px] font-bold">
+                              <div className="text-emerald-700 flex items-center justify-center gap-1">
+                                🎁 立即獲得優惠 <span className="text-base font-black">${rule.discount.toLocaleString()}</span>
                               </div>
-                            ) : (
-                              <div className="space-y-1.5 text-center text-[12px] font-bold text-slate-500">
-                                <div className="text-slate-400">🔒 尚未解鎖</div>
-                                <div className="text-orange-600 bg-orange-50 py-2 rounded-lg border border-orange-100">
-                                  距離解鎖還差 <br/>
-                                  <span className="text-lg font-black">${(rule.spendMin - currentSpend).toLocaleString()}</span>
-                                </div>
-                                <div>再購買即可開啟奶箱</div>
+                              <div className="text-slate-500 text-[11px]">
+                                開啟後累積消費將剩餘：<span className="font-mono">${remBalance.toLocaleString()}</span>
                               </div>
-                            )}
+                              {cartTotal < rule.discount && (
+                                <div className="text-amber-900 bg-[#FFF9E8] p-2 rounded-lg border border-[#FDE68A] mt-1 shadow-2xs">
+                                  ⚠️ 再加購 ${rule.discount - cartTotal} 即可全額折抵 ${rule.discount}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
                     );
                   })}
                 </div>
+
+                {/* 第三層：存著不開 */}
+                <div className="relative z-10 pt-4 mt-2 border-t border-slate-200 border-dashed">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col items-center text-center space-y-2">
+                    <div className="text-sm font-black text-slate-800">🐄 不急著開？</div>
+                    <div className="text-xs text-slate-500 font-bold leading-relaxed">
+                      累積更多消費，<br/>可直接解鎖更高級奶箱。
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedRewardRule(null);
+                        setExpandedBoxIdx(null);
+                      }}
+                      className={`mt-2 w-full py-2 rounded-lg text-xs font-black transition-all ${
+                        selectedRewardRule === null 
+                          ? "bg-slate-800 text-white shadow-md border-b-4 border-slate-900" 
+                          : "bg-white border-2 border-slate-300 text-slate-600 hover:bg-slate-100 hover:border-slate-400"
+                      }`}
+                    >
+                      {selectedRewardRule === null ? "✔ 目前已存著" : "暫不開啟，先存著"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Bottom Sheet for Prize Preview */}
+                {previewBox && (
+                  <div className="fixed inset-0 z-[100] flex flex-col justify-end">
+                    <div 
+                      className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" 
+                      onClick={() => setPreviewBox(null)}
+                    />
+                    <div className="relative bg-white rounded-t-3xl shadow-2xl p-6 pb-10 animate-slide-up space-y-4">
+                      <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4" />
+                      
+                      <div className="flex items-center gap-4">
+                        <img src={previewBox.image || milkBoxMini} alt={previewBox.name} className="w-16 h-16 object-contain drop-shadow-md scale-110" />
+                        <div>
+                          <h3 className="text-xl font-black text-slate-900">{previewBox.name || '神秘奶箱'}</h3>
+                          <p className="text-sm font-bold text-slate-500 mt-0.5">{previewBox.subtitle}</p>
+                        </div>
+                      </div>
+
+                      <div className="bg-[#F9FFFC] border border-[#D5F5E7] rounded-xl p-4 mt-4">
+                        <div className="text-xs font-black text-emerald-800 mb-3 flex items-center gap-1.5">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          打開可能獲得以下獎項：
+                        </div>
+                        <div className="space-y-2">
+                          {getDummyPrizes(previewBox.spendMin).map((prize, idx) => (
+                            <div key={idx} className="flex items-center gap-3 bg-white border border-slate-100 p-2.5 rounded-lg shadow-2xs">
+                              <span className="text-xl">{prize.icon}</span>
+                              <span className="text-sm font-bold text-slate-700">{prize.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => setPreviewBox(null)}
+                        className="w-full bg-slate-900 text-white font-black py-3.5 rounded-xl mt-4 shadow-lg active:scale-95 transition-transform"
+                      >
+                        我知道了
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })()}
