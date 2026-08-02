@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
-
+import { prisma } from '../database/context.js';
 export class PromotionService {
   static async getPromotions(payload: any) {
     const { communityId } = payload || {};
