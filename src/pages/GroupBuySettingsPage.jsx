@@ -2167,6 +2167,72 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                     )}
                                                 </div>
                                             </div>
+
+                                            {/* 獎品預覽清單 */}
+                                            <div className="flex flex-col gap-2 mt-1 pt-3 border-t border-[var(--border-primary)]/50">
+                                                <div className="flex justify-between items-center">
+                                                    <label className="text-[11px] font-bold text-[var(--text-secondary)] flex items-center gap-1.5">
+                                                        <Gift size={14} className="text-pink-500" /> 預覽獎品清單
+                                                    </label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newRules = [...rewardTierRules];
+                                                            const prizes = newRules[idx].prizes || [];
+                                                            newRules[idx].prizes = [...prizes, { icon: '🎁', text: '新獎品' }];
+                                                            setRewardTierRules(newRules);
+                                                        }}
+                                                        className="px-2 py-1 bg-pink-500/10 hover:bg-pink-500/20 text-pink-600 rounded text-[10px] font-bold border border-pink-500/30 flex items-center gap-1 cursor-pointer"
+                                                    >
+                                                        <Plus size={12} /> 新增獎品
+                                                    </button>
+                                                </div>
+                                                
+                                                <div className="space-y-2">
+                                                    {(rule.prizes || []).map((prize, pIdx) => (
+                                                        <div key={pIdx} className="flex gap-2 items-center">
+                                                            <input
+                                                                type="text"
+                                                                value={prize.icon || ''}
+                                                                placeholder="Emoji"
+                                                                onChange={(e) => {
+                                                                    const newRules = [...rewardTierRules];
+                                                                    newRules[idx].prizes[pIdx].icon = e.target.value;
+                                                                    setRewardTierRules(newRules);
+                                                                }}
+                                                                className="w-12 p-2 text-center bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-xs"
+                                                            />
+                                                            <input
+                                                                type="text"
+                                                                value={prize.text || ''}
+                                                                placeholder="獎品名稱 (例如: 35元折價券)"
+                                                                onChange={(e) => {
+                                                                    const newRules = [...rewardTierRules];
+                                                                    newRules[idx].prizes[pIdx].text = e.target.value;
+                                                                    setRewardTierRules(newRules);
+                                                                }}
+                                                                className="flex-1 p-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-xs"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const newRules = [...rewardTierRules];
+                                                                    newRules[idx].prizes = newRules[idx].prizes.filter((_, i) => i !== pIdx);
+                                                                    setRewardTierRules(newRules);
+                                                                }}
+                                                                className="p-2 text-[var(--text-tertiary)] hover:bg-rose-500/10 hover:text-rose-500 rounded-lg cursor-pointer transition-colors"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                    {(!rule.prizes || rule.prizes.length === 0) && (
+                                                        <div className="text-[10px] text-[var(--text-tertiary)] text-center py-2.5 bg-[var(--bg-primary)] rounded-lg border border-dashed border-[var(--border-primary)]">
+                                                            尚未設定任何獎品（前台將顯示系統預設的示範獎項）
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

@@ -4087,7 +4087,7 @@ ${freeNote(newFee, newMin)}
                           打開可能獲得以下獎項：
                         </div>
                         <div className="space-y-2">
-                          {getDummyPrizes(previewBox.spendMin).map((prize, idx) => (
+                          {(previewBox.prizes && previewBox.prizes.length > 0 ? previewBox.prizes : getDummyPrizes(previewBox.spendMin)).map((prize, idx) => (
                             <div key={idx} className="flex items-center gap-3 bg-white border border-slate-100 p-2.5 rounded-lg shadow-2xs">
                               <span className="text-xl">{prize.icon}</span>
                               <span className="text-sm font-bold text-slate-700">{prize.text}</span>
