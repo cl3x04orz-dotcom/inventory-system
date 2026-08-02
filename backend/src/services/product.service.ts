@@ -112,6 +112,8 @@ export const ProductService = {
         soldQty: Number(p.soldQty || 0),
         allowedCommunityIds: Array.isArray(p.allowedCommunityIds) ? p.allowedCommunityIds : [],
         communityQuotas: p.communityQuotas || {},
+        posSettings: p.posSettings || {},
+        barcodes: p.barcodes ? p.barcodes.map(b => b.barcode) : [],
         capacity: p.capacity || '',
         isPurchasable: p.isPurchasable !== false, // 進貨清單顯示，與前台上架無關
         _fromSheet: 'Products'
@@ -195,7 +197,9 @@ export const ProductService = {
       bundleSize,
       maxTotalQty,
       allowedCommunityIds,
-      communityQuotas
+      communityQuotas,
+      posSettings,
+      barcodes
     } = payload;
 
     if (!productId) {
@@ -266,8 +270,24 @@ export const ProductService = {
         soldQty: shouldResetSoldQty ? 0 : undefined,
         allowedCommunityIds: parsedAllowedIds,
         communityQuotas: communityQuotas !== undefined ? (communityQuotas || {}) : undefined,
+        posSettings: posSettings !== undefined ? posSettings : undefined,
       }
     });
+
+    if (barcodes !== undefined && Array.isArray(barcodes)) {
+      await prisma.productBarcode.deleteMany({
+        where: { productId: String(productId).trim(), storeCode: payload.storeCode }
+      });
+      if (barcodes.length > 0) {
+        await prisma.productBarcode.createMany({
+          data: barcodes.map((b: string) => ({
+            productId: String(productId).trim(),
+            barcode: String(b).trim(),
+            storeCode: payload.storeCode
+          }))
+        });
+      }
+    }
 
     return { success: true };
   },
