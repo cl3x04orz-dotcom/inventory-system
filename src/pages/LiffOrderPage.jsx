@@ -2326,7 +2326,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
       setCart({});
       setStep("success");
     } catch (err) {
-      alert("送出訂單失敗: " + err.message);
+      setAlertModal({ show: true, message: "送出訂單失敗: " + err.message });
     } finally {
       setIsSubmitting(false);
     }
