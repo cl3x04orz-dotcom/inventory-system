@@ -108,6 +108,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState({});
+  const [checkoutError, setCheckoutError] = useState("");
 
   // ── 團購 V2 狀態 ───────────────────────────────────────────────
   const [isGroupOrder, setIsGroupOrder] = useState(false);
