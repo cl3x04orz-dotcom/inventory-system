@@ -144,7 +144,8 @@ export default function POSPage({ user, apiUrl }) {
       if (document.activeElement?.tagName === 'INPUT') return;
 
       const currentTime = Date.now();
-      if (currentTime - lastKeyTime.current > 100) {
+      // 增加容許時間至 300ms，相容部分速度較慢的無線掃碼槍或手動快速輸入
+      if (currentTime - lastKeyTime.current > 300) {
         barcodeBuffer.current = '';
       }
       lastKeyTime.current = currentTime;
@@ -160,6 +161,8 @@ export default function POSPage({ user, apiUrl }) {
           );
           if (match) {
             handleAddToCart(match);
+          } else {
+            alert(`找不到對應的商品條碼：${scanned}`);
           }
         }
       } else if (e.key.length === 1) {
