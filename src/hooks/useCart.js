@@ -14,11 +14,11 @@ export function useCart(storeCode = 'MILI001', terminalId = 'POS01') {
     const costPrice = Number(product.price || product.defaultPrice || 0);
 
     const isBundle = Boolean(product.isBundle);
-    const packSize = Number(product.packSize || 1);
-    const addQty = isBundle ? packSize : 1;
+    const bundleSize = Number(product.bundleSize || 1);
+    const addQty = isBundle ? bundleSize : 1;
 
     // POS 捆裝的價格是「整組」的價格，因此單價要除以數量 (與線上邏輯一致)
-    const unitPrice = (isBundle && packSize > 0) ? (retailPrice / packSize) : retailPrice;
+    const unitPrice = (isBundle && bundleSize > 0) ? (retailPrice / bundleSize) : retailPrice;
 
     setCartItems(prev => {
       const pId = product.productId || product.id;
@@ -45,7 +45,7 @@ export function useCart(storeCode = 'MILI001', terminalId = 'POS01') {
         volume_pricing_settings: product.volume_pricing_settings || product.volumePricingSettings || null,
         isBundle: Boolean(product.isBundle),
         bundleSize: Number(product.bundleSize || 1),
-        packSize: Number(product.packSize || 1)
+        bundleSize: Number(product.bundleSize || 1)
       }];
     });
   }, []);

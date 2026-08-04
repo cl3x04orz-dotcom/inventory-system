@@ -62,6 +62,7 @@ export default function POSPage({ user, apiUrl }) {
             single_price: pos.price !== undefined && pos.price !== null ? pos.price : p.single_price,
             price: pos.price !== undefined && pos.price !== null ? pos.price : p.price,
             isBundle: pos.isBundle !== undefined ? pos.isBundle : p.isBundle,
+            bundleSize: pos.packSize !== undefined && pos.packSize !== null ? pos.packSize : p.bundleSize,
             packSize: pos.packSize !== undefined && pos.packSize !== null ? pos.packSize : p.packSize,
             sortWeight: pos.sortWeight !== undefined && pos.sortWeight !== null ? pos.sortWeight : p.sortWeight,
             has_flavor_attributes: pos.has_flavor_attributes !== undefined ? pos.has_flavor_attributes : p.has_flavor_attributes,
@@ -310,7 +311,7 @@ export default function POSPage({ user, apiUrl }) {
 
                 // 捆裝與多件特價
                 const isBundle = Boolean(product.isBundle);
-                const bundleSize = Number(product.packSize || 1);
+                const bundleSize = Number(product.bundleSize || 1);
 
                 const hasVolume = Boolean(product.has_volume_pricing || product.hasVolumePricing);
                 const volumeSettings = product.volume_pricing_settings || product.volumePricingSettings;
@@ -406,7 +407,7 @@ export default function POSPage({ user, apiUrl }) {
                       <h4 className="font-bold text-gray-800 text-sm truncate">{item.productName}</h4>
                       {item.isBundle && (
                         <span className="bg-indigo-100 text-indigo-700 text-[10px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap">
-                          捆裝{item.packSize}入
+                          捆裝{item.bundleSize}入
                         </span>
                       )}
                       {hasBundleDiscount && (
@@ -416,7 +417,7 @@ export default function POSPage({ user, apiUrl }) {
                       )}
                     </div>
                     <div className="text-xs text-gray-500 mt-0.5">
-                      ${item.isBundle ? (item.unitPrice * item.packSize).toLocaleString() : item.unitPrice.toLocaleString()} {item.isBundle ? `/組(${item.packSize}入)` : (item.capacity ? `• ${item.capacity}` : '')}
+                      ${item.isBundle ? (item.unitPrice * item.bundleSize).toLocaleString() : item.unitPrice.toLocaleString()} {item.isBundle ? `/組(${item.bundleSize}入)` : (item.capacity ? `• ${item.capacity}` : '')}
                     </div>
                   </div>
 
