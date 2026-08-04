@@ -302,7 +302,7 @@ export default function POSPage({ user, apiUrl }) {
               尚無符合條件的商品
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
               {filteredProducts.map((product) => {
                 const pName = product.name || product.productName || product.id;
                 const pId = product.id || product.productId;
