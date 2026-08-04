@@ -42,7 +42,7 @@ import { useStoreSetting } from './hooks/useStoreSetting';
 import logoImg from './assets/logo.png';
 import {
     LayoutDashboard, ShoppingCart, Archive, LogOut, PackagePlus,
-    FileText, ClipboardList, DollarSign, CheckSquare, Wallet, ChevronDown,
+    FileText, ClipboardList, DollarSign, CheckSquare, Wallet, ChevronDown, ChevronUp,
     TrendingUp, BarChart2, Users, Activity, PieChart, Shield, WifiOff, Menu,
     Edit2, Link, Calendar, Store, Building2
 } from 'lucide-react';
@@ -164,6 +164,7 @@ function AppContent() {
 
 
     const [showHeader, setShowHeader] = useState(true);
+    const [isHeaderForcedHidden, setIsHeaderForcedHidden] = useState(false);
     const [scrolled, setScrolled] = useState(false);
     const lastScrollY = React.useRef(0);
 
@@ -633,7 +634,7 @@ function AppContent() {
             {/* Version Update Banner 已移除：偵測到新版本直接自動強制重載 */}
 
             {/* Navbar（客戶點餐頁不顯示）*/}
-            {page !== 'liffOrder' && <header className={`h-[76px] border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]/85 backdrop-blur-xl flex justify-between items-center px-6 sticky top-0 z-[60] transition-[transform,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.17,0.67,0.83,0.67)] ${showHeader ? 'translate-y-0' : '-translate-y-full'} ${scrolled ? 'shadow-lg border-transparent' : 'shadow-none'}`}>
+            {page !== 'liffOrder' && <header className={`h-[76px] border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]/85 backdrop-blur-xl flex justify-between items-center px-6 sticky top-0 z-[60] transition-[transform,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.17,0.67,0.83,0.67)] ${(showHeader && !isHeaderForcedHidden) ? 'translate-y-0' : '-translate-y-full'} ${scrolled ? 'shadow-lg border-transparent' : 'shadow-none'}`}>
 
                 <div className="flex items-center gap-3">
                     <img src={setting?.logoUrl || logoImg} alt={setting?.name || "Logo"} className="h-11 w-auto object-contain brightness-0 dark:brightness-100 transition-transform hover:scale-105 cursor-pointer" onClick={() => handlePageChange('sales')} />
@@ -883,6 +884,15 @@ function AppContent() {
                         </div>
                     </nav>
 
+                    {/* Hide Header Toggle */}
+                    <button
+                        onClick={() => setIsHeaderForcedHidden(true)}
+                        className="hidden md:flex items-center justify-center p-2 mr-2 text-slate-400 hover:text-blue-600 transition-all duration-300 active:scale-95"
+                        title="隱藏上方選單 (全螢幕)"
+                    >
+                        <ChevronUp size={20} />
+                    </button>
+
                     {/* Mode (ThemeToggle) */}
                     <ThemeToggle />
 
@@ -905,6 +915,17 @@ function AppContent() {
                     </button>
                 </div>
             </header>}
+
+            {/* Floating Expand Header Button */}
+            {isHeaderForcedHidden && page !== 'liffOrder' && (
+                <button
+                    onClick={() => setIsHeaderForcedHidden(false)}
+                    className="fixed top-0 left-1/2 -translate-x-1/2 z-[70] bg-[var(--bg-secondary)] border border-t-0 border-[var(--border-primary)] shadow-md rounded-b-xl px-6 py-1.5 text-slate-400 hover:text-blue-500 hover:py-2 transition-all duration-300 group"
+                    title="顯示標題列"
+                >
+                    <ChevronDown size={20} className="group-hover:animate-bounce" />
+                </button>
+            )}
 
 
             {/* Main Content */}
