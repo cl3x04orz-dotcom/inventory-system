@@ -156,7 +156,7 @@ export default function POSPage({ user, apiUrl }) {
           const match = products.find(p => 
             (p.id || p.productId) === scanned || 
             (p.name || p.productName) === scanned ||
-            (p.barcodes && p.barcodes.some(b => b.barcode === scanned))
+            (p.barcodes && p.barcodes.some(b => (typeof b === 'object' ? b.barcode : b) === scanned))
           );
           if (match) {
             handleAddToCart(match);
