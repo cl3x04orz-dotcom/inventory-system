@@ -168,7 +168,8 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 roundThreshold: (mergedProduct.roundThreshold !== undefined && mergedProduct.roundThreshold !== '' && mergedProduct.roundThreshold !== null) ? Number(mergedProduct.roundThreshold) : null,
                 autoSuppress: Boolean(mergedProduct.autoSuppress),
                 maxSuggestion: Number(mergedProduct.maxSuggestion || 0),
-                posSettings: mergedProduct.posSettings
+                posSettings: mergedProduct.posSettings,
+                barcodes: mergedProduct.barcodes || []
             }, user.token);
             
             if (res && res.error) {
