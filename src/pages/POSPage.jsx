@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 /**
- * 跨商品 Mix-and-Match 組合特價計算
+ * 跨商品 Mix-and-Match 組合特價計算 (同商品優先原則)
  */
 function calculateCartSubtotal(cartItems) {
   if (!Array.isArray(cartItems) || cartItems.length === 0) return 0;
@@ -43,21 +43,32 @@ function calculateCartSubtotal(cartItems) {
     totalSum += (item.qty * item.unitPrice) - (item.discountAmount || 0);
   });
 
-  // 2. 多件特價商品（支援東湊西湊跨品項混搭）
+  // 2. 多件特價商品（同商品優先，剩餘散買才跨品項混搭）
   Object.values(groups).forEach(group => {
     const { targetQuantity, packagePrice, items } = group;
-    const totalGroupQty = items.reduce((s, i) => s + i.qty, 0);
-    const groupBaseSum = items.reduce((s, i) => s + (i.qty * i.unitPrice), 0);
+    let leftoverQtySum = 0;
+    let leftoverBaseSum = 0;
 
-    if (totalGroupQty >= targetQuantity) {
-      const fullBundles = Math.floor(totalGroupQty / targetQuantity);
-      const remainderQty = totalGroupQty % targetQuantity;
-      const avgUnitPrice = totalGroupQty > 0 ? (groupBaseSum / totalGroupQty) : 0;
+    items.forEach(item => {
+      const selfBundles = Math.floor(item.qty / targetQuantity);
+      const selfRemainder = item.qty % targetQuantity;
       
-      const discountedSubtotal = (fullBundles * packagePrice) + (remainderQty * avgUnitPrice);
-      totalSum += Math.round(discountedSubtotal);
+      // 同商品優先享用完整組合價
+      totalSum += (selfBundles * packagePrice);
+      
+      leftoverQtySum += selfRemainder;
+      leftoverBaseSum += (selfRemainder * item.unitPrice);
+    });
+
+    // 剩餘散買品項跨商品混搭
+    if (leftoverQtySum >= targetQuantity) {
+      const crossBundles = Math.floor(leftoverQtySum / targetQuantity);
+      const crossRemainder = leftoverQtySum % targetQuantity;
+      const avgUnitPrice = leftoverQtySum > 0 ? (leftoverBaseSum / leftoverQtySum) : 0;
+      
+      totalSum += (crossBundles * packagePrice) + Math.round(crossRemainder * avgUnitPrice);
     } else {
-      totalSum += groupBaseSum;
+      totalSum += leftoverBaseSum;
     }
   });
 
@@ -65,7 +76,7 @@ function calculateCartSubtotal(cartItems) {
 }
 
 /**
- * 計算購物車中各單項商品分配到的折抵後金額與省下金額
+ * 計算購物車中各單項商品分配到的折抵後金額與省下金額 (同商品優先)
  */
 function getItemDiscountedInfo(item, cartItems) {
   const originalTotal = Number(item.unitPrice || 0) * Number(item.qty || 0);
@@ -77,8 +88,15 @@ function getItemDiscountedInfo(item, cartItems) {
 
   const targetQty = Number(settings.target_quantity);
   const packagePrice = Number(settings.package_price);
+  const qty = Number(item.qty || 0);
+  const unitPrice = Number(item.unitPrice || 0);
 
-  // 找出購物車中所有同規則商品
+  // 1. 同商品優先自組
+  const selfBundles = Math.floor(qty / targetQty);
+  const selfRemainder = qty % targetQty;
+  const selfSavings = (selfBundles * targetQty * unitPrice) - (selfBundles * packagePrice);
+
+  // 找出同規則的其他商品
   const groupItems = cartItems.filter(i => 
     i.has_volume_pricing && 
     i.volume_pricing_settings &&
@@ -86,28 +104,40 @@ function getItemDiscountedInfo(item, cartItems) {
     Number(i.volume_pricing_settings.package_price) === packagePrice
   );
 
-  const totalGroupQty = groupItems.reduce((s, i) => s + Number(i.qty || 0), 0);
-  if (totalGroupQty < targetQty) {
+  let crossShareSavings = 0;
+  if (selfRemainder > 0) {
+    let leftoverQtySum = 0;
+    let leftoverBaseSum = 0;
+    let myRemainderBase = selfRemainder * unitPrice;
+
+    groupItems.forEach(i => {
+      const rem = Number(i.qty || 0) % targetQty;
+      leftoverQtySum += rem;
+      leftoverBaseSum += (rem * Number(i.unitPrice || 0));
+    });
+
+    if (leftoverQtySum >= targetQty) {
+      const crossBundles = Math.floor(leftoverQtySum / targetQty);
+      const crossRemainder = leftoverQtySum % targetQty;
+      const avgUnitPrice = leftoverQtySum > 0 ? (leftoverBaseSum / leftoverQtySum) : 0;
+      const leftoverDiscountedSum = (crossBundles * packagePrice) + (crossRemainder * avgUnitPrice);
+      const totalCrossSavings = leftoverBaseSum - leftoverDiscountedSum;
+
+      if (totalCrossSavings > 0 && leftoverBaseSum > 0) {
+        crossShareSavings = Math.round(totalCrossSavings * (myRemainderBase / leftoverBaseSum));
+      }
+    }
+  }
+
+  const totalSavings = selfSavings + crossShareSavings;
+
+  if (totalSavings <= 0) {
     return { discountedTotal: originalTotal, savings: 0 };
   }
 
-  const groupBaseSum = groupItems.reduce((s, i) => s + (Number(i.qty || 0) * Number(i.unitPrice || 0)), 0);
-  const fullBundles = Math.floor(totalGroupQty / targetQty);
-  const remainderQty = totalGroupQty % targetQty;
-  const avgUnitPrice = totalGroupQty > 0 ? (groupBaseSum / totalGroupQty) : 0;
-  
-  const groupDiscountedSum = (fullBundles * packagePrice) + (remainderQty * avgUnitPrice);
-  const totalGroupSavings = groupBaseSum - groupDiscountedSum;
+  const discountedTotal = Math.max(0, originalTotal - totalSavings);
 
-  if (totalGroupSavings <= 0 || groupBaseSum <= 0) {
-    return { discountedTotal: originalTotal, savings: 0 };
-  }
-
-  // 依金額比例分攤折抵金額
-  const itemShareSavings = Math.round(totalGroupSavings * (originalTotal / groupBaseSum));
-  const discountedTotal = Math.max(0, originalTotal - itemShareSavings);
-
-  return { discountedTotal, savings: itemShareSavings };
+  return { discountedTotal, savings: totalSavings };
 }
 
 function getItemSubtotal(item) {
@@ -420,7 +450,7 @@ export default function POSPage({ user, apiUrl }) {
                   >
                     <div className="flex justify-between items-start">
                       <div className="space-y-1 flex-1 pr-1">
-                        <div className="font-extrabold text-gray-900 text-sm md:text-base leading-tight group-hover:text-indigo-600 line-clamp-2">
+                        <div className="font-black text-gray-900 text-base md:text-lg leading-tight group-hover:text-indigo-600 line-clamp-2">
                           {pName}
                         </div>
                         <div className="text-xs text-gray-400 font-bold">
@@ -565,6 +595,15 @@ export default function POSPage({ user, apiUrl }) {
                         <div className="font-black text-gray-900 text-base md:text-lg">${originalTotal.toLocaleString()}</div>
                       )}
                     </div>
+                    {/* ✕ 單項獨立刪除按鈕 */}
+                    <button
+                      type="button"
+                      onClick={() => removeItem(item.productId)}
+                      className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors ml-1"
+                      title="單獨移除此商品"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               );
@@ -1034,7 +1073,27 @@ export default function POSPage({ user, apiUrl }) {
                     };
 
                     await callGAS(apiUrl, 'updateProductDetails', updatedFields, user.token);
-                    await fetchProducts();
+
+                    // 靜默無感更新本地 State，防止頁面 Loading 與滾動置頂
+                    setProducts(prevProducts => prevProducts.map(p => {
+                      if (p.id === editingPosProduct.id) {
+                        const newPos = updatedFields.posSettings;
+                        const newPrice = newPos.price !== null ? newPos.price : (p.single_price || p.price || 0);
+                        return {
+                          ...p,
+                          single_price: newPrice,
+                          price: newPrice,
+                          isBundle: Boolean(newPos.isBundle),
+                          bundleSize: newPos.packSize ? Number(newPos.packSize) : 1,
+                          packSize: newPos.packSize ? Number(newPos.packSize) : 1,
+                          has_volume_pricing: Boolean(newPos.has_volume_pricing),
+                          volume_pricing_settings: newPos.volume_pricing_settings || null,
+                          posSettings: newPos
+                        };
+                      }
+                      return p;
+                    }));
+
                     setEditingPosProduct(null);
                   } catch (err) {
                     console.error('Failed to update product POS settings:', err);
