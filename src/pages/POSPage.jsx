@@ -338,8 +338,8 @@ export default function POSPage({ user, apiUrl }) {
           </div>
         </div>
 
-        {/* 商品大卡片列表 */}
-        <div className="flex-1 overflow-y-auto p-3">
+        {/* 商品大卡片列表 (一行三格，大字體清晰排版) */}
+        <div className="flex-1 overflow-y-auto p-3.5">
           {loading ? (
             <div className="h-full flex items-center justify-center text-gray-400 space-x-2 text-sm">
               <RefreshCw className="w-5 h-5 animate-spin text-indigo-600" />
@@ -350,7 +350,7 @@ export default function POSPage({ user, apiUrl }) {
               尚無符合條件的商品
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
               {filteredProducts.map((product) => {
                 const pName = product.name || product.productName || product.id;
                 const pId = product.id || product.productId;
@@ -369,14 +369,14 @@ export default function POSPage({ user, apiUrl }) {
                 return (
                   <div
                     key={pId}
-                    className="bg-white p-3 rounded-xl border border-gray-200 hover:border-indigo-500 hover:shadow-md transition-all text-left flex flex-col justify-between h-32 group relative overflow-hidden"
+                    className="bg-white p-4 rounded-2xl border-2 border-gray-100 hover:border-indigo-500 hover:shadow-lg transition-all text-left flex flex-col justify-between h-36 md:h-40 group relative overflow-hidden shadow-xs"
                   >
                     <div className="flex justify-between items-start">
                       <div className="space-y-1 flex-1 pr-1 cursor-pointer" onClick={() => handleAddToCart(product)}>
-                        <div className="font-bold text-gray-800 text-xs line-clamp-2 leading-snug group-hover:text-indigo-600">
+                        <div className="font-extrabold text-gray-900 text-sm md:text-base leading-tight group-hover:text-indigo-600 line-clamp-2">
                           {pName}
                         </div>
-                        <div className="text-[10px] text-gray-400 font-medium">
+                        <div className="text-xs text-gray-400 font-bold">
                           {isBundle ? `1組(${bundleSize}入)` : (product.capacity || '')}
                         </div>
                       </div>
@@ -397,36 +397,36 @@ export default function POSPage({ user, apiUrl }) {
                             volume_pricing_settings: volumeSettings || { target_quantity: '', package_price: '' }
                           });
                         }}
-                        className="p-1 rounded-lg hover:bg-indigo-50 text-gray-400 hover:text-indigo-600 transition-colors z-10"
+                        className="p-1.5 rounded-xl hover:bg-indigo-50 text-gray-400 hover:text-indigo-600 transition-colors z-10"
                         title="自訂 POS 專屬特價與屬性"
                       >
-                        <Settings className="w-3.5 h-3.5" />
+                        <Settings className="w-4 h-4" />
                       </button>
                     </div>
 
                     <div className="cursor-pointer" onClick={() => handleAddToCart(product)}>
-                      {/* 標籤顯示 */}
-                      <div className="flex flex-wrap gap-1 mb-1">
+                      {/* 標籤顯示 (加大顯眼) */}
+                      <div className="flex flex-wrap gap-1.5 mb-1.5">
                         {isBundle && (
-                          <span className="inline-flex items-center space-x-0.5 text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold border border-indigo-200">
-                            <Layers className="w-2.5 h-2.5" />
+                          <span className="inline-flex items-center space-x-1 text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-lg font-extrabold border border-indigo-200">
+                            <Layers className="w-3 h-3" />
                             <span>捆裝{bundleSize}入</span>
                           </span>
                         )}
                         {bundleText && (
-                          <span className="inline-flex items-center space-x-0.5 text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-bold border border-amber-200">
-                            <Tag className="w-2.5 h-2.5" />
+                          <span className="inline-flex items-center space-x-1 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-lg font-extrabold border border-amber-300">
+                            <Tag className="w-3 h-3" />
                             <span>{bundleText}</span>
                           </span>
                         )}
                       </div>
 
-                      <div className="flex justify-between items-end border-t border-gray-100 pt-1">
-                        <span className="font-extrabold text-indigo-600 text-sm">
+                      <div className="flex justify-between items-end border-t border-gray-100 pt-1.5">
+                        <span className="font-black text-indigo-600 text-base md:text-lg">
                           ${price.toLocaleString()}{isBundle ? '/組' : ''}
                         </span>
-                        <span className="w-5 h-5 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                          <Plus className="w-3.5 h-3.5" />
+                        <span className="w-6 h-6 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                          <Plus className="w-4 h-4" />
                         </span>
                       </div>
                     </div>
@@ -449,7 +449,7 @@ export default function POSPage({ user, apiUrl }) {
           {cartItems.length > 0 && (
             <button 
               onClick={clear}
-              className="text-xs text-red-500 hover:text-red-700 flex items-center space-x-1"
+              className="text-xs text-red-500 hover:text-red-700 flex items-center space-x-1 font-bold"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>清空</span>
@@ -468,53 +468,47 @@ export default function POSPage({ user, apiUrl }) {
             cartItems.map((item) => {
               const itemTotal = getItemSubtotal(item);
               const originalTotal = item.unitPrice * item.qty;
-              const hasBundleDiscount = originalTotal > itemTotal;
 
               return (
-                <div key={item.productId} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-200 hover:border-indigo-300 transition-colors">
+                <div key={item.productId} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-200 hover:border-indigo-300 transition-colors">
                   <div className="flex-1 min-w-0 pr-2">
                     <div className="flex items-center space-x-1 flex-wrap gap-y-1">
-                      <h4 className="font-bold text-gray-800 text-sm truncate">{item.productName}</h4>
+                      <h4 className="font-extrabold text-gray-900 text-sm truncate">{item.productName}</h4>
                       {item.isBundle && (
-                        <span className="bg-indigo-100 text-indigo-700 text-[10px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap">
+                        <span className="bg-indigo-100 text-indigo-800 text-[11px] px-2 py-0.5 rounded-md font-extrabold whitespace-nowrap">
                           捆裝{item.bundleSize}入
                         </span>
                       )}
                       {item.has_volume_pricing && (
-                        <span className="bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap">
+                        <span className="bg-amber-100 text-amber-800 text-[11px] px-2 py-0.5 rounded-md font-extrabold whitespace-nowrap border border-amber-300">
                           {item.volume_pricing_settings?.target_quantity ? `滿${item.volume_pricing_settings.target_quantity}件特價` : '多件特價'}
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5">
+                    <div className="text-xs text-gray-500 mt-1 font-medium">
                       ${item.isBundle ? (item.unitPrice * item.bundleSize).toLocaleString() : item.unitPrice.toLocaleString()} {item.isBundle ? `/組(${item.bundleSize}入)` : (item.capacity ? `• ${item.capacity}` : '')}
                     </div>
                   </div>
 
                   {/* 數量調整與小計 */}
-                  <div className="flex items-center space-x-1.5">
-                    <div className="flex items-center border border-gray-300 rounded-lg bg-white overflow-hidden">
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center border border-gray-300 rounded-xl bg-white overflow-hidden shadow-2xs">
                       <button 
                         onClick={() => updateQty(item.productId, item.qty - 1)}
-                        className="p-1 hover:bg-gray-100 text-gray-600"
+                        className="p-1.5 hover:bg-gray-100 text-gray-600 active:bg-gray-200"
                       >
                         <Minus className="w-3.5 h-3.5" />
                       </button>
-                      <span className="px-2 text-xs font-bold text-gray-800 min-w-[1.2rem] text-center">{item.qty}</span>
+                      <span className="px-2 text-sm font-bold text-gray-800 min-w-[1.4rem] text-center">{item.qty}</span>
                       <button 
                         onClick={() => updateQty(item.productId, item.qty + 1)}
-                        className="p-1 hover:bg-gray-100 text-gray-600"
+                        className="p-1.5 hover:bg-gray-100 text-gray-600 active:bg-gray-200"
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className="min-w-[3.5rem] text-right">
-                      {hasBundleDiscount && (
-                        <div className="text-[10px] text-gray-400 line-through">${originalTotal}</div>
-                      )}
-                      <span className="font-extrabold text-gray-900 text-sm">
-                        ${itemTotal.toLocaleString()}
-                      </span>
+                    <div className="min-w-[3.8rem] text-right font-mono font-black text-gray-900 text-base">
+                      ${originalTotal.toLocaleString()}
                     </div>
                   </div>
                 </div>
@@ -523,29 +517,53 @@ export default function POSPage({ user, apiUrl }) {
           )}
         </div>
 
-        {/* 購物車底欄總計與結帳按鈕 */}
-        <div className="p-3.5 border-t border-gray-200 bg-gray-50 space-y-2.5">
-          <div className="flex justify-between items-center text-gray-600 text-xs">
-            <span>品項總數</span>
-            <span className="font-bold text-gray-800">{cartItems.reduce((s, i) => s + i.qty, 0)} 件</span>
-          </div>
-          <div className="flex justify-between items-center text-gray-900 font-black text-xl border-t border-gray-200 pt-2">
-            <span>應收總計</span>
-            <span className="text-indigo-600">${subtotal.toLocaleString()}</span>
-          </div>
+        {/* 購物車底欄總計與結帳按鈕 (包含組合優惠折抵明細) */}
+        {(() => {
+          const originalSubtotal = cartItems.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
+          const totalDiscount = Math.max(0, originalSubtotal - subtotal);
+          
+          return (
+            <div className="p-3.5 border-t border-gray-200 bg-gray-50 space-y-2.5">
+              <div className="flex justify-between items-center text-gray-600 text-xs font-semibold">
+                <span>品項總數</span>
+                <span className="font-bold text-gray-800">{cartItems.reduce((s, i) => s + i.qty, 0)} 件</span>
+              </div>
 
-          <button
-            disabled={cartItems.length === 0}
-            onClick={() => {
-              setReceivedAmountInput('');
-              setIsCheckoutOpen(true);
-            }}
-            className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white font-bold text-base rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
-          >
-            <DollarSign className="w-5 h-5" />
-            <span>前往結帳 (${subtotal.toLocaleString()})</span>
-          </button>
-        </div>
+              {/* 🎉 多件組合優惠折抵提示列 */}
+              {totalDiscount > 0 && (
+                <div className="flex justify-between items-center text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 text-xs font-extrabold animate-fade-in shadow-2xs">
+                  <span className="flex items-center gap-1.5">
+                    <Tag className="w-4 h-4 text-emerald-600" />
+                    <span>🎉 組合優惠折抵</span>
+                  </span>
+                  <span className="font-mono text-sm font-black text-emerald-600">-${totalDiscount.toLocaleString()}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center text-gray-900 font-black text-xl border-t border-gray-200 pt-2">
+                <span>應收總計</span>
+                <div className="text-right">
+                  {totalDiscount > 0 && (
+                    <div className="text-xs text-gray-400 font-bold line-through">${originalSubtotal.toLocaleString()}</div>
+                  )}
+                  <span className="text-indigo-600">${subtotal.toLocaleString()}</span>
+                </div>
+              </div>
+
+              <button
+                disabled={cartItems.length === 0}
+                onClick={() => {
+                  setReceivedAmountInput('');
+                  setIsCheckoutOpen(true);
+                }}
+                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white font-bold text-base rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
+              >
+                <DollarSign className="w-5 h-5" />
+                <span>前往結帳 (${subtotal.toLocaleString()})</span>
+              </button>
+            </div>
+          );
+        })()}
       </div>
 
       {/* 結帳彈窗 (Checkout Modal) */}
