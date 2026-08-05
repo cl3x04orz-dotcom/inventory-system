@@ -180,6 +180,10 @@ export default function POSPage({ user, apiUrl }) {
   const [editingPosProduct, setEditingPosProduct] = useState(null);
   const [savingPosSettings, setSavingPosSettings] = useState(false);
 
+  // Touch Numpad Modal State (藍芽掃碼槍防呆觸控數字鍵盤)
+  const [numpadTarget, setNumpadTarget] = useState(null);
+  const [numpadValue, setNumpadValue] = useState('');
+
   // E-Invoice State
   const [invoiceType, setInvoiceType] = useState('paper'); // 'paper' | 'mobile' | 'taxId' | 'donate'
   const [mobileCarrier, setMobileCarrier] = useState('');
@@ -592,7 +596,17 @@ export default function POSPage({ user, apiUrl }) {
                       >
                         <Minus className="w-3.5 h-3.5" />
                       </button>
-                      <span className="px-2 text-sm font-bold text-gray-800 min-w-[1.4rem] text-center">{item.qty}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNumpadTarget(item);
+                          setNumpadValue(String(item.qty));
+                        }}
+                        className="px-2 py-0.5 text-sm font-extrabold text-indigo-700 hover:bg-indigo-50 active:bg-indigo-100 min-w-[1.8rem] text-center underline decoration-indigo-300 underline-offset-2 transition-colors"
+                        title="點擊開啟螢幕觸控數字鍵盤"
+                      >
+                        {item.qty}
+                      </button>
                       <button 
                         onClick={() => updateQty(item.productId, item.qty + 1)}
                         className="p-1.5 hover:bg-gray-100 text-gray-600 active:bg-gray-200"
@@ -1130,6 +1144,105 @@ export default function POSPage({ user, apiUrl }) {
                     <span>儲存並即時生效</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 觸控專用數字鍵盤彈窗 (Touch Numpad Modal - 相容藍芽掃碼槍) */}
+      {numpadTarget && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl border border-gray-100 space-y-4">
+            {/* 標頭 */}
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <div>
+                <h3 className="font-extrabold text-gray-900 text-base truncate max-w-[220px]">{numpadTarget.productName}</h3>
+                <span className="text-xs text-gray-400 font-bold">修改購買數量</span>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setNumpadTarget(null)} 
+                className="p-1.5 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 螢幕顯示輸入區域 */}
+            <div className="bg-gray-900 text-white rounded-2xl p-3.5 text-right font-mono shadow-inner">
+              <div className="text-[10px] text-gray-400 font-bold mb-0.5">預計修改數量</div>
+              <div className="text-3xl font-black text-emerald-400 tracking-wider">
+                {numpadValue || '0'} <span className="text-xs text-gray-400 font-sans">件</span>
+              </div>
+            </div>
+
+            {/* 常用數量快選按鈕 (一鍵加量) */}
+            <div className="grid grid-cols-4 gap-1.5">
+              {[1, 5, 10, 20].map(add => (
+                <button
+                  key={add}
+                  type="button"
+                  onClick={() => {
+                    const curr = parseInt(numpadValue || '0', 10);
+                    setNumpadValue(String(curr + add));
+                  }}
+                  className="py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold text-xs rounded-xl transition-colors active:scale-95 border border-indigo-100"
+                >
+                  +{add}
+                </button>
+              ))}
+            </div>
+
+            {/* 大字體九宮格觸控數字鍵盤 */}
+            <div className="grid grid-cols-3 gap-2">
+              {['1','2','3','4','5','6','7','8','9','C','0','⌫'].map(btn => (
+                <button
+                  key={btn}
+                  type="button"
+                  onClick={() => {
+                    if (btn === 'C') {
+                      setNumpadValue('');
+                    } else if (btn === '⌫') {
+                      setNumpadValue(prev => prev.slice(0, -1));
+                    } else {
+                      setNumpadValue(prev => (prev === '0' ? btn : prev + btn));
+                    }
+                  }}
+                  className={`py-3.5 rounded-2xl font-black text-xl transition-all active:scale-95 shadow-2xs border ${
+                    btn === 'C' ? 'bg-amber-100 border-amber-200 text-amber-800 hover:bg-amber-200' :
+                    btn === '⌫' ? 'bg-red-100 border-red-200 text-red-700 hover:bg-red-200' :
+                    'bg-gray-50 border-gray-200 text-gray-800 hover:bg-gray-100'
+                  }`}
+                >
+                  {btn}
+                </button>
+              ))}
+            </div>
+
+            {/* 操作按鈕 */}
+            <div className="flex gap-2 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setNumpadTarget(null)}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm rounded-xl transition-colors"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const finalQty = parseInt(numpadValue || '1', 10);
+                  if (finalQty > 0) {
+                    updateQty(numpadTarget.productId, finalQty);
+                  } else {
+                    removeItem(numpadTarget.productId);
+                  }
+                  setNumpadTarget(null);
+                }}
+                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md transition-all active:scale-98"
+              >
+                確認修改
               </button>
             </div>
           </div>
