@@ -328,7 +328,17 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                             const createInitRow = (p) => {
                                 const localPriceKey = `last_price_${p.id}`;
                                 const localPrice = safeLocalStorage.getItem(localPriceKey);
-                                let finalPrice = localPrice !== null ? Number(localPrice) : '';
+                                const pos = p.posSettings || {};
+                                const packSize = pos.packSize !== undefined && pos.packSize !== null ? pos.packSize : p.packSize;
+                                const bundleSize = Number(pos.bundleSize !== undefined && pos.bundleSize !== null ? pos.bundleSize : (p.bundleSize || packSize || 1));
+                                const isBundle = pos.isBundle !== undefined ? Boolean(pos.isBundle) : (p.isBundle !== undefined ? Boolean(p.isBundle) : bundleSize > 1);
+
+                                let rawCatalogPrice = Number(pos.price || p.singlePrice || p.single_price || p.price || p.defaultPrice || 0);
+                                let defaultSinglePrice = (isBundle && bundleSize > 1) ? (rawCatalogPrice / bundleSize) : rawCatalogPrice;
+                                defaultSinglePrice = Math.round(defaultSinglePrice * 100) / 100;
+
+                                let finalPrice = localPrice !== null && localPrice !== '' ? Number(localPrice) : defaultSinglePrice;
+
                                 return {
                                     id: p.id,
                                     name: p.name,
@@ -341,7 +351,10 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     price: finalPrice,
                                     subtotal: 0,
                                     sortWeight: p.sortWeight,
-                                    fromSheet: p._fromSheet
+                                    fromSheet: p._fromSheet,
+                                    isBundle,
+                                    bundleSize,
+                                    catalogPrice: rawCatalogPrice
                                 };
                             };
 
@@ -355,6 +368,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 newRows = sortedProducts.map(p => {
                                     const existing = existingMap[p.id];
                                     if (existing) {
+                                        const pos = p.posSettings || {};
+                                        const packSize = pos.packSize !== undefined && pos.packSize !== null ? pos.packSize : p.packSize;
+                                        const bundleSize = Number(pos.bundleSize !== undefined && pos.bundleSize !== null ? pos.bundleSize : (p.bundleSize || packSize || 1));
+                                        const isBundle = pos.isBundle !== undefined ? Boolean(pos.isBundle) : (p.isBundle !== undefined ? Boolean(p.isBundle) : bundleSize > 1);
+                                        let rawCatalogPrice = Number(pos.price || p.singlePrice || p.single_price || p.price || p.defaultPrice || 0);
+
                                         // Keep user inputs (picked, original, returns, price, subtotal), update inventory (stock, name)
                                         return {
                                             ...existing,
@@ -362,7 +381,10 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                             stock: Number(p.stock) || 0,
                                             originalStock: Number(p.originalStock) || 0,
                                             sortWeight: p.sortWeight,
-                                            fromSheet: p._fromSheet
+                                            fromSheet: p._fromSheet,
+                                            isBundle,
+                                            bundleSize,
+                                            catalogPrice: rawCatalogPrice
                                         };
                                     } else {
                                         return createInitRow(p);
@@ -380,15 +402,41 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     newRows = newRows.map(row => {
                                         const match = cloned.salesData.find(d => String(d.productId) === String(row.id));
                                         if (match) {
+                                            const isBundle = row.isBundle || (row.bundleSize && row.bundleSize > 1);
+                                            const bundleSize = Number(row.bundleSize || 1);
+                                            let rawPrice = Number(match.unitPrice || 0);
+                                            let loadUnitPrice = rawPrice;
+
+                                            if (isBundle && bundleSize > 1) {
+                                                const catalogPackagePrice = Number(row.catalogPrice || row.price || 0);
+                                                const threshold = catalogPackagePrice > 0 ? (catalogPackagePrice / 1.5) : 30;
+                                                if (rawPrice >= threshold) {
+                                                    loadUnitPrice = rawPrice / bundleSize;
+                                                }
+                                            }
+
+                                            loadUnitPrice = Math.round(loadUnitPrice * 100) / 100;
+
                                             const updated = {
                                                 ...row,
                                                 picked: match.picked,
                                                 original: match.original,
                                                 returns: match.returns,
-                                                price: match.unitPrice
+                                                price: loadUnitPrice
                                             };
                                             updated.sold = getSafeNum(updated.picked) + getSafeNum(updated.original) - getSafeNum(updated.returns);
-                                            updated.subtotal = updated.sold * getSafeNum(updated.price);
+                                            
+                                            if (isBundle && bundleSize > 1 && updated.sold > 0 && (updated.sold % bundleSize === 0)) {
+                                                const catalogPackagePrice = Number(row.catalogPrice || row.price || 0);
+                                                if (catalogPackagePrice > 0) {
+                                                    updated.subtotal = (updated.sold / bundleSize) * catalogPackagePrice;
+                                                } else {
+                                                    updated.subtotal = Math.round(updated.sold * getSafeNum(updated.price) * 100) / 100;
+                                                }
+                                            } else {
+                                                updated.subtotal = Math.round(updated.sold * getSafeNum(updated.price) * 100) / 100;
+                                            }
+
                                             return updated;
                                         }
                                         return row;
@@ -539,7 +587,22 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
             // 6. Calculate Sold & Subtotal (Crucial: Use getSafeNum to avoid string concatenation)
             updated.sold = getSafeNum(updated.picked) + getSafeNum(updated.original) - getSafeNum(updated.returns);
-            updated.subtotal = updated.sold * (getSafeNum(updated.price) || 0);
+            
+            const bundleSize = Number(r.bundleSize || 1);
+            const isBundle = r.isBundle || bundleSize > 1;
+            const currentPrice = getSafeNum(updated.price);
+
+            if (isBundle && bundleSize > 1 && updated.sold > 0 && (updated.sold % bundleSize === 0)) {
+                const catalogPackagePrice = Number(r.catalogPrice || 0);
+                const expectedSinglePrice = catalogPackagePrice > 0 ? (catalogPackagePrice / bundleSize) : 0;
+                if (expectedSinglePrice > 0 && Math.abs(currentPrice - expectedSinglePrice) < 0.05) {
+                    updated.subtotal = (updated.sold / bundleSize) * catalogPackagePrice;
+                } else {
+                    updated.subtotal = Math.round(updated.sold * currentPrice * 100) / 100;
+                }
+            } else {
+                updated.subtotal = Math.round(updated.sold * currentPrice * 100) / 100;
+            }
 
             return updated;
         }));
