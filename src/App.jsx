@@ -935,7 +935,7 @@ function AppContent() {
                     <>
                         {page === 'pos' && (
                             <ErrorBoundary>
-                                <POSPage user={user} apiUrl={GAS_API_URL} />
+                                <POSPage user={user} apiUrl={GAS_API_URL} isHeaderHidden={isHeaderForcedHidden} />
                             </ErrorBoundary>
                         )}
                         {page === 'sales' && (

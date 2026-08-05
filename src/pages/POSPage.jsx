@@ -162,7 +162,7 @@ function getItemSubtotal(item) {
   return (singlePrice * qty) - (item.discountAmount || 0);
 }
 
-export default function POSPage({ user, apiUrl }) {
+export default function POSPage({ user, apiUrl, isHeaderHidden }) {
   const { cartItems, addItem, updateQty, removeItem, clear } = useCart();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -389,7 +389,7 @@ export default function POSPage({ user, apiUrl }) {
   };
 
   return (
-    <div className="flex flex-1 h-full min-h-0 bg-gray-100 overflow-hidden font-sans">
+    <div className={`flex w-full bg-gray-100 overflow-hidden font-sans transition-all duration-300 ${isHeaderHidden ? 'h-screen' : 'h-[calc(100vh-76px)]'}`}>
       {/* 隱藏列印區域 */}
       <POSReceiptPrint receiptData={lastReceipt} />
 
