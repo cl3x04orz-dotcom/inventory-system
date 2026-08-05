@@ -64,6 +64,52 @@ function calculateCartSubtotal(cartItems) {
   return totalSum;
 }
 
+/**
+ * 計算購物車中各單項商品分配到的折抵後金額與省下金額
+ */
+function getItemDiscountedInfo(item, cartItems) {
+  const originalTotal = Number(item.unitPrice || 0) * Number(item.qty || 0);
+  const settings = item.volume_pricing_settings;
+
+  if (!item.has_volume_pricing || !settings || !Number(settings.target_quantity) || !Number(settings.package_price)) {
+    return { discountedTotal: originalTotal, savings: 0 };
+  }
+
+  const targetQty = Number(settings.target_quantity);
+  const packagePrice = Number(settings.package_price);
+
+  // 找出購物車中所有同規則商品
+  const groupItems = cartItems.filter(i => 
+    i.has_volume_pricing && 
+    i.volume_pricing_settings &&
+    Number(i.volume_pricing_settings.target_quantity) === targetQty &&
+    Number(i.volume_pricing_settings.package_price) === packagePrice
+  );
+
+  const totalGroupQty = groupItems.reduce((s, i) => s + Number(i.qty || 0), 0);
+  if (totalGroupQty < targetQty) {
+    return { discountedTotal: originalTotal, savings: 0 };
+  }
+
+  const groupBaseSum = groupItems.reduce((s, i) => s + (Number(i.qty || 0) * Number(i.unitPrice || 0)), 0);
+  const fullBundles = Math.floor(totalGroupQty / targetQty);
+  const remainderQty = totalGroupQty % targetQty;
+  const avgUnitPrice = totalGroupQty > 0 ? (groupBaseSum / totalGroupQty) : 0;
+  
+  const groupDiscountedSum = (fullBundles * packagePrice) + (remainderQty * avgUnitPrice);
+  const totalGroupSavings = groupBaseSum - groupDiscountedSum;
+
+  if (totalGroupSavings <= 0 || groupBaseSum <= 0) {
+    return { discountedTotal: originalTotal, savings: 0 };
+  }
+
+  // 依金額比例分攤折抵金額
+  const itemShareSavings = Math.round(totalGroupSavings * (originalTotal / groupBaseSum));
+  const discountedTotal = Math.max(0, originalTotal - itemShareSavings);
+
+  return { discountedTotal, savings: itemShareSavings };
+}
+
 function getItemSubtotal(item) {
   const qty = Number(item.qty || 0);
   const singlePrice = Number(item.unitPrice || 0);
@@ -369,10 +415,11 @@ export default function POSPage({ user, apiUrl }) {
                 return (
                   <div
                     key={pId}
-                    className="bg-white p-4 rounded-2xl border-2 border-gray-100 hover:border-indigo-500 hover:shadow-lg transition-all text-left flex flex-col justify-between h-36 md:h-40 group relative overflow-hidden shadow-xs"
+                    onClick={() => handleAddToCart(product)}
+                    className="bg-white p-4 rounded-2xl border-2 border-gray-100 hover:border-indigo-500 hover:shadow-lg transition-all text-left flex flex-col justify-between h-36 md:h-40 group relative overflow-hidden shadow-xs cursor-pointer select-none active:scale-98"
                   >
                     <div className="flex justify-between items-start">
-                      <div className="space-y-1 flex-1 pr-1 cursor-pointer" onClick={() => handleAddToCart(product)}>
+                      <div className="space-y-1 flex-1 pr-1">
                         <div className="font-extrabold text-gray-900 text-sm md:text-base leading-tight group-hover:text-indigo-600 line-clamp-2">
                           {pName}
                         </div>
@@ -404,7 +451,7 @@ export default function POSPage({ user, apiUrl }) {
                       </button>
                     </div>
 
-                    <div className="cursor-pointer" onClick={() => handleAddToCart(product)}>
+                    <div>
                       {/* 標籤顯示 (加大顯眼) */}
                       <div className="flex flex-wrap gap-1.5 mb-1.5">
                         {isBundle && (
@@ -466,8 +513,8 @@ export default function POSPage({ user, apiUrl }) {
             </div>
           ) : (
             cartItems.map((item) => {
-              const itemTotal = getItemSubtotal(item);
-              const originalTotal = item.unitPrice * item.qty;
+              const originalTotal = (item.unitPrice || 0) * (item.qty || 0);
+              const { discountedTotal, savings } = getItemDiscountedInfo(item, cartItems);
 
               return (
                 <div key={item.productId} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-200 hover:border-indigo-300 transition-colors">
@@ -490,7 +537,7 @@ export default function POSPage({ user, apiUrl }) {
                     </div>
                   </div>
 
-                  {/* 數量調整與小計 */}
+                  {/* 數量調整與小計 (含單項劃線原價與實收特價) */}
                   <div className="flex items-center space-x-2">
                     <div className="flex items-center border border-gray-300 rounded-xl bg-white overflow-hidden shadow-2xs">
                       <button 
@@ -507,8 +554,16 @@ export default function POSPage({ user, apiUrl }) {
                         <Plus className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className="min-w-[3.8rem] text-right font-mono font-black text-gray-900 text-base">
-                      ${originalTotal.toLocaleString()}
+                    <div className="min-w-[4.2rem] text-right font-mono">
+                      {savings > 0 ? (
+                        <>
+                          <div className="text-[11px] text-gray-400 font-bold line-through">${originalTotal.toLocaleString()}</div>
+                          <div className="font-black text-emerald-600 text-base md:text-lg">${discountedTotal.toLocaleString()}</div>
+                          <div className="text-[10px] text-emerald-600 font-extrabold font-sans">(省${savings.toLocaleString()})</div>
+                        </>
+                      ) : (
+                        <div className="font-black text-gray-900 text-base md:text-lg">${originalTotal.toLocaleString()}</div>
+                      )}
                     </div>
                   </div>
                 </div>
