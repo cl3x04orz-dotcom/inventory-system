@@ -275,22 +275,26 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                     if (clonedRaw && !isBackgroundSync) {
                         try {
                             const cloned = JSON.parse(clonedRaw);
+                            // cashCounts 復原邏輯：若 DB 有存面額資料則 100% 忠實帶入，不介入修改；若完全無面額資料才用 totalCash 貪婪分配做 fallback
+                            const hasCashCountData = cloned.cashCounts && Object.values(cloned.cashCounts).some(v => Number(v) > 0);
+                            if (hasCashCountData) {
+                                setCashCounts(prev => ({ 1000: 0, 500: 0, 100: 0, 50: 0, 10: 0, 5: 0, 1: 0, ...cloned.cashCounts }));
+                            } else if (cloned.totalCash > 0) {
+                                const totalWithReserve = Number(cloned.totalCash) + Number(cloned.reserve || 0);
+                                let remainder = Math.round(totalWithReserve);
+                                const thousands = Math.floor(remainder / 1000); remainder %= 1000;
+                                const fiveHundreds = Math.floor(remainder / 500); remainder %= 500;
+                                const hundreds = Math.floor(remainder / 100); remainder %= 100;
+                                const fifties = Math.floor(remainder / 50); remainder %= 50;
+                                const tens = Math.floor(remainder / 10); remainder %= 10;
+                                const fives = Math.floor(remainder / 5); remainder %= 5;
+                                const ones = remainder;
+                                setCashCounts({ 1000: thousands, 500: fiveHundreds, 100: hundreds, 50: fifties, 10: tens, 5: fives, 1: ones });
+                            }
                             if (cloned.customer) setLocation(cloned.customer);
                             if (cloned.salesRep) setTargetSalesRep(cloned.salesRep);
                             if (cloned.paymentMethod) setPaymentType(cloned.paymentMethod);
                             if (cloned.reserve !== undefined) setReserve(Number(cloned.reserve));
-                            // cashCounts 復原邏輯：若 DB 有存面額資料則直接帶入；否則用 totalCash 做 fallback
-                            const hasCashCountData = cloned.cashCounts && Object.values(cloned.cashCounts).some(v => Number(v) > 0);
-                            if (hasCashCountData) {
-                                setCashCounts(prev => ({ ...prev, ...cloned.cashCounts }));
-                            } else if (cloned.totalCash > 0) {
-                                // 舊單沒存面額明細，用千元面額填入 totalCash+reserve 讓使用者看到原始金額（可手動調整）
-                                const totalWithReserve = Number(cloned.totalCash) + Number(cloned.reserve || 0);
-                                const thousands = Math.floor(totalWithReserve / 1000);
-                                const remainder = totalWithReserve % 1000;
-                                const hundreds = Math.floor(remainder / 100);
-                                setCashCounts({ 1000: thousands, 500: 0, 100: hundreds, 50: 0, 10: 0, 5: 0, 1: 0 });
-                            }
                             if (cloned.expenses) setExpenses(prev => ({ ...prev, ...cloned.expenses }));
                             if (cloned.originalDate) setOriginalDate(cloned.originalDate);
                             if (cloned.originalSaleId) setOriginalSaleId(cloned.originalSaleId);
@@ -329,9 +333,9 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 const localPriceKey = `last_price_${p.id}`;
                                 const localPrice = safeLocalStorage.getItem(localPriceKey);
                                 const pos = p.posSettings || {};
-                                const packSize = pos.packSize !== undefined && pos.packSize !== null ? pos.packSize : p.packSize;
-                                const bundleSize = Number(pos.bundleSize !== undefined && pos.bundleSize !== null ? pos.bundleSize : (p.bundleSize || packSize || 1));
-                                const isBundle = pos.isBundle !== undefined ? Boolean(pos.isBundle) : (p.isBundle !== undefined ? Boolean(p.isBundle) : bundleSize > 1);
+                                // 嚴格判定：僅當 pos.isBundle 或 p.isBundle 明確為 true 時才視為捆裝
+                                const isBundle = pos.isBundle !== undefined ? Boolean(pos.isBundle) : Boolean(p.isBundle);
+                                const bundleSize = isBundle ? Number(pos.bundleSize !== undefined && pos.bundleSize !== null ? pos.bundleSize : (p.bundleSize || 1)) : 1;
 
                                 let rawCatalogPrice = Number(pos.price || p.singlePrice || p.single_price || p.price || p.defaultPrice || 0);
                                 let defaultSinglePrice = (isBundle && bundleSize > 1) ? (rawCatalogPrice / bundleSize) : rawCatalogPrice;
@@ -369,9 +373,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     const existing = existingMap[p.id];
                                     if (existing) {
                                         const pos = p.posSettings || {};
-                                        const packSize = pos.packSize !== undefined && pos.packSize !== null ? pos.packSize : p.packSize;
-                                        const bundleSize = Number(pos.bundleSize !== undefined && pos.bundleSize !== null ? pos.bundleSize : (p.bundleSize || packSize || 1));
-                                        const isBundle = pos.isBundle !== undefined ? Boolean(pos.isBundle) : (p.isBundle !== undefined ? Boolean(p.isBundle) : bundleSize > 1);
+                                        const isBundle = pos.isBundle !== undefined ? Boolean(pos.isBundle) : Boolean(p.isBundle);
+                                        const bundleSize = isBundle ? Number(pos.bundleSize !== undefined && pos.bundleSize !== null ? pos.bundleSize : (p.bundleSize || 1)) : 1;
                                         let rawCatalogPrice = Number(pos.price || p.singlePrice || p.single_price || p.price || p.defaultPrice || 0);
 
                                         // Keep user inputs (picked, original, returns, price, subtotal), update inventory (stock, name)
@@ -402,8 +405,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     newRows = newRows.map(row => {
                                         const match = cloned.salesData.find(d => String(d.productId) === String(row.id));
                                         if (match) {
-                                            const isBundle = row.isBundle || (row.bundleSize && row.bundleSize > 1);
-                                            const bundleSize = Number(row.bundleSize || 1);
+                                            const isBundle = Boolean(row.isBundle);
+                                            const bundleSize = isBundle ? Number(row.bundleSize || 1) : 1;
                                             let rawPrice = Number(match.unitPrice || 0);
                                             let loadUnitPrice = rawPrice;
 
@@ -588,8 +591,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             // 6. Calculate Sold & Subtotal (Crucial: Use getSafeNum to avoid string concatenation)
             updated.sold = getSafeNum(updated.picked) + getSafeNum(updated.original) - getSafeNum(updated.returns);
             
-            const bundleSize = Number(r.bundleSize || 1);
-            const isBundle = r.isBundle || bundleSize > 1;
+            const isBundle = Boolean(r.isBundle);
+            const bundleSize = isBundle ? Number(r.bundleSize || 1) : 1;
             const currentPrice = getSafeNum(updated.price);
 
             if (isBundle && bundleSize > 1 && updated.sold > 0 && (updated.sold % bundleSize === 0)) {
