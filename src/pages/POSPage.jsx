@@ -895,6 +895,7 @@ export default function POSPage({ user, apiUrl }) {
                   setSavingPosSettings(true);
                   try {
                     const updatedFields = {
+                      productId: editingPosProduct.id,
                       single_price: editingPosProduct.single_price !== '' && editingPosProduct.single_price !== null ? Number(editingPosProduct.single_price) : null,
                       price: editingPosProduct.price !== '' && editingPosProduct.price !== null ? Number(editingPosProduct.price) : null,
                       isBundle: Boolean(editingPosProduct.isBundle),
@@ -916,7 +917,7 @@ export default function POSPage({ user, apiUrl }) {
                       }
                     };
 
-                    await callGAS(apiUrl, 'updateProduct', { id: editingPosProduct.id, ...updatedFields }, user.token);
+                    await callGAS(apiUrl, 'updateProductDetails', updatedFields, user.token);
                     await fetchProducts();
                     setEditingPosProduct(null);
                   } catch (err) {
