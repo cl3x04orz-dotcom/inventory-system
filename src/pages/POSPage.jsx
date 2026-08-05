@@ -76,27 +76,26 @@ function calculateCartSubtotal(cartItems) {
 }
 
 /**
- * 計算購物車中各單項商品分配到的折抵後金額與省下金額 (同商品優先)
+ * 計算購物車中各單項商品分配到的折抵後金額與省下金額 (同商品優先，支援小數位 $18.33 與第4/5個散買原價展示)
  */
 function getItemDiscountedInfo(item, cartItems) {
   const originalTotal = Number(item.unitPrice || 0) * Number(item.qty || 0);
   const settings = item.volume_pricing_settings;
 
   if (!item.has_volume_pricing || !settings || !Number(settings.target_quantity) || !Number(settings.package_price)) {
-    return { discountedTotal: originalTotal, savings: 0 };
+    return { discountedTotal: originalTotal, savings: 0, formattedDiscountedTotal: `$${originalTotal.toLocaleString()}` };
   }
 
   const targetQty = Number(settings.target_quantity);
   const packagePrice = Number(settings.package_price);
-  const qty = Number(item.qty || 0);
+  const itemQty = Number(item.qty || 0);
   const unitPrice = Number(item.unitPrice || 0);
 
-  // 1. 同商品優先自組
-  const selfBundles = Math.floor(qty / targetQty);
-  const selfRemainder = qty % targetQty;
-  const selfSavings = (selfBundles * targetQty * unitPrice) - (selfBundles * packagePrice);
+  if (itemQty <= 0) {
+    return { discountedTotal: 0, savings: 0, formattedDiscountedTotal: '$0' };
+  }
 
-  // 找出同規則的其他商品
+  // 1. 找出購物車中所有同規則商品 (保持出現順序)
   const groupItems = cartItems.filter(i => 
     i.has_volume_pricing && 
     i.volume_pricing_settings &&
@@ -104,40 +103,57 @@ function getItemDiscountedInfo(item, cartItems) {
     Number(i.volume_pricing_settings.package_price) === packagePrice
   );
 
-  let crossShareSavings = 0;
-  if (selfRemainder > 0) {
-    let leftoverQtySum = 0;
-    let leftoverBaseSum = 0;
-    let myRemainderBase = selfRemainder * unitPrice;
+  // 2. 收集各商品散買剩餘量
+  let leftoverItems = [];
 
-    groupItems.forEach(i => {
-      const rem = Number(i.qty || 0) % targetQty;
-      leftoverQtySum += rem;
-      leftoverBaseSum += (rem * Number(i.unitPrice || 0));
+  groupItems.forEach(i => {
+    const q = Number(i.qty || 0);
+    leftoverItems.push({
+      productId: i.productId,
+      unitPrice: Number(i.unitPrice || 0),
+      remainderQty: q % targetQty
     });
+  });
 
-    if (leftoverQtySum >= targetQty) {
-      const crossBundles = Math.floor(leftoverQtySum / targetQty);
-      const crossRemainder = leftoverQtySum % targetQty;
-      const avgUnitPrice = leftoverQtySum > 0 ? (leftoverBaseSum / leftoverQtySum) : 0;
-      const leftoverDiscountedSum = (crossBundles * packagePrice) + (crossRemainder * avgUnitPrice);
-      const totalCrossSavings = leftoverBaseSum - leftoverDiscountedSum;
+  // 3. 計算跨商品散買可組出的組數 (crossBundles)
+  const totalLeftoverQty = leftoverItems.reduce((s, i) => s + i.remainderQty, 0);
+  const crossBundles = Math.floor(totalLeftoverQty / targetQty);
+  let remainingCrossBundledCap = crossBundles * targetQty;
 
-      if (totalCrossSavings > 0 && leftoverBaseSum > 0) {
-        crossShareSavings = Math.round(totalCrossSavings * (myRemainderBase / leftoverBaseSum));
-      }
+  // 4. 計算目前 item 的特價件數 (totalBundledQty) 與 散買原價件數 (extraOriginalQty)
+  const mySelfBundles = Math.floor(itemQty / targetQty);
+  const mySelfBundledQty = mySelfBundles * targetQty;
+
+  let myCrossBundledQty = 0;
+  for (const lo of leftoverItems) {
+    const capTake = Math.min(lo.remainderQty, remainingCrossBundledCap);
+    remainingCrossBundledCap -= capTake;
+
+    if (lo.productId === item.productId) {
+      myCrossBundledQty = capTake;
+      break;
     }
   }
 
-  const totalSavings = selfSavings + crossShareSavings;
+  const totalBundledQty = mySelfBundledQty + myCrossBundledQty;
+  const extraOriginalQty = itemQty - totalBundledQty;
 
-  if (totalSavings <= 0) {
-    return { discountedTotal: originalTotal, savings: 0 };
+  // 5. 金額精算 (特價單價如 55/3 = 18.333333...)
+  const bundledUnitPrice = packagePrice / targetQty;
+  const discountedTotal = (totalBundledQty * bundledUnitPrice) + (extraOriginalQty * unitPrice);
+  const savings = originalTotal - discountedTotal;
+
+  if (savings <= 0.001) {
+    return { discountedTotal: originalTotal, savings: 0, formattedDiscountedTotal: `$${originalTotal.toLocaleString()}` };
   }
 
-  const discountedTotal = Math.max(0, originalTotal - totalSavings);
+  // 6. 格式化輸出 (有小數點顯示 .2f 如 $18.33)
+  const hasDecimals = Math.abs(discountedTotal - Math.round(discountedTotal)) > 0.001;
+  const formattedDiscountedTotal = hasDecimals 
+    ? `$${discountedTotal.toFixed(2)}` 
+    : `$${Math.round(discountedTotal).toLocaleString()}`;
 
-  return { discountedTotal, savings: totalSavings };
+  return { discountedTotal, savings, formattedDiscountedTotal };
 }
 
 function getItemSubtotal(item) {
@@ -544,7 +560,7 @@ export default function POSPage({ user, apiUrl }) {
           ) : (
             cartItems.map((item) => {
               const originalTotal = (item.unitPrice || 0) * (item.qty || 0);
-              const { discountedTotal, savings } = getItemDiscountedInfo(item, cartItems);
+              const { savings, formattedDiscountedTotal } = getItemDiscountedInfo(item, cartItems);
 
               return (
                 <div key={item.productId} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-200 hover:border-indigo-300 transition-colors">
@@ -588,7 +604,7 @@ export default function POSPage({ user, apiUrl }) {
                       {savings > 0 ? (
                         <>
                           <div className="text-[11px] text-gray-400 font-bold line-through">${originalTotal.toLocaleString()}</div>
-                          <div className="font-black text-emerald-600 text-base md:text-lg">${discountedTotal.toLocaleString()}</div>
+                          <div className="font-black text-emerald-600 text-base md:text-lg">{formattedDiscountedTotal}</div>
                         </>
                       ) : (
                         <div className="font-black text-gray-900 text-base md:text-lg">${originalTotal.toLocaleString()}</div>
