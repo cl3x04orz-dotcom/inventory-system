@@ -9,22 +9,64 @@ import {
 } from 'lucide-react';
 
 /**
- * 前端計算單項商品的組合/多件優惠價
+ * 跨商品 Mix-and-Match 組合特價計算
  */
+function calculateCartSubtotal(cartItems) {
+  if (!Array.isArray(cartItems) || cartItems.length === 0) return 0;
+
+  let totalSum = 0;
+  const groups = {}; // Key: `${target_quantity}_${package_price}`
+  const normalItems = [];
+
+  cartItems.forEach(item => {
+    const qty = Number(item.qty || 0);
+    const unitPrice = Number(item.unitPrice || 0);
+    const settings = item.volume_pricing_settings;
+
+    if (item.has_volume_pricing && settings && Number(settings.target_quantity) > 0 && Number(settings.package_price) > 0) {
+      const key = `${settings.target_quantity}_${settings.package_price}`;
+      if (!groups[key]) {
+        groups[key] = {
+          targetQuantity: Number(settings.target_quantity),
+          packagePrice: Number(settings.package_price),
+          items: []
+        };
+      }
+      groups[key].items.push({ ...item, qty, unitPrice });
+    } else {
+      normalItems.push({ ...item, qty, unitPrice });
+    }
+  });
+
+  // 1. 一般商品計價
+  normalItems.forEach(item => {
+    totalSum += (item.qty * item.unitPrice) - (item.discountAmount || 0);
+  });
+
+  // 2. 多件特價商品（支援東湊西湊跨品項混搭）
+  Object.values(groups).forEach(group => {
+    const { targetQuantity, packagePrice, items } = group;
+    const totalGroupQty = items.reduce((s, i) => s + i.qty, 0);
+    const groupBaseSum = items.reduce((s, i) => s + (i.qty * i.unitPrice), 0);
+
+    if (totalGroupQty >= targetQuantity) {
+      const fullBundles = Math.floor(totalGroupQty / targetQuantity);
+      const remainderQty = totalGroupQty % targetQuantity;
+      const avgUnitPrice = totalGroupQty > 0 ? (groupBaseSum / totalGroupQty) : 0;
+      
+      const discountedSubtotal = (fullBundles * packagePrice) + (remainderQty * avgUnitPrice);
+      totalSum += Math.round(discountedSubtotal);
+    } else {
+      totalSum += groupBaseSum;
+    }
+  });
+
+  return totalSum;
+}
+
 function getItemSubtotal(item) {
   const qty = Number(item.qty || 0);
   const singlePrice = Number(item.unitPrice || 0);
-  const settings = item.volume_pricing_settings;
-
-  if (item.has_volume_pricing && settings) {
-    const targetQty = Number(settings.target_quantity) || 0;
-    const packagePrice = Number(settings.package_price) || 0;
-    if (targetQty > 0 && packagePrice > 0) {
-      const groupCount = Math.floor(qty / targetQty);
-      const remainderCount = qty % targetQty;
-      return (groupCount * packagePrice) + (remainderCount * singlePrice);
-    }
-  }
   return (singlePrice * qty) - (item.discountAmount || 0);
 }
 
@@ -60,20 +102,21 @@ export default function POSPage({ user, apiUrl }) {
       if (Array.isArray(res)) {
         let mapped = res.map(p => {
           const pos = p.posSettings || {};
+          // 嚴格規定：僅當 posSettings 中明確有 isBundle === true 或 has_volume_pricing === true 時才開啟標籤
           return {
             ...p,
             isActive: pos.isActive !== undefined ? pos.isActive : p.isActive,
-            single_price: pos.price !== undefined && pos.price !== null ? pos.price : p.single_price,
-            price: pos.price !== undefined && pos.price !== null ? pos.price : p.price,
-            isBundle: pos.isBundle !== undefined ? pos.isBundle : p.isBundle,
-            bundleSize: pos.packSize !== undefined && pos.packSize !== null ? pos.packSize : p.bundleSize,
-            packSize: pos.packSize !== undefined && pos.packSize !== null ? pos.packSize : p.packSize,
+            single_price: pos.price !== undefined && pos.price !== null ? pos.price : (p.single_price || p.price || 0),
+            price: pos.price !== undefined && pos.price !== null ? pos.price : (p.price || p.single_price || 0),
+            isBundle: pos.isBundle !== undefined ? Boolean(pos.isBundle) : false,
+            bundleSize: pos.packSize !== undefined && pos.packSize !== null ? Number(pos.packSize) : 1,
+            packSize: pos.packSize !== undefined && pos.packSize !== null ? Number(pos.packSize) : 1,
             sortWeight: pos.sortWeight !== undefined && pos.sortWeight !== null ? pos.sortWeight : p.sortWeight,
             has_flavor_attributes: pos.has_flavor_attributes !== undefined ? pos.has_flavor_attributes : p.has_flavor_attributes,
             flavor_choices: pos.flavor_choices !== undefined ? pos.flavor_choices : p.flavor_choices,
             maxTotalQty: pos.maxTotalQty !== undefined ? pos.maxTotalQty : p.maxTotalQty,
-            has_volume_pricing: pos.has_volume_pricing !== undefined ? pos.has_volume_pricing : p.has_volume_pricing,
-            volume_pricing_settings: pos.volume_pricing_settings !== undefined ? pos.volume_pricing_settings : p.volume_pricing_settings,
+            has_volume_pricing: pos.has_volume_pricing !== undefined ? Boolean(pos.has_volume_pricing) : false,
+            volume_pricing_settings: pos.volume_pricing_settings !== undefined ? pos.volume_pricing_settings : null,
           };
         }).filter(p => p.isActive !== false);
 
@@ -123,8 +166,8 @@ export default function POSPage({ user, apiUrl }) {
       cost: Number(product.price || product.defaultPrice || 0),
       capacity: product.capacity || '',
       category: product.category || '',
-      has_volume_pricing: Boolean(product.has_volume_pricing || product.hasVolumePricing),
-      volume_pricing_settings: product.volume_pricing_settings || product.volumePricingSettings || null,
+      has_volume_pricing: Boolean(product.has_volume_pricing),
+      volume_pricing_settings: product.volume_pricing_settings || null,
       isBundle: Boolean(product.isBundle),
       bundleSize: Number(product.bundleSize || 1),
       packSize: Number(product.packSize || 1)
@@ -132,9 +175,9 @@ export default function POSPage({ user, apiUrl }) {
     addItem(normalizedProduct);
   };
 
-  // Totals Calculation
+  // Totals Calculation (與跨商品 Mix-and-Match 組合特價演算法對齊)
   const subtotal = useMemo(() => {
-    return cartItems.reduce((sum, item) => sum + getItemSubtotal(item), 0);
+    return calculateCartSubtotal(cartItems);
   }, [cartItems]);
 
   const receivedAmount = Number(receivedAmountInput) || 0;
@@ -437,9 +480,9 @@ export default function POSPage({ user, apiUrl }) {
                           捆裝{item.bundleSize}入
                         </span>
                       )}
-                      {hasBundleDiscount && (
+                      {item.has_volume_pricing && (
                         <span className="bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap">
-                          多件特價
+                          {item.volume_pricing_settings?.target_quantity ? `滿${item.volume_pricing_settings.target_quantity}件特價` : '多件特價'}
                         </span>
                       )}
                     </div>
