@@ -5,7 +5,7 @@ import { POSReceiptPrint } from '../components/POSReceiptPrint';
 import { 
   ShoppingCart, Trash2, Plus, Minus, CreditCard, DollarSign, 
   Search, RefreshCw, CheckCircle, Package, Tag, Layers,
-  FileText, Smartphone, Building2, Heart, Receipt, Delete
+  FileText, Smartphone, Building2, Heart, Receipt, Delete, Settings, X, Save
 } from 'lucide-react';
 
 /**
@@ -41,6 +41,10 @@ export default function POSPage({ user, apiUrl }) {
   const [receivedAmountInput, setReceivedAmountInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [lastReceipt, setLastReceipt] = useState(null);
+
+  // POS Product Settings Modal State
+  const [editingPosProduct, setEditingPosProduct] = useState(null);
+  const [savingPosSettings, setSavingPosSettings] = useState(false);
 
   // E-Invoice State
   const [invoiceType, setInvoiceType] = useState('paper'); // 'paper' | 'mobile' | 'taxId' | 'donate'
@@ -320,21 +324,44 @@ export default function POSPage({ user, apiUrl }) {
                   : null;
 
                 return (
-                  <button
+                  <div
                     key={pId}
-                    onClick={() => handleAddToCart(product)}
-                    className="bg-white p-3 rounded-xl border border-gray-200 hover:border-indigo-500 hover:shadow-md transition-all text-left flex flex-col justify-between h-32 group relative overflow-hidden active:scale-95"
+                    className="bg-white p-3 rounded-xl border border-gray-200 hover:border-indigo-500 hover:shadow-md transition-all text-left flex flex-col justify-between h-32 group relative overflow-hidden"
                   >
-                    <div className="space-y-1">
-                      <div className="font-bold text-gray-800 text-xs line-clamp-2 leading-snug group-hover:text-indigo-600">
-                        {pName}
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-1 flex-1 pr-1 cursor-pointer" onClick={() => handleAddToCart(product)}>
+                        <div className="font-bold text-gray-800 text-xs line-clamp-2 leading-snug group-hover:text-indigo-600">
+                          {pName}
+                        </div>
+                        <div className="text-[10px] text-gray-400 font-medium">
+                          {isBundle ? `1組(${bundleSize}入)` : (product.capacity || '')}
+                        </div>
                       </div>
-                      <div className="text-[10px] text-gray-400 font-medium">
-                        {isBundle ? `1組(${bundleSize}入)` : (product.capacity || '')}
-                      </div>
+
+                      {/* ⚙️ 門市 POS 自訂特價與屬性設定按鈕 */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingPosProduct({
+                            id: product.id,
+                            name: pName,
+                            single_price: price,
+                            price: price,
+                            isBundle: isBundle,
+                            bundleSize: bundleSize,
+                            has_volume_pricing: hasVolume,
+                            volume_pricing_settings: volumeSettings || { target_quantity: '', package_price: '' }
+                          });
+                        }}
+                        className="p-1 rounded-lg hover:bg-indigo-50 text-gray-400 hover:text-indigo-600 transition-colors z-10"
+                        title="自訂 POS 專屬特價與屬性"
+                      >
+                        <Settings className="w-3.5 h-3.5" />
+                      </button>
                     </div>
 
-                    <div>
+                    <div className="cursor-pointer" onClick={() => handleAddToCart(product)}>
                       {/* 標籤顯示 */}
                       <div className="flex flex-wrap gap-1 mb-1">
                         {isBundle && (
@@ -360,7 +387,7 @@ export default function POSPage({ user, apiUrl }) {
                         </span>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -684,6 +711,232 @@ export default function POSPage({ user, apiUrl }) {
                   <>
                     <CheckCircle className="w-5 h-5" />
                     <span>確認完成結帳</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 自訂 POS 專屬特價與屬性 Modal */}
+      {editingPosProduct && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl border border-gray-100 flex flex-col gap-4 animate-fade-in">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                  <Settings className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-base">門市 POS 自訂特價與屬性</h3>
+                  <p className="text-xs text-gray-500 font-medium truncate max-w-[240px]">{editingPosProduct.name}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setEditingPosProduct(null)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* 1. POS 售價 */}
+              <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 space-y-1.5">
+                <label className="font-bold text-gray-700 flex items-center gap-1.5">
+                  <DollarSign className="w-4 h-4 text-emerald-600" />
+                  <span>POS 專屬售價</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-gray-400 text-sm">$</span>
+                  <input
+                    type="number"
+                    className="w-full p-2.5 bg-white border border-gray-300 rounded-xl font-mono font-bold text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="請輸入單價"
+                    value={editingPosProduct.single_price ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEditingPosProduct(prev => ({
+                        ...prev,
+                        single_price: val,
+                        price: val
+                      }));
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* 2. 捆裝設定 */}
+              <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="font-bold text-gray-700 flex items-center gap-1.5 cursor-pointer">
+                    <Package className="w-4 h-4 text-blue-600" />
+                    <span>啟用捆裝銷售 (Bundle)</span>
+                  </label>
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
+                    checked={Boolean(editingPosProduct.isBundle)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setEditingPosProduct(prev => ({
+                        ...prev,
+                        isBundle: checked,
+                        bundleSize: checked ? (prev.bundleSize || 2) : 1
+                      }));
+                    }}
+                  />
+                </div>
+
+                {editingPosProduct.isBundle && (
+                  <div className="flex items-center gap-2 pt-1 animate-fade-in">
+                    <span className="text-gray-600 font-bold whitespace-nowrap">整組入數：</span>
+                    <input
+                      type="number"
+                      min="2"
+                      className="w-full p-2 bg-white border border-gray-300 rounded-xl font-mono font-bold text-center text-sm text-gray-800"
+                      placeholder="例：4"
+                      value={editingPosProduct.bundleSize ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditingPosProduct(prev => ({
+                          ...prev,
+                          bundleSize: val !== '' ? Number(val) : ''
+                        }));
+                      }}
+                    />
+                    <span className="text-gray-500 font-bold">入/組</span>
+                  </div>
+                )}
+              </div>
+
+              {/* 3. 多件特價設定 */}
+              <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="font-bold text-gray-700 flex items-center gap-1.5 cursor-pointer">
+                    <Tag className="w-4 h-4 text-amber-600" />
+                    <span>啟用多件特價 (滿幾件特價)</span>
+                  </label>
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
+                    checked={Boolean(editingPosProduct.has_volume_pricing)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setEditingPosProduct(prev => ({
+                        ...prev,
+                        has_volume_pricing: checked
+                      }));
+                    }}
+                  />
+                </div>
+
+                {editingPosProduct.has_volume_pricing && (
+                  <div className="grid grid-cols-2 gap-2 pt-1 animate-fade-in">
+                    <div>
+                      <span className="text-gray-500 text-[10px] font-bold block mb-1">滿幾件享特價</span>
+                      <input
+                        type="number"
+                        min="2"
+                        className="w-full p-2 bg-white border border-gray-300 rounded-xl font-mono font-bold text-center text-sm text-gray-800"
+                        placeholder="例：3"
+                        value={editingPosProduct.volume_pricing_settings?.target_quantity ?? ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditingPosProduct(prev => ({
+                            ...prev,
+                            volume_pricing_settings: {
+                              ...prev.volume_pricing_settings,
+                              target_quantity: val !== '' ? Number(val) : ''
+                            }
+                          }));
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <span className="text-gray-500 text-[10px] font-bold block mb-1">特價總金額 ($)</span>
+                      <input
+                        type="number"
+                        min="1"
+                        className="w-full p-2 bg-white border border-gray-300 rounded-xl font-mono font-bold text-center text-sm text-gray-800"
+                        placeholder="例：55"
+                        value={editingPosProduct.volume_pricing_settings?.package_price ?? ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditingPosProduct(prev => ({
+                            ...prev,
+                            volume_pricing_settings: {
+                              ...prev.volume_pricing_settings,
+                              package_price: val !== '' ? Number(val) : ''
+                            }
+                          }));
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 儲存按鈕 */}
+            <div className="flex gap-2 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setEditingPosProduct(null)}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-colors"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={savingPosSettings}
+                onClick={async () => {
+                  setSavingPosSettings(true);
+                  try {
+                    const updatedFields = {
+                      single_price: editingPosProduct.single_price !== '' && editingPosProduct.single_price !== null ? Number(editingPosProduct.single_price) : null,
+                      price: editingPosProduct.price !== '' && editingPosProduct.price !== null ? Number(editingPosProduct.price) : null,
+                      isBundle: Boolean(editingPosProduct.isBundle),
+                      bundleSize: editingPosProduct.isBundle ? Number(editingPosProduct.bundleSize || 1) : 1,
+                      has_volume_pricing: Boolean(editingPosProduct.has_volume_pricing),
+                      volume_pricing_settings: editingPosProduct.has_volume_pricing ? {
+                        target_quantity: Number(editingPosProduct.volume_pricing_settings?.target_quantity || 0),
+                        package_price: Number(editingPosProduct.volume_pricing_settings?.package_price || 0)
+                      } : null,
+                      posSettings: {
+                        price: editingPosProduct.single_price !== '' && editingPosProduct.single_price !== null ? Number(editingPosProduct.single_price) : null,
+                        isBundle: Boolean(editingPosProduct.isBundle),
+                        packSize: editingPosProduct.isBundle ? Number(editingPosProduct.bundleSize || 1) : 1,
+                        has_volume_pricing: Boolean(editingPosProduct.has_volume_pricing),
+                        volume_pricing_settings: editingPosProduct.has_volume_pricing ? {
+                          target_quantity: Number(editingPosProduct.volume_pricing_settings?.target_quantity || 0),
+                          package_price: Number(editingPosProduct.volume_pricing_settings?.package_price || 0)
+                        } : null
+                      }
+                    };
+
+                    await callGAS(apiUrl, 'updateProduct', { id: editingPosProduct.id, ...updatedFields }, user.token);
+                    await fetchProducts();
+                    setEditingPosProduct(null);
+                  } catch (err) {
+                    console.error('Failed to update product POS settings:', err);
+                    alert('儲存失敗：' + (err.message || '請重試'));
+                  } finally {
+                    setSavingPosSettings(false);
+                  }
+                }}
+                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-1.5"
+              >
+                {savingPosSettings ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>儲存中...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>儲存並即時生效</span>
                   </>
                 )}
               </button>
