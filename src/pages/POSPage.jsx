@@ -180,9 +180,10 @@ export default function POSPage({ user, apiUrl }) {
   const [editingPosProduct, setEditingPosProduct] = useState(null);
   const [savingPosSettings, setSavingPosSettings] = useState(false);
 
-  // Touch Numpad Modal State (藍芽掃碼槍防呆觸控數字鍵盤)
+  // Touch Numpad Modal State (藍芽掃碼槍防呆觸控數字鍵盤，支援首字覆蓋)
   const [numpadTarget, setNumpadTarget] = useState(null);
   const [numpadValue, setNumpadValue] = useState('');
+  const [isFirstKey, setIsFirstKey] = useState(true);
 
   // E-Invoice State
   const [invoiceType, setInvoiceType] = useState('paper'); // 'paper' | 'mobile' | 'taxId' | 'donate'
@@ -388,7 +389,7 @@ export default function POSPage({ user, apiUrl }) {
   };
 
   return (
-    <div className="flex h-[calc(100vh-76px)] bg-gray-100 overflow-hidden font-sans">
+    <div className="flex flex-1 h-full min-h-0 bg-gray-100 overflow-hidden font-sans">
       {/* 隱藏列印區域 */}
       <POSReceiptPrint receiptData={lastReceipt} />
 
@@ -601,6 +602,7 @@ export default function POSPage({ user, apiUrl }) {
                         onClick={() => {
                           setNumpadTarget(item);
                           setNumpadValue(String(item.qty));
+                          setIsFirstKey(true);
                         }}
                         className="px-2 py-0.5 text-sm font-extrabold text-indigo-700 hover:bg-indigo-50 active:bg-indigo-100 min-w-[1.8rem] text-center underline decoration-indigo-300 underline-offset-2 transition-colors"
                         title="點擊開啟螢幕觸控數字鍵盤"
@@ -1169,11 +1171,11 @@ export default function POSPage({ user, apiUrl }) {
               </button>
             </div>
 
-            {/* 螢幕顯示輸入區域 */}
-            <div className="bg-gray-900 text-white rounded-2xl p-3.5 text-right font-mono shadow-inner">
-              <div className="text-[10px] text-gray-400 font-bold mb-0.5">預計修改數量</div>
-              <div className="text-3xl font-black text-emerald-400 tracking-wider">
-                {numpadValue || '0'} <span className="text-xs text-gray-400 font-sans">件</span>
+            {/* 螢幕顯示輸入區域 (亮色極簡高對比風格) */}
+            <div className="bg-indigo-50/90 border-2 border-indigo-200 text-indigo-950 rounded-2xl p-4 text-right font-mono shadow-inner">
+              <div className="text-xs text-indigo-600 font-extrabold mb-1">預計修改數量</div>
+              <div className="text-4xl font-black text-indigo-700 tracking-wider">
+                {numpadValue || '0'} <span className="text-sm text-indigo-500 font-sans">件</span>
               </div>
             </div>
 
@@ -1186,15 +1188,16 @@ export default function POSPage({ user, apiUrl }) {
                   onClick={() => {
                     const curr = parseInt(numpadValue || '0', 10);
                     setNumpadValue(String(curr + add));
+                    setIsFirstKey(false);
                   }}
-                  className="py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold text-xs rounded-xl transition-colors active:scale-95 border border-indigo-100"
+                  className="py-2.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-extrabold text-xs rounded-xl transition-colors active:scale-95 border border-indigo-200"
                 >
                   +{add}
                 </button>
               ))}
             </div>
 
-            {/* 大字體九宮格觸控數字鍵盤 */}
+            {/* 大字體九宮格觸控數字鍵盤 (按第一個數字鍵直接覆蓋取代) */}
             <div className="grid grid-cols-3 gap-2">
               {['1','2','3','4','5','6','7','8','9','C','0','⌫'].map(btn => (
                 <button
@@ -1203,10 +1206,20 @@ export default function POSPage({ user, apiUrl }) {
                   onClick={() => {
                     if (btn === 'C') {
                       setNumpadValue('');
+                      setIsFirstKey(true);
                     } else if (btn === '⌫') {
-                      setNumpadValue(prev => prev.slice(0, -1));
+                      setNumpadValue(prev => {
+                        const nextVal = prev.slice(0, -1);
+                        if (nextVal.length === 0) setIsFirstKey(true);
+                        return nextVal;
+                      });
                     } else {
-                      setNumpadValue(prev => (prev === '0' ? btn : prev + btn));
+                      if (isFirstKey) {
+                        setNumpadValue(btn);
+                        setIsFirstKey(false);
+                      } else {
+                        setNumpadValue(prev => (prev === '0' ? btn : prev + btn));
+                      }
                     }
                   }}
                   className={`py-3.5 rounded-2xl font-black text-xl transition-all active:scale-95 shadow-2xs border ${
