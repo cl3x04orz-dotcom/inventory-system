@@ -589,7 +589,6 @@ export default function POSPage({ user, apiUrl }) {
                         <>
                           <div className="text-[11px] text-gray-400 font-bold line-through">${originalTotal.toLocaleString()}</div>
                           <div className="font-black text-emerald-600 text-base md:text-lg">${discountedTotal.toLocaleString()}</div>
-                          <div className="text-[10px] text-emerald-600 font-extrabold font-sans">(省${savings.toLocaleString()})</div>
                         </>
                       ) : (
                         <div className="font-black text-gray-900 text-base md:text-lg">${originalTotal.toLocaleString()}</div>
