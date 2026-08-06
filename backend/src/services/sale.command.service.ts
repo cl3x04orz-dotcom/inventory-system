@@ -120,9 +120,9 @@ export const SaleCommandService = {
               return {
                 productId: item.productId,
                 productName: item.productName,
-                picked: totalPickedQty, // 領貨處記錄實際出貨數量
+                picked: totalPickedQty, // 領貨處記錄實際出貨數量 (用作扣庫存: qty * bundleSize)
                 original: 0,            // 原貨不用重複記錄，設為 0
-                sold: totalPickedQty,   // 實售數量
+                sold: item.qty,         // 實售數量 (用作報表顯示: 原始組數)
                 unitPrice: effectiveUnitPrice, // 🔑 依組合價算出的平均成交單價 (例 18.3333)
                 unitCost: item.unitCost || 0,
                 discountAmount: lineDiscount,  // 🔑 多件/組合折抵金額 (例 5)

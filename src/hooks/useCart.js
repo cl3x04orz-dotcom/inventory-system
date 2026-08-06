@@ -15,10 +15,11 @@ export function useCart(storeCode = 'MILI001', terminalId = 'POS01') {
 
     const isBundle = Boolean(product.isBundle);
     const bundleSize = Number(product.bundleSize || 1);
-    const addQty = isBundle ? bundleSize : 1;
+    // 修正：不再強制把組數拆成單件，維持直覺的數量（1組 = 數量1）
+    const addQty = 1;
 
-    // POS 捆裝的價格是「整組」的價格，因此單價要除以數量 (與線上邏輯一致)
-    const unitPrice = (isBundle && bundleSize > 0) ? (retailPrice / bundleSize) : retailPrice;
+    // 修正：POS 捆裝的價格是「整組」的價格，直接使用，不再除以數量
+    const unitPrice = retailPrice;
 
     setCartItems(prev => {
       const pId = product.productId || product.id;
