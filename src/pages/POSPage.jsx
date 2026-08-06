@@ -5,7 +5,7 @@ import { POSReceiptPrint } from '../components/POSReceiptPrint';
 import { 
   ShoppingCart, Trash2, Plus, Minus, CreditCard, DollarSign, 
   Search, RefreshCw, CheckCircle, Package, Tag, Layers,
-  FileText, Smartphone, Building2, Heart, Receipt, Delete, Settings, X, Save
+  FileText, Smartphone, Building2, Heart, Receipt, Delete, Settings, X, Save, Store
 } from 'lucide-react';
 
 /**
@@ -487,6 +487,7 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                           setEditingPosProduct({
                             id: product.id,
                             name: pName,
+                            isActive: product.isActive !== false,
                             single_price: price,
                             price: price,
                             isBundle: isBundle,
@@ -928,6 +929,32 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
             </div>
 
             <div className="space-y-4 text-xs">
+              {/* 0. 門市 POS 獨立上架開關 */}
+              <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 flex justify-between items-center">
+                <div className="space-y-0.5">
+                  <label className="font-extrabold text-gray-800 text-xs flex items-center gap-1.5 cursor-pointer">
+                    <Store className="w-4 h-4 text-indigo-600" />
+                    <span>門市 POS 獨立上架狀態</span>
+                  </label>
+                  <span className="text-[10px] text-gray-400 font-bold block">
+                    開啟：門市 POS 展示販售；關閉：僅門市 POS 隱藏，不影響線上 Line 販售
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingPosProduct(prev => ({ ...prev, isActive: !prev.isActive }))}
+                  className={`w-11 h-6 rounded-full transition-colors relative flex items-center px-0.5 cursor-pointer ${
+                    editingPosProduct.isActive ? 'bg-indigo-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
+                      editingPosProduct.isActive ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
               {/* 1. POS 售價 */}
               <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 space-y-1.5">
                 <label className="font-bold text-gray-700 flex items-center gap-1.5">
@@ -1084,6 +1111,7 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                       productId: editingPosProduct.id,
                       isPosOnlyUpdate: true, // 標記此更新僅限於 POS 門市設定，絕不觸碰線上商品主檔
                       posSettings: {
+                        isActive: Boolean(editingPosProduct.isActive), // POS 門市獨立上架狀態
                         price: editingPosProduct.single_price !== '' && editingPosProduct.single_price !== null ? Number(editingPosProduct.single_price) : null,
                         isBundle: Boolean(editingPosProduct.isBundle),
                         packSize: editingPosProduct.isBundle ? Number(editingPosProduct.bundleSize || 1) : 1,
