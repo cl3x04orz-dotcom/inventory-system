@@ -25,10 +25,27 @@ jobs:
       - name: Install dependencies 📦
         run: npm install && npm install vite-plugin-pwa --save-dev
 
+      - name: Sync version to Code.gs 🔖
+        run: |
+          BUILD_TIME=$(node -e "console.log(Date.now())")
+          echo "BUILD_TIME=$BUILD_TIME" >> $GITHUB_ENV
+          # 更新 Code.gs 的 APP_VERSION
+          sed -i "s/const APP_VERSION = '[^']*'/const APP_VERSION = '$BUILD_TIME'/" Code.gs
+          echo "✅ APP_VERSION updated to $BUILD_TIME"
+
       - name: Build 🏗️
         run: npm run build
         env:
           VITE_GAS_API_URL: ${{ secrets.VITE_GAS_API_URL }}
+          VITE_APP_VERSION: ${{ env.BUILD_TIME }}
+
+      - name: Commit updated Code.gs 📝
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Code.gs
+          git diff --staged --quiet || git commit -m "chore: auto-sync APP_VERSION to ${{ env.BUILD_TIME }} [skip ci]"
+          git push origin main || true
 
       - name: Deploy 🚀
         uses: peaceiris/actions-gh-pages@v3
