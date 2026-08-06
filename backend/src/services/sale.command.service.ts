@@ -114,19 +114,19 @@ export const SaleCommandService = {
               const originalLineTotal = item.unitPrice * item.qty;
               const lineDiscount = Math.max(0, originalLineTotal - lineSubtotal) + (item.discountAmount || 0);
 
-              // 🔑 依照組合價算出的平均成交單價 (例 55 / 3 = 18.3333)
-              const effectiveUnitPrice = item.qty > 0 ? Number((lineSubtotal / item.qty).toFixed(4)) : item.unitPrice;
+              // 🔑 依單件算出的平均成交單價 (例 $100 / 6 = 16.6667)
+              const effectiveUnitPrice = totalPickedQty > 0 ? Number((lineSubtotal / totalPickedQty).toFixed(4)) : item.unitPrice;
 
               return {
                 productId: item.productId,
                 productName: item.productName,
-                picked: totalPickedQty, // 領貨處記錄實際出貨數量 (用作扣庫存: qty * bundleSize)
+                picked: totalPickedQty, // 領貨處記錄實際出貨數量 (扣庫存: 6件)
                 original: 0,            // 原貨不用重複記錄，設為 0
-                sold: item.qty,         // 實售數量 (用作報表顯示: 原始組數)
-                unitPrice: effectiveUnitPrice, // 🔑 依組合價算出的平均成交單價 (例 18.3333)
+                sold: totalPickedQty,   // 實售數量 (單件數量: 6件)
+                unitPrice: effectiveUnitPrice, // 🔑 依單件算出的平均成交單價 (例 16.6667)
                 unitCost: item.unitCost || 0,
-                discountAmount: lineDiscount,  // 🔑 多件/組合折抵金額 (例 5)
-                subtotal: lineSubtotal,        // 🔑 實際成交小計 (例 55)
+                discountAmount: lineDiscount,  // 🔑 多件/組合折抵金額
+                subtotal: lineSubtotal,        // 🔑 實際成交小計 (例 $100)
                 storeCode
               };
             })

@@ -346,13 +346,15 @@ export const GroupBuyService = {
             const multiplier = (prod && prod.isBundle) ? Number(prod.bundleSize || 1) : 1;
             const finalSold = Number(d.qty) * multiplier;
 
+            const effectiveUnitPrice = finalSold > 0 ? Number((Number(d.subtotal) / finalSold).toFixed(4)) : Number(d.unitPrice);
+
             return {
               productId: d.productId || 'UNKNOWN',
               sold: finalSold,
               picked: finalSold,
               original: 0,
               subtotal: Number(d.subtotal),
-              unitPrice: Number(d.unitPrice)
+              unitPrice: effectiveUnitPrice
             };
           })
         }

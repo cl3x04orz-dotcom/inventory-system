@@ -410,7 +410,10 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                             let rawPrice = Number(match.unitPrice || 0);
                                             let loadUnitPrice = rawPrice;
 
-                                            if (isBundle && bundleSize > 1) {
+                                            // 🔑 修正全單相容性：若舊單數據為整組價格 ($100)，自動轉為單件單價 ($100 / 6 = 16.6667)，防止 6 * 100 = 600
+                                            if (match.picked > 1 && match.subtotal > 0 && (rawPrice * match.picked > Number(match.subtotal) * 1.2)) {
+                                                loadUnitPrice = Number(match.subtotal) / match.picked;
+                                            } else if (isBundle && bundleSize > 1) {
                                                 const catalogPackagePrice = Number(row.catalogPrice || row.price || 0);
                                                 const threshold = catalogPackagePrice > 0 ? (catalogPackagePrice / 1.5) : 30;
                                                 if (rawPrice >= threshold) {
@@ -418,7 +421,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                                 }
                                             }
 
-                                            loadUnitPrice = Math.round(loadUnitPrice * 100) / 100;
+                                            loadUnitPrice = Math.round(loadUnitPrice * 10000) / 10000;
 
                                             const updated = {
                                                 ...row,
