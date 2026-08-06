@@ -1082,15 +1082,7 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                   try {
                     const updatedFields = {
                       productId: editingPosProduct.id,
-                      single_price: editingPosProduct.single_price !== '' && editingPosProduct.single_price !== null ? Number(editingPosProduct.single_price) : null,
-                      price: editingPosProduct.price !== '' && editingPosProduct.price !== null ? Number(editingPosProduct.price) : null,
-                      isBundle: Boolean(editingPosProduct.isBundle),
-                      bundleSize: editingPosProduct.isBundle ? Number(editingPosProduct.bundleSize || 1) : 1,
-                      has_volume_pricing: Boolean(editingPosProduct.has_volume_pricing),
-                      volume_pricing_settings: editingPosProduct.has_volume_pricing ? {
-                        target_quantity: Number(editingPosProduct.volume_pricing_settings?.target_quantity || 0),
-                        package_price: Number(editingPosProduct.volume_pricing_settings?.package_price || 0)
-                      } : null,
+                      isPosOnlyUpdate: true, // 標記此更新僅限於 POS 門市設定，絕不觸碰線上商品主檔
                       posSettings: {
                         price: editingPosProduct.single_price !== '' && editingPosProduct.single_price !== null ? Number(editingPosProduct.single_price) : null,
                         isBundle: Boolean(editingPosProduct.isBundle),

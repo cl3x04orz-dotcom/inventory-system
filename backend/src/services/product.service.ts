@@ -242,6 +242,8 @@ export const ProductService = {
       }
     }
 
+    const isPosOnly = Boolean(payload.isPosOnlyUpdate);
+
     await prisma.product.updateMany({
       where: { productId: String(productId).trim(), storeCode: payload.storeCode },
       data: {
@@ -250,12 +252,12 @@ export const ProductService = {
         category: category !== undefined ? String(category) : undefined,
         capacity: payload.capacity !== undefined ? String(payload.capacity).trim() : undefined,
         expiryDate: expiryDate !== undefined ? String(expiryDate) : undefined,
-        defaultPrice: price !== undefined && price !== '' && price !== null ? Number(price) : undefined,
+        defaultPrice: !isPosOnly && price !== undefined && price !== '' && price !== null ? Number(price) : undefined,
         hasFlavorAttributes: has_flavor_attributes !== undefined ? Boolean(has_flavor_attributes) : undefined,
         flavorChoices: flavor_choices !== undefined ? flavor_choices : undefined,
-        singlePrice: single_price !== undefined && single_price !== '' && single_price !== null ? Number(single_price) : undefined,
-        hasVolumePricing: has_volume_pricing !== undefined ? Boolean(has_volume_pricing) : undefined,
-        volumePricingSettings: volume_pricing_settings !== undefined ? volume_pricing_settings : undefined,
+        singlePrice: !isPosOnly && single_price !== undefined && single_price !== '' && single_price !== null ? Number(single_price) : undefined,
+        hasVolumePricing: !isPosOnly && has_volume_pricing !== undefined ? Boolean(has_volume_pricing) : undefined,
+        volumePricingSettings: !isPosOnly && volume_pricing_settings !== undefined ? volume_pricing_settings : undefined,
         packSize: packSize !== undefined ? Number(packSize) : undefined,
         dispatchSteps: dispatchSteps !== undefined ? dispatchSteps : undefined,
         roundThreshold: roundThreshold !== undefined
@@ -263,8 +265,8 @@ export const ProductService = {
           : undefined,
         autoSuppress: autoSuppress !== undefined ? Boolean(autoSuppress) : undefined,
         maxSuggestion: maxSuggestion !== undefined ? Number(maxSuggestion) : undefined,
-        isBundle: isBundle !== undefined ? Boolean(isBundle) : undefined,
-        bundleSize: bundleSize !== undefined ? Number(bundleSize) : undefined,
+        isBundle: !isPosOnly && isBundle !== undefined ? Boolean(isBundle) : undefined,
+        bundleSize: !isPosOnly && bundleSize !== undefined ? Number(bundleSize) : undefined,
         maxTotalQty: parsedMaxTotalQty,
         // 僅在活動上限實際變更（新值或清除）時，soldQty 才同步重設
         soldQty: shouldResetSoldQty ? 0 : undefined,
