@@ -1,3 +1,4 @@
+// Version build: 2026-08-06-v2
 import { safeLocalStorage, safeSessionStorage } from './utils/storage';
 import React, { useState, useEffect } from 'react';
 import LoginPage from './pages/LoginPage';
