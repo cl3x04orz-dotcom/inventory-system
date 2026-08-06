@@ -429,16 +429,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                             };
                                             updated.sold = getSafeNum(updated.picked) + getSafeNum(updated.original) - getSafeNum(updated.returns);
                                             
-                                            if (isBundle && bundleSize > 1 && updated.sold > 0 && (updated.sold % bundleSize === 0)) {
-                                                const catalogPackagePrice = Number(row.catalogPrice || row.price || 0);
-                                                if (catalogPackagePrice > 0) {
-                                                    updated.subtotal = (updated.sold / bundleSize) * catalogPackagePrice;
-                                                } else {
-                                                    updated.subtotal = Math.round(updated.sold * getSafeNum(updated.price) * 100) / 100;
-                                                }
-                                            } else {
-                                                updated.subtotal = Math.round(updated.sold * getSafeNum(updated.price) * 100) / 100;
-                                            }
+                                            // 核心全系統公式：100% 遵循【小計 = 數量 × 單價】，絕對不上進行任何模數或包裝價覆蓋！
+                                            updated.subtotal = Math.round(updated.sold * getSafeNum(updated.price) * 100) / 100;
 
                                             return updated;
                                         }
