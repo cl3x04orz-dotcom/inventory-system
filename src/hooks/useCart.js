@@ -77,12 +77,21 @@ export function useCart(storeCode = 'MILI001', terminalId = 'POS01') {
     setCartItems([]);
   }, []);
 
+  /**
+   * 批次替換購物車內容 (全車還原/暫存取單專用)
+   */
+  const replaceCart = useCallback((newItems) => {
+    setCartItems(Array.isArray(newItems) ? newItems : []);
+  }, []);
+
   return {
     cartItems,
     addItem,
     updateQty,
     removeItem,
     clear,
+    replaceCart,
+    setCartItems,
     storeCode,
     terminalId
   };

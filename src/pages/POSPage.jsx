@@ -5,7 +5,7 @@ import { POSReceiptPrint } from '../components/POSReceiptPrint';
 import { 
   ShoppingCart, Trash2, Plus, Minus, CreditCard, DollarSign, 
   Search, RefreshCw, CheckCircle, Package, Tag, Layers,
-  FileText, Smartphone, Building2, Heart, Receipt, Delete, Settings, X, Save, Store
+  FileText, Smartphone, Building2, Heart, Receipt, Delete, Settings, X, Save, Store, Eye, EyeOff, PauseCircle, PlayCircle, Clock
 } from 'lucide-react';
 
 /**
@@ -163,11 +163,34 @@ function getItemSubtotal(item) {
 }
 
 export default function POSPage({ user, apiUrl, isHeaderHidden }) {
-  const { cartItems, addItem, updateQty, removeItem, clear } = useCart();
+  const { cartItems, addItem, updateQty, removeItem, clear, replaceCart } = useCart();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showUnlistedProducts, setShowUnlistedProducts] = useState(false); // 門市未上架商品顯示開關
+
+  // 門市 POS 暫存掛單與取單 State (Hold & Resume Cart)
+  const [heldCarts, setHeldCarts] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pos_held_carts');
+      return saved ? JSON.parse(saved) : [];
+    } catch (_) {
+      return [];
+    }
+  });
+  const [isHoldModalOpen, setIsHoldModalOpen] = useState(false);
+  const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
+  const [holdNoteInput, setHoldNoteInput] = useState('');
+
+  // 持久化保存暫存單至 LocalStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('pos_held_carts', JSON.stringify(heldCarts));
+    } catch (err) {
+      console.error('Failed to save held carts:', err);
+    }
+  }, [heldCarts]);
   
   // Checkout Modal State
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -198,24 +221,31 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
       const res = await callGAS(apiUrl, 'getProducts', {}, user.token);
       if (Array.isArray(res)) {
         let mapped = res.map(p => {
-          const pos = p.posSettings || {};
-          // 嚴格規定：僅當 posSettings 中明確有 isBundle === true 或 has_volume_pricing === true 時才開啟標籤
+          let pos = p.posSettings || {};
+          if (typeof pos === 'string') {
+            try { pos = JSON.parse(pos); } catch (_) { pos = {}; }
+          }
+          // 門市 POS 獨立上架狀態：優先讀取 posSettings.isActive，若無才繼承 p.isActive
+          const isPosActive = pos.isActive !== undefined 
+            ? (pos.isActive === true || pos.isActive === 'true') 
+            : Boolean(p.isActive);
           return {
             ...p,
-            isActive: pos.isActive !== undefined ? pos.isActive : p.isActive,
+            isActive: isPosActive,
             single_price: pos.price !== undefined && pos.price !== null ? pos.price : (p.single_price || p.price || 0),
             price: pos.price !== undefined && pos.price !== null ? pos.price : (p.price || p.single_price || 0),
-            isBundle: pos.isBundle !== undefined ? Boolean(pos.isBundle) : false,
-            bundleSize: pos.packSize !== undefined && pos.packSize !== null ? Number(pos.packSize) : 1,
-            packSize: pos.packSize !== undefined && pos.packSize !== null ? Number(pos.packSize) : 1,
+            isBundle: pos.isBundle !== undefined ? Boolean(pos.isBundle) : Boolean(p.isBundle),
+            bundleSize: pos.packSize !== undefined && pos.packSize !== null ? Number(pos.packSize) : Number(p.bundleSize || p.packSize || 1),
+            packSize: pos.packSize !== undefined && pos.packSize !== null ? Number(pos.packSize) : Number(p.bundleSize || p.packSize || 1),
             sortWeight: pos.sortWeight !== undefined && pos.sortWeight !== null ? pos.sortWeight : p.sortWeight,
             has_flavor_attributes: pos.has_flavor_attributes !== undefined ? pos.has_flavor_attributes : p.has_flavor_attributes,
             flavor_choices: pos.flavor_choices !== undefined ? pos.flavor_choices : p.flavor_choices,
             maxTotalQty: pos.maxTotalQty !== undefined ? pos.maxTotalQty : p.maxTotalQty,
-            has_volume_pricing: pos.has_volume_pricing !== undefined ? Boolean(pos.has_volume_pricing) : false,
-            volume_pricing_settings: pos.volume_pricing_settings !== undefined ? pos.volume_pricing_settings : null,
+            has_volume_pricing: pos.has_volume_pricing !== undefined ? Boolean(pos.has_volume_pricing) : Boolean(p.has_volume_pricing || p.hasVolumePricing),
+            volume_pricing_settings: pos.volume_pricing_settings !== undefined ? pos.volume_pricing_settings : (p.volume_pricing_settings || p.volumePricingSettings || null),
+            posSettings: pos
           };
-        }).filter(p => p.isActive !== false);
+        });
 
         mapped.sort((a, b) => {
           const weightA = a.sortWeight != null ? Number(a.sortWeight) : 999999;
@@ -250,9 +280,13 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
       const matchSearch = !searchQuery || 
         pName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         pId.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchCat && matchSearch;
+      
+      // 若未勾選「顯示全品項 (含下架)」，只過濾顯示門市已上架商品
+      const matchActive = showUnlistedProducts || p.isActive === true;
+
+      return matchCat && matchSearch && matchActive;
     });
-  }, [products, selectedCategory, searchQuery]);
+  }, [products, selectedCategory, searchQuery, showUnlistedProducts]);
 
   // Helper to add normalized product to cart
   const handleAddToCart = (product) => {
@@ -276,6 +310,38 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
   const subtotal = useMemo(() => {
     return calculateCartSubtotal(cartItems);
   }, [cartItems]);
+
+  // 暫存掛單與取單邏輯
+  const handleHoldCart = () => {
+    if (!cartItems || cartItems.length === 0) return;
+    const newHeldCart = {
+      id: 'HOLD_' + Date.now(),
+      createdAt: new Date().toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      dateStr: new Date().toLocaleDateString('zh-TW'),
+      note: holdNoteInput.trim() || `暫存客 ${heldCarts.length + 1}`,
+      items: [...cartItems],
+      subtotal: subtotal
+    };
+    setHeldCarts(prev => [newHeldCart, ...prev]);
+    clear();
+    setHoldNoteInput('');
+    setIsHoldModalOpen(false);
+  };
+
+  const handleResumeCart = (heldCart) => {
+    if (cartItems.length > 0) {
+      if (!window.confirm('當前購物車內尚有商品，恢復暫存單將會取代當前購物車，是否確定恢復？')) {
+        return;
+      }
+    }
+    replaceCart(heldCart.items);
+    setHeldCarts(prev => prev.filter(c => c.id !== heldCart.id));
+    setIsResumeModalOpen(false);
+  };
+
+  const handleDeleteHeldCart = (heldCartId) => {
+    setHeldCarts(prev => prev.filter(c => c.id !== heldCartId));
+  };
 
   const receivedAmount = Number(receivedAmountInput) || 0;
   const changeAmount = Math.max(0, receivedAmount - subtotal);
@@ -415,6 +481,28 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
+            <button
+              type="button"
+              onClick={() => setShowUnlistedProducts(prev => !prev)}
+              className={`px-2.5 py-1.5 border rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center space-x-1 ${
+                showUnlistedProducts
+                  ? 'bg-amber-500 text-white border-amber-600 shadow-sm'
+                  : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+              }`}
+              title={showUnlistedProducts ? "點擊切換為僅顯示門市已上架商品" : "點擊顯示全品項 (包含門市已下架商品)"}
+            >
+              {showUnlistedProducts ? (
+                <>
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>顯示全品項 (含下架)</span>
+                </>
+              ) : (
+                <>
+                  <EyeOff className="w-3.5 h-3.5" />
+                  <span>僅顯示門市上架</span>
+                </>
+              )}
+            </button>
           </div>
 
           {/* 分類標籤 */}
@@ -463,11 +551,17 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                   ? `${volumeSettings.target_quantity}件$${volumeSettings.package_price}`
                   : null;
 
+                const isUnlisted = product.isActive === false;
+
                 return (
                   <div
                     key={pId}
                     onClick={() => handleAddToCart(product)}
-                    className="bg-white p-4 rounded-2xl border-2 border-gray-100 hover:border-indigo-500 hover:shadow-lg transition-all text-left flex flex-col justify-between h-36 md:h-40 group relative overflow-hidden shadow-xs cursor-pointer select-none active:scale-98"
+                    className={`p-4 rounded-2xl border-2 transition-all text-left flex flex-col justify-between h-36 md:h-40 group relative overflow-hidden shadow-xs cursor-pointer select-none active:scale-98 ${
+                      isUnlisted
+                        ? 'bg-gray-50/80 border-dashed border-gray-300 opacity-65 hover:border-amber-400'
+                        : 'bg-white border-gray-100 hover:border-indigo-500 hover:shadow-lg'
+                    }`}
                   >
                     <div className="flex justify-between items-start">
                       <div className="space-y-1 flex-1 pr-1">
@@ -488,6 +582,7 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                             id: product.id,
                             name: pName,
                             isActive: product.isActive !== false,
+                            barcodes: Array.isArray(product.barcodes) ? [...product.barcodes] : [],
                             single_price: price,
                             price: price,
                             isBundle: isBundle,
@@ -506,6 +601,12 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                     <div>
                       {/* 標籤顯示 (加大顯眼) */}
                       <div className="flex flex-wrap gap-1.5 mb-1.5">
+                        {isUnlisted && (
+                          <span className="inline-flex items-center space-x-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg font-extrabold border border-red-200">
+                            <EyeOff className="w-3 h-3" />
+                            <span>門市已下架</span>
+                          </span>
+                        )}
                         {isBundle && (
                           <span className="inline-flex items-center space-x-1 text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-lg font-extrabold border border-indigo-200">
                             <Layers className="w-3 h-3" />
@@ -539,21 +640,63 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
 
       {/* 右側：購物車與結帳區 (360px / 400px 固定寬度) */}
       <div className="w-[360px] lg:w-[400px] bg-white border-l border-gray-200 flex flex-col h-full shadow-lg z-10 shrink-0">
-        {/* 購物車標頭 */}
-        <div className="p-3.5 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-          <div className="flex items-center space-x-2 text-gray-800 font-bold text-base">
-            <ShoppingCart className="w-5 h-5 text-indigo-600" />
-            <span>當前購物車 ({cartItems.length})</span>
+        {/* 購物車標頭與暫存/取單按鈕列 */}
+        <div className="p-3 border-b border-gray-200 bg-gray-50 flex flex-col gap-2">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-2 text-gray-800 font-bold text-base">
+              <ShoppingCart className="w-5 h-5 text-indigo-600" />
+              <span>當前購物車 ({cartItems.length})</span>
+            </div>
+            {cartItems.length > 0 && (
+              <button 
+                onClick={clear}
+                className="text-xs text-red-500 hover:text-red-700 flex items-center space-x-1 font-bold cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>清空</span>
+              </button>
+            )}
           </div>
-          {cartItems.length > 0 && (
-            <button 
-              onClick={clear}
-              className="text-xs text-red-500 hover:text-red-700 flex items-center space-x-1 font-bold"
+
+          {/* 暫存掛單與取單按鈕列 */}
+          <div className="flex gap-1.5 pt-0.5">
+            <button
+              type="button"
+              disabled={cartItems.length === 0}
+              onClick={() => {
+                setHoldNoteInput(`暫存客 ${heldCarts.length + 1}`);
+                setIsHoldModalOpen(true);
+              }}
+              className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-extrabold flex items-center justify-center space-x-1 transition-all border ${
+                cartItems.length > 0
+                  ? 'bg-amber-500 text-white border-amber-600 hover:bg-amber-600 cursor-pointer shadow-2xs active:scale-95'
+                  : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+              }`}
+              title="將當前購物車暫存掛單，讓後方客人先結帳"
             >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>清空</span>
+              <PauseCircle className="w-3.5 h-3.5" />
+              <span>暫存掛單</span>
             </button>
-          )}
+
+            <button
+              type="button"
+              onClick={() => setIsResumeModalOpen(true)}
+              className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-extrabold flex items-center justify-center space-x-1 transition-all border ${
+                heldCarts.length > 0
+                  ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700 cursor-pointer shadow-sm active:scale-95'
+                  : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 cursor-pointer'
+              }`}
+              title="查看並恢復暫存掛單購物車"
+            >
+              <PlayCircle className="w-3.5 h-3.5" />
+              <span>暫存取單</span>
+              {heldCarts.length > 0 && (
+                <span className="ml-1 bg-white text-indigo-700 px-1.5 py-0.2 rounded-full text-[10px] font-black shadow-2xs">
+                  {heldCarts.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* 購物車明細清單 */}
@@ -929,7 +1072,91 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
             </div>
 
             <div className="space-y-4 text-xs">
-              {/* 0. 門市 POS 獨立上架開關 */}
+              {/* 0. 國際條碼 (共用主檔，支援多組) */}
+              <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="font-extrabold text-gray-800 text-xs flex items-center gap-1.5">
+                    <Receipt className="w-4 h-4 text-indigo-600" />
+                    <span>國際條碼 (共用主檔，支援多組)</span>
+                  </label>
+                  <span className="text-[10px] text-gray-400 font-bold">刷條碼快速找貨/結帳</span>
+                </div>
+                
+                {/* 現有條碼標籤 */}
+                <div className="space-y-2">
+                  {Array.isArray(editingPosProduct.barcodes) && editingPosProduct.barcodes.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {editingPosProduct.barcodes.map((bc, idx) => {
+                        const barcodeStr = typeof bc === 'object' ? (bc.barcode || '') : String(bc);
+                        return (
+                          <span key={idx} className="inline-flex items-center space-x-1 bg-white border border-gray-300 px-2.5 py-1 rounded-xl text-xs font-mono font-bold text-gray-700 shadow-2xs">
+                            <span>🏷️ {barcodeStr}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingPosProduct(prev => ({
+                                  ...prev,
+                                  barcodes: (prev.barcodes || []).filter((_, i) => i !== idx)
+                                }));
+                              }}
+                              className="text-gray-400 hover:text-red-500 ml-1 cursor-pointer"
+                              title="刪除此條碼"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-gray-400 italic">尚無綁定國際條碼</div>
+                  )}
+
+                  {/* 新增條碼輸入框 */}
+                  <div className="flex gap-1.5 pt-1">
+                    <input
+                      type="text"
+                      id="pos-modal-new-barcode"
+                      placeholder="請掃描或輸入新國際條碼..."
+                      className="flex-1 p-2 bg-white border border-gray-300 rounded-xl font-mono text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && e.target.value.trim()) {
+                          e.preventDefault();
+                          const val = e.target.value.trim();
+                          if (!editingPosProduct.barcodes?.includes(val)) {
+                            setEditingPosProduct(prev => ({
+                              ...prev,
+                              barcodes: [...(prev.barcodes || []), val]
+                            }));
+                          }
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const input = document.getElementById('pos-modal-new-barcode');
+                        if (input && input.value.trim()) {
+                          const val = input.value.trim();
+                          if (!editingPosProduct.barcodes?.includes(val)) {
+                            setEditingPosProduct(prev => ({
+                              ...prev,
+                              barcodes: [...(prev.barcodes || []), val]
+                            }));
+                          }
+                          input.value = '';
+                        }
+                      }}
+                      className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold text-xs rounded-xl border border-indigo-200 transition-colors cursor-pointer"
+                    >
+                      + 新增條碼
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 1. 門市 POS 獨立上架開關 */}
               <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 flex justify-between items-center">
                 <div className="space-y-0.5">
                   <label className="font-extrabold text-gray-800 text-xs flex items-center gap-1.5 cursor-pointer">
@@ -955,7 +1182,7 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                 </button>
               </div>
 
-              {/* 1. POS 售價 */}
+              {/* 2. POS 售價 */}
               <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 space-y-1.5">
                 <label className="font-bold text-gray-700 flex items-center gap-1.5">
                   <DollarSign className="w-4 h-4 text-emerald-600" />
@@ -980,7 +1207,7 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                 </div>
               </div>
 
-              {/* 2. 捆裝設定 */}
+              {/* 3. 捆裝設定 */}
               <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="font-bold text-gray-700 flex items-center gap-1.5 cursor-pointer">
@@ -1024,7 +1251,7 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                 )}
               </div>
 
-              {/* 3. 多件特價設定 */}
+              {/* 4. 多件特價設定 */}
               <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="font-bold text-gray-700 flex items-center gap-1.5 cursor-pointer">
@@ -1107,20 +1334,23 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                 onClick={async () => {
                   setSavingPosSettings(true);
                   try {
+                    const newPosSettings = {
+                      isActive: editingPosProduct.isActive === true, // 門市 POS 獨立上架狀態
+                      price: editingPosProduct.single_price !== '' && editingPosProduct.single_price !== null ? Number(editingPosProduct.single_price) : null,
+                      isBundle: Boolean(editingPosProduct.isBundle),
+                      packSize: editingPosProduct.isBundle ? Number(editingPosProduct.bundleSize || 1) : 1,
+                      has_volume_pricing: Boolean(editingPosProduct.has_volume_pricing),
+                      volume_pricing_settings: editingPosProduct.has_volume_pricing ? {
+                        target_quantity: Number(editingPosProduct.volume_pricing_settings?.target_quantity || 0),
+                        package_price: Number(editingPosProduct.volume_pricing_settings?.package_price || 0)
+                      } : null
+                    };
+
                     const updatedFields = {
                       productId: editingPosProduct.id,
                       isPosOnlyUpdate: true, // 標記此更新僅限於 POS 門市設定，絕不觸碰線上商品主檔
-                      posSettings: {
-                        isActive: Boolean(editingPosProduct.isActive), // POS 門市獨立上架狀態
-                        price: editingPosProduct.single_price !== '' && editingPosProduct.single_price !== null ? Number(editingPosProduct.single_price) : null,
-                        isBundle: Boolean(editingPosProduct.isBundle),
-                        packSize: editingPosProduct.isBundle ? Number(editingPosProduct.bundleSize || 1) : 1,
-                        has_volume_pricing: Boolean(editingPosProduct.has_volume_pricing),
-                        volume_pricing_settings: editingPosProduct.has_volume_pricing ? {
-                          target_quantity: Number(editingPosProduct.volume_pricing_settings?.target_quantity || 0),
-                          package_price: Number(editingPosProduct.volume_pricing_settings?.package_price || 0)
-                        } : null
-                      }
+                      barcodes: editingPosProduct.barcodes || [], // 支援國際條碼同步更新
+                      posSettings: newPosSettings
                     };
 
                     await callGAS(apiUrl, 'updateProductDetails', updatedFields, user.token);
@@ -1128,18 +1358,19 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                     // 靜默無感更新本地 State，防止頁面 Loading 與滾動置頂
                     setProducts(prevProducts => prevProducts.map(p => {
                       if (p.id === editingPosProduct.id) {
-                        const newPos = updatedFields.posSettings;
-                        const newPrice = newPos.price !== null ? newPos.price : (p.single_price || p.price || 0);
+                        const newPrice = newPosSettings.price !== null ? newPosSettings.price : (p.single_price || p.price || 0);
                         return {
                           ...p,
+                          isActive: newPosSettings.isActive,
+                          barcodes: updatedFields.barcodes,
                           single_price: newPrice,
                           price: newPrice,
-                          isBundle: Boolean(newPos.isBundle),
-                          bundleSize: newPos.packSize ? Number(newPos.packSize) : 1,
-                          packSize: newPos.packSize ? Number(newPos.packSize) : 1,
-                          has_volume_pricing: Boolean(newPos.has_volume_pricing),
-                          volume_pricing_settings: newPos.volume_pricing_settings || null,
-                          posSettings: newPos
+                          isBundle: Boolean(newPosSettings.isBundle),
+                          bundleSize: newPosSettings.packSize ? Number(newPosSettings.packSize) : 1,
+                          packSize: newPosSettings.packSize ? Number(newPosSettings.packSize) : 1,
+                          has_volume_pricing: Boolean(newPosSettings.has_volume_pricing),
+                          volume_pricing_settings: newPosSettings.volume_pricing_settings || null,
+                          posSettings: newPosSettings
                         };
                       }
                       return p;
@@ -1277,6 +1508,156 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
               >
                 確認修改
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 暫存掛單彈窗 (Hold Cart Modal) */}
+      {isHoldModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl border border-gray-100 flex flex-col gap-4">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+                  <PauseCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-base">暫存掛單 (Hold Cart)</h3>
+                  <p className="text-xs text-gray-400 font-medium">暫存當前購物車，先服務後方排隊顧客</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsHoldModalOpen(false)} 
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">顧客識別 / 備註標籤 (可自訂)</label>
+                <input
+                  type="text"
+                  className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-xl font-bold text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  placeholder="例：戴帽子的先生 / 夾克客人"
+                  value={holdNoteInput}
+                  onChange={(e) => setHoldNoteInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleHoldCart();
+                  }}
+                  autoFocus
+                />
+              </div>
+
+              <div className="bg-amber-50 p-3 rounded-2xl border border-amber-200 space-y-1">
+                <div className="font-extrabold text-amber-900 text-xs">當前暫存清單摘要：</div>
+                <div className="text-amber-800 font-bold">共 {cartItems.length} 項商品 / 總金額 ${subtotal.toLocaleString()}</div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setIsHoldModalOpen(false)}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-colors"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleHoldCart}
+                className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-1.5 cursor-pointer active:scale-98"
+              >
+                <PauseCircle className="w-4 h-4" />
+                <span>確認暫存掛單</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 暫存取單列表彈窗 (Resume Cart Modal) */}
+      {isResumeModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl border border-gray-100 flex flex-col gap-4 max-h-[85vh]">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                  <PlayCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-base">暫存掛單清單 ({heldCarts.length})</h3>
+                  <p className="text-xs text-gray-400 font-medium">點擊「恢復此單結帳」即可一鍵還原顧客購物車</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsResumeModalOpen(false)} 
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+              {heldCarts.length === 0 ? (
+                <div className="py-12 flex flex-col items-center justify-center text-gray-400 space-y-2">
+                  <Clock className="w-12 h-12 stroke-[1.5]" />
+                  <p className="text-sm font-bold">目前尚無暫存中的掛單</p>
+                </div>
+              ) : (
+                heldCarts.map((hc) => (
+                  <div key={hc.id} className="p-4 bg-gray-50 border border-gray-200 rounded-2xl flex flex-col gap-2.5 hover:border-indigo-300 transition-colors">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center space-x-2">
+                        <span className="px-2.5 py-0.5 bg-amber-100 text-amber-900 font-extrabold text-xs rounded-lg border border-amber-200">
+                          🏷️ {hc.note}
+                        </span>
+                        <span className="text-xs text-gray-400 font-mono flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" />
+                          {hc.createdAt}
+                        </span>
+                      </div>
+                      <span className="font-black text-indigo-600 text-base">
+                        ${hc.subtotal?.toLocaleString()}
+                      </span>
+                    </div>
+
+                    {/* 明細簡覽 */}
+                    <div className="bg-white p-2.5 rounded-xl border border-gray-200 text-xs text-gray-700 space-y-1 max-h-28 overflow-y-auto">
+                      {hc.items.map((item, idx) => (
+                        <div key={idx} className="flex justify-between font-medium">
+                          <span className="truncate max-w-[260px]">• {item.productName}</span>
+                          <span className="font-mono font-extrabold text-gray-500">x{item.qty}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 操作按鈕組 */}
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteHeldCart(hc.id)}
+                        className="px-3.5 py-2 bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-500 text-xs font-bold rounded-xl transition-colors flex items-center space-x-1 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>廢棄</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleResumeCart(hc)}
+                        className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold rounded-xl shadow-xs transition-all flex items-center justify-center space-x-1.5 cursor-pointer active:scale-98"
+                      >
+                        <PlayCircle className="w-4 h-4" />
+                        <span>恢復此單結帳</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

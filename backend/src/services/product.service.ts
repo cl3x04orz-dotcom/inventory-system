@@ -85,6 +85,15 @@ export const ProductService = {
         }
       }
 
+      let parsedPosSettings = p.posSettings || {};
+      if (typeof parsedPosSettings === 'string') {
+        try {
+          parsedPosSettings = JSON.parse(parsedPosSettings);
+        } catch {
+          parsedPosSettings = {};
+        }
+      }
+
       return {
         id: p.productId,
         name: p.productName,
@@ -112,7 +121,7 @@ export const ProductService = {
         soldQty: Number(p.soldQty || 0),
         allowedCommunityIds: Array.isArray(p.allowedCommunityIds) ? p.allowedCommunityIds : [],
         communityQuotas: p.communityQuotas || {},
-        posSettings: p.posSettings || {},
+        posSettings: parsedPosSettings,
         barcodes: p.barcodes ? p.barcodes.map(b => b.barcode) : [],
         capacity: p.capacity || '',
         isPurchasable: p.isPurchasable !== false, // 進貨清單顯示，與前台上架無關
