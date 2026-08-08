@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Link, Calendar, Clock, Copy, Save, Plus, Check, RefreshCw, Truck, Edit2, Trash2, ChevronUp, ChevronDown, StickyNote, Eye, EyeOff, Search, LayoutGrid, List, Gift, Sparkles, User, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Link, Calendar, Clock, Copy, Save, Plus, Check, RefreshCw, Truck, Edit2, Trash2, ChevronUp, ChevronDown, StickyNote, Eye, EyeOff, Search, LayoutGrid, List, Gift, Sparkles, User, ShieldCheck, AlertTriangle, GripVertical } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import { copyToClipboard } from '../utils/clipboard';
 
@@ -14,6 +14,11 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
     const [deliveryAreaSearchTerm, setDeliveryAreaSearchTerm] = useState(''); // 散客外送區域搜尋關鍵字
     const [deliveryAreaViewMode, setDeliveryAreaViewMode] = useState('grid'); // 外送區域顯示模式 (grid/table)
     const [productSearchTerm, setProductSearchTerm] = useState(''); // 專屬定價商品搜尋關鍵字
+
+    const reorderTimerRef = useRef(null);
+    const latestSettingsRef = useRef([]);
+    const [draggedBuilding, setDraggedBuilding] = useState(null);
+    const [dragOverBuilding, setDragOverBuilding] = useState(null);
 
     // 滿額折抵設定 state
     const [rewardMode, setRewardMode] = useState('OFF'); // OFF | TEST | ON
@@ -299,6 +304,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
             const data = await callGAS(apiUrl, 'getBuildingSettings', {}, user.token);
             if (Array.isArray(data)) {
                 setSettings(data);
+                latestSettingsRef.current = data;
                 
                 if (data.length > 0) {
                     // 預設選擇第一個
@@ -513,23 +519,86 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
         return `${formattedDate} ${formattedTime}`;
     };
 
-    const handleMoveBuilding = async (index, direction) => {
-        const newSettings = [...settings];
+    const saveBuildingOrder = useCallback(async (newOrderedList) => {
+        try {
+            const buildingsToSave = newOrderedList.map(s => s.building);
+            await callGAS(apiUrl, 'reorderBuildings', {
+                buildings: buildingsToSave
+            }, user.token);
+            console.log('排序已成功寫入資料庫:', buildingsToSave);
+        } catch (error) {
+            console.error('排序更新失敗:', error);
+        }
+    }, [apiUrl, user.token]);
+
+    const handleDragStart = (e, buildingName) => {
+        setDraggedBuilding(buildingName);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', buildingName);
+    };
+
+    const handleDragOver = (e, targetBuildingName) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+
+        if (!draggedBuilding || draggedBuilding === targetBuildingName) return;
+
+        setDragOverBuilding(targetBuildingName);
+
+        const currentList = latestSettingsRef.current.length > 0 
+            ? latestSettingsRef.current 
+            : settings;
+
+        const fromIndex = currentList.findIndex(s => s.building === draggedBuilding);
+        const toIndex = currentList.findIndex(s => s.building === targetBuildingName);
+
+        if (fromIndex !== -1 && toIndex !== -1 && fromIndex !== toIndex) {
+            const newList = [...currentList];
+            const [movedItem] = newList.splice(fromIndex, 1);
+            newList.splice(toIndex, 0, movedItem);
+
+            latestSettingsRef.current = newList;
+            setSettings(newList);
+        }
+    };
+
+    const handleDragEnd = () => {
+        setDraggedBuilding(null);
+        setDragOverBuilding(null);
+
+        // Single batch save to backend on drag release!
+        if (latestSettingsRef.current.length > 0) {
+            saveBuildingOrder(latestSettingsRef.current);
+        }
+    };
+
+    const handleMoveBuilding = (buildingName, direction) => {
+        const currentList = latestSettingsRef.current.length > 0 
+            ? latestSettingsRef.current 
+            : settings;
+
+        const index = currentList.findIndex(s => s.building === buildingName);
+        if (index === -1) return;
+
         const targetIndex = index + direction;
-        if (targetIndex < 0 || targetIndex >= newSettings.length) return;
+        if (targetIndex < 0 || targetIndex >= currentList.length) return;
 
         // swap
+        const newSettings = [...currentList];
         [newSettings[index], newSettings[targetIndex]] = [newSettings[targetIndex], newSettings[index]];
+        
+        latestSettingsRef.current = newSettings;
         setSettings(newSettings);
 
-        try {
-            await callGAS(apiUrl, 'reorderBuildings', {
-                buildings: newSettings.map(s => s.building)
-            }, user.token);
-        } catch (error) {
-            alert('排序更新失敗: ' + error.message);
-            await fetchSettings(); // rollback
+        if (reorderTimerRef.current) {
+            clearTimeout(reorderTimerRef.current);
         }
+
+        reorderTimerRef.current = setTimeout(() => {
+            if (latestSettingsRef.current.length > 0) {
+                saveBuildingOrder(latestSettingsRef.current);
+            }
+        }, 500);
     };
 
     const handleDeleteClick = async (buildingName) => {
@@ -668,7 +737,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
     }, [selectedBuilding, activeUrl, customTemplates, getDefaultTemplate]);
 
     return (
-        <div className="max-w-6xl mx-auto min-h-screen flex flex-col p-4 gap-4 pb-24">
+        <div className="max-w-[1600px] w-full mx-auto min-h-screen flex flex-col p-4 sm:p-6 gap-5 pb-24">
             {/* Header Area */}
             <div className="flex items-center justify-between bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-primary)] shadow-sm">
                 <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
@@ -764,32 +833,32 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
             ) : (
                 <>
                     {/* 大樓專屬三大頁籤 (SCHEDULE / PROMOTION_LINK / PRICING_SHIPPING) */}
-                    {activeTab !== 'DELIVERY_ZONES' && (
-                        <div className="flex flex-col gap-5 pb-6">
-                            {/* 🏢 大樓 / 社區 橫向左右滑動選擇器 */}
-                            <div className="bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-primary)] shadow-sm space-y-3">
+                    {activeTab !== 'DELIVERY_ZONES' && activeTab !== 'REWARD_SETTINGS' && (
+                        <div className="flex flex-col md:flex-row gap-6 pb-6 items-start">
+                            {/* 📱 手機版 頂部橫向左右滑動選擇器 (僅在 md 以下顯示) */}
+                            <div className="block md:hidden bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-primary)] shadow-sm space-y-3 w-full">
                                 {/* 頂欄：標題、搜尋框與輔助按鈕 */}
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border-primary)] pb-2.5">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <h3 className="font-extrabold text-sm md:text-base text-[var(--text-primary)] flex items-center gap-1.5 whitespace-nowrap">
+                                        <h3 className="font-extrabold text-sm md:text-base text-slate-900 flex items-center gap-1.5 whitespace-nowrap">
                                             <span className="flex items-center justify-center bg-blue-600 text-white rounded-full w-5 h-5 text-xs font-black">1</span>
                                             選擇大樓 / 社區
                                         </h3>
-                                        <span className="text-xs text-[var(--text-tertiary)] hidden sm:inline">
+                                        <span className="text-xs text-slate-500 font-bold inline">
                                             (← 左右滑動切換社區 →)
                                         </span>
                                     </div>
 
                                     <div className="flex items-center gap-2">
                                         {/* 🔍 大樓搜尋框 */}
-                                        <div className="relative min-w-[160px] sm:min-w-[200px]">
+                                        <div className="relative min-w-[140px] flex-1 sm:flex-none">
                                             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                                             <input
                                                 type="text"
                                                 placeholder="搜尋大樓..."
                                                 value={buildingSearchTerm}
                                                 onChange={(e) => setBuildingSearchTerm(e.target.value)}
-                                                className="w-full pl-7 pr-6 py-1 text-xs rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500 font-medium"
+                                                className="w-full pl-7 pr-6 py-1 text-xs font-bold rounded-xl border border-slate-300 bg-white text-slate-900 focus:outline-none focus:border-blue-500"
                                             />
                                             {buildingSearchTerm && (
                                                 <button
@@ -806,10 +875,10 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                         <button
                                             type="button"
                                             onClick={() => setShowHidden(prev => !prev)}
-                                            className={`text-xs font-bold px-2.5 py-1 rounded-xl border transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap ${
+                                            className={`text-xs font-extrabold px-2.5 py-1 rounded-xl border transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap ${
                                                 showHidden 
-                                                    ? 'bg-amber-500/10 text-amber-600 border-amber-500/30'
-                                                    : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:bg-[var(--bg-hover)]'
+                                                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                                             }`}
                                             title={showHidden ? '隱藏已關閉項目' : '顯示全數'}
                                         >
@@ -819,8 +888,8 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                     </div>
                                 </div>
 
-                                {/* ↔️ 大樓標籤列 (左右滑動) */}
-                                <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700">
+                                {/* ↔️ 大樓標籤列 (手機版 左右滑動) */}
+                                <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5 scrollbar-thin scrollbar-thumb-slate-300">
                                     {/* + 新增大樓按鈕 */}
                                     <button
                                         type="button"
@@ -838,10 +907,10 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                             setAutoCloseDay('');
                                             setAutoCloseTime('');
                                         }}
-                                        className={`px-3 py-1.5 rounded-xl border-2 border-dashed flex items-center gap-1.5 shrink-0 transition-all font-bold text-xs cursor-pointer ${
+                                        className={`px-3 py-1.5 rounded-xl border-2 border-dashed flex items-center gap-1.5 shrink-0 transition-all font-black text-xs cursor-pointer ${
                                             isAddingNew 
                                                 ? 'bg-blue-600 border-blue-600 text-white shadow-sm' 
-                                                : 'bg-blue-50 dark:bg-blue-950/30 border-blue-300 hover:border-blue-500 text-blue-600 dark:text-blue-400'
+                                                : 'bg-blue-50 border-blue-400 hover:bg-blue-100 text-blue-700'
                                         }`}
                                     >
                                         <Plus size={14} />
@@ -851,31 +920,46 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                     {settings
                                         .filter(s => showHidden || !hiddenBuildings.includes(s.building))
                                         .filter(s => !buildingSearchTerm.trim() || s.building.toLowerCase().includes(buildingSearchTerm.trim().toLowerCase()))
-                                        .map((s, idx) => {
+                                        .map((s) => {
                                             const isHidden = hiddenBuildings.includes(s.building);
                                             const isSelected = selectedBuilding === s.building && !isAddingNew;
+                                            const realIdx = settings.findIndex(item => item.building === s.building);
+                                            const isBeingDragged = draggedBuilding === s.building;
+                                            const isDragOver = dragOverBuilding === s.building;
+
                                             return (
                                                 <div
                                                     key={s.building}
+                                                    draggable="true"
+                                                    onDragStart={(e) => handleDragStart(e, s.building)}
+                                                    onDragOver={(e) => handleDragOver(e, s.building)}
+                                                    onDragEnd={handleDragEnd}
+                                                    onDrop={handleDragEnd}
                                                     onClick={() => {
                                                         setIsAddingNew(false);
                                                         setSelectedBuilding(s.building);
                                                         updateFormFields(s.building);
                                                     }}
-                                                    className={`px-3.5 py-1.5 rounded-xl border flex items-center gap-2 shrink-0 transition-all duration-150 cursor-pointer select-none font-bold text-xs ${
-                                                        isHidden
-                                                            ? 'bg-slate-100 dark:bg-slate-900/40 border-dashed border-slate-300 text-slate-400 opacity-60'
-                                                            : isSelected 
-                                                                ? 'bg-blue-600 border-blue-600 text-white shadow-md' 
-                                                                : 'bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)]'
+                                                    className={`px-3.5 py-1.5 rounded-xl border flex items-center gap-1.5 shrink-0 transition-all duration-150 cursor-pointer select-none font-black text-xs ${
+                                                        isBeingDragged
+                                                            ? 'opacity-40 bg-blue-50 border-blue-400'
+                                                            : isDragOver
+                                                                ? 'border-2 border-blue-600 bg-blue-100/60'
+                                                                : isHidden
+                                                                    ? 'bg-slate-100 border-dashed border-slate-300 text-slate-400 opacity-60'
+                                                                    : isSelected 
+                                                                        ? 'bg-blue-600 border-blue-600 text-white shadow-md' 
+                                                                        : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-900'
                                                     }`}
                                                 >
+                                                    <GripVertical size={14} className={`shrink-0 cursor-grab active:cursor-grabbing ${isSelected ? 'text-white/80' : 'text-slate-400'}`} title="拖曳排序" />
+                                                    <span className={`text-[10px] font-black shrink-0 ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>#{realIdx + 1}</span>
                                                     <span>{isHidden ? '🙈' : '🏢'}</span>
                                                     <span className={`whitespace-nowrap ${isHidden ? 'line-through' : ''}`}>
                                                         {s.building}
                                                     </span>
                                                     {s.admin_note && (
-                                                        <span className={`text-[10px] px-1.5 py-0.2 rounded font-medium ${isSelected ? 'bg-blue-500 text-blue-100' : 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300'}`}>
+                                                        <span className={`text-[10px] px-1.5 py-0.2 rounded font-black ${isSelected ? 'bg-white/20 text-white border border-white/30' : 'bg-amber-100 text-amber-900 border border-amber-300'}`}>
                                                             {s.admin_note}
                                                         </span>
                                                     )}
@@ -886,7 +970,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                             type="button"
                                                             onClick={() => toggleHideBuilding(s.building)}
                                                             className={`p-0.5 rounded transition-colors ${
-                                                                isSelected ? 'hover:bg-blue-500 text-blue-200' : 'hover:bg-slate-200 text-slate-400'
+                                                                isSelected ? 'hover:bg-white/20 text-white' : 'hover:bg-slate-200 text-slate-600'
                                                             }`}
                                                             title={isHidden ? '取消隱藏' : '隱藏'}
                                                         >
@@ -897,7 +981,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => handleRenameClick(s.building)}
-                                                                    className="p-0.5 hover:bg-blue-500 rounded text-blue-100 transition-colors"
+                                                                    className="p-0.5 hover:bg-white/20 rounded text-white transition-colors"
                                                                     title="修改名稱"
                                                                 >
                                                                     <Edit2 size={12} />
@@ -905,7 +989,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => handleDeleteClick(s.building)}
-                                                                    className="p-0.5 hover:bg-blue-500 rounded text-rose-200 transition-colors"
+                                                                    className="p-0.5 hover:bg-rose-500 rounded text-rose-100 transition-colors"
                                                                     title="刪除"
                                                                 >
                                                                     <Trash2 size={12} />
@@ -920,8 +1004,8 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
 
                                 {/* 新增大樓輸入欄 */}
                                 {isAddingNew && (
-                                    <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-150 p-2.5 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 rounded-xl">
-                                        <label className="text-xs font-extrabold text-blue-600 whitespace-nowrap">自訂新大樓名稱：</label>
+                                    <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-150 p-2.5 bg-blue-50 border border-blue-200 rounded-xl">
+                                        <label className="text-xs font-black text-blue-700 whitespace-nowrap">自訂新大樓名稱：</label>
                                         <input
                                             type="text"
                                             className="input-field flex-1 px-3 py-1.5 rounded-lg border border-blue-300 bg-white text-xs font-bold focus:outline-none focus:border-blue-500"
@@ -939,8 +1023,193 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                 )}
                             </div>
 
-                            {/* Content Panel */}
-                            <div className="flex flex-col gap-5">
+                            {/* 💻 電腦版 左側社區/大樓直向側邊欄 (僅在 md 以上顯示 - 高對比純亮色) */}
+                            <div className="hidden md:flex flex-col w-80 lg:w-96 shrink-0 sticky top-4 bg-[var(--bg-secondary)] p-4 rounded-2xl border border-[var(--border-primary)] shadow-sm space-y-3.5">
+                                {/* 側邊欄頂欄：標題與計數 */}
+                                <div className="flex items-center justify-between border-b border-[var(--border-primary)] pb-3">
+                                    <h3 className="font-black text-base lg:text-lg text-slate-900 flex items-center gap-2">
+                                        <span className="flex items-center justify-center bg-blue-600 text-white rounded-full w-6 h-6 text-xs font-black">1</span>
+                                        選擇大樓 / 社區
+                                    </h3>
+                                    <span className="text-xs font-black text-blue-700 bg-blue-100 border border-blue-200 px-3 py-1 rounded-xl shadow-2xs">
+                                        共 {settings.length} 個
+                                    </span>
+                                </div>
+
+                                {/* 🔍 側邊欄搜尋框與過濾按鈕 */}
+                                <div className="flex items-center gap-2">
+                                    <div className="relative flex-1">
+                                        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="搜尋大樓..."
+                                            value={buildingSearchTerm}
+                                            onChange={(e) => setBuildingSearchTerm(e.target.value)}
+                                            className="w-full pl-7 pr-6 py-2 text-xs font-extrabold rounded-xl border border-slate-300 bg-white text-slate-900 focus:outline-none focus:border-blue-500"
+                                        />
+                                        {buildingSearchTerm && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setBuildingSearchTerm('')}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                                            >
+                                                ✕
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowHidden(prev => !prev)}
+                                        className={`text-xs font-extrabold px-2.5 py-2 rounded-xl border transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap ${
+                                            showHidden 
+                                                ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                                        }`}
+                                        title={showHidden ? '隱藏已關閉項目' : '顯示全數'}
+                                    >
+                                        {showHidden ? <Eye size={14} /> : <EyeOff size={14} />}
+                                    </button>
+                                </div>
+
+                                {/* + 新增大樓按鈕 */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsAddingNew(true);
+                                        setSelectedBuilding('__new__');
+                                        setNewBuildingName('');
+                                        setStartDate('');
+                                        setStartTime('');
+                                        setEndDate('');
+                                        setEndTime('');
+                                        setIsAuto(false);
+                                        setAutoOpenDay('');
+                                        setAutoOpenTime('');
+                                        setAutoCloseDay('');
+                                        setAutoCloseTime('');
+                                    }}
+                                    className={`w-full py-2.5 rounded-xl border-2 border-dashed flex items-center justify-center gap-1.5 transition-all font-black text-xs md:text-sm cursor-pointer ${
+                                        isAddingNew 
+                                            ? 'bg-blue-600 border-blue-600 text-white shadow-sm' 
+                                            : 'bg-blue-50 hover:bg-blue-100 border-blue-400 text-blue-700 shadow-2xs'
+                                    }`}
+                                >
+                                    <Plus size={15} />
+                                    <span>新增大樓 / 社區</span>
+                                </button>
+
+                                {/* 新增大樓輸入欄 */}
+                                {isAddingNew && (
+                                    <div className="flex flex-col gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                                        <label className="text-xs font-black text-blue-700">自訂新大樓名稱：</label>
+                                        <input
+                                            type="text"
+                                            className="input-field w-full px-3 py-2 rounded-lg border border-blue-300 bg-white text-xs md:text-sm font-bold focus:outline-none focus:border-blue-500 text-slate-900"
+                                            placeholder="例如：遠雄富源大樓"
+                                            value={newBuildingName}
+                                            onChange={(e) => setNewBuildingName(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    const nextEl = document.getElementById('startDate');
+                                                    if (nextEl) nextEl.focus();
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* 📋 大樓直向列表 (電腦版 - 超高對比 100% 清晰純亮色 & 支援拖曳排序) */}
+                                <div className="flex flex-col gap-2 max-h-[calc(100vh-280px)] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-300">
+                                    {settings
+                                        .filter(s => showHidden || !hiddenBuildings.includes(s.building))
+                                        .filter(s => !buildingSearchTerm.trim() || s.building.toLowerCase().includes(buildingSearchTerm.trim().toLowerCase()))
+                                        .map((s) => {
+                                            const isHidden = hiddenBuildings.includes(s.building);
+                                            const isSelected = selectedBuilding === s.building && !isAddingNew;
+                                            const realIdx = settings.findIndex(item => item.building === s.building);
+                                            const isBeingDragged = draggedBuilding === s.building;
+                                            const isDragOver = dragOverBuilding === s.building;
+
+                                            return (
+                                                <div
+                                                    key={s.building}
+                                                    draggable="true"
+                                                    onDragStart={(e) => handleDragStart(e, s.building)}
+                                                    onDragOver={(e) => handleDragOver(e, s.building)}
+                                                    onDragEnd={handleDragEnd}
+                                                    onDrop={handleDragEnd}
+                                                    onClick={() => {
+                                                        setIsAddingNew(false);
+                                                        setSelectedBuilding(s.building);
+                                                        updateFormFields(s.building);
+                                                    }}
+                                                    className={`p-3 rounded-2xl border flex items-center justify-between gap-2.5 transition-all duration-150 cursor-pointer select-none font-black text-sm md:text-base ${
+                                                        isBeingDragged
+                                                            ? 'opacity-40 bg-blue-50 border-blue-400 scale-[0.98]'
+                                                            : isDragOver
+                                                                ? 'border-2 border-blue-600 bg-blue-100/60 shadow-md'
+                                                                : isHidden
+                                                                    ? 'bg-slate-100 border-dashed border-slate-300 text-slate-400 opacity-60'
+                                                                    : isSelected 
+                                                                        ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/25' 
+                                                                        : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-900 shadow-2xs'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                        <GripVertical size={16} className={`shrink-0 cursor-grab active:cursor-grabbing ${isSelected ? 'text-white/80' : 'text-slate-400 hover:text-slate-700'}`} title="按住拖曳排序" />
+                                                        <span className={`text-xs font-black shrink-0 min-w-[24px] ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>#{realIdx + 1}</span>
+                                                        <span className="text-base sm:text-lg shrink-0">{isHidden ? '🙈' : '🏢'}</span>
+                                                        <span className={`break-words text-slate-900 font-black ${isSelected ? '!text-white' : ''} ${isHidden ? 'line-through opacity-70' : ''}`}>
+                                                            {s.building}
+                                                        </span>
+                                                        {s.admin_note && (
+                                                            <span className={`text-xs px-2 py-0.5 rounded-md font-black shrink-0 ${isSelected ? 'bg-white/20 text-white border border-white/40' : 'bg-amber-100 text-amber-900 border border-amber-300'}`}>
+                                                                {s.admin_note}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* 右側按鈕：隱藏/重命名/刪除 */}
+                                                    <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleHideBuilding(s.building)}
+                                                            className={`p-1.5 rounded-lg transition-colors ${isSelected ? 'hover:bg-white/20 text-white' : 'hover:bg-slate-200 text-slate-700'}`}
+                                                            title={isHidden ? '取消隱藏' : '隱藏'}
+                                                        >
+                                                            {isHidden ? <Eye size={15} /> : <EyeOff size={15} />}
+                                                        </button>
+
+                                                        {isSelected && (
+                                                            <>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleRenameClick(s.building)}
+                                                                    className="p-1.5 hover:bg-white/20 rounded-lg text-white transition-colors"
+                                                                    title="修改名稱"
+                                                                >
+                                                                    <Edit2 size={15} />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDeleteClick(s.building)}
+                                                                    className="p-1.5 hover:bg-rose-500 rounded-lg text-rose-100 transition-colors"
+                                                                    title="刪除"
+                                                                >
+                                                                    <Trash2 size={15} />
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                </div>
+                            </div>
+
+                            {/* Content Panel (右側詳細設定面板) */}
+                            <div className="flex-1 w-full min-w-0 flex flex-col gap-5">
                                 
                                 {/* 📅 頁籤一：開團與時程控制面板 */}
                                 {activeTab === 'SCHEDULE' && (
@@ -1622,6 +1891,336 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                         </div>
                     )}
 
+                    {activeTab === 'REWARD_SETTINGS' && (
+                        <div className="bg-[var(--bg-secondary)] p-6 rounded-2xl border border-[var(--border-primary)] shadow-sm space-y-6">
+                        {/* 頂欄：標題與全區儲存按鈕 */}
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-[var(--border-primary)] pb-5">
+                            <div>
+                                <h3 className="font-black text-xl text-slate-900 flex items-center gap-2">
+                                    <Gift className="text-emerald-600" size={22} />
+                                    線上會員滿額折抵設定 (LIFF)
+                                </h3>
+                                <p className="text-xs text-slate-600 mt-1 font-bold">
+                                    顧客下單時可自選套用已解鎖之滿額折抵，使用後將自動扣除對應門檻額度。
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    setRewardSaving(true);
+                                    try {
+                                        const ids = rewardTestUserIds.split(',').map(s => s.trim()).filter(Boolean);
+                                        const res = await callGAS(apiUrl, 'saveRewardConfig', {
+                                            mode: rewardMode,
+                                            testUserIds: ids,
+                                            headerImage: rewardHeaderImage,
+                                            tierRules: rewardTierRules
+                                        }, user?.token);
+                                        if (res && res.success) {
+                                            alert('✅ 成功儲存滿額折抵設定！');
+                                        } else {
+                                            alert(res?.error || '儲存失敗');
+                                        }
+                                    } catch (e) {
+                                        alert('儲存出錯: ' + e.message);
+                                    } finally {
+                                        setRewardSaving(false);
+                                    }
+                                }}
+                                disabled={rewardSaving}
+                                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs md:text-sm rounded-xl shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-all shrink-0"
+                            >
+                                <Save size={16} />
+                                <span>{rewardSaving ? '儲存中...' : '儲存全區設定'}</span>
+                            </button>
+                        </div>
+                        {/* 1. ⚙️ 功能運行狀態模式 */}
+                        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+                            <label className="text-sm font-black text-slate-900 flex items-center gap-2">
+                                <ShieldCheck size={18} className="text-blue-600" />
+                                功能運行狀態模式：
+                            </label>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setRewardMode('OFF')}
+                                    className={`py-3.5 px-4 rounded-2xl text-xs font-black flex flex-col items-center gap-1.5 cursor-pointer transition-all border ${
+                                        rewardMode === 'OFF'
+                                            ? 'bg-rose-50 text-rose-800 border-2 border-rose-400 shadow-md'
+                                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                                    }`}
+                                >
+                                    <span className="text-sm font-black">🔴 關閉 (OFF)</span>
+                                    <span className="text-[11px] font-bold text-slate-500">全站顧客皆無法使用</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setRewardMode('TEST')}
+                                    className={`py-3.5 px-4 rounded-2xl text-xs font-black flex flex-col items-center gap-1.5 cursor-pointer transition-all border ${
+                                        rewardMode === 'TEST'
+                                            ? 'bg-amber-50 text-amber-900 border-2 border-amber-400 shadow-md'
+                                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                                    }`}
+                                >
+                                    <span className="text-sm font-black">🟡 測試模式 (TEST)</span>
+                                    <span className="text-[11px] font-bold text-slate-500">僅下方指定的 LINE UserID 能測試</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setRewardMode('ON')}
+                                    className={`py-3.5 px-4 rounded-2xl text-xs font-black flex flex-col items-center gap-1.5 cursor-pointer transition-all border ${
+                                        rewardMode === 'ON'
+                                            ? 'bg-emerald-50 text-emerald-900 border-2 border-emerald-500 shadow-md'
+                                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                                    }`}
+                                >
+                                    <span className="text-sm font-black">🟢 全站正式開啟 (ON)</span>
+                                    <span className="text-[11px] font-bold text-slate-500">所有 LIFF 下單顧客全面啟用</span>
+                                </button>
+                            </div>
+                            {rewardMode === 'TEST' && (
+                                <div className="pt-2 space-y-2 animate-in fade-in duration-150 p-4 bg-white rounded-xl border border-slate-200">
+                                    <label className="text-xs font-black text-slate-900">允許測試的 LINE User ID (多筆請用逗號隔開)：</label>
+                                    <input
+                                        type="text"
+                                        value={rewardTestUserIds}
+                                        onChange={(e) => setRewardTestUserIds(e.target.value)}
+                                        placeholder="留空代表允許所有管理員測試，或貼入 U123456..."
+                                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-blue-500"
+                                    />
+                                    <p className="text-[11px] font-bold text-slate-500">提示：可以在「會員管理」頁面複製您的 LINE UserID。</p>
+                                </div>
+                            )}
+                        </div>
+                        {/* 2. 🎨 滿額贈全域視覺設定 */}
+                        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-3">
+                            <h4 className="font-black text-sm text-slate-900 flex items-center gap-2">
+                                <Sparkles size={18} className="text-purple-600" />
+                                滿額贈全域視覺設定
+                            </h4>
+                            <div className="flex flex-col gap-2">
+                                <label className="text-xs font-black text-slate-700">標題頂部大圖示 (Header Image URL)</label>
+                                <div className="flex gap-3 items-center">
+                                    <input
+                                        type="text"
+                                        value={rewardHeaderImage}
+                                        onChange={(e) => setRewardHeaderImage(e.target.value)}
+                                        placeholder="請貼上圖片網址 (留空則使用預設經典奶箱圖示)"
+                                        className="flex-1 p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-500"
+                                    />
+                                    {rewardHeaderImage && (
+                                        <div className="w-12 h-12 rounded-xl bg-white border border-slate-300 shrink-0 flex items-center justify-center p-1 overflow-hidden shadow-2xs">
+                                            <img src={rewardHeaderImage} alt="Header Preview" className="w-full h-full object-contain" onError={(e) => {e.target.style.display='none'}} />
+                                        </div>
+                                    )}
+                                </div>
+                                <p className="text-[11px] font-bold text-slate-500">顯示在前台下單頁面「奶箱」標題旁邊的主視覺圖示。</p>
+                            </div>
+                        </div>
+                        {/* 3. 🎁 階梯門檻規則管理 */}
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+                                <h4 className="font-black text-base text-slate-900 flex items-center gap-2">
+                                    <Gift size={18} className="text-amber-500" />
+                                    階梯門檻與對應折抵金額
+                                </h4>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const lastRule = rewardTierRules[rewardTierRules.length - 1] || { spendMin: 0, discount: 0 };
+                                        setRewardTierRules([
+                                            ...rewardTierRules,
+                                            { 
+                                                spendMin: lastRule.spendMin + 5000, 
+                                                discount: lastRule.discount + 200,
+                                                name: '新階梯奶箱',
+                                                subtitle: '✨ 專屬優惠',
+                                                image: ''
+                                            }
+                                        ]);
+                                    }}
+                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                                >
+                                    <Plus size={15} /> 新增階梯門檻
+                                </button>
+                            </div>
+                            <div className="space-y-5">
+                                {rewardTierRules.map((rule, idx) => (
+                                    <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 hover:border-slate-300 transition-all">
+                                        {/* 卡片頂欄 */}
+                                        <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                                            <div className="flex items-center gap-2">
+                                                <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 font-black text-xs px-3 py-1 rounded-xl">
+                                                    階梯 #{idx + 1}
+                                                </span>
+                                                <span className="font-black text-slate-900 text-sm">{rule.name || '自訂奶箱名稱'}</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setRewardTierRules(rewardTierRules.filter((_, i) => i !== idx));
+                                                }}
+                                                className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                                                title="刪除此階梯"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                        
+                                        {/* 第 1 排：名稱與副標題 */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="flex flex-col gap-1.5">
+                                                <label className="text-xs font-black text-slate-700">奶箱/活動名稱</label>
+                                                <input
+                                                    type="text"
+                                                    value={rule.name || ''}
+                                                    placeholder="例如: 迷你奶箱"
+                                                    onChange={(e) => {
+                                                        const newRules = [...rewardTierRules];
+                                                        newRules[idx].name = e.target.value;
+                                                        setRewardTierRules(newRules);
+                                                    }}
+                                                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-black text-slate-900 focus:bg-white focus:outline-none focus:border-blue-500"
+                                                />
+                                            </div>
+                                            <div className="flex flex-col gap-1.5">
+                                                <label className="text-xs font-black text-slate-700">副標題 / 優惠標語</label>
+                                                <input
+                                                    type="text"
+                                                    value={rule.subtitle || ''}
+                                                    placeholder="例如: 💙 入門小確幸"
+                                                    onChange={(e) => {
+                                                        const newRules = [...rewardTierRules];
+                                                        newRules[idx].subtitle = e.target.value;
+                                                        setRewardTierRules(newRules);
+                                                    }}
+                                                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-black text-slate-900 focus:bg-white focus:outline-none focus:border-blue-500"
+                                                />
+                                            </div>
+                                        </div>
+                                        {/* 第 2 排：解鎖門檻與折扣金額 */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="flex flex-col gap-1.5">
+                                                <label className="text-xs font-black text-slate-700">解鎖門檻金額 ($)</label>
+                                                <input
+                                                    type="number"
+                                                    value={rule.spendMin}
+                                                    onChange={(e) => {
+                                                        const newRules = [...rewardTierRules];
+                                                        newRules[idx].spendMin = Number(e.target.value) || 0;
+                                                        setRewardTierRules(newRules);
+                                                    }}
+                                                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-black text-slate-900 focus:bg-white focus:outline-none focus:border-blue-500"
+                                                />
+                                            </div>
+                                            <div className="flex flex-col gap-1.5">
+                                                <label className="text-xs font-black text-emerald-700">對應折抵金額 ($)</label>
+                                                <input
+                                                    type="number"
+                                                    value={rule.discount}
+                                                    onChange={(e) => {
+                                                        const newRules = [...rewardTierRules];
+                                                        newRules[idx].discount = Number(e.target.value) || 0;
+                                                        setRewardTierRules(newRules);
+                                                    }}
+                                                    className="w-full p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl text-xs font-mono font-black text-emerald-700 focus:bg-white focus:outline-none focus:border-emerald-500"
+                                                />
+                                            </div>
+                                        </div>
+                                        
+                                        {/* 第 3 排：專屬圖片網址 */}
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-xs font-black text-slate-700">專屬圖片網址 (Image URL)</label>
+                                            <div className="flex gap-3 items-center">
+                                                <input
+                                                    type="text"
+                                                    value={rule.image || ''}
+                                                    placeholder="請貼上網址 (支援 .png, .webp, .jpg)"
+                                                    onChange={(e) => {
+                                                        const newRules = [...rewardTierRules];
+                                                        newRules[idx].image = e.target.value;
+                                                        setRewardTierRules(newRules);
+                                                    }}
+                                                    className="flex-1 p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-blue-500"
+                                                />
+                                                {rule.image && (
+                                                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-300 shrink-0 flex items-center justify-center p-0.5 overflow-hidden shadow-2xs">
+                                                        <img src={rule.image} alt="Preview" className="w-full h-full object-contain" onError={(e) => {e.target.style.display='none'}} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {/* 第 4 排：預覽獎品清單 */}
+                                        <div className="flex flex-col gap-2.5 pt-3 border-t border-slate-100">
+                                            <div className="flex justify-between items-center">
+                                                <label className="text-xs font-black text-slate-700 flex items-center gap-1.5">
+                                                    <Gift size={15} className="text-pink-500" /> 預覽獎品清單
+                                                </label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newRules = [...rewardTierRules];
+                                                        const prizes = newRules[idx].prizes || [];
+                                                        newRules[idx].prizes = [...prizes, { icon: '🎁', text: '新獎品' }];
+                                                        setRewardTierRules(newRules);
+                                                    }}
+                                                    className="px-3 py-1 bg-pink-50 hover:bg-pink-100 text-pink-700 rounded-lg text-xs font-black border border-pink-200 flex items-center gap-1 cursor-pointer transition-all"
+                                                >
+                                                    <Plus size={13} /> 新增獎品
+                                                </button>
+                                            </div>
+                                            
+                                            <div className="space-y-2">
+                                                {(rule.prizes || []).map((prize, pIdx) => (
+                                                    <div key={pIdx} className="flex gap-2 items-center">
+                                                        <input
+                                                            type="text"
+                                                            value={prize.icon || ''}
+                                                            placeholder="Emoji"
+                                                            onChange={(e) => {
+                                                                const newRules = [...rewardTierRules];
+                                                                newRules[idx].prizes[pIdx].icon = e.target.value;
+                                                                setRewardTierRules(newRules);
+                                                            }}
+                                                            className="w-14 p-2 text-center bg-slate-50 border border-slate-300 rounded-xl text-xs font-black text-slate-900"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={prize.text || ''}
+                                                            placeholder="獎品名稱 (例如: 35元折價券)"
+                                                            onChange={(e) => {
+                                                                const newRules = [...rewardTierRules];
+                                                                newRules[idx].prizes[pIdx].text = e.target.value;
+                                                                setRewardTierRules(newRules);
+                                                            }}
+                                                            className="flex-1 p-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const newRules = [...rewardTierRules];
+                                                                newRules[idx].prizes = newRules[idx].prizes.filter((_, i) => i !== pIdx);
+                                                                setRewardTierRules(newRules);
+                                                            }}
+                                                            className="p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-500 rounded-lg cursor-pointer transition-colors"
+                                                        >
+                                                            <Trash2 size={15} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                {(!rule.prizes || rule.prizes.length === 0) && (
+                                                    <div className="text-xs font-bold text-slate-400 text-center py-2.5 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                                                        尚未設定任何獎品（前台將顯示系統預設的示範獎項）
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
                     {/* 🛵 頁籤四：散客外送區域管理面板 */}
                     {activeTab === 'DELIVERY_ZONES' && (
                         <div className="bg-[var(--bg-secondary)] p-6 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-6">
@@ -1914,331 +2513,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                             </div>
                         </div>
                     )}
-                    {activeTab === 'REWARD_SETTINGS' && (
-                        <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-sm space-y-6">
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-[var(--border-primary)] pb-4">
-                                <div>
-                                    <h3 className="font-black text-lg text-[var(--text-primary)] flex items-center gap-2">
-                                        <Gift className="text-emerald-500" /> 線上會員滿額折抵設定 (LIFF)
-                                    </h3>
-                                    <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
-                                        顧客下單時可自選套用已解鎖之滿額折抵，使用後將自動扣除對應門檻額度。
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={async () => {
-                                        setRewardSaving(true);
-                                        try {
-                                            const ids = rewardTestUserIds.split(',').map(s => s.trim()).filter(Boolean);
-                                            const res = await callGAS(apiUrl, 'saveRewardConfig', {
-                                                mode: rewardMode,
-                                                testUserIds: ids,
-                                                headerImage: rewardHeaderImage,
-                                                tierRules: rewardTierRules
-                                            }, user?.token);
-                                            if (res && res.success) {
-                                                alert('成功儲存滿額折抵設定！');
-                                            } else {
-                                                alert(res?.error || '儲存失敗');
-                                            }
-                                        } catch (e) {
-                                            alert('儲存出錯');
-                                        } finally {
-                                            setRewardSaving(false);
-                                        }
-                                    }}
-                                    disabled={rewardSaving}
-                                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
-                                >
-                                    <Save size={16} />
-                                    {rewardSaving ? '儲存中...' : '儲存設定'}
-                                </button>
-                            </div>
 
-                            {/* 1. 功能模式設定 */}
-                            <div className="bg-[var(--bg-tertiary)] p-4 rounded-xl border border-[var(--border-primary)] space-y-3">
-                                <label className="text-xs font-black text-[var(--text-primary)] flex items-center gap-1.5">
-                                    <ShieldCheck size={16} className="text-blue-500" />
-                                    功能運行狀態模式：
-                                </label>
-                                <div className="grid grid-cols-3 gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setRewardMode('OFF')}
-                                        className={`py-3 px-3 rounded-xl text-xs font-black flex flex-col items-center gap-1 cursor-pointer transition-all border ${
-                                            rewardMode === 'OFF'
-                                                ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/40 shadow-sm'
-                                                : 'bg-[var(--bg-primary)] text-[var(--text-tertiary)] border-[var(--border-primary)]'
-                                        }`}
-                                    >
-                                        <span className="text-sm">🔴 關閉 (OFF)</span>
-                                        <span className="text-[10px] font-normal">全站顧客皆無法使用</span>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => setRewardMode('TEST')}
-                                        className={`py-3 px-3 rounded-xl text-xs font-black flex flex-col items-center gap-1 cursor-pointer transition-all border ${
-                                            rewardMode === 'TEST'
-                                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/40 shadow-sm'
-                                                : 'bg-[var(--bg-primary)] text-[var(--text-tertiary)] border-[var(--border-primary)]'
-                                        }`}
-                                    >
-                                        <span className="text-sm">🟡 測試模式 (TEST)</span>
-                                        <span className="text-[10px] font-normal">僅下方指定的 LINE UserID 能測試</span>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => setRewardMode('ON')}
-                                        className={`py-3 px-3 rounded-xl text-xs font-black flex flex-col items-center gap-1 cursor-pointer transition-all border ${
-                                            rewardMode === 'ON'
-                                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/40 shadow-sm'
-                                                : 'bg-[var(--bg-primary)] text-[var(--text-tertiary)] border-[var(--border-primary)]'
-                                        }`}
-                                    >
-                                        <span className="text-sm">🟢 全站正式開啟 (ON)</span>
-                                        <span className="text-[10px] font-normal">所有 LIFF 下單顧客全面啟用</span>
-                                    </button>
-                                </div>
-
-                                {rewardMode === 'TEST' && (
-                                    <div className="pt-2 space-y-1 animate-in fade-in duration-150">
-                                        <label className="text-[11px] font-bold text-[var(--text-secondary)]">允許測試的 LINE User ID (用逗號隔開)：</label>
-                                        <input
-                                            type="text"
-                                            value={rewardTestUserIds}
-                                            onChange={(e) => setRewardTestUserIds(e.target.value)}
-                                            placeholder="留空代表允許所有管理員測試，或貼入 U123456..."
-                                            className="w-full p-2.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl text-xs font-mono"
-                                        />
-                                        <p className="text-[10px] text-[var(--text-tertiary)]">可在「會員管理」頁面複製您自己的 LINE UserID。</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* 2. 全域設定 */}
-                            <div className="bg-[var(--bg-tertiary)] p-4 rounded-xl border border-[var(--border-primary)] space-y-3">
-                                <h4 className="font-extrabold text-sm text-[var(--text-primary)] flex items-center gap-1.5">
-                                    <Sparkles size={16} className="text-purple-500" />
-                                    滿額贈全域視覺設定
-                                </h4>
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-[11px] font-bold text-[var(--text-secondary)]">標題頂部大圖示 (Header Image URL)</label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            value={rewardHeaderImage}
-                                            onChange={(e) => setRewardHeaderImage(e.target.value)}
-                                            placeholder="請貼上圖片網址 (留空則使用預設經典奶箱)"
-                                            className="flex-1 p-2.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl text-xs"
-                                        />
-                                        {rewardHeaderImage && (
-                                            <div className="w-10 h-10 rounded-lg bg-white border border-[var(--border-primary)] shrink-0 flex items-center justify-center p-0.5 overflow-hidden shadow-2xs">
-                                                <img src={rewardHeaderImage} alt="Header Preview" className="w-full h-full object-contain" onError={(e) => {e.target.style.display='none'}} />
-                                            </div>
-                                        )}
-                                    </div>
-                                    <p className="text-[10px] text-[var(--text-tertiary)] mt-1">顯示在前台下單頁面「奶箱」標題旁邊的主視覺圖示。</p>
-                                </div>
-                            </div>
-
-                            {/* 3. 階梯門檻規則管理 */}
-                            <div className="space-y-3">
-                                <div className="flex justify-between items-center">
-                                    <h4 className="font-extrabold text-sm text-[var(--text-primary)] flex items-center gap-1.5">
-                                        <Gift size={16} className="text-amber-500" />
-                                        階梯門檻與對應折抵金額
-                                    </h4>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const lastRule = rewardTierRules[rewardTierRules.length - 1] || { spendMin: 0, discount: 0 };
-                                            setRewardTierRules([
-                                                ...rewardTierRules,
-                                                { 
-                                                    spendMin: lastRule.spendMin + 5000, 
-                                                    discount: lastRule.discount + 200,
-                                                    name: '新階梯奶箱',
-                                                    subtitle: '✨ 專屬優惠',
-                                                    image: ''
-                                                }
-                                            ]);
-                                        }}
-                                        className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-xl text-xs font-bold border border-blue-500/30 flex items-center gap-1 cursor-pointer"
-                                    >
-                                        <Plus size={14} /> 新增門檻
-                                    </button>
-                                </div>
-
-                                <div className="space-y-4 mt-4">
-                                    {rewardTierRules.map((rule, idx) => (
-                                        <div key={idx} className="bg-[var(--bg-tertiary)] p-4 rounded-xl border border-[var(--border-primary)] flex flex-col gap-3">
-                                            <div className="flex justify-between items-center pb-2 border-b border-[var(--border-primary)]">
-                                                <span className="font-extrabold text-sm text-[var(--text-primary)]">階梯 {idx + 1}</span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setRewardTierRules(rewardTierRules.filter((_, i) => i !== idx));
-                                                    }}
-                                                    className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-lg cursor-pointer transition-colors"
-                                                    title="刪除此階梯"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                            
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                                <div className="flex flex-col gap-1">
-                                                    <label className="text-[11px] font-bold text-[var(--text-secondary)]">奶箱名稱</label>
-                                                    <input
-                                                        type="text"
-                                                        value={rule.name || ''}
-                                                        placeholder="例如: 迷你奶箱"
-                                                        onChange={(e) => {
-                                                            const newRules = [...rewardTierRules];
-                                                            newRules[idx].name = e.target.value;
-                                                            setRewardTierRules(newRules);
-                                                        }}
-                                                        className="w-full p-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-xs"
-                                                    />
-                                                </div>
-                                                <div className="flex flex-col gap-1">
-                                                    <label className="text-[11px] font-bold text-[var(--text-secondary)]">副標題 / 優惠標語</label>
-                                                    <input
-                                                        type="text"
-                                                        value={rule.subtitle || ''}
-                                                        placeholder="例如: 💙 入門小確幸"
-                                                        onChange={(e) => {
-                                                            const newRules = [...rewardTierRules];
-                                                            newRules[idx].subtitle = e.target.value;
-                                                            setRewardTierRules(newRules);
-                                                        }}
-                                                        className="w-full p-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-xs"
-                                                    />
-                                                </div>
-                                                <div className="flex flex-col gap-1">
-                                                    <label className="text-[11px] font-bold text-[var(--text-secondary)]">解鎖門檻 ($)</label>
-                                                    <input
-                                                        type="number"
-                                                        value={rule.spendMin}
-                                                        onChange={(e) => {
-                                                            const newRules = [...rewardTierRules];
-                                                            newRules[idx].spendMin = Number(e.target.value) || 0;
-                                                            setRewardTierRules(newRules);
-                                                        }}
-                                                        className="w-full p-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-xs font-mono font-black"
-                                                    />
-                                                </div>
-                                                <div className="flex flex-col gap-1">
-                                                    <label className="text-[11px] font-bold text-emerald-600">折扣金額 ($)</label>
-                                                    <input
-                                                        type="number"
-                                                        value={rule.discount}
-                                                        onChange={(e) => {
-                                                            const newRules = [...rewardTierRules];
-                                                            newRules[idx].discount = Number(e.target.value) || 0;
-                                                            setRewardTierRules(newRules);
-                                                        }}
-                                                        className="w-full p-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-xs font-mono font-black text-emerald-600"
-                                                    />
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-[11px] font-bold text-[var(--text-secondary)]">圖片網址 (Image URL)</label>
-                                                <div className="flex gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={rule.image || ''}
-                                                        placeholder="貼上網址或上傳至圖床 (支援 .png, .webp, .jpg)"
-                                                        onChange={(e) => {
-                                                            const newRules = [...rewardTierRules];
-                                                            newRules[idx].image = e.target.value;
-                                                            setRewardTierRules(newRules);
-                                                        }}
-                                                        className="flex-1 p-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-xs"
-                                                    />
-                                                    {rule.image && (
-                                                        <div className="w-9 h-9 rounded bg-white border border-[var(--border-primary)] shrink-0 flex items-center justify-center p-0.5 overflow-hidden shadow-2xs">
-                                                            <img src={rule.image} alt="Preview" className="w-full h-full object-contain" onError={(e) => {e.target.style.display='none'}} />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* 獎品預覽清單 */}
-                                            <div className="flex flex-col gap-2 mt-1 pt-3 border-t border-[var(--border-primary)]/50">
-                                                <div className="flex justify-between items-center">
-                                                    <label className="text-[11px] font-bold text-[var(--text-secondary)] flex items-center gap-1.5">
-                                                        <Gift size={14} className="text-pink-500" /> 預覽獎品清單
-                                                    </label>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const newRules = [...rewardTierRules];
-                                                            const prizes = newRules[idx].prizes || [];
-                                                            newRules[idx].prizes = [...prizes, { icon: '🎁', text: '新獎品' }];
-                                                            setRewardTierRules(newRules);
-                                                        }}
-                                                        className="px-2 py-1 bg-pink-500/10 hover:bg-pink-500/20 text-pink-600 rounded text-[10px] font-bold border border-pink-500/30 flex items-center gap-1 cursor-pointer"
-                                                    >
-                                                        <Plus size={12} /> 新增獎品
-                                                    </button>
-                                                </div>
-                                                
-                                                <div className="space-y-2">
-                                                    {(rule.prizes || []).map((prize, pIdx) => (
-                                                        <div key={pIdx} className="flex gap-2 items-center">
-                                                            <input
-                                                                type="text"
-                                                                value={prize.icon || ''}
-                                                                placeholder="Emoji"
-                                                                onChange={(e) => {
-                                                                    const newRules = [...rewardTierRules];
-                                                                    newRules[idx].prizes[pIdx].icon = e.target.value;
-                                                                    setRewardTierRules(newRules);
-                                                                }}
-                                                                className="w-12 p-2 text-center bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-xs"
-                                                            />
-                                                            <input
-                                                                type="text"
-                                                                value={prize.text || ''}
-                                                                placeholder="獎品名稱 (例如: 35元折價券)"
-                                                                onChange={(e) => {
-                                                                    const newRules = [...rewardTierRules];
-                                                                    newRules[idx].prizes[pIdx].text = e.target.value;
-                                                                    setRewardTierRules(newRules);
-                                                                }}
-                                                                className="flex-1 p-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-xs"
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    const newRules = [...rewardTierRules];
-                                                                    newRules[idx].prizes = newRules[idx].prizes.filter((_, i) => i !== pIdx);
-                                                                    setRewardTierRules(newRules);
-                                                                }}
-                                                                className="p-2 text-[var(--text-tertiary)] hover:bg-rose-500/10 hover:text-rose-500 rounded-lg cursor-pointer transition-colors"
-                                                            >
-                                                                <Trash2 size={14} />
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                    {(!rule.prizes || rule.prizes.length === 0) && (
-                                                        <div className="text-[10px] text-[var(--text-tertiary)] text-center py-2.5 bg-[var(--bg-primary)] rounded-lg border border-dashed border-[var(--border-primary)]">
-                                                            尚未設定任何獎品（前台將顯示系統預設的示範獎項）
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </>
             )}
         </div>
