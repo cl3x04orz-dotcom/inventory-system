@@ -16,6 +16,14 @@ const app = buildApp();
 const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const host = process.env.HOST || '0.0.0.0';
 
+process.on('uncaughtException', (err) => {
+  console.error('💥 [CRITICAL] Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 [CRITICAL] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 async function start() {
   try {
     await app.listen({ port, host });
@@ -25,5 +33,20 @@ async function start() {
     process.exit(1);
   }
 }
+
+const shutdown = async (signal: string) => {
+  console.log(`[Server] 收到 ${signal} 訊號，正在優雅關閉伺服器...`);
+  try {
+    await app.close();
+    console.log('[Server] 伺服器已安全關閉');
+    process.exit(0);
+  } catch (err) {
+    console.error('[Server] 關閉過程發生錯誤:', err);
+    process.exit(1);
+  }
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 start();

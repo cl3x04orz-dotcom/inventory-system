@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "postinstall": "prisma generate",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "node --max-old-space-size=420 dist/server.js",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "node scratch/seed.js",
