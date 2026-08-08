@@ -200,7 +200,7 @@ function generateSubscriptionOrdersService(payload, user) {
   if (user.role !== 'BOSS') throw new Error('權限不足');
 
   const { building, date } = payload;
-  if (!building) throw new Error('請指定配送大樓');
+  const isAllBuildings = !building || building === '全部' || building === 'ALL';
 
   // date 格式為 YYYY-MM-DD，若未傳則預設今天
   const targetDateStr = date || Utilities.formatDate(new Date(), "Asia/Taipei", "yyyy-MM-dd");
@@ -212,7 +212,8 @@ function generateSubscriptionOrdersService(payload, user) {
   // 1. 取得所有有效的訂閱計畫
   const allSubs = getSubscriptionsService();
   const filteredSubs = allSubs.filter(sub => {
-    return sub.building === building && 
+    const matchesBuilding = isAllBuildings || sub.building === building;
+    return matchesBuilding && 
            sub.isActive === true && 
            sub.frequency.includes(dayOfWeek);
   });

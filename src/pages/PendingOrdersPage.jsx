@@ -415,13 +415,13 @@ export default function PendingOrdersPage({ user, apiUrl }) {
          }
      }, [user.token, activeTab, fetchOrders, fetchProducts, fetchGroupBindings, fetchBuildings]);
 
-    // 當切換到特定大樓時，自動在背景導入本週全數定期配，實現「100% 全自動零點擊體驗」
+    // 進到訂單審核或切換大樓時，自動在背景掃描並導入全站全大樓本週定期配，實現「100% 全自動無感零點擊體驗」
     useEffect(() => {
-        if (user?.token && activeTab === 'PENDING' && selectedBuilding && selectedBuilding !== '全部') {
+        if (user?.token && activeTab === 'PENDING') {
             const autoImport = async () => {
                 try {
                     const res = await callGAS(apiUrl, 'generateSubscriptionOrders', {
-                        building: selectedBuilding,
+                        building: selectedBuilding || '全部',
                         importWeek: true
                     }, user.token);
                     
