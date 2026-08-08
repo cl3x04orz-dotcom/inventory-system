@@ -199,6 +199,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     const [productSearchTerm, setProductSearchTerm] = useState('');
     const [expandedOrderIds, setExpandedOrderIds] = useState(new Set());
     const [dateFilter, setDateFilter] = useState(''); // 出貨日期篩選
+    const [startDate, setStartDate] = useState('');   // 起始日期篩選
+    const [endDate, setEndDate] = useState('');       // 結束日期篩選
     const [dateModalOrder, setDateModalOrder] = useState(null); // 設定出貨日期的目標訂單
     const [dateModalValue, setDateModalValue] = useState('');
     const [isSavingDate, setIsSavingDate] = useState(false);
@@ -413,13 +415,14 @@ export default function PendingOrdersPage({ user, apiUrl }) {
          }
      }, [user.token, activeTab, fetchOrders, fetchProducts, fetchGroupBindings, fetchBuildings]);
 
-    // 當切換到特定大樓時，自動在背景導入今日定期配，實現「全自動無感體驗」
+    // 當切換到特定大樓時，自動在背景導入本週全數定期配，實現「100% 全自動零點擊體驗」
     useEffect(() => {
         if (user?.token && activeTab === 'PENDING' && selectedBuilding && selectedBuilding !== '全部') {
             const autoImport = async () => {
                 try {
                     const res = await callGAS(apiUrl, 'generateSubscriptionOrders', {
-                        building: selectedBuilding
+                        building: selectedBuilding,
+                        importWeek: true
                     }, user.token);
                     
                     if (res && res.success && res.count > 0) {
@@ -471,20 +474,21 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             return;
         }
 
-        const confirmMsg = `確定要導入大樓【${selectedBuilding}】今天的定期配/月訂鮮奶訂單嗎？\n系統會自動篩選出今天（星期幾）需送貨的住戶，並自動防重複（已導入過的不會重複導入）。`;
+        const confirmMsg = `確定要手動掃描與導入大樓【${selectedBuilding}】本週（週一至週日）的定期配/月訂鮮奶訂單嗎？\n系統會自動對應各日期的配單，並自動防重複（已導入過的不會重複）。`;
         if (!window.confirm(confirmMsg)) return;
 
         setLoading(true);
         try {
             const res = await callGAS(apiUrl, 'generateSubscriptionOrders', {
-                building: selectedBuilding
+                building: selectedBuilding,
+                importWeek: true
             }, user.token);
             
             if (res && res.error) {
                 throw new Error(res.error);
             }
             
-            alert(res.message || `定期配導入成功！共導入 ${res.count} 筆訂單。`);
+            alert(res.message || `定期配本週自動導入完成！共處理新增 ${res.count} 筆訂單。`);
             fetchOrders();
         } catch (error) {
             console.error('Failed to import subscriptions:', error);
@@ -1249,6 +1253,15 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             return false;
         }
 
+        // 起迄日期區間篩選 (比對 expectedDeliveryDate 或 confirmedAt/createdAt 日期)
+        const orderDateStr = order.expectedDeliveryDate || (order.confirmedAt ? new Date(order.confirmedAt).toISOString().split('T')[0] : (order.createdAt ? new Date(order.createdAt).toISOString().split('T')[0] : ''));
+        if (startDate && orderDateStr && orderDateStr < startDate) {
+            return false;
+        }
+        if (endDate && orderDateStr && orderDateStr > endDate) {
+            return false;
+        }
+
         // 一般文字與金額搜尋（編號、姓名、電話、地址、群組、轉帳金額、對帳後五碼）
         if (searchTerm) {
             const search = searchTerm.toLowerCase().trim();
@@ -1860,24 +1873,37 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         )}
                     </div>
 
-                    {/* 預計出貨日篩選 (解決手機版 iOS 日期元件邊界溢出跑版) */}
-                    <div className="relative w-full sm:w-44 shrink-0 min-w-0 max-w-full overflow-hidden">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={16} />
-                        <input
-                            type="date"
-                            className="w-full max-w-full box-border min-w-0 pl-9 pr-7 text-xs py-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all appearance-none"
-                            value={dateFilter}
-                            onChange={(e) => setDateFilter(e.target.value)}
-                            title="篩選預計出貨日"
-                        />
-                        {dateFilter && (
+                    {/* 出貨/確認日期起迄區間篩選 */}
+                    <div className="flex items-center gap-1.5 shrink-0 max-w-full overflow-x-auto">
+                        <div className="relative w-36 shrink-0 min-w-0">
+                            <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={14} />
+                            <input
+                                type="date"
+                                className="w-full max-w-full box-border pl-8 pr-2 text-xs py-1.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 shadow-2xs transition-all appearance-none"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                title="選擇起始日期 (起)"
+                            />
+                        </div>
+                        <span className="text-xs font-black text-slate-400">~</span>
+                        <div className="relative w-36 shrink-0 min-w-0">
+                            <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={14} />
+                            <input
+                                type="date"
+                                className="w-full max-w-full box-border pl-8 pr-2 text-xs py-1.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 shadow-2xs transition-all appearance-none"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                title="選擇結束日期 (迄)"
+                            />
+                        </div>
+                        {(startDate || endDate) && (
                             <button
                                 type="button"
-                                onClick={() => setDateFilter('')}
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
-                                title="清空出貨日篩選"
+                                onClick={() => { setStartDate(''); setEndDate(''); }}
+                                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer"
+                                title="清空日期區間"
                             >
-                                <X size={14} />
+                                清空日期
                             </button>
                         )}
                     </div>
@@ -1912,11 +1938,11 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         <span className="text-lg sm:text-xl font-extrabold text-[var(--text-primary)] mt-1">{summaryStats.ordersCount} <span className="text-xs font-medium text-[var(--text-tertiary)]">筆</span></span>
                     </div>
                     <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl p-2.5 sm:p-3.5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-                        <span className="text-[10px] sm:text-xs font-bold text-[var(--text-secondary)] uppercase tracking-tight sm:tracking-wider whitespace-nowrap truncate block">{activeTab === 'UNPAID' ? '未付款商品數量' : '待出貨數量'}</span>
+                        <span className="text-[10px] sm:text-xs font-bold text-[var(--text-secondary)] uppercase tracking-tight sm:tracking-wider whitespace-nowrap truncate block">{activeTab === 'UNPAID' ? '未付款商品數量' : activeTab === 'CONFIRMED' ? '已出貨數量' : '待出貨數量'}</span>
                         <span className="text-lg sm:text-xl font-extrabold text-blue-600 mt-1">{summaryStats.totalQty} <span className="text-xs font-medium text-[var(--text-tertiary)]">瓶/件</span></span>
                     </div>
                     <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl p-2.5 sm:p-3.5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-                        <span className="text-[10px] sm:text-xs font-bold text-[var(--text-secondary)] uppercase tracking-tight sm:tracking-wider whitespace-nowrap truncate block">{activeTab === 'UNPAID' ? '未付款總金額' : '待出貨總金額'}</span>
+                        <span className="text-[10px] sm:text-xs font-bold text-[var(--text-secondary)] uppercase tracking-tight sm:tracking-wider whitespace-nowrap truncate block">{activeTab === 'UNPAID' ? '未付款總金額' : activeTab === 'CONFIRMED' ? '已出貨總金額' : '待出貨總金額'}</span>
                         <span className="text-lg sm:text-xl font-extrabold text-emerald-600 mt-1">${summaryStats.totalAmount.toLocaleString()}</span>
                     </div>
                 </div>
@@ -2005,7 +2031,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-[var(--border-primary)] pb-1.5 gap-2 w-full max-w-full">
                 <div className="grid grid-cols-3 w-full sm:flex sm:w-auto items-center gap-1 sm:gap-2">
                     <button
-                        onClick={() => { setActiveTab('PENDING'); setSelectedOrderIds([]); }}
+                        onClick={() => { setActiveTab('PENDING'); setSelectedOrderIds([]); setStartDate(''); setEndDate(''); }}
                         className={`px-1 sm:px-4 py-2 font-bold text-xs sm:text-sm text-center transition-colors border-b-2 whitespace-nowrap ${activeTab === 'PENDING'
                                 ? 'border-blue-500 text-blue-600'
                                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -2014,7 +2040,13 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         <span>待確認訂單</span><span className="hidden md:inline text-[11px] opacity-80"> (PENDING)</span>
                     </button>
                     <button
-                        onClick={() => { setActiveTab('CONFIRMED'); setSelectedOrderIds([]); }}
+                        onClick={() => { 
+                            setActiveTab('CONFIRMED'); 
+                            setSelectedOrderIds([]); 
+                            const today = new Date().toISOString().split('T')[0];
+                            setStartDate(today);
+                            setEndDate(today);
+                        }}
                         className={`px-1 sm:px-4 py-2 font-bold text-xs sm:text-sm text-center transition-colors border-b-2 whitespace-nowrap ${activeTab === 'CONFIRMED'
                                 ? 'border-blue-500 text-blue-600'
                                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -2023,7 +2055,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         <span>已出貨/確認</span><span className="hidden md:inline text-[11px] opacity-80"> (CONFIRMED)</span>
                     </button>
                     <button
-                        onClick={() => { setActiveTab('UNPAID'); setSelectedOrderIds([]); }}
+                        onClick={() => { setActiveTab('UNPAID'); setSelectedOrderIds([]); setStartDate(''); setEndDate(''); }}
                         className={`px-1 sm:px-4 py-2 font-bold text-xs sm:text-sm text-center transition-colors border-b-2 whitespace-nowrap ${activeTab === 'UNPAID'
                                 ? 'border-amber-500 text-amber-600'
                                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
