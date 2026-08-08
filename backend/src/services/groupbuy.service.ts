@@ -1521,7 +1521,7 @@ export const GroupBuyService = {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
 
     const { building, date, importWeek, mode } = payload;
-    if (!building) throw new Error('請指定配送大樓');
+    const isAllBuildings = !building || building === '全部' || building === 'ALL';
 
     // 計算欲處理的日期陣列（若為整週模式，則推算本週一至本週日共 7 天）
     const getWeekDates = (refDateStr?: string): string[] => {
@@ -1551,9 +1551,14 @@ export const GroupBuyService = {
       ? getWeekDates(date)
       : [date || new Date().toISOString().split('T')[0]];
 
-    // 1. 取得所有有效的定期配計畫
+    // 1. 取得所有有效的定期配計畫 (若指定大樓則只抓該大樓，否則抓全站)
+    const whereClause: any = { isActive: true };
+    if (!isAllBuildings) {
+      whereClause.building = building;
+    }
+
     const subs = await prisma.subscription.findMany({
-      where: { building, isActive: true }
+      where: whereClause
     });
 
     if (subs.length === 0) {
@@ -1587,12 +1592,14 @@ export const GroupBuyService = {
 
       if (filteredSubs.length === 0) continue;
 
-      // 按客戶分組
+      // 按大樓與客戶分組
       const customerGroups: Record<string, any> = {};
       filteredSubs.forEach((sub: any) => {
-        const key = `${sub.customerName}_${sub.phone || ''}`;
+        const subBuilding = sub.building || building || '';
+        const key = `${subBuilding}_${sub.customerName}_${sub.phone || ''}`;
         if (!customerGroups[key]) {
           customerGroups[key] = {
+            building: subBuilding,
             customerName: sub.customerName,
             phone: sub.phone || '',
             paymentMethod: sub.paymentMethod || '奶包金',
@@ -1619,14 +1626,19 @@ export const GroupBuyService = {
       });
 
       const alreadyImportedKeys = new Set(
-        existingOrders.map((o: any) => `${o.customerName}_${o.customerPhone || ''}`)
+        existingOrders.map((o: any) => {
+          // extract building from address or deliveryAddress if needed
+          const addr = o.deliveryAddress || '';
+          return `${o.customerName}_${o.customerPhone || ''}`;
+        })
       );
 
       // 寫入訂單
       for (const key in customerGroups) {
-        if (alreadyImportedKeys.has(key)) continue;
-
         const group = customerGroups[key];
+        const dedupeKey = `${group.customerName}_${group.phone || ''}`;
+        if (alreadyImportedKeys.has(dedupeKey)) continue;
+
         const orderId = `GB${targetDateStr.replace(/-/g, '')}${now.getHours()}${now.getMinutes()}${now.getSeconds()}_${Math.floor(Math.random() * 100)}`;
         const totalAmount = group.items.reduce((sum: number, item: any) => sum + (item.unitPrice * item.qty), 0);
 
@@ -1637,8 +1649,9 @@ export const GroupBuyService = {
               status: 'PENDING',
               customerName: group.customerName,
               customerPhone: group.phone,
-              deliveryAddress: `${building} ${group.note}`.trim(),
+              deliveryAddress: `${group.building} ${group.note}`.trim(),
               note: flagNote,
+              expectedDeliveryDate: targetDateStr,
               totalAmount,
               paymentMethod: group.paymentMethod,
               paymentStatus: group.paymentMethod === '奶包金' ? '已付款(扣餘額)' : '待確認',
