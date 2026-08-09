@@ -513,13 +513,14 @@ model InventoryAdjustment {
 }
 
 model BuildingSetting {
-  building  String   @id
-  startTime String?
-  endTime   String?
-  sortOrder Int      @default(0)
-  adminNote String?
-  updatedAt DateTime @updatedAt
-  storeCode String   @default("MILI001")
+  building          String   @id
+  startTime         String?
+  endTime           String?
+  sortOrder         Int      @default(0)
+  adminNote         String?
+  promotionTemplate String?
+  updatedAt         DateTime @updatedAt
+  storeCode         String   @default("MILI001")
 }
 
 model GroupBinding {

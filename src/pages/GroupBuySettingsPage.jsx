@@ -122,25 +122,48 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
         return `📢【${bName || '大樓名稱'}】本週團購開跑囉！🎉\n\n各位住戶鄰居大家好，本週團購專屬下單連結已開放：\n👉 點擊下單：${url || ''}\n\n🚚 預計配送時間：請依結單提示為準\n小提醒：下單後可直接選擇付款方式，有任何問題隨時在群組詢問小編喔！❤️`;
     }, []);
 
-    const handleSaveTemplate = (bName, newText) => {
+    const handleSaveTemplate = async (bName, newText) => {
         if (!bName) return;
         setCustomTemplates(prev => {
             const next = { ...prev, [bName]: newText };
-            localStorage.setItem('admin_line_templates', JSON.stringify(next));
+            try {
+                localStorage.setItem('admin_line_templates', JSON.stringify(next));
+            } catch (e) {}
             return next;
         });
-        alert(`✅ 已成功儲存【${bName}】專屬 LINE 發文文案範本！`);
+
+        try {
+            await callGAS(apiUrl, 'saveBuildingSettings', {
+                building: bName,
+                promotion_template: newText
+            }, user.token);
+            alert(`✅ 已成功儲存【${bName}】專屬 LINE 發文文案範本至雲端！`);
+        } catch (e) {
+            console.error('儲存至雲端失敗:', e);
+            alert(`已在本機儲存【${bName}】文案！(雲端同步失敗: ${e.message})`);
+        }
     };
 
-    const handleResetTemplate = (bName) => {
+    const handleResetTemplate = async (bName) => {
         if (!bName) return;
         setCustomTemplates(prev => {
             const next = { ...prev };
             delete next[bName];
-            localStorage.setItem('admin_line_templates', JSON.stringify(next));
+            try {
+                localStorage.setItem('admin_line_templates', JSON.stringify(next));
+            } catch (e) {}
             return next;
         });
-        alert(`已重設【${bName}】的文案為預設範本。`);
+
+        try {
+            await callGAS(apiUrl, 'saveBuildingSettings', {
+                building: bName,
+                promotion_template: ''
+            }, user.token);
+            alert(`已重設【${bName}】的文案為預設範本。`);
+        } catch (e) {
+            console.error('重設雲端文案失敗:', e);
+        }
     };
 
     // HTML5 date / time state
@@ -305,6 +328,26 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
             if (Array.isArray(data)) {
                 setSettings(data);
                 latestSettingsRef.current = data;
+                
+                // 自動同步雲端 promotion_template 到前端 customTemplates 狀態
+                setCustomTemplates(prev => {
+                    const updated = { ...prev };
+                    data.forEach(item => {
+                        if (item.building && item.promotion_template) {
+                            updated[item.building] = item.promotion_template;
+                        } else if (item.building && prev[item.building]) {
+                            // 若本機有舊自訂文案但雲端尚未儲存，自動靜默無縫備份上雲端
+                            callGAS(apiUrl, 'saveBuildingSettings', {
+                                building: item.building,
+                                promotion_template: prev[item.building]
+                            }, user.token).catch(e => console.error(e));
+                        }
+                    });
+                    try {
+                        localStorage.setItem('admin_line_templates', JSON.stringify(updated));
+                    } catch (e) {}
+                    return updated;
+                });
                 
                 if (data.length > 0) {
                     // 預設選擇第一個

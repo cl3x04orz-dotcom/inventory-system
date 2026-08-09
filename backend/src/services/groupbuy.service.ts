@@ -510,6 +510,7 @@ export const GroupBuyService = {
         end_time: s.endTime || '',
         sort_order: s.sortOrder !== undefined && s.sortOrder !== null ? s.sortOrder : 0,
         admin_note: s.adminNote || '',
+        promotion_template: s.promotionTemplate || '',
         is_auto: s.isAuto || false,
         auto_open_day: s.autoOpenDay !== null && s.autoOpenDay !== undefined ? s.autoOpenDay : '',
         auto_open_time: s.autoOpenTime || '',
@@ -533,6 +534,7 @@ export const GroupBuyService = {
           end_time: '',
           sort_order: 999,
           admin_note: '',
+          promotion_template: '',
           is_auto: false,
           auto_open_day: '',
           auto_open_time: '',
@@ -551,7 +553,7 @@ export const GroupBuyService = {
   // 8. 儲存/更新大樓設定
   async saveBuildingSettings(payload: any, user: any) {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
-    const { building, start_time, end_time, sort_order, admin_note } = payload;
+    const { building, start_time, end_time, sort_order, admin_note, promotion_template } = payload;
     if (!building) throw new Error('缺少大樓名稱');
 
     const updateData: any = {};
@@ -559,13 +561,15 @@ export const GroupBuyService = {
     if (end_time !== undefined) updateData.endTime = end_time || null;
     if (sort_order !== undefined) updateData.sortOrder = Number(sort_order);
     if (admin_note !== undefined) updateData.adminNote = admin_note || null;
+    if (promotion_template !== undefined) updateData.promotionTemplate = promotion_template || null;
 
     const createData: any = {
       building,
       startTime: start_time || null,
       endTime: end_time || null,
       sortOrder: sort_order !== undefined ? Number(sort_order) : 0,
-      adminNote: admin_note || null
+      adminNote: admin_note || null,
+      promotionTemplate: promotion_template || null
     };
 
     await prisma.buildingSetting.upsert({
