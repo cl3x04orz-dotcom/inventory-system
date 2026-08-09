@@ -487,13 +487,23 @@ export const GroupBuyService = {
   // 7. 取得大樓設定列表（含對應社區的運費設定）
   async getBuildingSettings(payload: any, user: any) {
     const { storeCode } = payload;
-    const settings = await prisma.buildingSetting.findMany({
-      where: { storeCode },
-      orderBy: [
-        { sortOrder: 'asc' },
-        { building: 'asc' }
-      ]
-    });
+    let settings: any[] = [];
+    try {
+      settings = await prisma.buildingSetting.findMany({
+        where: { storeCode },
+        orderBy: [
+          { sortOrder: 'asc' },
+          { building: 'asc' }
+        ]
+      });
+    } catch (e: any) {
+      console.warn('[BuildingSetting] Fallback query:', e.message);
+      try {
+        settings = await prisma.$queryRaw`SELECT building, "startTime", "endTime", "sortOrder", "adminNote" FROM "BuildingSetting" WHERE "storeCode" = ${storeCode} ORDER BY "sortOrder" ASC, building ASC`;
+      } catch (err: any) {
+        settings = [];
+      }
+    }
     // 一次查出所有社區的運費設定（依名稱匹配）
     const allComms = await prisma.groupBuyCommunity.findMany({
       where: { storeCode },
