@@ -205,6 +205,16 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     const [dateModalValue, setDateModalValue] = useState('');
     const [isSavingDate, setIsSavingDate] = useState(false);
 
+    // 取得相對天數的 YYYY-MM-DD 日期字串 (用於日期搜尋快捷按鍵)
+    const getRelativeDateStr = useCallback((offsetDays) => {
+        const d = new Date();
+        d.setDate(d.getDate() + offsetDays);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dateNum = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${dateNum}`;
+    }, []);
+
     // 批次與大樓功能狀態
     const [selectedOrderIds, setSelectedOrderIds] = useState([]);
     const [isBatchProcessing, setIsBatchProcessing] = useState(false);
@@ -1873,39 +1883,77 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         )}
                     </div>
 
-                    {/* 出貨/確認日期起迄區間篩選 */}
-                    <div className="flex items-center gap-1.5 shrink-0 max-w-full overflow-x-auto">
-                        <div className="relative w-36 shrink-0 min-w-0">
-                            <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={14} />
-                            <input
-                                type="date"
-                                className="w-full max-w-full box-border pl-8 pr-2 text-xs py-1.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 shadow-2xs transition-all appearance-none"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                title="選擇起始日期 (起)"
-                            />
+                    {/* 出貨/確認日期起迄區間篩選與快捷按鈕 */}
+                    <div className="flex items-center gap-2 shrink-0 max-w-full overflow-x-auto py-0.5">
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            <div className="relative w-36 shrink-0 min-w-0">
+                                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={14} />
+                                <input
+                                    type="date"
+                                    className="w-full max-w-full box-border pl-8 pr-2 text-xs py-1.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 shadow-2xs transition-all appearance-none"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    title="選擇起始日期 (起)"
+                                />
+                            </div>
+                            <span className="text-xs font-black text-slate-400">~</span>
+                            <div className="relative w-36 shrink-0 min-w-0">
+                                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={14} />
+                                <input
+                                    type="date"
+                                    className="w-full max-w-full box-border pl-8 pr-2 text-xs py-1.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 shadow-2xs transition-all appearance-none"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    title="選擇結束日期 (迄)"
+                                />
+                            </div>
                         </div>
-                        <span className="text-xs font-black text-slate-400">~</span>
-                        <div className="relative w-36 shrink-0 min-w-0">
-                            <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={14} />
-                            <input
-                                type="date"
-                                className="w-full max-w-full box-border pl-8 pr-2 text-xs py-1.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 shadow-2xs transition-all appearance-none"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                title="選擇結束日期 (迄)"
-                            />
+
+                        {/* 快捷按鈕群：今天 / 明天 / 後天 / 大後天 (清爽高對比明亮主題) */}
+                        <div className="flex items-center gap-1.5 shrink-0 bg-slate-50 p-1.5 rounded-2xl border border-slate-200/90 shadow-2xs">
+                            <span className="text-xs font-black text-slate-600 pl-1 pr-0.5 whitespace-nowrap">快速選擇：</span>
+                            {[
+                                { label: '今天', offset: 0 },
+                                { label: '明天', offset: 1 },
+                                { label: '後天', offset: 2 },
+                                { label: '大後天', offset: 3 },
+                            ].map((item) => {
+                                const targetDate = getRelativeDateStr(item.offset);
+                                const isActive = startDate === targetDate && endDate === targetDate;
+                                return (
+                                    <button
+                                        key={item.label}
+                                        type="button"
+                                        onClick={() => {
+                                            if (isActive) {
+                                                setStartDate('');
+                                                setEndDate('');
+                                            } else {
+                                                setStartDate(targetDate);
+                                                setEndDate(targetDate);
+                                            }
+                                        }}
+                                        className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer border ${
+                                            isActive
+                                                ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs scale-105 font-black'
+                                                : 'bg-white border-slate-200/90 text-slate-700 hover:bg-slate-100 hover:text-slate-900 shadow-2xs font-bold'
+                                        }`}
+                                    >
+                                        {item.label}
+                                    </button>
+                                );
+                            })}
+                            {(startDate || endDate) && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setStartDate(''); setEndDate(''); }}
+                                    className="px-2.5 py-1.5 text-xs font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shrink-0 cursor-pointer ml-0.5"
+                                    title="清空日期選擇"
+                                >
+                                    清空
+                                </button>
+                            )}
                         </div>
-                        {(startDate || endDate) && (
-                            <button
-                                type="button"
-                                onClick={() => { setStartDate(''); setEndDate(''); }}
-                                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer"
-                                title="清空日期區間"
-                            >
-                                清空日期
-                            </button>
-                        )}
                     </div>
 
                     {/* 導入今日定期配 */}

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Package, Search, RefreshCw, Save, Image, Edit2, ChevronDown, ChevronUp, Check, AlertCircle, Store, Barcode, DollarSign, TrendingUp, Zap, X, ScanLine } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Package, Search, RefreshCw, Save, Image, Edit2, ChevronDown, ChevronUp, Check, AlertCircle, Store, Barcode, DollarSign, TrendingUp, Zap, X, ScanLine, AlertTriangle, Clock, ShieldAlert, Trash2 } from 'lucide-react';
 import { callGAS } from '../utils/api';
 
 export default function ProductManagementPage({ user, apiUrl }) {
@@ -14,6 +14,32 @@ export default function ProductManagementPage({ user, apiUrl }) {
     const [stockFilter, setStockFilter] = useState('ALL'); // 'ALL' | 'HAS_STOCK' | 'NO_STOCK'
     const [communities, setCommunities] = useState([]); // [{ communityId, communityName }]
     const [activeTabs, setActiveTabs] = useState({}); // { [productId]: 'basic' | 'promo' | 'community' | 'ai' }
+
+    // ── 效期預警彈窗 (低於 7 天) State ──────────────────────────────
+    const [showExpiryModal, setShowExpiryModal] = useState(false);
+    const [dontRemindToday, setDontRemindToday] = useState(false);
+
+    // 計算距離效期剩餘天數
+    const getDaysLeft = useCallback((expiryDateStr) => {
+        if (!expiryDateStr) return null;
+        const parts = String(expiryDateStr).trim().split(/[-/]/);
+        if (parts.length < 3) return null;
+        const expiry = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        expiry.setHours(0, 0, 0, 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const diffTime = expiry.getTime() - today.getTime();
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }, []);
+
+    // 篩選出所有效期低於等於 7 天的商品
+    const expiringProducts = useMemo(() => {
+        return products.filter(p => {
+            if (!p.expiryDate) return false;
+            const daysLeft = getDaysLeft(p.expiryDate);
+            return daysLeft !== null && daysLeft <= 7;
+        });
+    }, [products, getDaysLeft]);
 
     const fetchProducts = useCallback(async () => {
         setLoading(true);
@@ -99,6 +125,34 @@ export default function ProductManagementPage({ user, apiUrl }) {
             });
         }
     }, [user.token, fetchProducts, apiUrl]);
+
+    // 當商品載入完成且有低於 7 天效期商品時，自動跳出預警彈窗 (若當日未被選擇不再提醒)
+    useEffect(() => {
+        if (!loading && products.length > 0) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const dismissedKey = `expiry_alert_dismissed_${todayStr}`;
+            const isDismissedToday = localStorage.getItem(dismissedKey) === 'true';
+
+            const hasExpiring = products.some(p => {
+                if (!p.expiryDate) return false;
+                const days = getDaysLeft(p.expiryDate);
+                return days !== null && days <= 7;
+            });
+
+            if (hasExpiring && !isDismissedToday) {
+                setShowExpiryModal(true);
+            }
+        }
+    }, [loading, products, getDaysLeft]);
+
+    const handleCloseExpiryModal = () => {
+        if (dontRemindToday) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const dismissedKey = `expiry_alert_dismissed_${todayStr}`;
+            localStorage.setItem(dismissedKey, 'true');
+        }
+        setShowExpiryModal(false);
+    };
 
     const handleFieldChange = (id, field, value) => {
         setProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: value, _dirty: true } : p));
@@ -1048,6 +1102,146 @@ export default function ProductManagementPage({ user, apiUrl }) {
                     </div>
                 )}
             </div>
+
+            {/* ⚠️ 商品效期過期預警與即時下架 Modal 彈窗 (高對比明亮主題 + 清除日期功能) */}
+            {showExpiryModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full border border-slate-200 overflow-hidden flex flex-col max-h-[85vh]">
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-rose-500 to-amber-500 p-4 md:p-5 text-white flex items-center justify-between shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-white/20 rounded-2xl backdrop-blur-xs">
+                                    <AlertTriangle className="w-6 h-6 text-white animate-bounce" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black tracking-wide flex items-center gap-2">
+                                        商品效期預警通知
+                                        <span className="text-xs bg-white text-rose-600 px-2.5 py-0.5 rounded-full font-black shadow-2xs">
+                                            {expiringProducts.length} 項低於 7 天
+                                        </span>
+                                    </h3>
+                                    <p className="text-xs text-rose-100 font-medium mt-0.5">
+                                        以下商品即將到期或已過期，請及時評估促銷、清空日期或切換網購下架。
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleCloseExpiryModal}
+                                className="text-white/80 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-all cursor-pointer"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Product List */}
+                        <div className="p-4 md:p-5 overflow-y-auto flex-1 divide-y divide-slate-100 space-y-3 bg-white">
+                            {expiringProducts.map((product) => {
+                                const daysLeft = getDaysLeft(product.expiryDate);
+                                const currentStock = stockMap[product.name] || 0;
+                                const isExpired = daysLeft !== null && daysLeft <= 0;
+
+                                return (
+                                    <div key={product.id} className="pt-3 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 hover:bg-slate-100/70 p-3.5 rounded-2xl border border-slate-200/90 transition-all">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            {product.imageUrl ? (
+                                                <img src={product.imageUrl} alt={product.name} className="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0" />
+                                            ) : (
+                                                <div className="w-12 h-12 rounded-xl bg-slate-200 flex items-center justify-center shrink-0 text-slate-400">
+                                                    <Package size={20} />
+                                                </div>
+                                            )}
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="font-black text-slate-800 text-sm truncate">{product.name}</span>
+                                                    {product.category && (
+                                                        <span className="text-[10px] font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded-md">
+                                                            {product.category}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-3 text-xs text-slate-500 font-medium mt-1">
+                                                    <span>售價: <strong className="text-slate-800">${product.price || product.single_price || 0}</strong></span>
+                                                    <span>當前庫存: <strong className="text-slate-800">{currentStock}</strong></span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Expiry Badge, Clear Date & Off-Shelf Toggle */}
+                                        <div className="flex items-center justify-between sm:justify-end gap-2.5 border-t sm:border-t-0 border-slate-200/60 pt-2 sm:pt-0 shrink-0 flex-wrap">
+                                            {/* Badge */}
+                                            <div className="flex items-center gap-1">
+                                                <Clock size={14} className={isExpired ? 'text-rose-600' : 'text-amber-600'} />
+                                                <span className={`text-xs font-black px-2.5 py-1 rounded-xl border ${
+                                                    isExpired
+                                                        ? 'bg-rose-100 text-rose-700 border-rose-300'
+                                                        : 'bg-amber-100 text-amber-800 border-amber-300'
+                                                }`}>
+                                                    {daysLeft < 0 ? `已過期 ${Math.abs(daysLeft)} 天` : daysLeft === 0 ? '今日到期' : `剩 ${daysLeft} 天到期`}
+                                                </span>
+                                            </div>
+
+                                            {/* 清除日期按鈕 */}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    handleFieldChange(product.id, 'expiryDate', '');
+                                                    handleSaveProduct(product.id, { expiryDate: '' });
+                                                }}
+                                                className="px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:text-rose-600 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-xl transition-all cursor-pointer flex items-center gap-1 shrink-0 shadow-2xs group"
+                                                title="清除此商品的有效日期"
+                                            >
+                                                <Trash2 size={13} className="text-slate-400 group-hover:text-rose-500" />
+                                                清除日期
+                                            </button>
+
+                                            {/* Off Shelf Toggle */}
+                                            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
+                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="sr-only peer"
+                                                        checked={!!product.isActive}
+                                                        onChange={(e) => {
+                                                            const newActive = e.target.checked;
+                                                            handleFieldChange(product.id, 'isActive', newActive);
+                                                            handleSaveProduct(product.id, { isActive: newActive });
+                                                        }}
+                                                    />
+                                                    <div className="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
+                                                </label>
+                                                <span className={`text-xs font-bold ${product.isActive ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                                    {product.isActive ? '🌐 網購上架' : '🚫 已下架'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="bg-slate-50 p-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+                            <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={dontRemindToday}
+                                    onChange={(e) => setDontRemindToday(e.target.checked)}
+                                    className="w-4 h-4 rounded-md border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                                />
+                                📅 當日不再提醒
+                            </label>
+                            <button
+                                type="button"
+                                onClick={handleCloseExpiryModal}
+                                className="w-full sm:w-auto px-6 py-2 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer"
+                            >
+                                我知道了 / 關閉通知
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
