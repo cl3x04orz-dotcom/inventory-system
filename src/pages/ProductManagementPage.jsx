@@ -222,6 +222,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 roundThreshold: (mergedProduct.roundThreshold !== undefined && mergedProduct.roundThreshold !== '' && mergedProduct.roundThreshold !== null) ? Number(mergedProduct.roundThreshold) : null,
                 autoSuppress: Boolean(mergedProduct.autoSuppress),
                 maxSuggestion: Number(mergedProduct.maxSuggestion || 0),
+                stopPickupThreshold: (mergedProduct.stopPickupThreshold !== undefined && mergedProduct.stopPickupThreshold !== '' && mergedProduct.stopPickupThreshold !== null) ? Number(mergedProduct.stopPickupThreshold) : null,
                 posSettings: mergedProduct.posSettings,
                 barcodes: mergedProduct.barcodes || []
             }, user.token);
@@ -1040,14 +1041,14 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 </div>
                                                             </div>
 
-                                                            {/* 直覺停領門檻 (NEW!) */}
+                                                            {/* 直覺停領門檻 (高對比亮色主題) */}
                                                             <div className="flex flex-col gap-2">
-                                                                <span className="text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1">🛑 直覺停領門檻</span>
+                                                                <span className="text-xs font-extrabold text-rose-700 flex items-center gap-1">🛑 直覺停領門檻</span>
                                                                 <div className="flex flex-col gap-1">
-                                                                    <span className="text-[11px] text-[var(--text-secondary)] font-medium">身上有此數量即不領 (例: 5)</span>
+                                                                    <span className="text-[11px] text-slate-600 font-bold">身上有此數量即不領 (例: 5)</span>
                                                                     <input
                                                                         type="number"
-                                                                        className="input-field text-xs p-2 text-center font-mono border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400 font-black bg-rose-50/50 dark:bg-rose-950/20"
+                                                                        className="w-full bg-white text-slate-900 border-2 border-rose-400 focus:border-rose-600 focus:ring-2 focus:ring-rose-200 text-xs p-2 text-center font-mono font-black shadow-sm rounded-lg"
                                                                         placeholder="例：5 (身上有5即不領)"
                                                                         value={product.stopPickupThreshold === '' || product.stopPickupThreshold === undefined || product.stopPickupThreshold === null ? '' : product.stopPickupThreshold}
                                                                         onChange={(e) => handleFieldChange(product.id, 'stopPickupThreshold', e.target.value !== '' ? Number(e.target.value) : '')}
