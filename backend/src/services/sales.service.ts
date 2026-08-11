@@ -606,7 +606,8 @@ export const SalesService = {
         dispatchSteps: true,
         roundThreshold: true,
         autoSuppress: true,
-        maxSuggestion: true
+        maxSuggestion: true,
+        stopPickupThreshold: true
       }
     });
     const productSettingsMap: Record<string, typeof dbProducts[0]> = {};
@@ -721,6 +722,16 @@ export const SalesService = {
 
       // 扣掉身上已有的貨 (Returns)
       const onTruck = Number(currentOriginals[pId] || 0);
+
+      // ⭐ 直覺停領門檻判斷：當身上庫存 (onTruck) 大於等於設定的 stopPickupThreshold (例如 5) 時，AI 補貨直接歸零 (0 瓶)！
+      const stopPickupThreshold = (pSetting as any).stopPickupThreshold !== null && (pSetting as any).stopPickupThreshold !== undefined
+        ? Number((pSetting as any).stopPickupThreshold)
+        : null;
+
+      if (stopPickupThreshold !== null && stopPickupThreshold !== undefined && onTruck >= stopPickupThreshold) {
+        suggestions[pId] = 0;
+        continue;
+      }
       const rawNeed = target - onTruck;
       let needToPick = 0;
 

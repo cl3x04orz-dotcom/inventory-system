@@ -42,6 +42,7 @@ model Product {
   posSettings           Json? // POS 專用設定集 overrides (price, isBundle, isActive, sortWeight, packSize, etc.)
   autoSuppress          Boolean                 @default(false)
   maxSuggestion         Int                     @default(0)
+  stopPickupThreshold   Int?
   isBundle              Boolean                 @default(false)
   bundleSize            Int                     @default(1)
   maxTotalQty           Int?

@@ -103,6 +103,7 @@ export const ProductService = {
         roundThreshold: p.roundThreshold !== null && p.roundThreshold !== undefined ? Number(p.roundThreshold) : null,
         autoSuppress: Boolean(p.autoSuppress),
         maxSuggestion: Number(p.maxSuggestion || 0),
+        stopPickupThreshold: p.stopPickupThreshold !== null && p.stopPickupThreshold !== undefined ? Number(p.stopPickupThreshold) : null,
         stock: stockInfo.stock,
         originalStock: stockInfo.originalStock,
         isActive: p.isActive,
@@ -274,6 +275,9 @@ export const ProductService = {
           : undefined,
         autoSuppress: autoSuppress !== undefined ? Boolean(autoSuppress) : undefined,
         maxSuggestion: maxSuggestion !== undefined ? Number(maxSuggestion) : undefined,
+        stopPickupThreshold: payload.stopPickupThreshold !== undefined
+          ? (payload.stopPickupThreshold === '' || payload.stopPickupThreshold === null || isNaN(Number(payload.stopPickupThreshold)) ? null : Number(payload.stopPickupThreshold))
+          : undefined,
         isBundle: !isPosOnly && isBundle !== undefined ? Boolean(isBundle) : undefined,
         bundleSize: !isPosOnly && bundleSize !== undefined ? Number(bundleSize) : undefined,
         maxTotalQty: parsedMaxTotalQty,

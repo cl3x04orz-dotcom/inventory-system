@@ -1010,7 +1010,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                             <span className="text-xs uppercase font-extrabold text-amber-600 dark:text-amber-400 tracking-wider">🤖 AI 領貨補貨進階配置參數</span>
                                                         </div>
 
-                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
                                                             {/* AI 包裝與發貨階梯 */}
                                                             <div className="flex flex-col gap-2">
                                                                 <span className="text-xs font-bold text-[var(--text-primary)]">📦 發貨包裝與階梯</span>
@@ -1037,6 +1037,22 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                             onBlur={(e) => handleSaveProduct(product.id, { dispatchSteps: e.target.value })}
                                                                         />
                                                                     </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* 直覺停領門檻 (NEW!) */}
+                                                            <div className="flex flex-col gap-2">
+                                                                <span className="text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1">🛑 直覺停領門檻</span>
+                                                                <div className="flex flex-col gap-1">
+                                                                    <span className="text-[11px] text-[var(--text-secondary)] font-medium">身上有此數量即不領 (例: 5)</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        className="input-field text-xs p-2 text-center font-mono border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400 font-black bg-rose-50/50 dark:bg-rose-950/20"
+                                                                        placeholder="例：5 (身上有5即不領)"
+                                                                        value={product.stopPickupThreshold === '' || product.stopPickupThreshold === undefined || product.stopPickupThreshold === null ? '' : product.stopPickupThreshold}
+                                                                        onChange={(e) => handleFieldChange(product.id, 'stopPickupThreshold', e.target.value !== '' ? Number(e.target.value) : '')}
+                                                                        onBlur={(e) => handleSaveProduct(product.id, { stopPickupThreshold: e.target.value !== '' ? Number(e.target.value) : null })}
+                                                                    />
                                                                 </div>
                                                             </div>
 
