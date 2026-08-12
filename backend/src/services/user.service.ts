@@ -54,28 +54,11 @@ export const UserService = {
       }
     }
 
-    let gasToken = '';
-    const gasUrl = process.env.GAS_API_URL;
-    if (gasUrl) {
-      try {
-        console.log(`[Proxy] Logging in to GAS Web App to fetch dynamic gasToken for user: ${username}`);
-        const resJson: any = await callGASFromNode(gasUrl, 'login', { username, password });
-        if (resJson && resJson.success && resJson.token) {
-          gasToken = resJson.token;
-          console.log('[Proxy] Successfully obtained gasToken from GAS!');
-        } else {
-          console.warn('[Proxy] GAS login responded without success/token:', resJson);
-        }
-      } catch (err) {
-        console.error('[Proxy] Failed to forward login to GAS:', err);
-      }
-    }
-
     const tokenPayload = {
       username: user.username,
       role: user.role,
       permissions,
-      gasToken,
+      gasToken: '',
       storeCode: user.storeCode
     };
 
