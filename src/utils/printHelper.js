@@ -1,5 +1,5 @@
 /**
- * 0.1 秒極速原生直印工具 (100% 擬真 Google 試算表樣式)
+ * 0.1 秒極速原生直印工具 (100% 精準對齊 Google 試算表 Template_領貨單 A4 左右雙欄對折樣式)
  * 解決 Google Apps Script PDF 轉檔耗時 30~60 秒且容易轉圈圈失敗的致命問題
  */
 export function printNativeSpreadsheetHtml(printData) {
@@ -8,10 +8,53 @@ export function printNativeSpreadsheetHtml(printData) {
     const location = data.location || '總部/車次';
     const salesRep = data.salesRep || '業務員';
     const rows = data.rows || [];
+
     const totalSalesAmount = Number(data.totalSalesAmount || 0).toLocaleString();
     const totalCashCalc = Number(data.totalCashCalc || 0).toLocaleString();
     const finalTotal = Number(data.finalTotal || 0).toLocaleString();
-    const expenses = Number(data.expenses || 0).toLocaleString();
+    const reserve = Number(data.reserve || 0).toLocaleString();
+
+    // 解析詳細支出項目 (攤位、清潔、電費、其他)
+    const expObj = typeof data.expenses === 'object' && data.expenses !== null ? data.expenses : {};
+    const expStall = Number(expObj.stall || 0).toLocaleString();
+    const expCleaning = Number(expObj.cleaning || 0).toLocaleString();
+    const expElectricity = Number(expObj.electricity || 0).toLocaleString();
+    const expOthers = Number(expObj.others || 0).toLocaleString();
+    const totalExpenses = Number(
+        typeof data.expenses === 'number' ? data.expenses : (Number(expObj.stall || 0) + Number(expObj.cleaning || 0) + Number(expObj.electricity || 0) + Number(expObj.others || 0))
+    ).toLocaleString();
+
+    // 💡 關鍵排版邏輯：將品項平分為「左欄」與「右欄」左右對折並排，確保所有品項完美收納在 1 張 A4 紙內
+    const mid = Math.ceil(rows.length / 2);
+    const leftRows = rows.slice(0, mid);
+    const rightRows = rows.slice(mid);
+
+    const renderTableHalf = (items, startIndex) => `
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 6%;">#</th>
+                    <th style="width: 36%; text-align: left;">品項名稱</th>
+                    <th style="width: 14%;">原庫存</th>
+                    <th style="width: 14%;">領貨數</th>
+                    <th style="width: 14%;">退貨數</th>
+                    <th style="width: 16%;">實售數</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${items.map((r, i) => `
+                    <tr>
+                        <td class="text-center">${startIndex + i + 1}</td>
+                        <td class="font-bold text-truncate">${r.name}</td>
+                        <td class="text-center">${r.originalStock ?? r.stock ?? 0}</td>
+                        <td class="text-center ${Number(r.picked || 0) > 0 ? 'text-red font-black' : ''}">${r.picked || 0}</td>
+                        <td class="text-center">${r.returns || 0}</td>
+                        <td class="text-center font-bold">${r.sold || 0}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
 
     const htmlContent = `
     <!DOCTYPE html>
@@ -23,7 +66,7 @@ export function printNativeSpreadsheetHtml(printData) {
         <style>
             @page {
                 size: A4 portrait;
-                margin: 8mm;
+                margin: 6mm;
             }
             * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             body {
@@ -31,17 +74,17 @@ export function printNativeSpreadsheetHtml(printData) {
                 color: #0f172a;
                 background: #ffffff;
                 margin: 0;
-                padding: 12px;
-                font-size: 13px;
+                padding: 10px;
+                font-size: 12px;
             }
             .header-bar {
                 text-align: center;
                 border-bottom: 2px solid #000000;
-                padding-bottom: 8px;
-                margin-bottom: 12px;
+                padding-bottom: 6px;
+                margin-bottom: 8px;
             }
             .main-title {
-                font-size: 24px;
+                font-size: 22px;
                 font-weight: 900;
                 letter-spacing: 2px;
                 color: #000000;
@@ -49,32 +92,44 @@ export function printNativeSpreadsheetHtml(printData) {
             .meta-grid {
                 display: flex;
                 justify-content: space-between;
-                font-size: 13px;
+                font-size: 12px;
                 font-weight: 700;
                 background: #f8fafc;
-                border: 1px solid #cbd5e1;
-                padding: 8px 12px;
-                border-radius: 6px;
-                margin-bottom: 12px;
+                border: 1px solid #000000;
+                padding: 6px 12px;
+                border-radius: 4px;
+                margin-bottom: 10px;
             }
+            
+            /* 左右雙欄對折佈局 */
+            .columns-container {
+                display: flex;
+                gap: 10px;
+                width: 100%;
+            }
+            .column-half {
+                flex: 1;
+                width: 50%;
+            }
+
             .data-table {
                 width: 100%;
                 border-collapse: collapse;
-                margin-bottom: 14px;
+                margin-bottom: 8px;
             }
             .data-table th {
                 background-color: #e2e8f0 !important;
                 color: #000000;
                 font-weight: 800;
-                font-size: 12px;
+                font-size: 11px;
                 border: 1px solid #000000;
-                padding: 6px 8px;
+                padding: 4px 6px;
                 text-align: center;
             }
             .data-table td {
                 border: 1px solid #000000;
-                padding: 6px 8px;
-                font-size: 12px;
+                padding: 4px 6px;
+                font-size: 11px;
             }
             .data-table tr:nth-child(even) {
                 background-color: #f8fafc;
@@ -82,36 +137,48 @@ export function printNativeSpreadsheetHtml(printData) {
             .text-center { text-align: center; }
             .text-right { text-align: right; }
             .font-bold { font-weight: 700; }
-            .text-red { color: #dc2626; font-weight: 800; }
+            .font-black { font-weight: 900; }
+            .text-red { color: #dc2626; }
+            .text-truncate {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                max-width: 140px;
+            }
             
             .summary-card {
                 border: 2px solid #000000;
                 background: #ffffff;
-                padding: 10px 14px;
-                border-radius: 6px;
-                margin-top: 12px;
+                padding: 8px 12px;
+                border-radius: 4px;
+                margin-top: 6px;
             }
-            .summary-row {
-                display: flex;
-                justify-content: space-between;
-                font-size: 14px;
+            .summary-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 6px;
+                font-size: 12px;
                 font-weight: 700;
-                margin: 4px 0;
+            }
+            .expense-detail {
+                font-size: 11px;
+                color: #475569;
+                margin-top: 2px;
             }
             .signature-area {
-                margin-top: 24px;
+                margin-top: 20px;
                 display: flex;
                 justify-content: space-between;
-                font-size: 13px;
+                font-size: 12px;
                 font-weight: 700;
                 padding: 0 16px;
             }
             .no-print-toolbar {
                 background: #eff6ff;
                 border: 1px solid #bfdbfe;
-                padding: 10px 16px;
+                padding: 8px 14px;
                 border-radius: 8px;
-                margin-bottom: 16px;
+                margin-bottom: 12px;
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
@@ -120,7 +187,7 @@ export function printNativeSpreadsheetHtml(printData) {
                 background: #2563eb;
                 color: #ffffff;
                 border: none;
-                padding: 8px 18px;
+                padding: 6px 16px;
                 border-radius: 6px;
                 font-weight: 700;
                 cursor: pointer;
@@ -140,7 +207,7 @@ export function printNativeSpreadsheetHtml(printData) {
         <div class="no-print-toolbar">
             <div style="display:flex; align-items:center; gap:8px;">
                 <span style="font-size:16px;">⚡</span>
-                <span style="font-weight:700; color:#1e40af;">0.1秒極速直印 (已精準對齊試算表樣式)</span>
+                <span style="font-weight:700; color:#1e40af;">0.1秒極速直印 (已 100% 精準對齊 試算表 A4 左右雙欄對折排版)</span>
             </div>
             <button class="btn-action" onclick="window.print()">🖨️ 立即列印 / 另存 PDF</button>
         </div>
@@ -155,40 +222,27 @@ export function printNativeSpreadsheetHtml(printData) {
             <div>👤 業務員：${salesRep}</div>
         </div>
 
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th style="width: 5%;">#</th>
-                    <th style="width: 35%; text-align: left;">品項名稱</th>
-                    <th style="width: 10%;">原車庫存</th>
-                    <th style="width: 10%;">補領貨數</th>
-                    <th style="width: 10%;">退貨數</th>
-                    <th style="width: 10%;">實售數</th>
-                    <th style="width: 10%;">單價</th>
-                    <th style="width: 10%;">金額小計</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${rows.map((r, i) => `
-                    <tr>
-                        <td class="text-center">${i + 1}</td>
-                        <td class="font-bold">${r.name}</td>
-                        <td class="text-center">${r.originalStock ?? r.stock ?? 0}</td>
-                        <td class="text-center ${Number(r.picked || 0) > 0 ? 'text-red' : ''}">${r.picked || 0}</td>
-                        <td class="text-center">${r.returns || 0}</td>
-                        <td class="text-center font-bold">${r.sold || 0}</td>
-                        <td class="text-right">$${Number(r.price || 0).toLocaleString()}</td>
-                        <td class="text-right font-bold">$${Number(r.subtotal || 0).toLocaleString()}</td>
-                    </tr>
-                `).join('')}
-            </tbody>
-        </table>
+        <!-- 左右雙欄對折並排佈局 -->
+        <div class="columns-container">
+            <div class="column-half">
+                ${renderTableHalf(leftRows, 0)}
+            </div>
+            <div class="column-half">
+                ${renderTableHalf(rightRows, leftRows.length)}
+            </div>
+        </div>
 
         <div class="summary-card">
-            <div class="summary-row">
-                <span>💰 銷售總額：<b>$${totalSalesAmount}</b></span>
-                <span>💸 營業支出：<b>$${expenses}</b></span>
-                <span>💵 應繳現金：<b style="color:#2563eb; font-size:16px;">$${totalCashCalc || finalTotal}</b></span>
+            <div class="summary-grid">
+                <div>💰 銷售總額：<b>$${totalSalesAmount}</b></div>
+                <div>💵 應繳現金：<b style="color:#2563eb; font-size:15px;">$${totalCashCalc || finalTotal}</b></div>
+                <div>
+                    💸 營業總支出：<b>$${totalExpenses}</b>
+                    <div class="expense-detail">
+                        (攤位:$${expStall} | 清潔:$${expCleaning} | 電費:$${expElectricity} | 其他:$${expOthers})
+                    </div>
+                </div>
+                <div>🏦 預留金：<b>$${reserve}</b></div>
             </div>
         </div>
 
