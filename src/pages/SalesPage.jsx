@@ -10,6 +10,7 @@ import { evaluateFormula } from '../utils/mathUtils';
 import MergePrintModal from '../components/MergePrintModal';
 import HistoryImportModal from '../components/HistoryImportModal';
 import ProductSortModal from '../components/ProductSortModal';
+import PrintTemplateConfigModal from '../components/PrintTemplateConfigModal';
 import { printNativeSpreadsheetHtml } from '../utils/printHelper';
 import PrintTemplate from './PrintTemplate';
 
@@ -123,6 +124,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
     // [New] Product Sort Modal State
     const [showSortModal, setShowSortModal] = useState(false);
+    const [isProductSortOpen, setIsProductSortOpen] = useState(false);
+    const [isPrintConfigOpen, setIsPrintConfigOpen] = useState(false);
     const [isSavingSortOrder, setIsSavingSortOrder] = useState(false);
 
     const handleSaveSortOrder = async (productIds) => {
@@ -1328,8 +1331,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 )}
                             </div>
 
-                            {/* Group 2: Action Buttons (Grid 2x2) */}
-                            <div className="grid grid-cols-2 gap-2 w-full md:w-auto">
+                            {/* Group 2: Action Buttons */}
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 w-full md:w-auto">
                                 {/* Import Returns */}
                                 <button
                                     onClick={handleOpenHistoryImport}
@@ -1375,8 +1378,17 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     <Printer size={16} className="shrink-0" />
                                     <span>{isPrinting ? '列印中...' : '列印單據'}</span>
                                 </button>
-                            </div>
 
+                                {/* Print Template Config Modal Trigger */}
+                                <button
+                                    type="button"
+                                    onClick={() => setIsPrintConfigOpen(true)}
+                                    title="自訂列印單據字體與排版"
+                                    className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition-all whitespace-nowrap"
+                                >
+                                    <span>⚙️ 樣式與字體設定</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -1753,6 +1765,12 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 </div>
             </div>
 
+
+            {/* Print Template Config Modal */}
+            <PrintTemplateConfigModal
+                isOpen={isPrintConfigOpen}
+                onClose={() => setIsPrintConfigOpen(false)}
+            />
 
             {/* Merge Print Modal */}
             <MergePrintModal
