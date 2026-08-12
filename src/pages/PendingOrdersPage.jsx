@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Package, ClipboardList, Eye, Edit, Trash2, CheckCircle, RefreshCw, X, User, Users, Phone, MapPin, FileText, Plus, Minus, Save, Calendar, Clock, Check, Search, Copy, PackageSearch, ChevronDown, ChevronUp, Building2 } from 'lucide-react';
+import { Package, ClipboardList, Eye, Edit, Trash2, CheckCircle, RefreshCw, X, User, Users, Phone, MapPin, FileText, Plus, Minus, Save, Calendar, Clock, Check, Search, Copy, PackageSearch, ChevronDown, ChevronUp, Building2, CreditCard } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import { copyToClipboard } from '../utils/clipboard';
 
@@ -182,6 +182,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     const [activeTab, setActiveTab] = useState('PENDING'); // 'PENDING' | 'CONFIRMED'
     const [groupBindings, setGroupBindings] = useState({});
     const [selectedBuilding, setSelectedBuilding] = useState('全部');
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('全部');
     const [copied, setCopied] = useState(false);
     const [detailCopied, setDetailCopied] = useState(false);
     const [clientDetailCopied, setClientDetailCopied] = useState(false);
@@ -1237,6 +1238,17 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         return Array.from(set).filter(Boolean);
     }, [buildings, groupBindings, orders]);
 
+    // 依據歷史與現有訂單動態整理付款方式選項
+    const allAvailablePaymentMethods = React.useMemo(() => {
+        const set = new Set();
+        orders.forEach(o => {
+            const pm = String(o.paymentMethod || '').trim();
+            if (pm) set.add(pm);
+        });
+        ['轉帳', '現金', '奶包金扣抵', '滿額消費折抵', 'LINE Pay'].forEach(m => set.add(m));
+        return Array.from(set).filter(Boolean);
+    }, [orders]);
+
     const filteredOrders = orders.filter(order => {
         // 未付款分頁雙重防護過濾
         if (activeTab === 'UNPAID') {
@@ -1254,6 +1266,16 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             const matchesAddress = addr.startsWith(selectedBuilding);
             const matchesGroup = displayGrp === selectedBuilding;
             if (!matchesAddress && !matchesGroup) {
+                return false;
+            }
+        }
+
+        // 付款方式篩選
+        if (selectedPaymentMethod !== '全部') {
+            const orderPm = String(order.paymentMethod || '').trim();
+            if (selectedPaymentMethod === '未指定') {
+                if (orderPm !== '' && orderPm !== '未指定') return false;
+            } else if (orderPm !== selectedPaymentMethod && !orderPm.includes(selectedPaymentMethod)) {
                 return false;
             }
         }
@@ -1844,6 +1866,22 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             <option value="全部">全部社區大樓</option>
                             {allAvailableBuildings.map(bname => (
                                 <option key={bname} value={bname}>{bname}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={15} />
+                    </div>
+
+                    {/* 付款方式篩選選單 */}
+                    <div className="relative w-full sm:w-44 shrink-0">
+                        <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={16} />
+                        <select
+                            className="w-full text-xs md:text-sm py-2 pl-9 pr-8 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] appearance-none focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all cursor-pointer truncate"
+                            value={selectedPaymentMethod}
+                            onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                        >
+                            <option value="全部">全部付款方式</option>
+                            {allAvailablePaymentMethods.map(method => (
+                                <option key={method} value={method}>{method}</option>
                             ))}
                         </select>
                         <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={15} />
