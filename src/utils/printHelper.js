@@ -13,7 +13,6 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
         }
     }
     config = config || {};
-    const title = config.title || '銷售與領貨點貨單據';
     const baseFontSize = config.fontSize || 15;
     const isTwoColumns = config.layout !== 'single_column';
     const showExpenses = config.showExpenses !== false;
@@ -41,6 +40,30 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
         typeof data.expenses === 'number' ? data.expenses : (Number(expObj.stall || 0) + Number(expObj.cleaning || 0) + Number(expObj.electricity || 0) + Number(expObj.others || 0))
     ).toLocaleString();
 
+    const globalCtx = { dateStr, location, salesRep, totalSalesAmount, totalCashCalc, finalTotal, reserve, totalExpenses };
+
+    const parseVariables = (str, ctx = {}, row = {}) => {
+        if (!str) return '';
+        return str
+            .replace(/\{\{date\}\}/g, ctx.dateStr || '')
+            .replace(/\{\{location\}\}/g, ctx.location || '')
+            .replace(/\{\{salesRep\}\}/g, ctx.salesRep || '')
+            .replace(/\{\{totalSalesAmount\}\}/g, ctx.totalSalesAmount || '0')
+            .replace(/\{\{totalCashCalc\}\}/g, ctx.totalCashCalc || '0')
+            .replace(/\{\{reserve\}\}/g, ctx.reserve || '0')
+            .replace(/\{\{totalExpenses\}\}/g, ctx.totalExpenses || '0')
+            .replace(/\{\{\#\}\}/g, row.idx !== undefined ? String(row.idx) : '')
+            .replace(/\{\{product_name\}\}/g, row.name !== undefined ? String(row.name) : '')
+            .replace(/\{\{stock\}\}/g, row.stock !== undefined ? String(row.stock) : '')
+            .replace(/\{\{picked\}\}/g, row.picked !== undefined ? String(row.picked) : '')
+            .replace(/\{\{returns\}\}/g, row.returns !== undefined ? String(row.returns) : '')
+            .replace(/\{\{sold\}\}/g, row.sold !== undefined ? String(row.sold) : '')
+            .replace(/\{\{price\}\}/g, row.price !== undefined ? `$${Number(row.price || 0).toLocaleString()}` : '')
+            .replace(/\{\{subtotal\}\}/g, row.subtotal !== undefined ? `$${Number(row.subtotal || 0).toLocaleString()}` : '');
+    };
+
+    const title = parseVariables(config.title || '銷售與領貨點貨單據', globalCtx);
+
     let leftRows = rows;
     let rightRows = [];
 
@@ -52,14 +75,14 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
 
     // 預設與自訂欄位設定
     const defaultCols = [
-        { id: 'idx', key: 'idx', label: '#', width: 6, align: 'center', visible: true },
-        { id: 'name', key: 'name', label: '品項名稱', width: 34, align: 'left', visible: true },
-        { id: 'stock', key: 'stock', label: '原庫存', width: 12, align: 'center', visible: true },
-        { id: 'picked', key: 'picked', label: '補領貨數', width: 14, align: 'center', visible: true },
-        { id: 'returns', key: 'returns', label: '退貨數', width: 12, align: 'center', visible: true },
-        { id: 'sold', key: 'sold', label: '實售數', width: 12, align: 'center', visible: true },
-        { id: 'price', key: 'price', label: '單價', width: 10, align: 'right', visible: false },
-        { id: 'subtotal', key: 'subtotal', label: '金額小計', width: 12, align: 'right', visible: false }
+        { id: 'idx', key: 'idx', label: '{{#}}', width: 6, align: 'center', visible: true },
+        { id: 'name', key: 'name', label: '{{product_name}}', width: 34, align: 'left', visible: true },
+        { id: 'stock', key: 'stock', label: '原庫存({{stock}})', width: 12, align: 'center', visible: true },
+        { id: 'picked', key: 'picked', label: '補領貨({{picked}})', width: 14, align: 'center', visible: true },
+        { id: 'returns', key: 'returns', label: '退貨數({{returns}})', width: 12, align: 'center', visible: true },
+        { id: 'sold', key: 'sold', label: '實售數({{sold}})', width: 12, align: 'center', visible: true },
+        { id: 'price', key: 'price', label: '單價({{price}})', width: 10, align: 'right', visible: false },
+        { id: 'subtotal', key: 'subtotal', label: '小計({{subtotal}})', width: 12, align: 'right', visible: false }
     ];
     const columns = (config.columns && config.columns.length > 0 ? config.columns : defaultCols).filter(c => c.visible !== false);
 
@@ -75,27 +98,47 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
         return '';
     };
 
+    const nameFontSize = config.nameFontSize || baseFontSize;
+
     const renderTableHalf = (items, startIndex) => `
         <table class="data-table">
             <thead>
                 <tr>
-                    ${columns.map(c => `
-                        <th style="width: ${c.width}%; text-align: ${c.align || 'center'};">${c.label}</th>
-                    `).join('')}
+                    ${columns.map(c => {
+                        const parsedHeaderLabel = parseVariables(c.label, globalCtx, {});
+                        return `<th style="width: ${c.width}%; text-align: ${c.align || 'center'};">${parsedHeaderLabel}</th>`;
+                    }).join('')}
                 </tr>
             </thead>
             <tbody>
-                ${items.map((r, i) => `
+                ${items.map((r, i) => {
+                    const rowCtx = {
+                        idx: startIndex + i + 1,
+                        name: r.name || '',
+                        stock: r.originalStock ?? r.stock ?? 0,
+                        picked: r.picked || 0,
+                        returns: r.returns || 0,
+                        sold: r.sold || 0,
+                        price: r.price || 0,
+                        subtotal: r.subtotal || 0
+                    };
+                    return `
                     <tr>
                         ${columns.map(c => {
-                            const val = getCellValue(r, c.id || c.key, startIndex + i);
-                            const isPicked = (c.id === 'picked' || c.key === 'picked') && Number(r.picked || 0) > 0;
+                            const colKey = c.id || c.key;
+                            let val = getCellValue(r, colKey, startIndex + i);
+                            if (c.label && c.label.includes('{{')) {
+                                val = parseVariables(c.label, globalCtx, rowCtx);
+                            }
+                            const isPicked = colKey === 'picked' && Number(r.picked || 0) > 0;
+                            const isName = colKey === 'name';
                             const alignClass = c.align === 'left' ? 'text-left' : c.align === 'right' ? 'text-right' : 'text-center';
-                            const extraClass = isPicked ? 'text-red font-black' : (c.id === 'name' ? 'font-bold text-truncate' : 'font-bold');
-                            return `<td class="${alignClass} ${extraClass}">${val}</td>`;
+                            const extraClass = isPicked ? 'text-red font-black' : (isName ? 'font-black text-truncate' : 'font-bold');
+                            const customStyle = isName ? `font-size: ${nameFontSize}px; line-height: 1.2;` : '';
+                            return `<td class="${alignClass} ${extraClass}" ${customStyle ? `style="${customStyle}"` : ''}>${val}</td>`;
                         }).join('')}
                     </tr>
-                `).join('')}
+                `}).join('')}
             </tbody>
         </table>
     `;
