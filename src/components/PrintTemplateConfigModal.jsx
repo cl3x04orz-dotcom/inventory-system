@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Type, Layout, Eye, Settings, Save, RotateCcw, MoveLeft, MoveRight, EyeOff, Plus, Trash2 } from 'lucide-react';
+import { X, Check, Type, Layout, Eye, Settings, Save, RotateCcw, MoveLeft, MoveRight } from 'lucide-react';
 import { safeLocalStorage } from '../utils/storage';
 import { printNativeSpreadsheetHtml } from '../utils/printHelper';
 
@@ -100,53 +100,55 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+            {/* Pure Light Mode Container (No dark mode classes) */}
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-300 w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden text-slate-900">
+                
+                {/* Modal Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-lg">
+                        <div className="p-2 bg-blue-100 text-blue-700 rounded-xl shadow-sm">
                             <Settings size={22} />
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">📊 線上試算表畫布設計器 (Grid Designer)</h2>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">自由拉寬欄位、拖曳欄位順序、直接編輯標題與字體大小</p>
+                            <h2 className="text-lg font-black text-slate-900">📊 線上試算表畫布設計器 (Grid Designer)</h2>
+                            <p className="text-xs font-medium text-slate-600">自由拉寬欄位、拖曳欄位順序、直接編輯標題與字體大小</p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                        className="p-2 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-200 transition-colors"
                     >
                         <X size={20} />
                     </button>
                 </div>
 
-                {/* Body */}
-                <div className="p-6 overflow-y-auto space-y-6">
+                {/* Modal Body */}
+                <div className="p-6 overflow-y-auto space-y-6 bg-white">
                     {/* Top Controls: Title, Font Size, Layout */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Title */}
-                        <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
-                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-2">
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <label className="text-xs font-black text-slate-800 block mb-2">
                                 📝 單據大標題 (點擊編輯)
                             </label>
                             <input
                                 type="text"
                                 value={config.title}
                                 onChange={(e) => setConfig({ ...config, title: e.target.value })}
-                                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                             />
                         </div>
 
                         {/* Font Size */}
-                        <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
-                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-2 flex items-center gap-1">
-                                <Type size={14} className="text-blue-500" />
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <label className="text-xs font-black text-slate-800 block mb-2 flex items-center gap-1">
+                                <Type size={14} className="text-blue-600" />
                                 🔍 字體放大層級
                             </label>
                             <select
                                 value={config.fontSize}
                                 onChange={(e) => setConfig({ ...config, fontSize: Number(e.target.value) })}
-                                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-bold text-slate-900 dark:text-slate-100"
+                                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                             >
                                 <option value={11}>精簡級 (11px) - 商品極多</option>
                                 <option value={13}>標準級 (13px) - 標準比例</option>
@@ -156,15 +158,15 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave }) {
                         </div>
 
                         {/* Layout */}
-                        <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
-                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-2 flex items-center gap-1">
-                                <Layout size={14} className="text-blue-500" />
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <label className="text-xs font-black text-slate-800 block mb-2 flex items-center gap-1">
+                                <Layout size={14} className="text-blue-600" />
                                 📐 版型結構
                             </label>
                             <select
                                 value={config.layout}
                                 onChange={(e) => setConfig({ ...config, layout: e.target.value })}
-                                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-bold text-slate-900 dark:text-slate-100"
+                                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                             >
                                 <option value="two_columns">A4 左右雙欄對折並排 ⭐ (單頁塞最多品項)</option>
                                 <option value="single_column">A4 單欄直式傳統列表</option>
@@ -173,59 +175,59 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave }) {
                     </div>
 
                     {/* Interactive Spreadsheet Canvas Grid */}
-                    <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
                         <div className="flex items-center justify-between mb-3">
-                            <label className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                            <label className="text-sm font-black text-slate-900 flex items-center gap-2">
                                 📊 試算表欄位畫布 (可自由修改名稱、調整欄寬與排序)
                             </label>
-                            <span className="text-xs text-blue-600 dark:text-blue-400 font-bold">
+                            <span className="text-xs text-blue-700 font-bold bg-blue-50 px-2 py-1 rounded-md border border-blue-200">
                                 💡 提示：點擊欄位名稱直接修改標題，按左右按鈕可調整順序
                             </span>
                         </div>
 
                         {/* Grid Canvas Table */}
-                        <div className="overflow-x-auto border border-slate-300 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 shadow-inner">
-                            <table className="w-full border-collapse text-xs">
+                        <div className="overflow-x-auto border border-slate-300 rounded-xl bg-white shadow-sm">
+                            <table className="w-full border-collapse text-xs text-slate-900">
                                 <thead>
-                                    <tr className="bg-slate-100 dark:bg-slate-700/80 border-b border-slate-300 dark:border-slate-700">
-                                        <th className="p-2 border-r border-slate-300 dark:border-slate-700 text-center w-12 text-slate-500">顯示</th>
-                                        <th className="p-2 border-r border-slate-300 dark:border-slate-700 text-left">標題名稱 (直接打字編輯)</th>
-                                        <th className="p-2 border-r border-slate-300 dark:border-slate-700 text-center w-28">欄寬比例 (%)</th>
-                                        <th className="p-2 border-r border-slate-300 dark:border-slate-700 text-center w-24">對齊方式</th>
-                                        <th className="p-2 text-center w-24">順序調整</th>
+                                    <tr className="bg-slate-100 border-b border-slate-300 text-slate-800 font-black">
+                                        <th className="p-2.5 border-r border-slate-300 text-center w-12">顯示</th>
+                                        <th className="p-2.5 border-r border-slate-300 text-left">標題名稱 (直接打字編輯)</th>
+                                        <th className="p-2.5 border-r border-slate-300 text-center w-32">欄寬比例 (%)</th>
+                                        <th className="p-2.5 border-r border-slate-300 text-center w-24">對齊方式</th>
+                                        <th className="p-2.5 text-center w-24">順序調整</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {config.columns.map((col, idx) => (
                                         <tr
                                             key={col.id}
-                                            className={`border-b border-slate-200 dark:border-slate-700/60 transition-colors ${
-                                                !col.visible ? 'opacity-40 bg-slate-50 dark:bg-slate-800/40' : 'hover:bg-blue-50/50 dark:hover:bg-blue-900/10'
+                                            className={`border-b border-slate-200 transition-colors ${
+                                                !col.visible ? 'opacity-40 bg-slate-100' : 'hover:bg-blue-50/60'
                                             }`}
                                         >
                                             {/* Visibility Toggle */}
-                                            <td className="p-2 border-r border-slate-200 dark:border-slate-700 text-center">
+                                            <td className="p-2 border-r border-slate-200 text-center">
                                                 <input
                                                     type="checkbox"
                                                     checked={col.visible}
                                                     onChange={(e) => updateColumn(idx, 'visible', e.target.checked)}
-                                                    className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
                                                 />
                                             </td>
 
                                             {/* Editable Label */}
-                                            <td className="p-2 border-r border-slate-200 dark:border-slate-700">
+                                            <td className="p-2 border-r border-slate-200">
                                                 <input
                                                     type="text"
                                                     value={col.label}
                                                     onChange={(e) => updateColumn(idx, 'label', e.target.value)}
-                                                    className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded font-bold text-slate-900 dark:text-slate-100 focus:bg-white focus:ring-1 focus:ring-blue-500"
+                                                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded font-black text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                                                 />
                                             </td>
 
                                             {/* Column Width Slider */}
-                                            <td className="p-2 border-r border-slate-200 dark:border-slate-700 text-center">
-                                                <div className="flex items-center gap-2">
+                                            <td className="p-2 border-r border-slate-200 text-center">
+                                                <div className="flex items-center gap-2 px-1">
                                                     <input
                                                         type="range"
                                                         min="4"
@@ -234,16 +236,16 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave }) {
                                                         onChange={(e) => updateColumn(idx, 'width', Number(e.target.value))}
                                                         className="w-full accent-blue-600 cursor-pointer"
                                                     />
-                                                    <span className="font-mono text-xs w-8 text-right font-bold">{col.width}%</span>
+                                                    <span className="font-mono text-xs w-8 text-right font-black text-slate-800">{col.width}%</span>
                                                 </div>
                                             </td>
 
                                             {/* Alignment */}
-                                            <td className="p-2 border-r border-slate-200 dark:border-slate-700 text-center">
+                                            <td className="p-2 border-r border-slate-200 text-center">
                                                 <select
                                                     value={col.align}
                                                     onChange={(e) => updateColumn(idx, 'align', e.target.value)}
-                                                    className="px-2 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold"
+                                                    className="px-2 py-1 bg-white border border-slate-300 rounded text-xs font-bold text-slate-900 focus:ring-1 focus:ring-blue-500"
                                                 >
                                                     <option value="left">靠左</option>
                                                     <option value="center">置中</option>
@@ -258,7 +260,7 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave }) {
                                                         type="button"
                                                         disabled={idx === 0}
                                                         onClick={() => moveColumn(idx, -1)}
-                                                        className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30"
+                                                        className="p-1 rounded text-slate-700 hover:bg-slate-200 disabled:opacity-30 border border-slate-200"
                                                     >
                                                         <MoveLeft size={14} />
                                                     </button>
@@ -266,7 +268,7 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave }) {
                                                         type="button"
                                                         disabled={idx === config.columns.length - 1}
                                                         onClick={() => moveColumn(idx, 1)}
-                                                        className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30"
+                                                        className="p-1 rounded text-slate-700 hover:bg-slate-200 disabled:opacity-30 border border-slate-200"
                                                     >
                                                         <MoveRight size={14} />
                                                     </button>
@@ -280,35 +282,35 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave }) {
                     </div>
 
                     {/* Section Controls */}
-                    <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
-                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-2">
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <label className="text-xs font-black text-slate-800 block mb-2">
                             區塊開關控制
                         </label>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                            <label className="flex items-center gap-2 text-slate-700 dark:text-slate-300 cursor-pointer">
+                            <label className="flex items-center gap-2 font-bold text-slate-800 cursor-pointer">
                                 <input
                                     type="checkbox"
                                     checked={config.showExpenses}
                                     onChange={(e) => setConfig({ ...config, showExpenses: e.target.checked })}
-                                    className="rounded text-blue-600 focus:ring-blue-500"
+                                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600"
                                 />
                                 顯示營業支出 (攤位/清潔/電費)
                             </label>
-                            <label className="flex items-center gap-2 text-slate-700 dark:text-slate-300 cursor-pointer">
+                            <label className="flex items-center gap-2 font-bold text-slate-800 cursor-pointer">
                                 <input
                                     type="checkbox"
                                     checked={config.showCash}
                                     onChange={(e) => setConfig({ ...config, showCash: e.target.checked })}
-                                    className="rounded text-blue-600 focus:ring-blue-500"
+                                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600"
                                 />
                                 顯示應繳現金與預留金
                             </label>
-                            <label className="flex items-center gap-2 text-slate-700 dark:text-slate-300 cursor-pointer">
+                            <label className="flex items-center gap-2 font-bold text-slate-800 cursor-pointer">
                                 <input
                                     type="checkbox"
                                     checked={config.showSignatures}
                                     onChange={(e) => setConfig({ ...config, showSignatures: e.target.checked })}
-                                    className="rounded text-blue-600 focus:ring-blue-500"
+                                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600"
                                 />
                                 顯示業務員與點貨員簽名欄
                             </label>
@@ -316,13 +318,13 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave }) {
                     </div>
                 </div>
 
-                {/* Footer */}
-                <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                {/* Modal Footer */}
+                <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50">
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
                             onClick={handleReset}
-                            className="px-3 py-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-xs font-bold flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800"
+                            className="px-3 py-2 text-slate-700 hover:text-slate-900 text-xs font-bold flex items-center gap-1 rounded-xl border border-slate-300 hover:bg-white bg-slate-100 shadow-sm"
                         >
                             <RotateCcw size={14} />
                             恢復預設值
@@ -330,7 +332,7 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave }) {
                         <button
                             type="button"
                             onClick={handlePreview}
-                            className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 rounded-lg transition-colors shadow-sm"
+                            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold flex items-center gap-1.5 rounded-xl transition-colors shadow-sm"
                         >
                             <Eye size={14} />
                             🖨️ 試印預覽
@@ -339,14 +341,14 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave }) {
 
                     <div className="flex items-center gap-3">
                         {savedNotice && (
-                            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                            <span className="text-xs text-emerald-700 font-black flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
                                 <Check size={14} /> 已儲存最新樣板畫布！
                             </span>
                         )}
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 text-slate-600 dark:text-slate-300 font-bold text-sm hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl"
+                            className="px-4 py-2 text-slate-700 font-bold text-sm hover:bg-slate-200 rounded-xl"
                         >
                             取消
                         </button>
@@ -356,7 +358,7 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave }) {
                                 handleSave();
                                 onClose();
                             }}
-                            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-blue-500/20 flex items-center gap-2 transition-all active:scale-95"
+                            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-black text-sm rounded-xl shadow-md shadow-blue-500/20 flex items-center gap-2 transition-all active:scale-95"
                         >
                             <Save size={16} />
                             儲存設計樣板

@@ -1,7 +1,7 @@
 import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Save, RefreshCw, Calculator, DollarSign, GripVertical, ListOrdered, Printer, ChevronUp, ChevronDown, FileText } from 'lucide-react';
+import { Save, RefreshCw, Calculator, DollarSign, GripVertical, ListOrdered, Printer, ChevronUp, ChevronDown, FileText, Settings } from 'lucide-react';
 
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { callGAS } from '../utils/api';
@@ -1331,8 +1331,8 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                 )}
                             </div>
 
-                            {/* Group 2: Action Buttons */}
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 w-full md:w-auto">
+                            {/* Group 2: Action Buttons (2x2 Grid 上下放) */}
+                            <div className="grid grid-cols-2 gap-2 w-full md:w-auto">
                                 {/* Import Returns */}
                                 <button
                                     onClick={handleOpenHistoryImport}
@@ -1366,28 +1366,28 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                                     <span>合併列印</span>
                                 </button>
 
-                                {/* Print */}
-                                <button
-                                    onClick={handlePrint}
-                                    disabled={isPrinting}
-                                    className={`flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${isPrinting
-                                        ? 'bg-gray-400 text-white cursor-not-allowed'
-                                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
-                                        }`}
-                                >
-                                    <Printer size={16} className="shrink-0" />
-                                    <span>{isPrinting ? '列印中...' : '列印單據'}</span>
-                                </button>
-
-                                {/* Print Template Config Modal Trigger */}
-                                <button
-                                    type="button"
-                                    onClick={() => setIsPrintConfigOpen(true)}
-                                    title="自訂列印單據字體與排版"
-                                    className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition-all whitespace-nowrap"
-                                >
-                                    <span>⚙️ 樣式與字體設定</span>
-                                </button>
+                                {/* Print & Settings Group (Merged into 1 clean button to preserve layout) */}
+                                <div className="flex items-center rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] overflow-hidden hover:border-[var(--accent-blue)] transition-all">
+                                    <button
+                                        onClick={handlePrint}
+                                        disabled={isPrinting}
+                                        className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-2 text-xs font-bold text-[var(--text-secondary)] whitespace-nowrap ${isPrinting
+                                            ? 'bg-gray-400 text-white cursor-not-allowed'
+                                            : 'hover:text-[var(--accent-blue)]'
+                                            }`}
+                                    >
+                                        <Printer size={16} className="shrink-0" />
+                                        <span>{isPrinting ? '列印中...' : '列印單據'}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsPrintConfigOpen(true)}
+                                        title="自訂列印單據字體與排版"
+                                        className="px-2 py-2 text-xs font-bold border-l border-[var(--border-primary)] text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                    >
+                                        <Settings size={15} />
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
