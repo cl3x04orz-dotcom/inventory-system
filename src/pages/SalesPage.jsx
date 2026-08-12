@@ -9,6 +9,7 @@ import { sortProducts } from '../utils/constants';
 import { evaluateFormula } from '../utils/mathUtils';
 import MergePrintModal from '../components/MergePrintModal';
 import HistoryImportModal from '../components/HistoryImportModal';
+import ProductSortModal from '../components/ProductSortModal';
 import { printNativeSpreadsheetHtml } from '../utils/printHelper';
 import PrintTemplate from './PrintTemplate';
 
