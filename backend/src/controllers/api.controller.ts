@@ -278,6 +278,36 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
     case 'saveRewardConfig':
       return GroupBuyService.saveRewardConfig(payload, user);
 
+    // 12. 列印樣板全系統雲端資料庫備份與自動同步 (PostgreSQL)
+    case 'getPrintTemplateConfig': {
+      try {
+        const record = await prisma.groupBuySystemSetting.findUnique({
+          where: { key: 'print_template_config' }
+        });
+        if (record && record.value) {
+          return { success: true, config: JSON.parse(record.value) };
+        }
+        return { success: true, config: null };
+      } catch (err: any) {
+        console.warn('[PrintConfig] Failed to fetch print template config from DB:', err.message);
+        return { success: true, config: null };
+      }
+    }
+    case 'savePrintTemplateConfig': {
+      try {
+        const configStr = typeof payload.config === 'string' ? payload.config : JSON.stringify(payload.config || {});
+        await prisma.groupBuySystemSetting.upsert({
+          where: { key: 'print_template_config' },
+          update: { value: configStr },
+          create: { key: 'print_template_config', value: configStr }
+        });
+        return { success: true };
+      } catch (err: any) {
+        console.error('[PrintConfig] Failed to save print template config to DB:', err.message);
+        throw new Error('無法儲存列印樣板至雲端資料庫: ' + err.message);
+      }
+    }
+
     default:
       console.warn(`[Controller] 未移植或不支援的 Action: ${action}`);
       throw new Error(`後端尚未移植或不支援該操作: [${action}]`);

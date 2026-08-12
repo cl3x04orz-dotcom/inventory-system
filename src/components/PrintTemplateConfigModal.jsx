@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check, Type, Layout, Eye, Settings, Save, RotateCcw, MoveLeft, MoveRight } from 'lucide-react';
 import { safeLocalStorage } from '../utils/storage';
-import { printNativeSpreadsheetHtml } from '../utils/printHelper';
+import { callGAS } from '../utils/api';
 
 export const DEFAULT_GRID_COLUMNS = [
     { id: 'idx', key: 'idx', label: '#', width: 6, align: 'center', visible: true, locked: true },
@@ -25,33 +25,67 @@ export const DEFAULT_PRINT_CONFIG = {
     showSignatures: true
 };
 
-export default function PrintTemplateConfigModal({ isOpen, onClose, onSave }) {
+export default function PrintTemplateConfigModal({ isOpen, onClose, onSave, apiUrl }) {
     const [config, setConfig] = useState(DEFAULT_PRINT_CONFIG);
     const [savedNotice, setSavedNotice] = useState(false);
+    const targetApiUrl = apiUrl || (typeof window !== 'undefined' && window.VITE_API_URL) || '/api';
 
     useEffect(() => {
-        const saved = safeLocalStorage.getItem('print_template_config');
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                setConfig({
-                    ...DEFAULT_PRINT_CONFIG,
-                    ...parsed,
-                    columns: parsed.columns && parsed.columns.length > 0 ? parsed.columns : DEFAULT_GRID_COLUMNS
-                });
-            } catch (e) {
-                console.error('Parse print config error:', e);
+        const loadConfig = async () => {
+            // 1. 先讀本機 Fast Cache
+            const saved = safeLocalStorage.getItem('print_template_config');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    setConfig({
+                        ...DEFAULT_PRINT_CONFIG,
+                        ...parsed,
+                        columns: parsed.columns && parsed.columns.length > 0 ? parsed.columns : DEFAULT_GRID_COLUMNS
+                    });
+                } catch (e) {
+                    console.error('Parse print config error:', e);
+                }
             }
+
+            // 2. 背景從 PostgreSQL 雲端資料庫抓取最新版同步
+            try {
+                const res = await callGAS(targetApiUrl, 'getPrintTemplateConfig', {});
+                if (res && res.success && res.config) {
+                    const cloudConfig = typeof res.config === 'string' ? JSON.parse(res.config) : res.config;
+                    const merged = {
+                        ...DEFAULT_PRINT_CONFIG,
+                        ...cloudConfig,
+                        columns: cloudConfig.columns && cloudConfig.columns.length > 0 ? cloudConfig.columns : DEFAULT_GRID_COLUMNS
+                    };
+                    setConfig(merged);
+                    safeLocalStorage.setItem('print_template_config', JSON.stringify(merged));
+                }
+            } catch (err) {
+                console.warn('[PrintConfigModal] Cloud DB fetch fallback:', err);
+            }
+        };
+
+        if (isOpen) {
+            loadConfig();
         }
-    }, [isOpen]);
+    }, [isOpen, targetApiUrl]);
 
     if (!isOpen) return null;
 
-    const handleSave = () => {
+    const handleSave = async () => {
+        // 1. 立即更新本機 Fast Cache
         safeLocalStorage.setItem('print_template_config', JSON.stringify(config));
         setSavedNotice(true);
         setTimeout(() => setSavedNotice(false), 2000);
         if (onSave) onSave(config);
+
+        // 2. 同步寫入雲端 PostgreSQL 資料庫，全公司所有設備秒同步
+        try {
+            await callGAS(targetApiUrl, 'savePrintTemplateConfig', { config });
+            console.log('[PrintConfigModal] Saved to Cloud PostgreSQL DB successfully!');
+        } catch (err) {
+            console.error('[PrintConfigModal] Cloud DB save failed, saved locally:', err);
+        }
     };
 
     const handleReset = () => {

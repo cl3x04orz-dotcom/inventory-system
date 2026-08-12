@@ -1770,6 +1770,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
             <PrintTemplateConfigModal
                 isOpen={isPrintConfigOpen}
                 onClose={() => setIsPrintConfigOpen(false)}
+                apiUrl={apiUrl}
             />
 
             {/* Merge Print Modal */}
