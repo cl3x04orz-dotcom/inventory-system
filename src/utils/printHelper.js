@@ -48,18 +48,18 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
             .replace(/\{\{date\}\}/g, ctx.dateStr || '')
             .replace(/\{\{location\}\}/g, ctx.location || '')
             .replace(/\{\{salesRep\}\}/g, ctx.salesRep || '')
-            .replace(/\{\{totalSalesAmount\}\}/g, ctx.totalSalesAmount || '0')
-            .replace(/\{\{totalCashCalc\}\}/g, ctx.totalCashCalc || '0')
-            .replace(/\{\{reserve\}\}/g, ctx.reserve || '0')
-            .replace(/\{\{totalExpenses\}\}/g, ctx.totalExpenses || '0')
+            .replace(/\{\{totalSalesAmount\}\}/g, ctx.totalSalesAmount || '')
+            .replace(/\{\{totalCashCalc\}\}/g, ctx.totalCashCalc || '')
+            .replace(/\{\{reserve\}\}/g, ctx.reserve || '')
+            .replace(/\{\{totalExpenses\}\}/g, ctx.totalExpenses || '')
             .replace(/\{\{\#\}\}/g, row.idx !== undefined ? String(row.idx) : '')
             .replace(/\{\{product_name\}\}/g, row.name !== undefined ? String(row.name) : '')
-            .replace(/\{\{stock\}\}/g, row.stock !== undefined ? String(row.stock) : '')
-            .replace(/\{\{picked\}\}/g, row.picked !== undefined ? String(row.picked) : '')
-            .replace(/\{\{returns\}\}/g, row.returns !== undefined ? String(row.returns) : '')
-            .replace(/\{\{sold\}\}/g, row.sold !== undefined ? String(row.sold) : '')
-            .replace(/\{\{price\}\}/g, row.price !== undefined ? `$${Number(row.price || 0).toLocaleString()}` : '')
-            .replace(/\{\{subtotal\}\}/g, row.subtotal !== undefined ? `$${Number(row.subtotal || 0).toLocaleString()}` : '');
+            .replace(/\{\{stock\}\}/g, row.stock ? String(row.stock) : '')
+            .replace(/\{\{picked\}\}/g, row.picked ? String(row.picked) : '')
+            .replace(/\{\{returns\}\}/g, row.returns ? String(row.returns) : '')
+            .replace(/\{\{sold\}\}/g, row.sold ? String(row.sold) : '')
+            .replace(/\{\{price\}\}/g, row.price ? Number(row.price).toLocaleString() : '')
+            .replace(/\{\{subtotal\}\}/g, '');
     };
 
     const title = parseVariables(config.title || '銷售與領貨點貨單據', globalCtx);
@@ -86,15 +86,45 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
     ];
     const columns = (config.columns && config.columns.length > 0 ? config.columns : defaultCols).filter(c => c.visible !== false);
 
+    const formatNumberVal = (num) => {
+        const val = Number(num || 0);
+        if (val === 0 || isNaN(val)) return '';
+        if (Number.isInteger(val)) return val.toLocaleString();
+        // 小數點只呈現 1 位 (如 11.667 -> 11.6)
+        const truncated = Math.floor(val * 10) / 10;
+        return truncated.toString();
+    };
+
     const getCellValue = (r, key, idx) => {
         if (key === 'idx') return idx + 1;
         if (key === 'name') return r.name || '';
-        if (key === 'stock') return r.originalStock ?? r.stock ?? 0;
-        if (key === 'picked') return r.picked || 0;
-        if (key === 'returns') return r.returns || 0;
-        if (key === 'sold') return r.sold || 0;
-        if (key === 'price') return `$${Number(r.price || 0).toLocaleString()}`;
-        if (key === 'subtotal') return `$${Number(r.subtotal || 0).toLocaleString()}`;
+        if (key === 'subtotal') return ''; // 應繳金直接空白
+
+        if (key === 'stock') {
+            const raw = r.originalStock ?? r.stock;
+            if (typeof raw === 'string' && raw.trim() !== '') return raw;
+            return formatNumberVal(raw);
+        }
+        if (key === 'picked') {
+            const raw = r.picked;
+            if (typeof raw === 'string' && raw.trim() !== '') return raw;
+            return formatNumberVal(raw);
+        }
+        if (key === 'returns') {
+            const raw = r.returns;
+            if (typeof raw === 'string' && raw.trim() !== '') return raw;
+            return formatNumberVal(raw);
+        }
+        if (key === 'sold') {
+            const raw = r.sold;
+            if (typeof raw === 'string' && raw.trim() !== '') return raw;
+            return formatNumberVal(raw);
+        }
+        if (key === 'price') {
+            const raw = r.price;
+            if (typeof raw === 'string' && raw.trim() !== '') return raw;
+            return formatNumberVal(raw);
+        }
         return '';
     };
 
@@ -102,6 +132,9 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
 
     const renderTableHalf = (items, startIndex) => `
         <table class="data-table">
+            <colgroup>
+                ${columns.map(c => `<col style="width: ${c.width}%;" />`).join('')}
+            </colgroup>
             <thead>
                 <tr>
                     ${columns.map(c => {
@@ -153,27 +186,33 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
         <style>
             @page {
                 size: A4 portrait;
-                margin: 6mm;
+                margin: 4mm;
             }
             * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            body {
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft JhengHei", sans-serif;
-                color: #0f172a;
-                background: #ffffff;
+            html, body {
+                height: 100%;
                 margin: 0;
-                padding: 8px;
+                padding: 0;
+                background: #ffffff;
+                color: #0f172a;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft JhengHei", sans-serif;
                 font-size: ${baseFontSize}px;
+                page-break-inside: avoid;
+            }
+            .print-wrapper {
+                padding: 6px;
+                page-break-inside: avoid;
             }
             .header-bar {
                 text-align: center;
                 border-bottom: 2px solid #000000;
-                padding-bottom: 6px;
-                margin-bottom: 8px;
+                padding-bottom: 4px;
+                margin-bottom: 6px;
             }
             .main-title {
-                font-size: ${baseFontSize + 8}px;
+                font-size: ${baseFontSize + 6}px;
                 font-weight: 900;
-                letter-spacing: 2px;
+                letter-spacing: 1px;
                 color: #000000;
             }
             .meta-grid {
@@ -183,14 +222,14 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
                 font-weight: 700;
                 background: #f8fafc;
                 border: 1px solid #000000;
-                padding: 6px 12px;
+                padding: 4px 8px;
                 border-radius: 4px;
-                margin-bottom: 10px;
+                margin-bottom: 6px;
             }
             
             .columns-container {
                 display: flex;
-                gap: 10px;
+                gap: 8px;
                 width: 100%;
             }
             .column-half {
@@ -200,8 +239,16 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
 
             .data-table {
                 width: 100%;
+                table-layout: fixed; /* 🔒 100% 嚴格固死欄寬，絕對不因文字過長而自動拉寬或縮小框框 */
                 border-collapse: collapse;
-                margin-bottom: 8px;
+                margin-bottom: 4px;
+                page-break-inside: avoid;
+            }
+            .data-table th, .data-table td {
+                overflow: hidden;
+                text-overflow: clip; /* ❌ 100% 絕對不使用 ... 刪節號 */
+                white-space: nowrap; /* ❌ 100% 絕對不換行 */
+                word-break: keep-all;
             }
             .data-table th {
                 background-color: #e2e8f0 !important;
@@ -209,12 +256,12 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
                 font-weight: 800;
                 font-size: ${baseFontSize - 2}px;
                 border: 1px solid #000000;
-                padding: 4px 6px;
+                padding: 2.5px 4px;
                 text-align: center;
             }
             .data-table td {
                 border: 1px solid #000000;
-                padding: 4px 6px;
+                padding: 2.5px 4px;
                 font-size: ${baseFontSize - 2}px;
             }
             .data-table tr:nth-child(even) {
@@ -226,23 +273,23 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
             .font-black { font-weight: 900; }
             .text-red { color: #dc2626; }
             .text-truncate {
-                white-space: nowrap;
+                white-space: nowrap; /* ❌ 絕對不換行 */
                 overflow: hidden;
-                text-overflow: ellipsis;
-                max-width: 140px;
+                text-overflow: clip; /* ❌ 絕對不顯示 ... */
             }
             
             .summary-card {
                 border: 2px solid #000000;
                 background: #ffffff;
-                padding: 8px 12px;
+                padding: 6px 10px;
                 border-radius: 4px;
-                margin-top: 6px;
+                margin-top: 4px;
+                page-break-inside: avoid;
             }
             .summary-grid {
                 display: grid;
                 grid-template-columns: repeat(2, 1fr);
-                gap: 6px;
+                gap: 4px;
                 font-size: ${baseFontSize - 1}px;
                 font-weight: 700;
             }
@@ -252,19 +299,20 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
                 margin-top: 2px;
             }
             .signature-area {
-                margin-top: 18px;
+                margin-top: 10px;
                 display: flex;
                 justify-content: space-between;
                 font-size: ${baseFontSize - 1}px;
                 font-weight: 700;
-                padding: 0 16px;
+                padding: 0 12px;
+                page-break-inside: avoid;
             }
             .no-print-toolbar {
                 background: #eff6ff;
                 border: 1px solid #bfdbfe;
-                padding: 8px 14px;
+                padding: 6px 12px;
                 border-radius: 8px;
-                margin-bottom: 12px;
+                margin-bottom: 8px;
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
@@ -273,16 +321,17 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
                 background: #2563eb;
                 color: #ffffff;
                 border: none;
-                padding: 6px 16px;
+                padding: 5px 14px;
                 border-radius: 6px;
                 font-weight: 700;
                 cursor: pointer;
-                font-size: 13px;
+                font-size: 12px;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             }
             @media print {
                 .no-print-toolbar { display: none !important; }
-                body { padding: 0; }
+                html, body { height: auto; margin: 0; padding: 0; }
+                .print-wrapper { padding: 0; }
             }
         </style>
     </head>
@@ -295,49 +344,51 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
             <button class="btn-action" onclick="window.print()">🖨️ 立即列印 / 另存 PDF</button>
         </div>
 
-        <div class="header-bar">
-            <div class="main-title">${title}</div>
-        </div>
-        
-        <div class="meta-grid">
-            <div>📅 日期：${dateStr}</div>
-            <div>📍 營業所：${location}</div>
-            <div>👤 業務員：${salesRep}</div>
-        </div>
-
-        <div class="columns-container">
-            <div class="column-half">
-                ${renderTableHalf(leftRows, 0)}
+        <div class="print-wrapper">
+            <div class="header-bar">
+                <div class="main-title">${title}</div>
             </div>
-            ${isTwoColumns ? `
-            <div class="column-half">
-                ${renderTableHalf(rightRows, leftRows.length)}
+            
+            <div class="meta-grid">
+                <div>📅 日期：${dateStr}</div>
+                <div>📍 營業所：${location}</div>
+                <div>👤 業務員：${salesRep}</div>
+            </div>
+
+            <div class="columns-container">
+                <div class="column-half">
+                    ${renderTableHalf(leftRows, 0)}
+                </div>
+                ${isTwoColumns ? `
+                <div class="column-half">
+                    ${renderTableHalf(rightRows, leftRows.length)}
+                </div>
+                ` : ''}
+            </div>
+
+            <div class="summary-card">
+                <div class="summary-grid">
+                    <div>💰 銷售總額：<b>$${totalSalesAmount}</b></div>
+                    ${showCash ? `<div>💵 應繳現金：<b style="color:#2563eb; font-size:${baseFontSize + 1}px;">$${totalCashCalc || finalTotal}</b></div>` : ''}
+                    ${showExpenses ? `
+                    <div>
+                        💸 營業總支出：<b>$${totalExpenses}</b>
+                        <div class="expense-detail">
+                            (攤位:$${expStall} | 清潔:$${expCleaning} | 電費:$${expElectricity} | 其他:$${expOthers})
+                        </div>
+                    </div>
+                    ` : ''}
+                    ${showCash ? `<div>🏦 預留金：<b>$${reserve}</b></div>` : ''}
+                </div>
+            </div>
+
+            ${showSignatures ? `
+            <div class="signature-area">
+                <div>業務員簽名：__________________</div>
+                <div>點貨員簽核：__________________</div>
             </div>
             ` : ''}
         </div>
-
-        <div class="summary-card">
-            <div class="summary-grid">
-                <div>💰 銷售總額：<b>$${totalSalesAmount}</b></div>
-                ${showCash ? `<div>💵 應繳現金：<b style="color:#2563eb; font-size:${baseFontSize + 1}px;">$${totalCashCalc || finalTotal}</b></div>` : ''}
-                ${showExpenses ? `
-                <div>
-                    💸 營業總支出：<b>$${totalExpenses}</b>
-                    <div class="expense-detail">
-                        (攤位:$${expStall} | 清潔:$${expCleaning} | 電費:$${expElectricity} | 其他:$${expOthers})
-                    </div>
-                </div>
-                ` : ''}
-                ${showCash ? `<div>🏦 預留金：<b>$${reserve}</b></div>` : ''}
-            </div>
-        </div>
-
-        ${showSignatures ? `
-        <div class="signature-area">
-            <div>業務員簽名：__________________</div>
-            <div>點貨員簽核：__________________</div>
-        </div>
-        ` : ''}
 
         <script>
             window.onload = function() {

@@ -1138,17 +1138,18 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 const displayPrice = row.price || '';
 
                 const aiQty = aiSuggestions ? aiSuggestions[String(row.id)] : null;
+                const returnsVal = p ? p.returns.filter(v => v !== 0 && v !== '0' && v !== '').join(' / ') : '';
 
                 return {
                     name: row.name,
-                    stock: 0, // 合併列印時不顯示庫存
-                    originalStock: 0,
-                    picked: aiSuggestions ? (aiQty !== null ? aiQty : 0) : '',
+                    stock: returnsVal, // 1. 將【退貨數】數字搬到【原庫存】欄位呈現
+                    originalStock: returnsVal,
+                    picked: aiSuggestions ? (aiQty !== null && aiQty !== undefined ? aiQty : '') : '',
                     original: p ? p.original.filter(v => v !== 0 && v !== '0' && v !== '').join(' / ') : '',
-                    returns: p ? p.returns.filter(v => v !== 0 && v !== '0' && v !== '').join(' / ') : '',
-                    sold: p ? p.sold.filter(v => v !== 0 && v !== '0' && v !== '').join(' / ') : '',
+                    returns: '', // 原欄位不重複顯示
+                    sold: '', // 2. 實際售出 (sold) 改為【空白】
                     price: displayPrice,
-                    subtotal: '' // 合併時不計算小計
+                    subtotal: ''
                 };
             });
 
