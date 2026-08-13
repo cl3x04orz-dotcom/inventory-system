@@ -80,11 +80,11 @@ export const InventoryService = {
 
   // ── 原有舊版相容方法 (避免 API Controller 斷裂) ──
 
-  // 1. 取得批次庫存 (quantity != 0)
+  // 1. 取得批次庫存 (包含正數與負數/零庫存項目，確保負庫存如 -1 永不隱藏)
   async getInventory(payload: any = {}) {
     const { storeCode = 'MILI001' } = payload;
     const invList = await prisma.inventory.findMany({
-      where: { quantity: { not: 0 }, storeCode },
+      where: { storeCode },
       include: { product: { select: { sortWeight: true, productName: true } } }
     });
 

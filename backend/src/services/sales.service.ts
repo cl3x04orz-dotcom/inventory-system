@@ -1305,5 +1305,50 @@ export async function deductInventory(productId: string, qtyToDeduct: number, ta
     });
   }
 
+  // 3. 🔑 若剩餘未扣足的數量 (remaining > 0)，表示零庫存或負庫存銷售！
+  // 無論是 POS 結帳或線上下單出貨，均強制扣至負數 (如 -1)，確保事後入庫時可正確平補沖銷 (-1 + 75 = 74)
+  if (remaining > 0) {
+    const existingNegativeBatch = await prisma.inventory.findFirst({
+      where: {
+        productId,
+        type: targetType === 'STOCK' ? 'STOCK' : { not: 'STOCK' },
+        ...(storeCode ? { storeCode } : {}),
+        quantity: { lte: 0 }
+      },
+      orderBy: { entryDate: 'desc' }
+    });
+
+    if (existingNegativeBatch) {
+      await prisma.inventory.updateMany({
+        where: { batchId: existingNegativeBatch.batchId },
+        data: { quantity: existingNegativeBatch.quantity - remaining }
+      });
+      consumed.push({
+        expiryDate: existingNegativeBatch.expiryDate,
+        quantity: remaining
+      });
+    } else {
+      const prod = await prisma.product.findUnique({
+        where: { productId }
+      });
+      const newNegBatch = await prisma.inventory.create({
+        data: {
+          productId,
+          quantity: -remaining,
+          entryDate: new Date(),
+          expiryDate: new Date('2099-12-31'),
+          type: targetType === 'STOCK' ? 'STOCK' : 'ORIGINAL',
+          cost: 0,
+          storeCode: storeCode || 'MILI001',
+          productName: prod?.productName || ''
+        }
+      });
+      consumed.push({
+        expiryDate: newNegBatch.expiryDate,
+        quantity: remaining
+      });
+    }
+  }
+
   return consumed;
 }

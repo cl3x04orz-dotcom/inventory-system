@@ -206,20 +206,36 @@ export const PurchaseService = {
           }
         });
 
-        // 寫入 Inventory (STOCK)
-        await prisma.inventory.create({
-          data: {
-            batchId: getUuid(),
-            productId,
-            productName: itemName,
-            quantity: itemQty,
-            expiryDate,
-            entryDate,
-            type: 'STOCK',
-            cost: itemPrice,
-            storeCode
-          }
+        // 寫入 Inventory (STOCK)，優先平補負數庫存 (例如 -1 + 75 = 74)
+        const negBatch = await prisma.inventory.findFirst({
+          where: { productId, storeCode, type: 'STOCK', quantity: { lt: 0 } },
+          orderBy: { entryDate: 'asc' }
         });
+
+        if (negBatch) {
+          await prisma.inventory.updateMany({
+            where: { batchId: negBatch.batchId },
+            data: {
+              quantity: negBatch.quantity + itemQty,
+              expiryDate: expiryDate || negBatch.expiryDate,
+              cost: itemPrice || negBatch.cost
+            }
+          });
+        } else {
+          await prisma.inventory.create({
+            data: {
+              batchId: getUuid(),
+              productId,
+              productName: itemName,
+              quantity: itemQty,
+              expiryDate,
+              entryDate,
+              type: 'STOCK',
+              cost: itemPrice,
+              storeCode
+            }
+          });
+        }
 
         count++;
       }
