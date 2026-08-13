@@ -168,8 +168,8 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
                             const isPicked = colKey === 'picked' && Number(r.picked || 0) > 0;
                             const isName = colKey === 'name';
                             const alignClass = c.align === 'left' ? 'text-left' : c.align === 'right' ? 'text-right' : 'text-center';
-                            const extraClass = isPicked ? 'text-red font-black' : (isName ? 'font-black text-truncate' : 'font-bold');
-                            const customStyle = isName ? `font-size: ${nameFontSize}px; line-height: 1.2;` : '';
+                            const extraClass = isPicked ? 'text-red font-black' : (isName ? 'font-normal text-truncate' : 'font-bold');
+                            const customStyle = isName ? `font-size: ${nameFontSize}px; font-weight: normal; line-height: 1.2;` : '';
                             return `<td class="${alignClass} ${extraClass}" ${customStyle ? `style="${customStyle}"` : ''}>${val}</td>`;
                         }).join('')}
                     </tr>

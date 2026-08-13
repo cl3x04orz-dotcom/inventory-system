@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Check, Type, Layout, Eye, EyeOff, Settings, Save, RotateCcw, MoveLeft, MoveRight, Code, Tag, Info, Sparkles, Sliders, Layers } from 'lucide-react';
+import { X, Check, Type, Layout, Eye, EyeOff, Settings, Save, RotateCcw, MoveLeft, MoveRight, Code, Tag, Info, Sparkles, Sliders, Layers, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { safeLocalStorage } from '../utils/storage';
 import { callGAS } from '../utils/api';
 import { printNativeSpreadsheetHtml } from '../utils/printHelper';
@@ -213,6 +213,14 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave, apiU
         const temp = newCols[index];
         newCols[index] = newCols[targetIndex];
         newCols[targetIndex] = temp;
+        setConfig({ ...config, columns: newCols });
+    };
+
+    const cycleColumnAlign = (index) => {
+        const newCols = [...config.columns];
+        const current = newCols[index].align || 'center';
+        const nextMap = { center: 'left', left: 'right', right: 'center' };
+        newCols[index] = { ...newCols[index], align: nextMap[current] || 'center' };
         setConfig({ ...config, columns: newCols });
     };
 
@@ -475,7 +483,7 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave, apiU
                                                             style={{ width: `${col.width}%`, textAlign: col.align || 'center' }}
                                                             className="p-1.5 border-r border-slate-900 font-black relative group bg-slate-100 hover:bg-blue-50/80 transition-colors"
                                                         >
-                                                            {/* On-Paper Label Input with StopPropagation to allow clean editing */}
+                                                            {/* On-Paper Label Input with StopPropagation & Dynamic Alignment */}
                                                             <input
                                                                 type="text"
                                                                 value={col.label}
@@ -483,21 +491,38 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave, apiU
                                                                 onClick={(e) => e.stopPropagation()}
                                                                 onFocus={() => setActiveInputIndex(idx)}
                                                                 onChange={(e) => updateColumn(idx, 'label', e.target.value)}
-                                                                className="w-full bg-white/70 hover:bg-white focus:bg-white border border-slate-300 focus:border-blue-600 rounded text-center font-black focus:outline-none px-1 py-0.5"
+                                                                style={{ textAlign: col.align || 'center' }}
+                                                                className="w-full bg-white/70 hover:bg-white focus:bg-white border border-slate-300 focus:border-blue-600 rounded font-black focus:outline-none px-1 py-0.5"
                                                             />
 
-                                                            {/* Data Width Badge */}
-                                                            <div className="text-[9px] font-mono text-slate-500 font-normal mt-0.5">
-                                                                ({col.width}%)
+                                                            {/* Data Width & Align Badge */}
+                                                            <div className="text-[9px] font-mono text-slate-500 font-normal mt-0.5 flex items-center justify-center gap-1">
+                                                                <span>({col.width}%)</span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => { e.stopPropagation(); cycleColumnAlign(idx); }}
+                                                                    title={`目前對齊: ${col.align || 'center'} (點擊切換 靠左/置中/靠右)`}
+                                                                    className="px-1 bg-slate-200 hover:bg-blue-600 hover:text-white rounded text-[9px] font-bold transition-all"
+                                                                >
+                                                                    {col.align === 'left' ? '靠左' : col.align === 'right' ? '靠右' : '置中'}
+                                                                </button>
                                                             </div>
 
-                                                            {/* Column Reorder Arrows on Hover */}
+                                                            {/* Column Reorder & Align Controls on Hover */}
                                                             <div className="absolute top-0.5 right-1 hidden group-hover:flex items-center gap-0.5 bg-white/90 border border-slate-300 rounded px-0.5 shadow-xs">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => { e.stopPropagation(); cycleColumnAlign(idx); }}
+                                                                    title="切換對齊方式 (靠左/置中/靠右)"
+                                                                    className="hover:text-blue-600 p-0.5"
+                                                                >
+                                                                    {col.align === 'left' ? <AlignLeft size={10} /> : col.align === 'right' ? <AlignRight size={10} /> : <AlignCenter size={10} />}
+                                                                </button>
                                                                 <button
                                                                     type="button"
                                                                     disabled={idx === 0}
                                                                     onClick={(e) => { e.stopPropagation(); moveColumn(idx, -1); }}
-                                                                    className="hover:text-blue-600 disabled:opacity-20"
+                                                                    className="hover:text-blue-600 disabled:opacity-20 p-0.5"
                                                                 >
                                                                     <MoveLeft size={10} />
                                                                 </button>
@@ -505,7 +530,7 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave, apiU
                                                                     type="button"
                                                                     disabled={idx === config.columns.length - 1}
                                                                     onClick={(e) => { e.stopPropagation(); moveColumn(idx, 1); }}
-                                                                    className="hover:text-blue-600 disabled:opacity-20"
+                                                                    className="hover:text-blue-600 disabled:opacity-20 p-0.5"
                                                                 >
                                                                     <MoveRight size={10} />
                                                                 </button>
@@ -542,13 +567,13 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave, apiU
                                                         else if (c.id === 'price') val = Number(r.price || 0) === 0 ? '' : Number(r.price).toLocaleString();
                                                         else if (c.id !== 'name' && c.id !== 'idx' && Number(val) === 0) val = '';
 
-                                                        const customStyle = isName ? { fontSize: `${config.nameFontSize || config.fontSize}px`, fontWeight: 900 } : {};
+                                                        const customStyle = isName ? { fontSize: `${config.nameFontSize || config.fontSize}px`, fontWeight: 400 } : {};
                                                         return (
                                                             <td
                                                                 key={c.id}
                                                                 style={{ textAlign: c.align || 'center', ...customStyle }}
-                                                                className={`p-1.5 border-r border-slate-900 font-bold ${
-                                                                    isPicked ? 'text-red-600 font-black' : (isName ? 'font-black' : '')
+                                                                className={`p-1.5 border-r border-slate-900 ${
+                                                                    isPicked ? 'text-red-600 font-black' : (isName ? 'font-normal' : 'font-bold')
                                                                 }`}
                                                             >
                                                                 {val}
@@ -585,10 +610,19 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave, apiU
                                                                     onClick={(e) => e.stopPropagation()}
                                                                     onFocus={() => setActiveInputIndex(idx)}
                                                                     onChange={(e) => updateColumn(idx, 'label', e.target.value)}
-                                                                    className="w-full bg-white/70 hover:bg-white focus:bg-white border border-slate-300 focus:border-blue-600 rounded text-center font-black focus:outline-none px-1 py-0.5"
+                                                                    style={{ textAlign: col.align || 'center' }}
+                                                                    className="w-full bg-white/70 hover:bg-white focus:bg-white border border-slate-300 focus:border-blue-600 rounded font-black focus:outline-none px-1 py-0.5"
                                                                 />
-                                                                <div className="text-[9px] font-mono text-slate-500 font-normal mt-0.5">
-                                                                    ({col.width}%)
+                                                                <div className="text-[9px] font-mono text-slate-500 font-normal mt-0.5 flex items-center justify-center gap-1">
+                                                                    <span>({col.width}%)</span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => { e.stopPropagation(); cycleColumnAlign(idx); }}
+                                                                        title={`目前對齊: ${col.align || 'center'} (點擊切換 靠左/置中/靠右)`}
+                                                                        className="px-1 bg-slate-200 hover:bg-blue-600 hover:text-white rounded text-[9px] font-bold transition-all"
+                                                                    >
+                                                                        {col.align === 'left' ? '靠左' : col.align === 'right' ? '靠右' : '置中'}
+                                                                    </button>
                                                                 </div>
                                                                 <div
                                                                     onMouseDown={(e) => handleMouseDownResizer(e, idx)}
@@ -619,13 +653,13 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave, apiU
                                                             else if (c.id === 'price') val = Number(r.price || 0) === 0 ? '' : Number(r.price).toLocaleString();
                                                             else if (c.id !== 'name' && c.id !== 'idx' && Number(val) === 0) val = '';
 
-                                                            const customStyle = isName ? { fontSize: `${config.nameFontSize || config.fontSize}px`, fontWeight: 900 } : {};
+                                                            const customStyle = isName ? { fontSize: `${config.nameFontSize || config.fontSize}px`, fontWeight: 400 } : {};
                                                             return (
                                                                 <td
                                                                     key={c.id}
                                                                     style={{ textAlign: c.align || 'center', ...customStyle }}
-                                                                    className={`p-1.5 border-r border-slate-900 font-bold ${
-                                                                        isPicked ? 'text-red-600 font-black' : (isName ? 'font-black' : '')
+                                                                    className={`p-1.5 border-r border-slate-900 ${
+                                                                        isPicked ? 'text-red-600 font-black' : (isName ? 'font-normal' : 'font-bold')
                                                                     }`}
                                                                 >
                                                                     {val}
