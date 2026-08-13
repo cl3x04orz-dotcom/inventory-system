@@ -75,16 +75,32 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
 
     // 預設與自訂欄位設定
     const defaultCols = [
-        { id: 'idx', key: 'idx', label: '{{#}}', width: 6, align: 'center', visible: true },
-        { id: 'name', key: 'name', label: '{{product_name}}', width: 34, align: 'left', visible: true },
-        { id: 'stock', key: 'stock', label: '原庫存({{stock}})', width: 12, align: 'center', visible: true },
-        { id: 'picked', key: 'picked', label: '補領貨({{picked}})', width: 14, align: 'center', visible: true },
-        { id: 'returns', key: 'returns', label: '退貨數({{returns}})', width: 12, align: 'center', visible: true },
-        { id: 'sold', key: 'sold', label: '實售數({{sold}})', width: 12, align: 'center', visible: true },
-        { id: 'price', key: 'price', label: '單價({{price}})', width: 10, align: 'right', visible: false },
-        { id: 'subtotal', key: 'subtotal', label: '小計({{subtotal}})', width: 12, align: 'right', visible: false }
+        { id: 'idx', key: 'idx', label: '編號', width: 6, align: 'center', visible: true },
+        { id: 'name', key: 'name', label: '品項', width: 34, align: 'left', visible: true },
+        { id: 'stock', key: 'stock', label: '原庫存', width: 12, align: 'center', visible: true },
+        { id: 'picked', key: 'picked', label: '領貨數', width: 14, align: 'center', visible: true },
+        { id: 'returns', key: 'returns', label: '退貨數', width: 12, align: 'center', visible: true },
+        { id: 'sold', key: 'sold', label: '實售數', width: 12, align: 'center', visible: true },
+        { id: 'price', key: 'price', label: '單價', width: 10, align: 'right', visible: false },
+        { id: 'subtotal', key: 'subtotal', label: '應繳金', width: 12, align: 'right', visible: false }
     ];
-    const columns = (config.columns && config.columns.length > 0 ? config.columns : defaultCols).filter(c => c.visible !== false);
+
+    const sanitizeHeaderLabel = (label) => {
+        if (!label) return '';
+        const clean = label.replace(/\(\{\{.*?\}\}\)/g, '').replace(/\{\{.*?\}\}/g, '').trim();
+        if (clean === '小計') return '應繳金';
+        if (clean === '補領貨') return '領貨數';
+        if (clean === '{{#}}' || clean === '#') return '編號';
+        if (clean === '{{product_name}}') return '品項';
+        return clean || label;
+    };
+
+    const columns = (config.columns && config.columns.length > 0 ? config.columns : defaultCols)
+        .filter(c => c.visible !== false)
+        .map(c => ({
+            ...c,
+            label: sanitizeHeaderLabel(c.label)
+        }));
 
     const formatNumberVal = (num) => {
         const val = Number(num || 0);
@@ -138,31 +154,17 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
             <thead>
                 <tr>
                     ${columns.map(c => {
-                        const parsedHeaderLabel = parseVariables(c.label, globalCtx, {});
-                        return `<th style="width: ${c.width}%; text-align: ${c.align || 'center'};">${parsedHeaderLabel}</th>`;
+                        const headerText = sanitizeHeaderLabel(c.label);
+                        return `<th style="width: ${c.width}%; text-align: ${c.align || 'center'};">${headerText}</th>`;
                     }).join('')}
                 </tr>
             </thead>
             <tbody>
-                ${items.map((r, i) => {
-                    const rowCtx = {
-                        idx: startIndex + i + 1,
-                        name: r.name || '',
-                        stock: r.originalStock ?? r.stock ?? 0,
-                        picked: r.picked || 0,
-                        returns: r.returns || 0,
-                        sold: r.sold || 0,
-                        price: r.price || 0,
-                        subtotal: r.subtotal || 0
-                    };
-                    return `
+                ${items.map((r, i) => `
                     <tr>
                         ${columns.map(c => {
                             const colKey = c.id || c.key;
-                            let val = getCellValue(r, colKey, startIndex + i);
-                            if (c.label && c.label.includes('{{')) {
-                                val = parseVariables(c.label, globalCtx, rowCtx);
-                            }
+                            const val = getCellValue(r, colKey, startIndex + i);
                             const isPicked = colKey === 'picked' && Number(r.picked || 0) > 0;
                             const isName = colKey === 'name';
                             const alignClass = c.align === 'left' ? 'text-left' : c.align === 'right' ? 'text-right' : 'text-center';
@@ -171,7 +173,7 @@ export function printNativeSpreadsheetHtml(printData, customConfig = null) {
                             return `<td class="${alignClass} ${extraClass}" ${customStyle ? `style="${customStyle}"` : ''}>${val}</td>`;
                         }).join('')}
                     </tr>
-                `}).join('')}
+                `).join('')}
             </tbody>
         </table>
     `;
