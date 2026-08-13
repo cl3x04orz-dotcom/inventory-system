@@ -5,21 +5,21 @@ import { callGAS } from '../utils/api';
 import { printNativeSpreadsheetHtml } from '../utils/printHelper';
 
 export const DEFAULT_GRID_COLUMNS = [
-    { id: 'idx', key: 'idx', label: '{{#}}', width: 6, align: 'center', visible: true, locked: true },
-    { id: 'name', key: 'name', label: '{{product_name}}', width: 34, align: 'left', visible: true },
-    { id: 'stock', key: 'stock', label: '原庫存({{stock}})', width: 12, align: 'center', visible: true },
-    { id: 'picked', key: 'picked', label: '補領貨({{picked}})', width: 14, align: 'center', visible: true, isHighlight: true },
-    { id: 'returns', key: 'returns', label: '退貨數({{returns}})', width: 12, align: 'center', visible: true },
-    { id: 'sold', key: 'sold', label: '實售數({{sold}})', width: 12, align: 'center', visible: true },
-    { id: 'price', key: 'price', label: '單價({{price}})', width: 10, align: 'right', visible: false },
-    { id: 'subtotal', key: 'subtotal', label: '小計({{subtotal}})', width: 12, align: 'right', visible: false }
+    { id: 'idx', key: 'idx', label: '編號', width: 6, align: 'center', visible: true, locked: true },
+    { id: 'name', key: 'name', label: '品項', width: 34, align: 'left', visible: true },
+    { id: 'stock', key: 'stock', label: '原庫存', width: 12, align: 'center', visible: true },
+    { id: 'picked', key: 'picked', label: '領貨數', width: 14, align: 'center', visible: true, isHighlight: true },
+    { id: 'returns', key: 'returns', label: '退貨數', width: 12, align: 'center', visible: true },
+    { id: 'sold', key: 'sold', label: '實售數', width: 12, align: 'center', visible: true },
+    { id: 'price', key: 'price', label: '單價', width: 10, align: 'right', visible: false },
+    { id: 'subtotal', key: 'subtotal', label: '應繳金', width: 12, align: 'right', visible: false }
 ];
 
 export const DEFAULT_PRINT_CONFIG = {
-    title: '銷售與領貨點貨單據 (日期: {{date}} / 營業所: {{location}})',
+    title: '銷售與領貨點貨單據',
     layout: 'two_columns', // 'two_columns' | 'single_column'
     fontSize: 15, // 11 | 13 | 15 | 18
-    nameFontSize: 18, // 📦 品項名稱單獨字體大小: 13 | 16 | 18 | 20 | 22 | 24
+    nameFontSize: 18, // 📦 品項名稱單獨字體大小: 1 - 100px
     borderStyle: 'thick', // 'thick' | 'thin'
     columns: DEFAULT_GRID_COLUMNS,
     showExpenses: true,
@@ -27,22 +27,15 @@ export const DEFAULT_PRINT_CONFIG = {
     showSignatures: true
 };
 
-export const AVAILABLE_VARIABLES = [
-    { tag: '{{date}}', desc: '開單日期' },
-    { tag: '{{location}}', desc: '營業所/車次' },
-    { tag: '{{salesRep}}', desc: '業務員' },
-    { tag: '{{totalSalesAmount}}', desc: '總銷售金額' },
-    { tag: '{{totalCashCalc}}', desc: '應繳現金' },
-    { tag: '{{reserve}}', desc: '預留金' },
-    { tag: '{{totalExpenses}}', desc: '總營業支出' },
-    { tag: '{{#}}', desc: '商品編號' },
-    { tag: '{{product_name}}', desc: '商品品項名稱' },
-    { tag: '{{stock}}', desc: '原車庫存' },
-    { tag: '{{picked}}', desc: '補領貨數' },
-    { tag: '{{returns}}', desc: '退貨數' },
-    { tag: '{{sold}}', desc: '實售數' },
-    { tag: '{{price}}', desc: '單價' },
-    { tag: '{{subtotal}}', desc: '金額小計' },
+export const FRIENDLY_COLUMN_OPTIONS = [
+    { id: 'idx', label: '編號', icon: '🔢' },
+    { id: 'name', label: '品項', icon: '📦' },
+    { id: 'stock', label: '原庫存', icon: '📦' },
+    { id: 'picked', label: '領貨數', icon: '🚚' },
+    { id: 'returns', label: '退貨數', icon: '↩️' },
+    { id: 'sold', label: '實售數', icon: '💰' },
+    { id: 'price', label: '單價', icon: '💵' },
+    { id: 'subtotal', label: '應繳金', icon: '📝' },
 ];
 
 export default function PrintTemplateConfigModal({ isOpen, onClose, onSave, apiUrl }) {
@@ -375,22 +368,42 @@ export default function PrintTemplateConfigModal({ isOpen, onClose, onSave, apiU
                     </div>
                 </div>
 
-                {/* 🧰 Variable Toolbar (代碼插入工具箱) */}
-                <div className="px-6 py-2 bg-slate-50 border-b border-slate-200 flex items-center gap-2 overflow-x-auto text-xs">
-                    <Tag size={14} className="text-blue-700 shrink-0" />
-                    <span className="font-black text-blue-900 shrink-0">點擊代碼帶入儲存格:</span>
-                    {AVAILABLE_VARIABLES.map((v) => (
-                        <button
-                            key={v.tag}
-                            type="button"
-                            onClick={() => insertVariable(v.tag)}
-                            title={`點擊插入 ${v.desc}`}
-                            className="px-2 py-0.5 bg-white hover:bg-blue-600 hover:text-white border border-blue-300 rounded text-[11px] font-mono font-bold text-blue-800 shadow-2xs whitespace-nowrap transition-all active:scale-95 cursor-pointer shrink-0"
-                        >
-                            <span>{v.tag}</span>
-                            <span className="text-[9px] opacity-75 font-sans ml-0.5">({v.desc})</span>
-                        </button>
-                    ))}
+                {/* 🧰 Column Selector Bar (常用欄位快速開關與選擇列) */}
+                <div className="px-6 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-2 overflow-x-auto text-xs">
+                    <span className="font-black text-slate-800 shrink-0 flex items-center gap-1">
+                        ✨ 欄位快速開啟/隱藏:
+                    </span>
+                    {FRIENDLY_COLUMN_OPTIONS.map((opt) => {
+                        const colObj = config.columns.find(c => c.id === opt.id);
+                        const isVisible = colObj ? colObj.visible !== false : false;
+                        return (
+                            <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => {
+                                    const newCols = config.columns.map(c => {
+                                        if (c.id === opt.id) {
+                                            return { ...c, visible: !c.visible };
+                                        }
+                                        return c;
+                                    });
+                                    setConfig({ ...config, columns: newCols });
+                                }}
+                                title={`點擊切換 ${opt.label} 欄位顯示/隱藏`}
+                                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 shadow-xs border ${
+                                    isVisible
+                                        ? 'bg-blue-600 text-white border-blue-600 shadow-blue-500/20'
+                                        : 'bg-white text-slate-500 border-slate-300 hover:bg-slate-100 hover:text-slate-700'
+                                }`}
+                            >
+                                <span>{opt.icon}</span>
+                                <span>{opt.label}</span>
+                                <span className={`text-[10px] px-1 py-0.2 rounded font-mono ${isVisible ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                                    {isVisible ? '✓ 顯示' : '隱藏'}
+                                </span>
+                            </button>
+                        );
+                    })}
                 </div>
 
                 {/* Modal Body - 1:1 Live A4 Paper Canvas Center */}
