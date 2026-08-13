@@ -1280,18 +1280,24 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             }
         }
 
-        // 預計出貨/配送日篩選
+        // 預計出貨/配送日篩選 (100% 嚴格僅比對 expectedDeliveryDate)
         if (dateFilter && String(order.expectedDeliveryDate || '') !== dateFilter) {
             return false;
         }
 
-        // 起迄日期區間篩選 (比對 expectedDeliveryDate 或 confirmedAt/createdAt 日期)
-        const orderDateStr = order.expectedDeliveryDate || (order.confirmedAt ? new Date(order.confirmedAt).toISOString().split('T')[0] : (order.createdAt ? new Date(order.createdAt).toISOString().split('T')[0] : ''));
-        if (startDate && orderDateStr && orderDateStr < startDate) {
-            return false;
-        }
-        if (endDate && orderDateStr && orderDateStr > endDate) {
-            return false;
+        // 起迄日期區間篩選 (100% 嚴格僅比對已確認配送日 expectedDeliveryDate)
+        // 當設定了日期區間篩選時，未確認/未指定配送日的訂單一律不呈現，確保 8/13 的搜尋結果中 100% 只有 8/13 配送日的訂單
+        if (startDate || endDate) {
+            const expDate = String(order.expectedDeliveryDate || '').trim();
+            if (!expDate) {
+                return false; // 未指定/未確認配送日，在日期搜尋時直接隱藏！
+            }
+            if (startDate && expDate < startDate) {
+                return false;
+            }
+            if (endDate && expDate > endDate) {
+                return false;
+            }
         }
 
         // 一般文字與金額搜尋（編號、姓名、電話、地址、群組、轉帳金額、對帳後五碼）
