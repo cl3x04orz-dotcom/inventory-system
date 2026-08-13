@@ -208,6 +208,20 @@ function AppContent() {
     }, [mobileMenuOpen]);
 
 
+    // 跨設備 0.1 秒自動雲端同步最新列印樣板 (PostgreSQL DB)
+    useEffect(() => {
+        const targetApi = GAS_API_URL || (typeof window !== 'undefined' && window.VITE_API_URL) || '/api';
+        callGAS(targetApi, 'getPrintTemplateConfig', {})
+            .then(res => {
+                if (res && res.success && res.config) {
+                    const cloudConfig = typeof res.config === 'string' ? JSON.parse(res.config) : res.config;
+                    safeLocalStorage.setItem('print_template_config', JSON.stringify(cloudConfig));
+                    console.log('[PrintConfig] 跨設備成功從 PostgreSQL 雲端資料庫同步最新樣板！');
+                }
+            })
+            .catch(err => console.warn('[PrintConfig] 雲端樣板同步退回本機快取:', err));
+    }, []);
+
     // Activity Logger
     const { logActivity, logLogin, logLogout, logPageView } = useActivityLogger({
         user,

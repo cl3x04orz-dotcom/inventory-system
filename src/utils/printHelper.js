@@ -1,4 +1,24 @@
 import { safeLocalStorage } from './storage';
+import { callGAS } from './api';
+
+export async function syncPrintTemplateConfigFromCloud(apiUrl = '/api') {
+    try {
+        const res = await callGAS(apiUrl, 'getPrintTemplateConfig', {});
+        if (res && res.success && res.config) {
+            const cloudConfig = typeof res.config === 'string' ? JSON.parse(res.config) : res.config;
+            const merged = {
+                ...DEFAULT_PRINT_CONFIG,
+                ...cloudConfig,
+                columns: cloudConfig.columns && cloudConfig.columns.length > 0 ? cloudConfig.columns : DEFAULT_GRID_COLUMNS
+            };
+            safeLocalStorage.setItem('print_template_config', JSON.stringify(merged));
+            return merged;
+        }
+    } catch (err) {
+        console.warn('[PrintConfig] Cloud sync fallback to local cache:', err);
+    }
+    return null;
+}
 
 export function printNativeSpreadsheetHtml(printData, customConfig = null) {
     let config = customConfig;
