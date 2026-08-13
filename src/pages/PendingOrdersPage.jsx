@@ -140,39 +140,58 @@ const SearchableProductSelect = ({ products = [], onSelect, placeholder = "-- �
     );
 };
 
-const formatDetailItemLine = (item, prod) => {
-    let rawName = item.productName || item.productId || '';
-    let cleanName = rawName.replace(/\s*\([\s\S]*?\)\s*$/, '').trim();
-    if (cleanName.includes('【口味備註：')) {
-        cleanName = cleanName.split('【口味備註：')[0].trim();
-    } else if (cleanName.includes('【')) {
-        cleanName = cleanName.split('【')[0].trim();
+const formatCleanProductNameAndFlavor = (rawProductName, rawRemark, qty) => {
+    let pName = String(rawProductName || '').trim();
+    let rem = String(rawRemark || '').trim();
+
+    // 先全區尋找是否有 【口味備註：...】 或 【...】
+    let innerFlavor = '';
+    const combinedStr = `${pName} ${rem}`;
+
+    if (combinedStr.includes('【口味備註：')) {
+        const match = combinedStr.match(/【口味備註：(.*?)】/);
+        if (match && match[1]) innerFlavor = match[1].trim();
+    } else if (combinedStr.includes('【') && combinedStr.includes('】')) {
+        const match = combinedStr.match(/【(.*?)】/);
+        if (match && match[1]) innerFlavor = match[1].trim();
+    } else if (rem && rem !== '贈品') {
+        innerFlavor = rem;
     }
 
+    if (innerFlavor) {
+        innerFlavor = stripTrailingQty(innerFlavor);
+        innerFlavor = innerFlavor.replace(/【?口味備註：?/g, '').replace(/】/g, '').trim();
+    }
+
+    // 乾淨的主要商品名稱 (剔除括號與【...】及隨後的冗餘文字)
+    let cleanBaseName = pName
+        .split('【')[0]
+        .split('(')[0]
+        .replace(/x\d+$/i, '')
+        .trim();
+
+    if (!cleanBaseName) cleanBaseName = pName;
+
+    const flavorBracket = innerFlavor ? `【${innerFlavor}】` : '';
+    const qtyStr = qty != null ? `x${qty}` : '';
+
+    return {
+        cleanBaseName,
+        innerFlavor,
+        flavorBracket,
+        pNameDisplay: `${cleanBaseName}${flavorBracket}`,
+        fullDisplay: `${cleanBaseName}${flavorBracket}${qtyStr}`
+    };
+};
+
+const formatDetailItemLine = (item, prod) => {
     const isBundle = prod ? prod.isBundle : false;
     const bundleSize = prod ? prod.bundleSize : 1;
     const unitStr = isBundle ? `組 (共 ${item.qty * bundleSize} 瓶)` : '瓶';
 
-    let cleanRemarkStr = '';
-    const rawRemark = item.remark ? String(item.remark).trim() : '';
-    let remarkToParse = rawRemark;
-    if (!remarkToParse && rawName.includes('【')) {
-        remarkToParse = rawName;
-    }
+    const formatted = formatCleanProductNameAndFlavor(item.productName || item.productId, item.remark, item.qty);
 
-    if (remarkToParse) {
-        if (remarkToParse.includes('【口味備註：')) {
-            const inner = stripTrailingQty(remarkToParse.replace(/.*?【口味備註：(.*?)】.*/, '$1').trim());
-            if (inner) cleanRemarkStr = `【${inner}】`;
-        } else if (remarkToParse.includes('【') && remarkToParse.includes('】')) {
-            const inner = stripTrailingQty(remarkToParse.replace(/.*?【(.*?)】.*/, '$1').trim());
-            if (inner) cleanRemarkStr = `【${inner}】`;
-        } else {
-            cleanRemarkStr = ` (${remarkToParse})`;
-        }
-    }
-
-    return `   - ${cleanName} x ${item.qty} ${unitStr}${cleanRemarkStr}`;
+    return `   - ${formatted.cleanBaseName} x ${item.qty} ${unitStr}${formatted.flavorBracket}`;
 };
 
 export default function PendingOrdersPage({ user, apiUrl }) {
@@ -274,14 +293,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     (ri.productName && String(ri.productName).includes('贈品'))
                 );
                 const prod = products.find(p => p.id === ri.productId || p.name === ri.productName || p.name === ri.productId);
-                let sub = isGift ? 0 : ri.subtotal;
-                if (!isGift) {
-                    if (prod && (prod.has_volume_pricing || (Array.isArray(prod.promotions) && prod.promotions.length > 0))) {
-                        sub = calculateItemSubtotal(ri.productId, ri.qty, ri.price);
-                    } else if (sub == null || isNaN(Number(sub)) || Number(sub) <= 0) {
-                        sub = calculateItemSubtotal(ri.productId, ri.qty, ri.price);
-                    }
-                }
+                const sub = isGift ? 0 : calculateItemSubtotal(ri.productId || ri.productName, ri.qty, ri.price ?? ri.unitPrice);
                 return {
                     ...ri,
                     price: isGift ? 0 : (ri.price ?? ri.unitPrice),
@@ -1701,30 +1713,14 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     const rTotal = r.items.reduce((sum, ri) => sum + (ri.subtotal != null && ri.subtotal !== undefined ? Number(ri.subtotal) : 0), 0);
                     lines.push(`      👤 ${r.recipientName}（$${rTotal}）`);
                     r.items.forEach(ri => {
-                        const rawRem = String(ri.remark || '').trim();
-                        let flavorStr = '';
-                        if (rawRem.includes('【口味備註：')) {
-                            flavorStr = rawRem.replace(/.*?【口味備註：(.*?)】.*/, '$1').trim();
-                        } else if (rawRem.includes('【') && rawRem.includes('】')) {
-                            flavorStr = rawRem.replace(/.*?【(.*?)】.*/, '$1').trim();
-                        } else if (rawRem && rawRem !== '贈品') {
-                            flavorStr = rawRem;
-                        }
-                        flavorStr = stripTrailingQty(flavorStr);
-                        const remarkStr = flavorStr ? `【${flavorStr}】` : (rawRem === '贈品' ? '【贈品】' : '');
-
-                        const cleanRiName = String(ri.productName || '')
-                            .replace(/\s*【.*?】/g, '')
-                            .replace(/\s*\(.*?\)/g, '')
-                            .trim();
-
-                        const prod = products.find(p => p.id === ri.productId || p.name === cleanRiName);
+                        const formatted = formatCleanProductNameAndFlavor(ri.productName, ri.remark, null);
+                        const prod = products.find(p => p.id === ri.productId || p.name === formatted.cleanBaseName);
                         const isBundle = prod ? prod.isBundle : false;
                         const bundleSize = prod ? prod.bundleSize : 1;
                         const unitStr = isBundle ? `組 (共 ${ri.qty * bundleSize} 瓶)` : '瓶';
 
                         const sub = ri.subtotal != null && ri.subtotal !== undefined ? Number(ri.subtotal) : 0;
-                        lines.push(`         - ${cleanRiName} x ${ri.qty} ${unitStr}${remarkStr}= $${sub}`);
+                        lines.push(`         - ${formatted.pNameDisplay} x${ri.qty} ${unitStr} = $${sub}`);
                     });
                 });
             }
@@ -2517,32 +2513,23 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                                     const recipientTotal = r.items.reduce((sum, ri) => sum + (ri.subtotal != null && ri.subtotal !== undefined ? Number(ri.subtotal) : calculateItemSubtotal(ri.productId, ri.qty, ri.price)), 0);
                                                                     return (
                                                                         <div key={rIdx} className="bg-[var(--bg-secondary)] p-3 rounded-lg border border-[var(--border-primary)]">
-                                                                            <div className="flex justify-between items-center text-sm font-bold text-[var(--text-primary)]">
+                                                                            <div className="flex justify-between items-center text-base font-extrabold text-[var(--text-primary)] border-b border-dashed border-[var(--border-primary)] pb-1 mb-1.5">
                                                                                 <span>👤 {r.recipientName}</span>
-                                                                                <span className="text-blue-600 font-mono">${recipientTotal} 元</span>
+                                                                                <span className="text-blue-600 font-mono text-base">${recipientTotal} 元</span>
                                                                             </div>
-                                                                            <div className="pl-3 mt-1.5 space-y-0.5 text-xs text-[var(--text-secondary)]">
+                                                                            <div className="pl-2 space-y-1 text-sm md:text-base text-[var(--text-secondary)]">
                                                                                 {r.items.map((ri, riIdx) => {
-                                                                                    const sub = ri.subtotal != null && ri.subtotal !== undefined ? Number(ri.subtotal) : calculateItemSubtotal(ri.productId, ri.qty, ri.price);
-                                                                                    const cleanName = String(ri.productName || '')
-                                                                                        .replace(/\s*\(\s*【?口味備註：[^】)]+】?\s*\)/g, '')
-                                                                                        .replace(/\s*【口味備註：[^】]+】/g, '')
-                                                                                        .trim();
-                                                                                    const rawRem = String(ri.remark || '')
-                                                                                        .replace(/【?口味備註：?/g, '')
-                                                                                        .replace(/】/g, '')
-                                                                                        .trim();
-                                                                                    const cleanRemark = stripTrailingQty(rawRem);
-                                                                                    const pNameDisplay = cleanName + (cleanRemark ? ` 【${cleanRemark}】` : '');
+                                                                                    const sub = calculateItemSubtotal(ri.productId || ri.productName, ri.qty, ri.price ?? ri.unitPrice);
+                                                                                    const formatted = formatCleanProductNameAndFlavor(ri.productName, ri.remark, ri.qty);
                                                                                     const freeQty = calculateFreeQtyFromTotal(ri.productId, ri.qty);
                                                                                     const paidQty = ri.qty - freeQty;
                                                                                     const qtyDisplay = freeQty > 0 ? `x${ri.qty} (付費:${paidQty},送:${freeQty})` : `x${ri.qty}`;
                                                                                     return (
                                                                                         <div key={riIdx} className="flex justify-between items-start font-mono">
-                                                                                            <span className="pr-2 text-[var(--text-secondary)] break-words">
-                                                                                                <span className="text-[var(--text-primary)]">{pNameDisplay}</span> {qtyDisplay}
+                                                                                            <span className="pr-2 text-[var(--text-secondary)] break-words leading-snug">
+                                                                                                <span className="text-[var(--text-primary)] font-normal text-sm md:text-base">{formatted.pNameDisplay}</span> <span className="font-normal text-blue-600 dark:text-blue-400">{qtyDisplay}</span>
                                                                                             </span>
-                                                                                            <span className="flex-shrink-0 font-bold text-[var(--text-primary)] mt-0.5">${sub}</span>
+                                                                                            <span className="flex-shrink-0 font-normal text-[var(--text-primary)] mt-0.5 text-sm md:text-base">${sub}</span>
                                                                                         </div>
                                                                                     );
                                                                                 })}
