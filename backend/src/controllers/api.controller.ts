@@ -1,4 +1,4 @@
-import prisma from '../prisma/client.js';
+import { prisma } from '../database/context.js';
 import { UserService } from '../services/user.service.js';
 import { ProductService } from '../services/product.service.js';
 import { SalesService } from '../services/sales.service.js';
@@ -283,10 +283,10 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
     case 'getPrintTemplateConfig': {
       try {
         const record = await prisma.groupBuySystemSetting.findUnique({
-          where: { key: 'print_template_config' }
+          where: { settingKey: 'print_template_config' }
         });
-        if (record && record.value) {
-          return { success: true, config: JSON.parse(record.value) };
+        if (record && record.settingValue) {
+          return { success: true, config: JSON.parse(record.settingValue) };
         }
         return { success: true, config: null };
       } catch (err: any) {
@@ -298,9 +298,9 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       try {
         const configStr = typeof payload.config === 'string' ? payload.config : JSON.stringify(payload.config || {});
         await prisma.groupBuySystemSetting.upsert({
-          where: { key: 'print_template_config' },
-          update: { value: configStr },
-          create: { key: 'print_template_config', value: configStr }
+          where: { settingKey: 'print_template_config' },
+          update: { settingValue: configStr },
+          create: { settingKey: 'print_template_config', settingValue: configStr }
         });
         return { success: true };
       } catch (err: any) {
@@ -313,10 +313,10 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
     case 'getPurchaseProductOrder': {
       try {
         const record = await prisma.groupBuySystemSetting.findUnique({
-          where: { key: 'purchase_product_order' }
+          where: { settingKey: 'purchase_product_order' }
         });
-        if (record && record.value) {
-          return { success: true, order: JSON.parse(record.value) };
+        if (record && record.settingValue) {
+          return { success: true, order: JSON.parse(record.settingValue) };
         }
         return { success: true, order: null };
       } catch (err: any) {
@@ -328,9 +328,9 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       try {
         const orderStr = typeof payload.order === 'string' ? payload.order : JSON.stringify(payload.order || []);
         await prisma.groupBuySystemSetting.upsert({
-          where: { key: 'purchase_product_order' },
-          update: { value: orderStr },
-          create: { key: 'purchase_product_order', value: orderStr }
+          where: { settingKey: 'purchase_product_order' },
+          update: { settingValue: orderStr },
+          create: { settingKey: 'purchase_product_order', settingValue: orderStr }
         });
         return { success: true };
       } catch (err: any) {
