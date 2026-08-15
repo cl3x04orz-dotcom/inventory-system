@@ -187,9 +187,12 @@ export const GroupBuyService = {
     if (paymentStatus !== undefined) updateData.paymentStatus = paymentStatus;
     if (payload.expectedDeliveryDate !== undefined) updateData.expectedDeliveryDate = payload.expectedDeliveryDate;
 
-    // 🛡️ 強制從 DB 最新多階梯特惠驗算每一個品項的小計，確保 100% 精準寫入資料庫與審核頁面
+    // 🛡️ 歷史訂單快照保護：僅在品項未帶有小計 (item.subtotal 為 undefined/null) 時進行備用計算，避免新促銷追溯影響歷史舊訂單！
     if (Array.isArray(items) && items.length > 0) {
       for (const item of items) {
+        if (item.subtotal !== undefined && item.subtotal !== null && !isNaN(Number(item.subtotal))) {
+          continue; // 優先保留歷史下單金額快照
+        }
         const pid = item.productId || item.productName;
         if (!pid) continue;
         const dbProd = await prisma.product.findFirst({

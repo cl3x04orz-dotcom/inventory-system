@@ -309,7 +309,9 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     (ri.productName && String(ri.productName).includes('贈品'))
                 );
                 const prod = products.find(p => p.id === ri.productId || p.name === ri.productName || p.name === ri.productId);
-                const sub = isGift ? 0 : calculateItemSubtotal(ri.productId || ri.productName, ri.qty, ri.price ?? ri.unitPrice);
+                // 🛡️ 歷史快照保護：若有原始小計則保留，避免隨新促銷活動變動歷史訂單金額
+                const hasOriginalSubtotal = ri.subtotal !== undefined && ri.subtotal !== null && !isNaN(Number(ri.subtotal));
+                const sub = isGift ? 0 : (hasOriginalSubtotal ? Number(ri.subtotal) : calculateItemSubtotal(ri.productId || ri.productName, ri.qty, ri.price ?? ri.unitPrice));
                 return {
                     ...ri,
                     price: isGift ? 0 : (ri.price ?? ri.unitPrice),
@@ -330,17 +332,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
             let sub = isGift ? 0 : item.subtotal;
             if (!isGift) {
-                if (prod && (prod.has_volume_pricing || (Array.isArray(prod.promotions) && prod.promotions.length > 0))) {
-                    sub = calculateItemSubtotal(item.productId, item.qty, item.unitPrice);
-                } else if (hasRecipients && prod && prod.has_volume_pricing) {
-                    const totalRecipQty = normalizedRecipients.reduce((sum, r) => {
-                        return sum + (r.items || []).reduce((s, ri) => (ri.productId === item.productId || ri.productName === item.productName) ? s + Number(ri.qty) : s, 0);
-                    }, 0);
-                    if (totalRecipQty === item.qty) {
-                        sub = calculateItemSubtotal(item.productId, item.qty, item.unitPrice);
-                    }
-                }
-                if (sub == null || isNaN(Number(sub)) || Number(sub) <= 0) {
+                // 🛡️ 歷史快照保護：若歷史訂單已有寫入的小計 (item.subtotal)，優先保留快照，避免受日後新活動影響！
+                if (sub == null || isNaN(Number(sub))) {
                     sub = calculateItemSubtotal(item.productId, item.qty, item.unitPrice);
                 }
             }
