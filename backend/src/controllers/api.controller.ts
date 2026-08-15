@@ -1,3 +1,4 @@
+import prisma from '../prisma/client.js';
 import { UserService } from '../services/user.service.js';
 import { ProductService } from '../services/product.service.js';
 import { SalesService } from '../services/sales.service.js';
