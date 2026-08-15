@@ -4,13 +4,18 @@ import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
  */
 export const callGAS = async (apiUrl, action, payload, token = null, customTimeoutMs = null) => {
     try {
+        let targetUrl = apiUrl || (typeof window !== 'undefined' && window.GAS_API_URL) || import.meta.env.VITE_GAS_API_URL;
+        if (!targetUrl || targetUrl === '/api' || targetUrl.startsWith('/') || targetUrl.includes('github.io')) {
+            targetUrl = 'https://inventory-system-j6rs.onrender.com/api';
+        }
+
         const isLongRunningAction = action === 'generatePdf' || action === 'getSmartPickSuggestion' || action === 'getSalesByDateRange' || action === 'importHistoryData';
         const timeoutDuration = customTimeoutMs || (isLongRunningAction ? 180000 : 60000);
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
 
-        const response = await fetch(apiUrl, {
+        const response = await fetch(targetUrl, {
             method: 'POST',
             redirect: 'follow', // GAS requirement
             headers: { 'Content-Type': 'text/plain' },

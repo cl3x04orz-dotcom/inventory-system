@@ -330,7 +330,7 @@ function AppContent() {
                 }
             }
 
-            // 2. 判斷是否為 LIFF 頁面
+            // 2. 判斷是否需要自動帶入 guest 進入線上點餐頁面
             const params = new URLSearchParams(window.location.search);
             const isInLineBrowser = /Line/i.test(navigator.userAgent);
             const hasLiffParams = params.get('page') === 'liffOrder' ||
@@ -350,43 +350,36 @@ function AppContent() {
 
             if (isLiff) {
                 safeSessionStorage.setItem('is_liff_context', 'true');
-            } else {
-                safeSessionStorage.removeItem('is_liff_context');
             }
 
-            let isQuickLiff = false;
-            if (isLiff) {
-                if (!currentUser) {
-                    if (window.GAS_GUEST_TOKEN) {
-                        console.log('Using pre-injected guest token');
-                        const res = {
-                            success: true,
-                            token: window.GAS_GUEST_TOKEN,
-                            username: 'guest',
-                            role: 'EMPLOYEE',
-                            permissions: ['sales_liff']
-                        };
-                        handleLogin(res);
-                        setPage('liffOrder');
-                        isQuickLiff = true;
-                    } else {
-                        try {
-                            console.log('Detecting LIFF order request, logging in guest...');
-                            const res = await callGAS(GAS_API_URL, 'login', { username: 'guest', password: 'guest' });
-                            if (res && res.success) {
-                                handleLogin(res);
-                                setPage('liffOrder');
-                            } else {
-                                console.error('Auto login guest failed:', res?.error);
-                            }
-                        } catch (err) {
-                            console.error('Auto login guest error:', err);
-                        }
-                    }
-                } else {
+            // 無儲存 Session 時，預設一律自動以 Guest 免登入身份進入下單頁面
+            if (!currentUser) {
+                if (window.GAS_GUEST_TOKEN) {
+                    const res = {
+                        success: true,
+                        token: window.GAS_GUEST_TOKEN,
+                        username: 'guest',
+                        role: 'EMPLOYEE',
+                        permissions: ['sales_liff']
+                    };
+                    handleLogin(res);
                     setPage('liffOrder');
-                    isQuickLiff = true;
+                } else {
+                    try {
+                        console.log('Auto logging in guest for public order page...');
+                        const res = await callGAS(GAS_API_URL, 'login', { username: 'guest', password: 'guest' });
+                        if (res && res.success) {
+                            handleLogin(res);
+                            setPage('liffOrder');
+                        } else {
+                            console.error('Auto login guest failed:', res?.error);
+                        }
+                    } catch (err) {
+                        console.error('Auto login guest error:', err);
+                    }
                 }
+            } else if (isLiff) {
+                setPage('liffOrder');
             }
 
             // 3. 初始化結束，立刻淡出遮罩（不人工 delay）
