@@ -308,6 +308,36 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       }
     }
 
+    // 13. 進貨作業獨立產品排序 跨設備雲端資料庫同步 (PostgreSQL)
+    case 'getPurchaseProductOrder': {
+      try {
+        const record = await prisma.groupBuySystemSetting.findUnique({
+          where: { key: 'purchase_product_order' }
+        });
+        if (record && record.value) {
+          return { success: true, order: JSON.parse(record.value) };
+        }
+        return { success: true, order: null };
+      } catch (err: any) {
+        console.warn('[PurchaseProductOrder] Failed to fetch purchase product order from DB:', err.message);
+        return { success: true, order: null };
+      }
+    }
+    case 'savePurchaseProductOrder': {
+      try {
+        const orderStr = typeof payload.order === 'string' ? payload.order : JSON.stringify(payload.order || []);
+        await prisma.groupBuySystemSetting.upsert({
+          where: { key: 'purchase_product_order' },
+          update: { value: orderStr },
+          create: { key: 'purchase_product_order', value: orderStr }
+        });
+        return { success: true };
+      } catch (err: any) {
+        console.error('[PurchaseProductOrder] Failed to save purchase product order to DB:', err.message);
+        throw new Error('無法儲存進貨產品排序至雲端資料庫: ' + err.message);
+      }
+    }
+
     default:
       console.warn(`[Controller] 未移植或不支援的 Action: ${action}`);
       throw new Error(`後端尚未移植或不支援該操作: [${action}]`);

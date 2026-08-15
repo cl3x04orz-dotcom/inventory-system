@@ -113,10 +113,14 @@ export default function PurchaseConfigModal({ isOpen, onClose, apiUrl, token, ve
 
         setProducts(newProducts);
 
-        // 獨立儲存進貨作業專用產品排序權重 (purchase_product_order)
+        // 獨立儲存進貨作業專用產品排序權重 (purchase_product_order) 並 100% 同步至 PostgreSQL 雲端資料庫
+        const orderNames = newProducts.map(p => p.name);
         try {
-            safeLocalStorage.setItem('purchase_product_order', JSON.stringify(newProducts.map(p => p.name)));
-        } catch (e) {}
+            safeLocalStorage.setItem('purchase_product_order', JSON.stringify(orderNames));
+            await callGAS(apiUrl, 'savePurchaseProductOrder', { order: orderNames }, token);
+        } catch (e) {
+            console.error("Failed to save cloud purchase product order", e);
+        }
 
         try {
             const productIds = newProducts.map(p => p.id);

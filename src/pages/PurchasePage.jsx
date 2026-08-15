@@ -34,6 +34,12 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
             if (Array.isArray(products)) {
                 setAllProductNames(products.map(p => p.name));
             }
+
+            // [新增] 跨設備從 PostgreSQL 雲端資料庫同步最新進貨產品排序
+            const cloudOrderRes = await callGAS(apiUrl, 'getPurchaseProductOrder', {}, user.token);
+            if (cloudOrderRes && cloudOrderRes.order && Array.isArray(cloudOrderRes.order)) {
+                safeLocalStorage.setItem('purchase_product_order', JSON.stringify(cloudOrderRes.order));
+            }
         } catch (e) {
             console.error("Failed to fetch suggestions", e);
         }
