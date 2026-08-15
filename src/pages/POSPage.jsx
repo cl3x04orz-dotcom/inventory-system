@@ -281,6 +281,9 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
         pName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         pId.toLowerCase().includes(searchQuery.toLowerCase());
       
+      // 若商品已標記停售/停產，全門市完全硬性隱藏，不可販售
+      if (p.isDiscontinued) return false;
+
       // 若未勾選「顯示全品項 (含下架)」，只過濾顯示門市已上架商品
       const matchActive = showUnlistedProducts || p.isActive === true;
 
