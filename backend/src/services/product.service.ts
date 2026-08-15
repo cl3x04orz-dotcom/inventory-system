@@ -126,6 +126,7 @@ export const ProductService = {
         barcodes: p.barcodes ? p.barcodes.map(b => b.barcode) : [],
         capacity: p.capacity || '',
         isPurchasable: p.isPurchasable !== false, // 進貨清單顯示，與前台上架無關
+        isDiscontinued: Boolean(p.isDiscontinued), // 停售/停產狀態
         _fromSheet: 'Products'
       };
     });
@@ -286,6 +287,8 @@ export const ProductService = {
         allowedCommunityIds: parsedAllowedIds,
         communityQuotas: communityQuotas !== undefined ? (communityQuotas || {}) : undefined,
         posSettings: posSettings !== undefined ? posSettings : undefined,
+        isPurchasable: payload.isPurchasable !== undefined ? Boolean(payload.isPurchasable) : undefined,
+        isDiscontinued: payload.isDiscontinued !== undefined ? Boolean(payload.isDiscontinued) : undefined,
       }
     });
 

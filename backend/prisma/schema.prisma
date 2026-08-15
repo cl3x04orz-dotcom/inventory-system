@@ -28,6 +28,7 @@ model Product {
   sortWeight            Int                     @default(0)
   isActive              Boolean                 @default(true)
   isPurchasable         Boolean                 @default(true) // 是否出現在進貨清單（與前台上架 isActive 完全獨立）
+  isDiscontinued        Boolean                 @default(false) // 停售/停產狀態（全系統隱藏）
   imageUrl              String?
   capacity              String? // 容量規格 (例如: "936ml", "360g", "6入/盒")
   expiryDate            String?
