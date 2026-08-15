@@ -1300,13 +1300,16 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     if (!product || !qty) return 0;
     const singlePrice = Number(product.single_price) || Number(product.price) || 0;
     if (product.has_volume_pricing && product.volume_pricing_settings) {
-      const settings = product.volume_pricing_settings;
+      let settings = product.volume_pricing_settings;
+      if (typeof settings === 'string') {
+        try { settings = JSON.parse(settings); } catch (e) {}
+      }
       let tiers = [];
-      if (Array.isArray(settings.tiers) && settings.tiers.length > 0) {
+      if (settings && Array.isArray(settings.tiers) && settings.tiers.length > 0) {
         tiers = settings.tiers
           .map(t => ({ target_quantity: Number(t.target_quantity || 0), package_price: Number(t.package_price || 0) }))
           .filter(t => t.target_quantity > 0 && t.package_price > 0);
-      } else if (Number(settings.target_quantity) > 0 && Number(settings.package_price) > 0) {
+      } else if (settings && Number(settings.target_quantity) > 0 && Number(settings.package_price) > 0) {
         tiers = [{ target_quantity: Number(settings.target_quantity), package_price: Number(settings.package_price) }];
       }
       tiers.sort((a, b) => b.target_quantity - a.target_quantity);
@@ -5589,7 +5592,11 @@ ${freeNote(newFee, newMin)}
                 </div>
                 {flavorModalProduct.has_volume_pricing &&
                   flavorModalProduct.volume_pricing_settings && (() => {
-                    const s = flavorModalProduct.volume_pricing_settings;
+                    let s = flavorModalProduct.volume_pricing_settings;
+                    if (typeof s === 'string') {
+                      try { s = JSON.parse(s); } catch (e) {}
+                    }
+                    if (!s) return null;
                     const tiers = Array.isArray(s.tiers) && s.tiers.length > 0
                       ? s.tiers.filter(t => t.target_quantity && t.package_price)
                       : (s.target_quantity ? [{ target_quantity: s.target_quantity, package_price: s.package_price }] : []);

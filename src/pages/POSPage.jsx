@@ -8,7 +8,12 @@ import {
   FileText, Smartphone, Building2, Heart, Receipt, Delete, Settings, X, Save, Store, Eye, EyeOff, PauseCircle, PlayCircle, Clock
 } from 'lucide-react';
 
-function getTiers(settings) {
+function getTiers(rawSettings) {
+  if (!rawSettings) return [];
+  let settings = rawSettings;
+  if (typeof settings === 'string') {
+    try { settings = JSON.parse(settings); } catch (e) {}
+  }
   if (!settings) return [];
   let tiers = [];
   if (Array.isArray(settings.tiers) && settings.tiers.length > 0) {

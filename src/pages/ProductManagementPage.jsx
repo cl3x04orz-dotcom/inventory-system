@@ -769,15 +769,20 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                             </div>
 
                                                             {(() => {
-                                                                const rawTiers = Array.isArray(product.volume_pricing_settings?.tiers) && product.volume_pricing_settings.tiers.length > 0
-                                                                    ? product.volume_pricing_settings.tiers
-                                                                    : (product.volume_pricing_settings?.target_quantity ? [{ target_quantity: product.volume_pricing_settings.target_quantity, package_price: product.volume_pricing_settings.package_price }] : [{ target_quantity: '', package_price: '' }]);
+                                                                let s = product.volume_pricing_settings;
+                                                                if (typeof s === 'string') {
+                                                                    try { s = JSON.parse(s); } catch (e) {}
+                                                                }
+                                                                const rawTiers = Array.isArray(s?.tiers) && s.tiers.length > 0
+                                                                    ? s.tiers
+                                                                    : (s?.target_quantity ? [{ target_quantity: s.target_quantity, package_price: s.package_price }] : [{ target_quantity: '', package_price: '' }]);
 
                                                                 const updateTiers = (newTiers) => {
                                                                     const sorted = [...newTiers].sort((a, b) => Number(a.target_quantity || 0) - Number(b.target_quantity || 0));
                                                                     const first = sorted[0] || {};
+                                                                    const baseObj = (typeof product.volume_pricing_settings === 'object' && product.volume_pricing_settings) ? product.volume_pricing_settings : (s || {});
                                                                     const newSettings = {
-                                                                        ...(product.volume_pricing_settings || {}),
+                                                                        ...baseObj,
                                                                         target_quantity: first.target_quantity !== '' && first.target_quantity !== undefined ? Number(first.target_quantity) : 0,
                                                                         package_price: first.package_price !== '' && first.package_price !== undefined ? Number(first.package_price) : 0,
                                                                         tiers: sorted.map(t => ({

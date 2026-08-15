@@ -450,5 +450,8 @@ function updateProductDetailsService(payload, user) {
     }
 
     SpreadsheetApp.flush();
+    if (typeof clearCache !== 'undefined') {
+        clearCache('liff_products');
+    }
     return { success: true };
 }
