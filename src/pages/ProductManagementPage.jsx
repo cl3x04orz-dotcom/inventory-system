@@ -264,17 +264,22 @@ export default function ProductManagementPage({ user, apiUrl }) {
         if (!matchSearch) return false;
 
         const isOnline = p.isActive === true || p.isActive === 'true' || p.isActive === 1 || p.isActive === '1';
+        const isDiscontinued = p.isDiscontinued === true || p.isDiscontinued === 'true';
 
         if (stockFilter === 'ONLINE') {
-            if (!isOnline) return false;
+            if (!isOnline || isDiscontinued) return false;
         } else if (stockFilter === 'OFFLINE') {
-            if (isOnline) return false;
+            if (isOnline || isDiscontinued) return false;
         } else if (stockFilter === 'HAS_STOCK') {
             const qty = stockMap[p.name] || 0;
-            if (qty <= 0) return false;
+            if (qty <= 0 || isDiscontinued) return false;
         } else if (stockFilter === 'NO_STOCK') {
             const qty = stockMap[p.name] || 0;
-            if (qty > 0) return false;
+            if (qty > 0 || isDiscontinued) return false;
+        } else if (stockFilter === 'DISCONTINUED') {
+            if (!isDiscontinued) return false;
+        } else if (stockFilter === 'ALL') {
+            if (isDiscontinued) return false;
         }
 
         return true;
@@ -291,18 +296,20 @@ export default function ProductManagementPage({ user, apiUrl }) {
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
                     {/* Style A Custom Dropdown Selector */}
-                    <div className="relative w-full sm:w-44">
+                    <div className="relative w-full sm:w-52">
                         <Package size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                         <select
                             value={stockFilter}
                             onChange={(e) => setStockFilter(e.target.value)}
                             className="w-full appearance-none pl-9 pr-8 py-2 text-xs font-bold rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500 hover:border-blue-300 transition-all cursor-pointer shadow-sm"
                         >
-                            <option value="ALL">📦 顯示全部商品</option>
-                            <option value="ONLINE">🟢 已上架</option>
-                            <option value="OFFLINE">🔴 已下架</option>
+                            <option value="ALL">📦 販售中商品 (預設)</option>
+                            <option value="ONLINE">🟢 已網購上架</option>
+                            <option value="OFFLINE">🔴 已網購下架</option>
                             <option value="HAS_STOCK">🟢 只看有庫存</option>
                             <option value="NO_STOCK">🔴 只看無庫存</option>
+                            <option value="DISCONTINUED">🚫 已停售/停產商品</option>
+                            <option value="ALL_WITH_DISCONTINUED">👁️ 全部商品 (含停售)</option>
                         </select>
                         <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
@@ -371,23 +378,71 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                     {product.name}
                                                 </div>
                                                 
-                                                {/* 上架開關 (商品名稱同列最右側靠右對齊) */}
-                                                <div className="flex items-center gap-1.5 bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-lg border border-[var(--border-primary)] shadow-2xs" onClick={(e) => e.stopPropagation()}>
-                                                    <span className={`text-[11px] font-bold whitespace-nowrap ${product.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
-                                                        {product.isActive ? '🌐 網購上架' : '❌ 網購下架'}
-                                                    </span>
-                                                    <label className="relative inline-flex items-center cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            className="sr-only peer"
-                                                            checked={!!product.isActive}
-                                                            onChange={(e) => {
-                                                                handleFieldChange(product.id, 'isActive', e.target.checked);
-                                                                handleSaveProduct(product.id, { isActive: e.target.checked });
-                                                            }}
-                                                        />
-                                                        <div className="w-7 h-4 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
-                                                    </label>
+                                                {/* 上架與停售開關 */}
+                                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                    {/* 停售狀態按鈕 */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newDiscontinued = !product.isDiscontinued;
+                                                            handleFieldChange(product.id, 'isDiscontinued', newDiscontinued);
+                                                            if (newDiscontinued) {
+                                                                handleFieldChange(product.id, 'isActive', false);
+                                                                handleFieldChange(product.id, 'isPurchasable', false);
+                                                                handleSaveProduct(product.id, { isDiscontinued: true, isActive: false, isPurchasable: false });
+                                                            } else {
+                                                                handleSaveProduct(product.id, { isDiscontinued: false });
+                                                            }
+                                                        }}
+                                                        className={`px-2 py-0.5 rounded-lg border text-[11px] font-bold transition-all flex items-center gap-1 ${
+                                                            product.isDiscontinued
+                                                                ? 'bg-rose-500/10 text-rose-600 border-rose-200 dark:border-rose-800'
+                                                                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-amber-300'
+                                                        }`}
+                                                    >
+                                                        {product.isDiscontinued ? '🚫 已標記停售' : '🚫 標記停售'}
+                                                    </button>
+
+                                                    {/* 網購上架開關 */}
+                                                    <div className="flex items-center gap-1.5 bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-lg border border-[var(--border-primary)] shadow-2xs">
+                                                        <span className={`text-[11px] font-bold whitespace-nowrap ${product.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                                                            {product.isActive ? '🌐 網購上架' : '❌ 網購下架'}
+                                                        </span>
+                                                        <label className="relative inline-flex items-center cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="sr-only peer"
+                                                                checked={!!product.isActive}
+                                                                onChange={(e) => {
+                                                                    handleFieldChange(product.id, 'isActive', e.target.checked);
+                                                                    handleSaveProduct(product.id, { isActive: e.target.checked });
+                                                                }}
+                                                            />
+                                                            <div className="w-7 h-4 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                                                        </label>
+                                                    </div>
+
+                                                    {/* 安全刪除按鈕 */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const qty = stockMap[product.name] || 0;
+                                                            if (qty > 0) {
+                                                                alert(`【安全提醒】商品「${product.name}」目前仍有庫存 ${qty} 件。\n為確保過往財務與進銷存帳目對齊，請將其點擊『🚫 標記停售』即可全系統安全隱藏，無需刪除數據！`);
+                                                            } else {
+                                                                if (confirm(`【確認隱藏/停售】是否確定將商品「${product.name}」標記為停售隱藏？`)) {
+                                                                    handleFieldChange(product.id, 'isDiscontinued', true);
+                                                                    handleFieldChange(product.id, 'isActive', false);
+                                                                    handleFieldChange(product.id, 'isPurchasable', false);
+                                                                    handleSaveProduct(product.id, { isDiscontinued: true, isActive: false, isPurchasable: false });
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-md transition-all"
+                                                        title="刪除 / 停售隱藏"
+                                                    >
+                                                        <Trash2 size={15} />
+                                                    </button>
                                                 </div>
                                             </div>
                                             <div className="text-[11px] text-[var(--text-tertiary)] font-mono mt-0.5 flex items-center gap-1.5">
