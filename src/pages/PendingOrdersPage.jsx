@@ -261,18 +261,34 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             }
             return singlePrice * (qty - bestFree);
         }
-        // 多件優惠 (階梯組合價)
+        // 多件優惠 (階梯組合價 - 多階梯貪婪演算法)
         if (prod.has_volume_pricing && prod.volume_pricing_settings) {
             let settings = prod.volume_pricing_settings;
             if (typeof settings === 'string') {
                 try { settings = JSON.parse(settings); } catch (e) {}
             }
-            const targetQty = Number(settings?.target_quantity);
-            const packagePrice = Number(settings?.package_price);
-            if (targetQty > 0 && packagePrice >= 0) {
-                const groupCount = Math.floor(qty / targetQty);
-                const remainderCount = qty % targetQty;
-                return (groupCount * packagePrice) + (remainderCount * singlePrice);
+            let tiers = [];
+            if (settings && Array.isArray(settings.tiers) && settings.tiers.length > 0) {
+                tiers = settings.tiers
+                    .map(t => ({ target_quantity: Number(t.target_quantity || 0), package_price: Number(t.package_price || 0) }))
+                    .filter(t => t.target_quantity > 0 && t.package_price > 0);
+            } else if (settings && Number(settings.target_quantity) > 0 && Number(settings.package_price) > 0) {
+                tiers = [{ target_quantity: Number(settings.target_quantity), package_price: Number(settings.package_price) }];
+            }
+            tiers.sort((a, b) => b.target_quantity - a.target_quantity);
+
+            if (tiers.length > 0) {
+                let remaining = qty;
+                let total = 0;
+                for (const tier of tiers) {
+                    if (remaining >= tier.target_quantity) {
+                        const count = Math.floor(remaining / tier.target_quantity);
+                        total += count * tier.package_price;
+                        remaining %= tier.target_quantity;
+                    }
+                }
+                total += remaining * singlePrice;
+                return total;
             }
         }
         return singlePrice * qty;

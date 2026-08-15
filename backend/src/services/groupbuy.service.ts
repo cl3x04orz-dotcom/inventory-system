@@ -187,6 +187,39 @@ export const GroupBuyService = {
     if (paymentStatus !== undefined) updateData.paymentStatus = paymentStatus;
     if (payload.expectedDeliveryDate !== undefined) updateData.expectedDeliveryDate = payload.expectedDeliveryDate;
 
+    // 🛡️ 強制從 DB 最新多階梯特惠驗算每一個品項的小計，確保 100% 精準寫入資料庫與審核頁面
+    if (Array.isArray(items) && items.length > 0) {
+      for (const item of items) {
+        const pid = item.productId || item.productName;
+        if (!pid) continue;
+        const dbProd = await prisma.product.findFirst({
+          where: { OR: [{ productId: String(pid).trim() }, { productName: String(pid).trim() }, { productName: String(item.productName || '').trim() }] }
+        });
+        if (dbProd) {
+          const singlePrice = Number(dbProd.singlePrice || dbProd.defaultPrice || item.unitPrice || 0);
+          let settings: any = null;
+          if (dbProd.volumePricingSettings) {
+            settings = typeof dbProd.volumePricingSettings === 'string'
+              ? JSON.parse(dbProd.volumePricingSettings as string)
+              : dbProd.volumePricingSettings;
+          }
+          if (dbProd.hasVolumePricing && settings) {
+            const calcSub = calculateItemSubtotal({
+              productId: dbProd.productId,
+              productName: dbProd.productName,
+              unitPrice: singlePrice,
+              qty: Number(item.qty || 0),
+              has_volume_pricing: true,
+              volume_pricing_settings: settings
+            });
+            if (calcSub > 0) {
+              item.subtotal = calcSub;
+            }
+          }
+        }
+      }
+    }
+
     // 計算商品總額
     let productTotal = 0;
     if (Array.isArray(items) && items.length > 0) {
