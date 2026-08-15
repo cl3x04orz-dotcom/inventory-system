@@ -89,26 +89,46 @@ export default function PurchasePage({ user, apiUrl, logActivity }) {
 
 
 
-    // Helper to get product list for a specific vendor
+    // Helper to get product list for a specific vendor, strictly sorted by independent purchase product order
     const getProductSuggestions = (currentVendor) => {
         const activeSet = new Set(allProductNames);
+        let list = [];
         if (currentVendor && suggestions.vendorProductMap[currentVendor]) {
-            return suggestions.vendorProductMap[currentVendor].filter(pName => activeSet.has(pName));
+            list = suggestions.vendorProductMap[currentVendor].filter(pName => activeSet.has(pName));
+        } else {
+            const allProducts = new Set();
+            Object.values(suggestions.vendorProductMap || {}).forEach(pList => 
+                pList.forEach(p => {
+                    if (activeSet.has(p)) {
+                        allProducts.add(p);
+                    }
+                })
+            );
+            if (allProducts.size > 0) {
+                list = Array.from(allProducts);
+            } else {
+                list = Array.from(activeSet);
+            }
         }
-        // If no vendor selected (or not found), show all unique active products
-        const allProducts = new Set();
-        Object.values(suggestions.vendorProductMap || {}).forEach(list => 
-            list.forEach(p => {
-                if (activeSet.has(p)) {
-                    allProducts.add(p);
-                }
-            })
-        );
-        // 如果有歷史產品，顯示歷史產品；否則直接顯示全部產品
-        if (allProducts.size > 0) {
-            return Array.from(allProducts);
+
+        // 獨立進貨作業排序 (purchase_product_order)，完全不影響 POS、銷售或報表
+        let customOrder = [];
+        try {
+            const saved = safeLocalStorage.getItem('purchase_product_order');
+            if (saved) customOrder = JSON.parse(saved);
+        } catch (e) {}
+
+        if (customOrder && customOrder.length > 0) {
+            const orderMap = {};
+            customOrder.forEach((name, idx) => { orderMap[name] = idx; });
+            list.sort((a, b) => {
+                const wA = orderMap[a] !== undefined ? orderMap[a] : 999999;
+                const wB = orderMap[b] !== undefined ? orderMap[b] : 999999;
+                return wA - wB;
+            });
         }
-        return Array.from(activeSet);
+
+        return list;
     };
 
     const handleItemChange = (id, field, value) => {

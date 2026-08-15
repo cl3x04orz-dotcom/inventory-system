@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { safeLocalStorage } from '../utils/storage';
 import { callGAS } from '../utils/api';
 import { X, Search } from 'lucide-react';
 
@@ -111,6 +112,11 @@ export default function PurchaseConfigModal({ isOpen, onClose, apiUrl, token, ve
         newProducts[realIdxB] = prodA;
 
         setProducts(newProducts);
+
+        // 獨立儲存進貨作業專用產品排序權重 (purchase_product_order)
+        try {
+            safeLocalStorage.setItem('purchase_product_order', JSON.stringify(newProducts.map(p => p.name)));
+        } catch (e) {}
 
         try {
             const productIds = newProducts.map(p => p.id);
