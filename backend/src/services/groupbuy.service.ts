@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma, runInTransaction } from '../database/context.js';
 import { ProductService, verifyAndDeductProductQuota } from './product.service.js';
 import { deductInventory } from './sales.service.js';
+import { calculateItemSubtotal } from './pricing.service.js';
 
 function generateOrderId(): string {
   const now = new Date();
@@ -954,6 +955,36 @@ export const GroupBuyService = {
     if (CampaignId) {
       const camp = await prisma.groupBuyCampaign.findUnique({ where: { campaignId: CampaignId } });
       if (camp) campNameSnap = camp.campaignName;
+    }
+
+    // 🛡️ 強制從 DB 最新多階梯特惠驗算每一個品項的小計，確保 100% 精準寫入資料庫與審核頁面
+    for (const item of items) {
+      if (!item?.productId) continue;
+      const dbProd = await prisma.product.findUnique({
+        where: { productId: String(item.productId).trim() }
+      });
+      if (dbProd) {
+        const singlePrice = Number(dbProd.singlePrice || dbProd.defaultPrice || item.unitPrice || 0);
+        let settings: any = null;
+        if (dbProd.volumePricingSettings) {
+          settings = typeof dbProd.volumePricingSettings === 'string'
+            ? JSON.parse(dbProd.volumePricingSettings as string)
+            : dbProd.volumePricingSettings;
+        }
+        if (dbProd.hasVolumePricing && settings) {
+          const calcSub = calculateItemSubtotal({
+            productId: dbProd.productId,
+            productName: dbProd.productName,
+            unitPrice: singlePrice,
+            qty: Number(item.qty || 0),
+            has_volume_pricing: true,
+            volume_pricing_settings: settings
+          });
+          if (calcSub > 0) {
+            item.subtotal = calcSub;
+          }
+        }
+      }
     }
 
     const productTotal = items.reduce((sum: number, item: any) =>
