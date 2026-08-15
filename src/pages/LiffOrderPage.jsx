@@ -1296,7 +1296,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     setTempFlavorQty((prev) => ({ ...prev, [flavor]: val }));
   };
 
-  const calcProductSubtotal = (product, qty) => {
+  const calculateProductSubtotal = (product, qty) => {
     if (!product || !qty) return 0;
     const singlePrice = Number(product.single_price) || Number(product.price) || 0;
     if (product.has_volume_pricing && product.volume_pricing_settings) {
