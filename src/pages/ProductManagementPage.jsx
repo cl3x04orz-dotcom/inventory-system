@@ -224,7 +224,9 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 maxSuggestion: Number(mergedProduct.maxSuggestion || 0),
                 stopPickupThreshold: (mergedProduct.stopPickupThreshold !== undefined && mergedProduct.stopPickupThreshold !== '' && mergedProduct.stopPickupThreshold !== null) ? Number(mergedProduct.stopPickupThreshold) : null,
                 posSettings: mergedProduct.posSettings,
-                barcodes: mergedProduct.barcodes || []
+                barcodes: mergedProduct.barcodes || [],
+                isPurchasable: mergedProduct.isPurchasable,
+                isDiscontinued: mergedProduct.isDiscontinued
             }, user.token);
             
             if (res && res.error) {
