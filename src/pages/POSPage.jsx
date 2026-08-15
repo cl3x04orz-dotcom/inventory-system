@@ -8,152 +8,96 @@ import {
   FileText, Smartphone, Building2, Heart, Receipt, Delete, Settings, X, Save, Store, Eye, EyeOff, PauseCircle, PlayCircle, Clock
 } from 'lucide-react';
 
-/**
- * 跨商品 Mix-and-Match 組合特價計算 (同商品優先原則)
- */
+function getTiers(settings) {
+  if (!settings) return [];
+  let tiers = [];
+  if (Array.isArray(settings.tiers) && settings.tiers.length > 0) {
+    tiers = settings.tiers
+      .map(t => ({ target_quantity: Number(t.target_quantity || 0), package_price: Number(t.package_price || 0) }))
+      .filter(t => t.target_quantity > 0 && t.package_price > 0);
+  } else if (Number(settings.target_quantity) > 0 && Number(settings.package_price) > 0) {
+    tiers = [{ target_quantity: Number(settings.target_quantity), package_price: Number(settings.package_price) }];
+  }
+  return tiers.sort((a, b) => b.target_quantity - a.target_quantity);
+}
+
+function calcItemVolumeSubtotal(qty, unitPrice, settings) {
+  const tiers = getTiers(settings);
+  if (tiers.length === 0 || qty <= 0) return qty * unitPrice;
+
+  let remaining = qty;
+  let subtotal = 0;
+  for (const tier of tiers) {
+    if (remaining >= tier.target_quantity) {
+      const count = Math.floor(remaining / tier.target_quantity);
+      subtotal += count * tier.package_price;
+      remaining %= tier.target_quantity;
+    }
+  }
+  subtotal += remaining * unitPrice;
+  return subtotal;
+}
+
+function getAppliedTiersBreakdown(qty, settings) {
+  const tiers = getTiers(settings);
+  if (tiers.length === 0 || qty <= 0) return { applied: [], remainder: qty };
+
+  let remaining = qty;
+  const applied = [];
+
+  for (const tier of tiers) {
+    if (remaining >= tier.target_quantity) {
+      const count = Math.floor(remaining / tier.target_quantity);
+      applied.push({
+        target_quantity: tier.target_quantity,
+        package_price: tier.package_price,
+        count
+      });
+      remaining %= tier.target_quantity;
+    }
+  }
+
+  return { applied, remainder: remaining };
+}
+
 function calculateCartSubtotal(cartItems) {
   if (!Array.isArray(cartItems) || cartItems.length === 0) return 0;
-
   let totalSum = 0;
-  const groups = {}; // Key: `${target_quantity}_${package_price}`
-  const normalItems = [];
-
   cartItems.forEach(item => {
     const qty = Number(item.qty || 0);
     const unitPrice = Number(item.unitPrice || 0);
-    const settings = item.volume_pricing_settings;
-
-    if (item.has_volume_pricing && settings && Number(settings.target_quantity) > 0 && Number(settings.package_price) > 0) {
-      const key = `${settings.target_quantity}_${settings.package_price}`;
-      if (!groups[key]) {
-        groups[key] = {
-          targetQuantity: Number(settings.target_quantity),
-          packagePrice: Number(settings.package_price),
-          items: []
-        };
-      }
-      groups[key].items.push({ ...item, qty, unitPrice });
+    if (item.has_volume_pricing && item.volume_pricing_settings) {
+      totalSum += calcItemVolumeSubtotal(qty, unitPrice, item.volume_pricing_settings) - (item.discountAmount || 0);
     } else {
-      normalItems.push({ ...item, qty, unitPrice });
+      totalSum += (qty * unitPrice) - (item.discountAmount || 0);
     }
   });
-
-  // 1. 一般商品計價
-  normalItems.forEach(item => {
-    totalSum += (item.qty * item.unitPrice) - (item.discountAmount || 0);
-  });
-
-  // 2. 多件特價商品（同商品優先，剩餘散買才跨品項混搭）
-  Object.values(groups).forEach(group => {
-    const { targetQuantity, packagePrice, items } = group;
-    let leftoverQtySum = 0;
-    let leftoverBaseSum = 0;
-
-    items.forEach(item => {
-      const selfBundles = Math.floor(item.qty / targetQuantity);
-      const selfRemainder = item.qty % targetQuantity;
-      
-      // 同商品優先享用完整組合價
-      totalSum += (selfBundles * packagePrice);
-      
-      leftoverQtySum += selfRemainder;
-      leftoverBaseSum += (selfRemainder * item.unitPrice);
-    });
-
-    // 剩餘散買品項跨商品混搭
-    if (leftoverQtySum >= targetQuantity) {
-      const crossBundles = Math.floor(leftoverQtySum / targetQuantity);
-      const crossRemainder = leftoverQtySum % targetQuantity;
-      const avgUnitPrice = leftoverQtySum > 0 ? (leftoverBaseSum / leftoverQtySum) : 0;
-      
-      totalSum += (crossBundles * packagePrice) + Math.round(crossRemainder * avgUnitPrice);
-    } else {
-      totalSum += leftoverBaseSum;
-    }
-  });
-
-  return totalSum;
+  return Math.max(0, totalSum);
 }
 
 /**
- * 計算購物車中各單項商品分配到的折抵後金額與省下金額 (同商品優先，支援小數位 $18.33 與第4/5個散買原價展示)
+ * 計算購物車中各單項商品分配到的折抵後金額與省下金額
  */
 function getItemDiscountedInfo(item, cartItems) {
   const originalTotal = Number(item.unitPrice || 0) * Number(item.qty || 0);
+  const qty = Number(item.qty || 0);
+  const unitPrice = Number(item.unitPrice || 0);
   const settings = item.volume_pricing_settings;
 
-  if (!item.has_volume_pricing || !settings || !Number(settings.target_quantity) || !Number(settings.package_price)) {
-    return { discountedTotal: originalTotal, savings: 0, formattedDiscountedTotal: `$${originalTotal.toLocaleString()}` };
+  if (!item.has_volume_pricing || !settings || getTiers(settings).length === 0 || qty <= 0) {
+    const finalTotal = Math.max(0, originalTotal - (item.discountAmount || 0));
+    return { discountedTotal: finalTotal, savings: item.discountAmount || 0, formattedDiscountedTotal: `$${finalTotal.toLocaleString()}` };
   }
 
-  const targetQty = Number(settings.target_quantity);
-  const packagePrice = Number(settings.package_price);
-  const itemQty = Number(item.qty || 0);
-  const unitPrice = Number(item.unitPrice || 0);
-
-  if (itemQty <= 0) {
-    return { discountedTotal: 0, savings: 0, formattedDiscountedTotal: '$0' };
-  }
-
-  // 1. 找出購物車中所有同規則商品 (保持出現順序)
-  const groupItems = cartItems.filter(i => 
-    i.has_volume_pricing && 
-    i.volume_pricing_settings &&
-    Number(i.volume_pricing_settings.target_quantity) === targetQty &&
-    Number(i.volume_pricing_settings.package_price) === packagePrice
-  );
-
-  // 2. 收集各商品散買剩餘量
-  let leftoverItems = [];
-
-  groupItems.forEach(i => {
-    const q = Number(i.qty || 0);
-    leftoverItems.push({
-      productId: i.productId,
-      unitPrice: Number(i.unitPrice || 0),
-      remainderQty: q % targetQty
-    });
-  });
-
-  // 3. 計算跨商品散買可組出的組數 (crossBundles)
-  const totalLeftoverQty = leftoverItems.reduce((s, i) => s + i.remainderQty, 0);
-  const crossBundles = Math.floor(totalLeftoverQty / targetQty);
-  let remainingCrossBundledCap = crossBundles * targetQty;
-
-  // 4. 計算目前 item 的特價件數 (totalBundledQty) 與 散買原價件數 (extraOriginalQty)
-  const mySelfBundles = Math.floor(itemQty / targetQty);
-  const mySelfBundledQty = mySelfBundles * targetQty;
-
-  let myCrossBundledQty = 0;
-  for (const lo of leftoverItems) {
-    const capTake = Math.min(lo.remainderQty, remainingCrossBundledCap);
-    remainingCrossBundledCap -= capTake;
-
-    if (lo.productId === item.productId) {
-      myCrossBundledQty = capTake;
-      break;
-    }
-  }
-
-  const totalBundledQty = mySelfBundledQty + myCrossBundledQty;
-  const extraOriginalQty = itemQty - totalBundledQty;
-
-  // 5. 金額精算 (特價單價如 55/3 = 18.333333...)
-  const bundledUnitPrice = packagePrice / targetQty;
-  const discountedTotal = (totalBundledQty * bundledUnitPrice) + (extraOriginalQty * unitPrice);
+  const volumeSubtotal = calcItemVolumeSubtotal(qty, unitPrice, settings);
+  const discountedTotal = Math.max(0, volumeSubtotal - (item.discountAmount || 0));
   const savings = originalTotal - discountedTotal;
 
-  if (savings <= 0.001) {
-    return { discountedTotal: originalTotal, savings: 0, formattedDiscountedTotal: `$${originalTotal.toLocaleString()}` };
-  }
-
-  // 6. 格式化輸出 (有小數點顯示 .2f 如 $18.33)
-  const hasDecimals = Math.abs(discountedTotal - Math.round(discountedTotal)) > 0.001;
-  const formattedDiscountedTotal = hasDecimals 
-    ? `$${discountedTotal.toFixed(2)}` 
-    : `$${Math.round(discountedTotal).toLocaleString()}`;
-
-  return { discountedTotal, savings, formattedDiscountedTotal };
+  return {
+    discountedTotal,
+    savings: Math.max(0, savings),
+    formattedDiscountedTotal: `$${discountedTotal.toLocaleString()}`
+  };
 }
 
 function getItemSubtotal(item) {
@@ -550,9 +494,7 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
 
                 const hasVolume = Boolean(product.has_volume_pricing || product.hasVolumePricing);
                 const volumeSettings = product.volume_pricing_settings || product.volumePricingSettings;
-                const bundleText = (hasVolume && volumeSettings?.target_quantity && volumeSettings?.package_price)
-                  ? `${volumeSettings.target_quantity}件$${volumeSettings.package_price}`
-                  : null;
+                const volumeTiers = hasVolume ? getTiers(volumeSettings) : [];
 
                 const isUnlisted = product.isActive === false;
 
@@ -616,12 +558,12 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                             <span>捆裝{bundleSize}入</span>
                           </span>
                         )}
-                        {bundleText && (
-                          <span className="inline-flex items-center space-x-1 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-lg font-extrabold border border-amber-300">
+                        {volumeTiers.map((t, idx) => (
+                          <span key={idx} className="inline-flex items-center space-x-1 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-lg font-extrabold border border-amber-300">
                             <Tag className="w-3 h-3" />
-                            <span>{bundleText}</span>
+                            <span>{t.target_quantity}件${t.package_price}</span>
                           </span>
-                        )}
+                        ))}
                       </div>
 
                       <div className="flex justify-between items-end border-t border-gray-100 pt-1.5">
@@ -724,11 +666,24 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                           捆裝{item.bundleSize}入
                         </span>
                       )}
-                      {item.has_volume_pricing && (
-                        <span className="bg-amber-100 text-amber-800 text-[11px] px-2 py-0.5 rounded-md font-extrabold whitespace-nowrap border border-amber-300">
-                          {item.volume_pricing_settings?.target_quantity ? `滿${item.volume_pricing_settings.target_quantity}件特價` : '多件特價'}
-                        </span>
-                      )}
+                      {item.has_volume_pricing && (() => {
+                        const breakdown = getAppliedTiersBreakdown(item.qty, item.volume_pricing_settings);
+                        if (breakdown.applied.length === 0) {
+                          const tiers = getTiers(item.volume_pricing_settings);
+                          const nextTier = tiers[tiers.length - 1];
+                          return (
+                            <span className="bg-emerald-100 text-emerald-800 text-[11px] px-2 py-0.5 rounded-md font-extrabold whitespace-nowrap border border-emerald-300">
+                              {nextTier ? `滿${nextTier.target_quantity}件特價` : '多件特價'}
+                            </span>
+                          );
+                        }
+                        const badgeText = breakdown.applied.map(a => `滿${a.target_quantity}件${a.count > 1 ? `x${a.count}` : ''}`).join('+');
+                        return (
+                          <span className="bg-emerald-100 text-emerald-800 text-[11px] px-2 py-0.5 rounded-md font-extrabold whitespace-nowrap border border-emerald-300">
+                            {badgeText}特價
+                          </span>
+                        );
+                      })()}
                     </div>
                     <div className="text-xs text-gray-500 mt-1 font-medium">
                       ${item.isBundle ? (item.unitPrice * item.bundleSize).toLocaleString() : item.unitPrice.toLocaleString()} {item.isBundle ? `/組(${item.bundleSize}入)` : (item.capacity ? `• ${item.capacity}` : '')}
@@ -1276,47 +1231,96 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                 </div>
 
                 {editingPosProduct.has_volume_pricing && (
-                  <div className="grid grid-cols-2 gap-2 pt-1 animate-fade-in">
-                    <div>
-                      <span className="text-gray-500 text-[10px] font-bold block mb-1">滿幾件享特價</span>
-                      <input
-                        type="number"
-                        min="2"
-                        className="w-full p-2 bg-white border border-gray-300 rounded-xl font-mono font-bold text-center text-sm text-gray-800"
-                        placeholder="例：3"
-                        value={editingPosProduct.volume_pricing_settings?.target_quantity ?? ''}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setEditingPosProduct(prev => ({
-                            ...prev,
-                            volume_pricing_settings: {
-                              ...prev.volume_pricing_settings,
-                              target_quantity: val !== '' ? Number(val) : ''
-                            }
-                          }));
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <span className="text-gray-500 text-[10px] font-bold block mb-1">特價總金額 ($)</span>
-                      <input
-                        type="number"
-                        min="1"
-                        className="w-full p-2 bg-white border border-gray-300 rounded-xl font-mono font-bold text-center text-sm text-gray-800"
-                        placeholder="例：55"
-                        value={editingPosProduct.volume_pricing_settings?.package_price ?? ''}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setEditingPosProduct(prev => ({
-                            ...prev,
-                            volume_pricing_settings: {
-                              ...prev.volume_pricing_settings,
-                              package_price: val !== '' ? Number(val) : ''
-                            }
-                          }));
-                        }}
-                      />
-                    </div>
+                  <div className="flex flex-col gap-2 pt-1 animate-fade-in">
+                    {(() => {
+                      const settings = editingPosProduct.volume_pricing_settings || {};
+                      const rawTiers = Array.isArray(settings.tiers) && settings.tiers.length > 0
+                        ? settings.tiers
+                        : (settings.target_quantity ? [{ target_quantity: settings.target_quantity, package_price: settings.package_price }] : [{ target_quantity: '', package_price: '' }]);
+
+                      return (
+                        <>
+                          {rawTiers.map((tier, idx) => (
+                            <div key={idx} className="flex items-center gap-1">
+                              <span className="text-[10px] text-gray-500 font-bold whitespace-nowrap">滿</span>
+                              <input
+                                type="number"
+                                min="2"
+                                className="w-16 p-1.5 bg-white border border-gray-300 rounded-lg font-mono font-bold text-center text-xs text-gray-800"
+                                placeholder="件"
+                                value={tier.target_quantity ?? ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const next = [...rawTiers];
+                                  next[idx] = { ...next[idx], target_quantity: val !== '' ? Number(val) : '' };
+                                  setEditingPosProduct(prev => ({
+                                    ...prev,
+                                    volume_pricing_settings: {
+                                      ...prev.volume_pricing_settings,
+                                      tiers: next
+                                    }
+                                  }));
+                                }}
+                              />
+                              <span className="text-[10px] text-gray-500 font-bold whitespace-nowrap">件，$</span>
+                              <input
+                                type="number"
+                                min="1"
+                                className="flex-1 p-1.5 bg-white border border-gray-300 rounded-lg font-mono font-bold text-center text-xs text-gray-800"
+                                placeholder="特價"
+                                value={tier.package_price ?? ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const next = [...rawTiers];
+                                  next[idx] = { ...next[idx], package_price: val !== '' ? Number(val) : '' };
+                                  setEditingPosProduct(prev => ({
+                                    ...prev,
+                                    volume_pricing_settings: {
+                                      ...prev.volume_pricing_settings,
+                                      tiers: next
+                                    }
+                                  }));
+                                }}
+                              />
+                              {rawTiers.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = rawTiers.filter((_, i) => i !== idx);
+                                    setEditingPosProduct(prev => ({
+                                      ...prev,
+                                      volume_pricing_settings: {
+                                        ...prev.volume_pricing_settings,
+                                        tiers: next
+                                      }
+                                    }));
+                                  }}
+                                  className="p-1 text-rose-500 hover:bg-rose-50 rounded"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = [...rawTiers, { target_quantity: '', package_price: '' }];
+                              setEditingPosProduct(prev => ({
+                                ...prev,
+                                volume_pricing_settings: {
+                                  ...prev.volume_pricing_settings,
+                                  tiers: next
+                                }
+                              }));
+                            }}
+                            className="self-start text-[10px] font-bold text-indigo-600 hover:underline"
+                          >
+                            ➕ 新增特惠階梯 (例: 滿24件 $380)
+                          </button>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
@@ -1343,10 +1347,22 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                       isBundle: Boolean(editingPosProduct.isBundle),
                       packSize: editingPosProduct.isBundle ? Number(editingPosProduct.bundleSize || 1) : 1,
                       has_volume_pricing: Boolean(editingPosProduct.has_volume_pricing),
-                      volume_pricing_settings: editingPosProduct.has_volume_pricing ? {
-                        target_quantity: Number(editingPosProduct.volume_pricing_settings?.target_quantity || 0),
-                        package_price: Number(editingPosProduct.volume_pricing_settings?.package_price || 0)
-                      } : null
+                      volume_pricing_settings: editingPosProduct.has_volume_pricing ? (() => {
+                        const settings = editingPosProduct.volume_pricing_settings || {};
+                        const rawTiers = Array.isArray(settings.tiers) && settings.tiers.length > 0
+                          ? settings.tiers
+                          : (settings.target_quantity ? [{ target_quantity: settings.target_quantity, package_price: settings.package_price }] : [{ target_quantity: 0, package_price: 0 }]);
+                        const validTiers = rawTiers
+                          .map(t => ({ target_quantity: Number(t.target_quantity || 0), package_price: Number(t.package_price || 0) }))
+                          .filter(t => t.target_quantity > 0 && t.package_price > 0)
+                          .sort((a, b) => a.target_quantity - b.target_quantity);
+                        const first = validTiers[0] || { target_quantity: 0, package_price: 0 };
+                        return {
+                          target_quantity: first.target_quantity,
+                          package_price: first.package_price,
+                          tiers: validTiers
+                        };
+                      })() : null
                     };
 
                     const updatedFields = {

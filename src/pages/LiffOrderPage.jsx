@@ -1300,11 +1300,30 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     if (!product || !qty) return 0;
     const singlePrice = Number(product.single_price) || Number(product.price) || 0;
     if (product.has_volume_pricing && product.volume_pricing_settings) {
-      const targetQty = Number(product.volume_pricing_settings.target_quantity) || 1;
-      const packagePrice = Number(product.volume_pricing_settings.package_price) || 0;
-      const groupCount = Math.floor(qty / targetQty);
-      const remainderCount = qty % targetQty;
-      return groupCount * packagePrice + remainderCount * singlePrice;
+      const settings = product.volume_pricing_settings;
+      let tiers = [];
+      if (Array.isArray(settings.tiers) && settings.tiers.length > 0) {
+        tiers = settings.tiers
+          .map(t => ({ target_quantity: Number(t.target_quantity || 0), package_price: Number(t.package_price || 0) }))
+          .filter(t => t.target_quantity > 0 && t.package_price > 0);
+      } else if (Number(settings.target_quantity) > 0 && Number(settings.package_price) > 0) {
+        tiers = [{ target_quantity: Number(settings.target_quantity), package_price: Number(settings.package_price) }];
+      }
+      tiers.sort((a, b) => b.target_quantity - a.target_quantity);
+
+      if (tiers.length > 0) {
+        let remaining = qty;
+        let total = 0;
+        for (const tier of tiers) {
+          if (remaining >= tier.target_quantity) {
+            const count = Math.floor(remaining / tier.target_quantity);
+            total += count * tier.package_price;
+            remaining %= tier.target_quantity;
+          }
+        }
+        total += remaining * singlePrice;
+        return total;
+      }
     }
     return singlePrice * qty;
   };
@@ -1765,11 +1784,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         item.freeQty = legacyFreeQty;
         item.subtotal = singlePrice * (item.qty - legacyFreeQty); 
       } else if (p.has_volume_pricing && p.volume_pricing_settings) {
-        const targetQty = Number(p.volume_pricing_settings.target_quantity);
-        const packagePrice = Number(p.volume_pricing_settings.package_price);
-        const groupCount = Math.floor(item.qty / targetQty);
-        const remainderCount = item.qty % targetQty;
-        item.subtotal = groupCount * packagePrice + remainderCount * singlePrice;
+        item.subtotal = calculateProductSubtotal(p, item.qty);
       } else {
         item.subtotal = singlePrice * item.qty;
       }
@@ -3381,11 +3396,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                           
                           let subtotal = 0;
                           if (product && product.has_volume_pricing && product.volume_pricing_settings) {
-                            const targetQty = Number(product.volume_pricing_settings.target_quantity);
-                            const packagePrice = Number(product.volume_pricing_settings.package_price);
-                            const groupCount = Math.floor(qty / targetQty);
-                            const remainderCount = qty % targetQty;
-                            subtotal = groupCount * packagePrice + remainderCount * singlePrice;
+                            subtotal = calculateProductSubtotal(product, qty);
                           } else {
                             subtotal = singlePrice * qty;
                           }
@@ -5248,20 +5259,22 @@ ${freeNote(newFee, newMin)}
                                     )}
                                   </span>
                                   {product.has_volume_pricing &&
-                                    product.volume_pricing_settings && (
-                                      <span className="text-[10px] text-red-500 font-bold leading-none mt-0.5">
-                                        任選{" "}
-                                        {
-                                          product.volume_pricing_settings
-                                            .target_quantity
-                                        }{" "}
-                                        入 $
-                                        {
-                                          product.volume_pricing_settings
-                                            .package_price
-                                        }
-                                      </span>
-                                    )}
+                                    product.volume_pricing_settings && (() => {
+                                      const s = product.volume_pricing_settings;
+                                      const tiers = Array.isArray(s.tiers) && s.tiers.length > 0
+                                        ? s.tiers.filter(t => t.target_quantity && t.package_price)
+                                        : (s.target_quantity ? [{ target_quantity: s.target_quantity, package_price: s.package_price }] : []);
+                                      if (tiers.length === 0) return null;
+                                      return (
+                                        <div className="flex flex-wrap gap-1 mt-0.5">
+                                          {tiers.map((t, idx) => (
+                                            <span key={idx} className="text-[10px] bg-rose-50 text-rose-600 px-1 py-0.2 rounded font-bold border border-rose-200 leading-none">
+                                              任選 {t.target_quantity} 入 ${t.package_price}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      );
+                                    })()}
                                 </div>
                                 <div className="flex items-center gap-0.5">
                                   {qty > 0 && (
@@ -5575,18 +5588,19 @@ ${freeNote(newFee, newMin)}
                   </span>
                 </div>
                 {flavorModalProduct.has_volume_pricing &&
-                  flavorModalProduct.volume_pricing_settings && (
-                    <div className="text-red-500 font-semibold mt-1">
-                      ※ 本商品享組合價：任選{" "}
-                      {
-                        flavorModalProduct.volume_pricing_settings
-                          .target_quantity
-                      }{" "}
-                      入 $
-                      {flavorModalProduct.volume_pricing_settings.package_price}
-                      （可口味混搭）
-                    </div>
-                  )}
+                  flavorModalProduct.volume_pricing_settings && (() => {
+                    const s = flavorModalProduct.volume_pricing_settings;
+                    const tiers = Array.isArray(s.tiers) && s.tiers.length > 0
+                      ? s.tiers.filter(t => t.target_quantity && t.package_price)
+                      : (s.target_quantity ? [{ target_quantity: s.target_quantity, package_price: s.package_price }] : []);
+                    if (tiers.length === 0) return null;
+                    const tiersText = tiers.map(t => `任選 ${t.target_quantity} 入 $${t.package_price}`).join(' / ');
+                    return (
+                      <div className="text-red-500 font-semibold mt-1">
+                        ※ 本商品享組合價：{tiersText}（可口味混搭）
+                      </div>
+                    );
+                  })()}
               </div>
             </div>
 

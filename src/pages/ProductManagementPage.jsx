@@ -768,44 +768,89 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 </label>
                                                             </div>
 
-                                                            <div className={`flex flex-col gap-1 ${!product.has_volume_pricing ? 'opacity-40 pointer-events-none select-none' : ''}`}>
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="text-xs text-[var(--text-secondary)] whitespace-nowrap font-bold">滿</span>
-                                                                    <input
-                                                                        type="number"
-                                                                        className="input-field text-xs p-2 w-20 text-center font-mono font-bold"
-                                                                        placeholder="件"
-                                                                        disabled={!product.has_volume_pricing}
-                                                                        value={product.volume_pricing_settings?.target_quantity || ''}
-                                                                        onChange={(e) => {
-                                                                            const settings = { ...(product.volume_pricing_settings || {}), target_quantity: e.target.value !== '' ? Number(e.target.value) : 0 };
-                                                                            handleFieldChange(product.id, 'volume_pricing_settings', settings);
-                                                                        }}
-                                                                        onBlur={(e) => {
-                                                                            const settings = { ...(product.volume_pricing_settings || {}), target_quantity: e.target.value !== '' ? Number(e.target.value) : 0 };
-                                                                            handleSaveProduct(product.id, { volume_pricing_settings: settings });
-                                                                        }}
-                                                                    />
-                                                                    <span className="text-xs text-[var(--text-secondary)] whitespace-nowrap font-bold">件，優惠總價 共 $</span>
-                                                                    <div className="relative flex-1 max-w-[180px]">
-                                                                        <input
-                                                                            type="number"
-                                                                            className="input-field text-xs p-2 w-full font-mono font-bold"
-                                                                            placeholder="組合特價"
-                                                                            disabled={!product.has_volume_pricing}
-                                                                            value={product.volume_pricing_settings?.package_price || ''}
-                                                                            onChange={(e) => {
-                                                                                const settings = { ...(product.volume_pricing_settings || {}), package_price: e.target.value !== '' ? Number(e.target.value) : 0 };
-                                                                                handleFieldChange(product.id, 'volume_pricing_settings', settings);
+                                                            {(() => {
+                                                                const rawTiers = Array.isArray(product.volume_pricing_settings?.tiers) && product.volume_pricing_settings.tiers.length > 0
+                                                                    ? product.volume_pricing_settings.tiers
+                                                                    : (product.volume_pricing_settings?.target_quantity ? [{ target_quantity: product.volume_pricing_settings.target_quantity, package_price: product.volume_pricing_settings.package_price }] : [{ target_quantity: '', package_price: '' }]);
+
+                                                                const updateTiers = (newTiers) => {
+                                                                    const sorted = [...newTiers].sort((a, b) => Number(a.target_quantity || 0) - Number(b.target_quantity || 0));
+                                                                    const first = sorted[0] || {};
+                                                                    const newSettings = {
+                                                                        ...(product.volume_pricing_settings || {}),
+                                                                        target_quantity: first.target_quantity !== '' && first.target_quantity !== undefined ? Number(first.target_quantity) : 0,
+                                                                        package_price: first.package_price !== '' && first.package_price !== undefined ? Number(first.package_price) : 0,
+                                                                        tiers: sorted.map(t => ({
+                                                                            target_quantity: t.target_quantity !== '' ? Number(t.target_quantity) : '',
+                                                                            package_price: t.package_price !== '' ? Number(t.package_price) : ''
+                                                                        }))
+                                                                    };
+                                                                    handleFieldChange(product.id, 'volume_pricing_settings', newSettings);
+                                                                    handleSaveProduct(product.id, { volume_pricing_settings: newSettings });
+                                                                };
+
+                                                                return (
+                                                                    <div className={`flex flex-col gap-2 ${!product.has_volume_pricing ? 'opacity-40 pointer-events-none select-none' : ''}`}>
+                                                                        {rawTiers.map((tier, idx) => (
+                                                                            <div key={idx} className="flex items-center gap-2">
+                                                                                <span className="text-xs text-[var(--text-secondary)] whitespace-nowrap font-bold">滿</span>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    className="input-field text-xs p-2 w-20 text-center font-mono font-bold"
+                                                                                    placeholder="件"
+                                                                                    disabled={!product.has_volume_pricing}
+                                                                                    value={tier.target_quantity ?? ''}
+                                                                                    onChange={(e) => {
+                                                                                        const next = [...rawTiers];
+                                                                                        next[idx] = { ...next[idx], target_quantity: e.target.value !== '' ? Number(e.target.value) : '' };
+                                                                                        handleFieldChange(product.id, 'volume_pricing_settings', { ...(product.volume_pricing_settings || {}), tiers: next });
+                                                                                    }}
+                                                                                    onBlur={() => updateTiers(rawTiers)}
+                                                                                />
+                                                                                <span className="text-xs text-[var(--text-secondary)] whitespace-nowrap font-bold">件，優惠總價 共 $</span>
+                                                                                <div className="relative flex-1 max-w-[140px]">
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        className="input-field text-xs p-2 w-full font-mono font-bold"
+                                                                                        placeholder="組合特價"
+                                                                                        disabled={!product.has_volume_pricing}
+                                                                                        value={tier.package_price ?? ''}
+                                                                                        onChange={(e) => {
+                                                                                            const next = [...rawTiers];
+                                                                                            next[idx] = { ...next[idx], package_price: e.target.value !== '' ? Number(e.target.value) : '' };
+                                                                                            handleFieldChange(product.id, 'volume_pricing_settings', { ...(product.volume_pricing_settings || {}), tiers: next });
+                                                                                        }}
+                                                                                        onBlur={() => updateTiers(rawTiers)}
+                                                                                    />
+                                                                                </div>
+                                                                                {rawTiers.length > 1 && (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => {
+                                                                                            const next = rawTiers.filter((_, i) => i !== idx);
+                                                                                            updateTiers(next);
+                                                                                        }}
+                                                                                        className="p-1 rounded-md text-rose-500 hover:bg-rose-500/10 transition-colors"
+                                                                                        title="刪除此階梯"
+                                                                                    >
+                                                                                        <Trash2 size={14} />
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+                                                                        ))}
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                const next = [...rawTiers, { target_quantity: '', package_price: '' }];
+                                                                                handleFieldChange(product.id, 'volume_pricing_settings', { ...(product.volume_pricing_settings || {}), tiers: next });
                                                                             }}
-                                                                            onBlur={(e) => {
-                                                                                const settings = { ...(product.volume_pricing_settings || {}), package_price: e.target.value !== '' ? Number(e.target.value) : 0 };
-                                                                                handleSaveProduct(product.id, { volume_pricing_settings: settings });
-                                                                            }}
-                                                                        />
+                                                                            className="self-start text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 mt-1"
+                                                                        >
+                                                                            ➕ 新增更高優惠階梯 (例: 滿24件 $400)
+                                                                        </button>
                                                                     </div>
-                                                                </div>
-                                                            </div>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     </div>
                                                 )}

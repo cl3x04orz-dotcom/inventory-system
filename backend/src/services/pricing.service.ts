@@ -8,6 +8,7 @@ export interface CartItemInput {
   volume_pricing_settings?: {
     target_quantity?: number;
     package_price?: number;
+    tiers?: Array<{ target_quantity?: number; package_price?: number }>;
   } | null;
 }
 
@@ -21,9 +22,21 @@ export interface CalculationResult {
   changeAmount: number;
 }
 
+export function getVolumeTiers(settings: any): Array<{ target_quantity: number; package_price: number }> {
+  if (!settings) return [];
+  let tiers: Array<{ target_quantity: number; package_price: number }> = [];
+  if (Array.isArray(settings.tiers) && settings.tiers.length > 0) {
+    tiers = settings.tiers
+      .map((t: any) => ({ target_quantity: Number(t.target_quantity || 0), package_price: Number(t.package_price || 0) }))
+      .filter((t: any) => t.target_quantity > 0 && t.package_price > 0);
+  } else if (Number(settings.target_quantity) > 0 && Number(settings.package_price) > 0) {
+    tiers = [{ target_quantity: Number(settings.target_quantity), package_price: Number(settings.package_price) }];
+  }
+  return tiers.sort((a, b) => b.target_quantity - a.target_quantity);
+}
+
 /**
- * 計算單一商品的組合/捆綁/多件優惠價
- * 例如：單價 100，買 3 件特價 250。若買 7 件 = 2組(500) + 零散1件(100) = 600
+ * 計算單一商品的組合/捆綁/多件優惠價 (支援多階梯貪婪折抵)
  */
 export function calculateItemSubtotal(item: CartItemInput): number {
   const qty = Number(item.qty || 0);
@@ -31,12 +44,19 @@ export function calculateItemSubtotal(item: CartItemInput): number {
   const settings = item.volume_pricing_settings;
 
   if (item.has_volume_pricing && settings) {
-    const targetQty = Number(settings.target_quantity) || 0;
-    const packagePrice = Number(settings.package_price) || 0;
-    if (targetQty > 0 && packagePrice > 0) {
-      const groupCount = Math.floor(qty / targetQty);
-      const remainderCount = qty % targetQty;
-      return (groupCount * packagePrice) + (remainderCount * singlePrice);
+    const tiers = getVolumeTiers(settings);
+    if (tiers.length > 0 && qty > 0) {
+      let remaining = qty;
+      let total = 0;
+      for (const tier of tiers) {
+        if (remaining >= tier.target_quantity) {
+          const count = Math.floor(remaining / tier.target_quantity);
+          total += count * tier.package_price;
+          remaining %= tier.target_quantity;
+        }
+      }
+      total += remaining * singlePrice;
+      return total;
     }
   }
   return singlePrice * qty;
