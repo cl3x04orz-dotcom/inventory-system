@@ -107,49 +107,88 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
     return outputArray;
   };
 
-  // 註冊 Service Worker (sw.js) 並訂閱 Apple/Google 離線背景推播
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+
+  // 離線背景推播手動綁定按鈕 (解決瀏覽器 User Gesture 資安限制)
+  const handleEnablePushNotification = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      alert('您的瀏覽器不支援 Web Push 離線推播功能');
+      return;
+    }
+
+    setPushLoading(true);
+    try {
+      // 1. 請求通知權限 (User Gesture 下必定觸發彈窗)
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        alert('請在瀏覽器設定中允許「通知」權限，才能啟用離線背景推播！');
+        setPushLoading(false);
+        return;
+      }
+
+      const userToken = user?.token || user?.accessToken || safeLocalStorage.getItem('token');
+      const swUrl = `${import.meta.env.BASE_URL || '/'}sw.js`.replace(/\/+/g, '/');
+
+      // 2. 註冊 Service Worker
+      const reg = await navigator.serviceWorker.register(swUrl, {
+        scope: import.meta.env.BASE_URL || '/'
+      });
+      await navigator.serviceWorker.ready;
+
+      // 3. 取得 VAPID 公鑰
+      const keyRes = await callGAS(apiUrl, 'getWebPushPublicKey', {}, userToken);
+      if (!keyRes || !keyRes.success || !keyRes.publicKey) {
+        throw new Error('無法取得推播加密公鑰');
+      }
+
+      // 4. 向 Apple / Google 官方推播網關訂閱此設備 (User Gesture 解鎖成功)
+      const subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyRes.publicKey)
+      });
+
+      // 5. 傳送至後端儲存
+      await callGAS(apiUrl, 'subscribeWebPush', { subscription: subscription.toJSON() }, userToken);
+
+      setPushSubscribed(true);
+      
+      // 立即跳出 OS 背景推播確認
+      if (reg.showNotification) {
+        reg.showNotification('🎉 離線背景推播啟用成功！', {
+          body: '這台設備已成功綁定！即使完全關閉 WEB 網頁，有人下單時也會跳出音效與通知卡片！',
+          icon: `${import.meta.env.BASE_URL || '/'}logo.png`.replace(/\/+/g, '/'),
+          vibrate: [200, 100, 200]
+        });
+      }
+
+      alert('🎉 離線背景推播已成功開啟！即使關閉網頁也能收到下單通知！');
+    } catch (err) {
+      console.error('[WebPush] Manual subscribe error:', err);
+      alert('離線推播綁定提示: ' + (err.message || '請確認通知權限已開啟'));
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
+  // 註冊 Service Worker (sw.js) 並自動嘗試檢查綁定
   useEffect(() => {
     if (!isBoss || !apiUrl) return;
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
 
-    const setupWebPush = async () => {
+    const checkPushSub = async () => {
       try {
-        const userToken = user?.token || user?.accessToken || safeLocalStorage.getItem('token');
-        
-        // 1. 註冊公用 Service Worker 腳本 sw.js (動態配合 GitHub Pages 子路徑)
         const swUrl = `${import.meta.env.BASE_URL || '/'}sw.js`.replace(/\/+/g, '/');
         const reg = await navigator.serviceWorker.register(swUrl, {
           scope: import.meta.env.BASE_URL || '/'
         });
-        console.log('[WebPush] Service Worker registered successfully:', reg.scope);
-
-        // 2. 請求瀏覽器桌面通知權限
-        if (Notification.permission === 'default') {
-          await Notification.requestPermission();
-        }
-
-        if (Notification.permission !== 'granted') return;
-
-        // 3. 向上游後端取得公鑰
-        const keyRes = await callGAS(apiUrl, 'getWebPushPublicKey', {}, userToken);
-        if (!keyRes || !keyRes.success || !keyRes.publicKey) return;
-
-        // 4. 向 Apple / Google 官方推播網關訂閱此設備
-        const subscription = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(keyRes.publicKey)
-        });
-
-        // 5. 將設備憑證安全的傳送至後端儲存
-        await callGAS(apiUrl, 'subscribeWebPush', { subscription: subscription.toJSON() }, userToken);
-        console.log('[WebPush] BOSS offline background push subscription active!');
-      } catch (err) {
-        console.warn('[WebPush] Background Push registration note:', err.message);
-      }
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) setPushSubscribed(true);
+      } catch (e) {}
     };
 
-    setupWebPush();
-  }, [isBoss, apiUrl, user]);
+    checkPushSub();
+  }, [isBoss, apiUrl]);
 
   // 定時輪詢新訂單通知 (每 4 秒一次)
   useEffect(() => {
@@ -257,8 +296,27 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
         </div>
       )}
 
-      {/* 🔊 BOSS 專屬：輕量全時段測試通知按鈕 (點擊解鎖聲音權限與測試彈窗) */}
-      <div className="fixed bottom-4 left-4 z-[9990] opacity-80 hover:opacity-100 transition-opacity">
+      {/* 🔊 BOSS 專屬：全時段離線背景推播啟用按鈕與測試通知 */}
+      <div className="fixed bottom-4 left-4 z-[9990] opacity-90 hover:opacity-100 transition-opacity flex flex-col gap-2">
+        <button
+          onClick={handleEnablePushNotification}
+          disabled={pushLoading}
+          className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-lg backdrop-blur-sm transition-all active:scale-95 border ${
+            pushSubscribed
+              ? "bg-emerald-950/90 text-emerald-300 border-emerald-500/50 hover:bg-emerald-900"
+              : "bg-amber-950/90 text-amber-300 border-amber-500/60 animate-bounce hover:bg-amber-900"
+          }`}
+          title="點擊解鎖並開啟全時段離線背景推播 (即使關閉網頁也能收到 OS 系統卡片與音效)"
+        >
+          <Bell size={13} className={pushSubscribed ? "" : "animate-spin"} />
+          <span>
+            {pushLoading
+              ? "設定中..."
+              : pushSubscribed
+              ? "✅ 已開啟全時段離線背景推播"
+              : "🔔 點我開啟關閉網頁背景推播"}
+          </span>
+        </button>
         <button
           onClick={handleTestNotification}
           className="bg-slate-900/80 text-blue-400 hover:text-white border border-blue-500/30 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-lg backdrop-blur-sm transition-all active:scale-95"
