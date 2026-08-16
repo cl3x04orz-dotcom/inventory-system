@@ -4,6 +4,7 @@ import { ProductService, verifyAndDeductProductQuota } from './product.service.j
 import { deductInventory } from './sales.service.js';
 import { calculateItemSubtotal } from './pricing.service.js';
 import { NotificationService } from './notification.service.js';
+import { WebPushService } from './webpush.service.js';
 
 function generateOrderId(): string {
   const now = new Date();
@@ -1236,13 +1237,17 @@ export const GroupBuyService = {
       }
     }, { maxWait: 15000, timeout: 30000 });
 
-    // 🔔 廣播新訂單通知 (通知 BOSS 老闆角色)
+    // 🔔 廣播新訂單通知 (通知 BOSS 老闆角色與發射離線 Web Push)
     try {
-      NotificationService.notifyNewOrder({
+      const orderPushData = {
         orderId,
         customerName: String(customerName || lineDisplayName || '顧客').trim(),
         totalAmount: Math.round(Number(totalAmount)) || 0,
         sourceGroup: commNameSnap || '線上下單'
+      };
+      NotificationService.notifyNewOrder(orderPushData);
+      WebPushService.sendOrderPush(orderPushData).catch(err => {
+        console.warn('[WebPush] Async sendOrderPush error:', err.message);
       });
     } catch (err: any) {
       console.warn('[Notification] Failed to emit notifyNewOrder:', err.message);

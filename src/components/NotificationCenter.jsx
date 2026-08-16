@@ -95,14 +95,58 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
     });
   };
 
-  // 請求瀏覽器桌面通知權限
-  useEffect(() => {
-    if (!isBoss) return;
-    if ('Notification' in window && Notification.permission === 'default' && !permissionRequested) {
-      setPermissionRequested(true);
-      Notification.requestPermission().catch(() => {});
+  // 將 VAPID Base64 公鑰轉為 Uint8Array (瀏覽器 PushManager 標準格式)
+  const urlBase64ToUint8Array = (base64String) => {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
     }
-  }, [isBoss, permissionRequested]);
+    return outputArray;
+  };
+
+  // 註冊 Service Worker (sw.js) 並訂閱 Apple/Google 離線背景推播
+  useEffect(() => {
+    if (!isBoss || !apiUrl) return;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+    const setupWebPush = async () => {
+      try {
+        const userToken = user?.token || user?.accessToken || safeLocalStorage.getItem('token');
+        
+        // 1. 註冊公用 Service Worker 腳本 sw.js
+        const reg = await navigator.serviceWorker.register('/sw.js');
+        console.log('[WebPush] Service Worker registered successfully:', reg.scope);
+
+        // 2. 請求瀏覽器桌面通知權限
+        if (Notification.permission === 'default') {
+          await Notification.requestPermission();
+        }
+
+        if (Notification.permission !== 'granted') return;
+
+        // 3. 向上游後端取得公鑰
+        const keyRes = await callGAS(apiUrl, 'getWebPushPublicKey', {}, userToken);
+        if (!keyRes || !keyRes.success || !keyRes.publicKey) return;
+
+        // 4. 向 Apple / Google 官方推播網關訂閱此設備
+        const subscription = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(keyRes.publicKey)
+        });
+
+        // 5. 將設備憑證安全的傳送至後端儲存
+        await callGAS(apiUrl, 'subscribeWebPush', { subscription: subscription.toJSON() }, userToken);
+        console.log('[WebPush] BOSS offline background push subscription active!');
+      } catch (err) {
+        console.warn('[WebPush] Background Push registration note:', err.message);
+      }
+    };
+
+    setupWebPush();
+  }, [isBoss, apiUrl, user]);
 
   // 定時輪詢新訂單通知 (每 4 秒一次)
   useEffect(() => {

@@ -14,10 +14,15 @@ import { PromotionService } from '../services/promotion.service.js';
 import { StoreSettingService } from '../services/storesetting.service.js';
 import { SaleCommandService } from '../services/sale.command.service.js';
 import { NotificationService } from '../services/notification.service.js';
+import { WebPushService } from '../services/webpush.service.js';
 import { callGASFromNode } from '../utils/gasClient.js';
 
 export async function apiRouter(action: string, payload: any, user: any): Promise<any> {
   switch (action) {
+    case 'getWebPushPublicKey':
+      return { success: true, publicKey: await WebPushService.getPublicKey() };
+    case 'subscribeWebPush':
+      return WebPushService.subscribeBoss(payload, user);
     case 'getRecentNotifications':
       return NotificationService.getNotificationsSince(payload, user);
     case 'getStoreSetting':
