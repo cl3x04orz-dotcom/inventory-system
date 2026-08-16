@@ -155,8 +155,9 @@ export const WebPushService = {
           console.log('[WebPush] Successfully sent Push to FCM/APNs! Endpoint:', sub.endpoint.substring(0, 40) + '...', 'StatusCode:', res.statusCode);
         } catch (err: any) {
           console.warn('[WebPush] Push notification error for endpoint:', sub.endpoint.substring(0, 40) + '...', 'StatusCode:', err.statusCode || err.message);
-          // 若 404/410 代表訂閱已過期，註記刪除
-          if (err.statusCode === 404 || err.statusCode === 410) {
+          // 若 403/404/410 或金鑰格式錯誤，代表訂閱已過期/無效/不匹配，一律自動註記刪除
+          if (err.statusCode === 403 || err.statusCode === 404 || err.statusCode === 410 || !err.statusCode) {
+            console.log('[WebPush] Automatically purging invalid/expired endpoint:', sub.endpoint.substring(0, 40) + '...');
             invalidEndpoints.push(sub.endpoint);
           }
         }
