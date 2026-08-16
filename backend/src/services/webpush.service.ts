@@ -65,7 +65,13 @@ export const WebPushService = {
    * BOSS 綁定設備背景離線推播憑證
    */
   async subscribeBoss(payload: any, user: any) {
-    if (!user || (user.role !== 'BOSS' && user.role !== 'SUPER_ADMIN')) {
+    const userRole = user?.role || user?.userRole || user?.type;
+    const isBossOrAdmin = userRole === 'BOSS' || userRole === 'SUPER_ADMIN' || userRole === 'admin' || user?.isSuperAdmin;
+
+    console.log('[WebPush] subscribeBoss request by user:', user?.username || user?.id, 'Role:', userRole);
+
+    if (!user || !isBossOrAdmin) {
+      console.warn('[WebPush] Auth failed for subscribeBoss. Current User:', user);
       return { success: false, message: '權限不足 (僅 BOSS 可訂閱推播)' };
     }
 
@@ -101,7 +107,8 @@ export const WebPushService = {
         });
       }
 
-      return { success: true, message: 'BOSS 背景離線推播設備綁定成功' };
+      console.log(`[WebPush] BOSS 裝置憑證寫入成功！目前有效離線推播裝置數：${subs.length}`);
+      return { success: true, message: 'BOSS 背景離線推播設備綁定成功', activeDevices: subs.length };
     } catch (err: any) {
       console.error('[WebPush] Failed to save subscription:', err.message);
       throw new Error('無法儲存背景推播訂閱: ' + err.message);
@@ -115,22 +122,28 @@ export const WebPushService = {
     await initVapidKeys();
 
     try {
+      console.log(`[WebPush] sendOrderPush triggered for Order #${orderData.orderId}`);
+
       const setting = await prisma.groupBuySystemSetting.findUnique({
         where: { settingKey: 'boss_webpush_subscriptions' }
       });
 
-      if (!setting || !setting.settingValue) return;
+      if (!setting || !setting.settingValue) {
+        console.warn('[WebPush] No boss_webpush_subscriptions setting found in DB!');
+        return;
+      }
 
       let subs: any[] = typeof setting.settingValue === 'string'
         ? JSON.parse(setting.settingValue)
         : setting.settingValue;
 
+      console.log(`[WebPush] Found ${subs?.length || 0} active BOSS subscriptions in DB.`);
       if (!Array.isArray(subs) || subs.length === 0) return;
 
       const pushPayload = JSON.stringify({
         title: '🛒 有人線上下單囉！',
         body: `顧客：${orderData.customerName || '顧客'} | 金額：$${orderData.totalAmount} 元 (${orderData.sourceGroup || '線上下單'})`,
-        url: '/#pendingOrders',
+        url: './#pendingOrders',
         orderId: orderData.orderId
       });
 
@@ -138,10 +151,10 @@ export const WebPushService = {
 
       for (const sub of subs) {
         try {
-          await webpush.sendNotification(sub, pushPayload);
-          console.log('[WebPush] Successfully sent offline push to BOSS device!');
+          const res = await webpush.sendNotification(sub, pushPayload);
+          console.log('[WebPush] Successfully sent Push to FCM/APNs! Endpoint:', sub.endpoint.substring(0, 40) + '...', 'StatusCode:', res.statusCode);
         } catch (err: any) {
-          console.warn('[WebPush] Push notification error for endpoint:', sub.endpoint, err.statusCode || err.message);
+          console.warn('[WebPush] Push notification error for endpoint:', sub.endpoint.substring(0, 40) + '...', 'StatusCode:', err.statusCode || err.message);
           // 若 404/410 代表訂閱已過期，註記刪除
           if (err.statusCode === 404 || err.statusCode === 410) {
             invalidEndpoints.push(sub.endpoint);
