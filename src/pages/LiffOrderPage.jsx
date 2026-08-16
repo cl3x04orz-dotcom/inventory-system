@@ -1157,6 +1157,12 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   };
 
   const handleUpdateMemberQty = (memberName, pid, delta) => {
+    const prod = products.find(p => p.id === pid);
+    if (prod && prod.has_flavor_attributes) {
+      setActiveRecipient(memberName);
+      handleProductAction(prod, delta > 0);
+      return;
+    }
     setGroupCart((prev) => {
       const recipientItems = prev[memberName] || {};
       const currentQty = recipientItems[pid] || 0;
