@@ -7,7 +7,8 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
   const [activeToast, setActiveToast] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
   const [permissionRequested, setPermissionRequested] = useState(false);
-  const lastTimestampRef = useRef(new Date().toISOString());
+  // 初始化時間戳記錄 (設為 30 秒前，避免剛開網頁漏掉剛成立的訂單)
+  const lastTimestampRef = useRef(new Date(Date.now() - 30000).toISOString());
 
   // 🛡️ 權限過濾：目前僅開通 BOSS (老闆) 角色接收下單通知
   const isBoss = user && (user.role === 'BOSS' || user.role === 'SUPER_ADMIN');
@@ -49,10 +50,10 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
     if (!('Notification' in window)) return;
     if (Notification.permission === 'granted') {
       try {
-        const n = new Notification('🛒 有人線上下單囉！', {
-          body: `顧客：${notif.customerName} | 金額：$${notif.totalAmount} 元 (${notif.sourceGroup || '線上下單'})`,
+        const n = new Notification(notif.title || '🛒 有人線上下單囉！', {
+          body: notif.body || `顧客：${notif.customerName} | 金額：$${notif.totalAmount} 元 (${notif.sourceGroup || '線上下單'})`,
           icon: '/favicon.ico',
-          tag: notif.id
+          tag: notif.id || 'test_notif'
         });
         n.onclick = () => {
           window.focus();
@@ -64,6 +65,36 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
     }
   };
 
+  // 測試通知與解鎖瀏覽器聲音
+  const handleTestNotification = () => {
+    playChimeSound();
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        triggerDesktopNotification({
+          id: `test_${Date.now()}`,
+          title: '🔔 下單通知與音效測試成功！',
+          body: '系統已準備就緒，當有人線上下單時將自動在此跳出提示！'
+        });
+      } else {
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            triggerDesktopNotification({
+              id: `test_${Date.now()}`,
+              title: '🔔 下單通知授權成功！',
+              body: '系統已準備就緒，當有人線上下單時將自動在此跳出提示！'
+            });
+          }
+        });
+      }
+    }
+    setActiveToast({
+      id: `test_${Date.now()}`,
+      customerName: '測試顧客 (系統播報測試)',
+      totalAmount: 168,
+      sourceGroup: '測試按鈕'
+    });
+  };
+
   // 請求瀏覽器桌面通知權限
   useEffect(() => {
     if (!isBoss) return;
@@ -73,16 +104,21 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
     }
   }, [isBoss, permissionRequested]);
 
-  // 定時輪詢新訂單通知 (每 5 秒一次)
+  // 定時輪詢新訂單通知 (每 4 秒一次)
   useEffect(() => {
     if (!isBoss || !apiUrl) return;
 
     let isMounted = true;
+    const userToken = user?.token || user?.accessToken || safeLocalStorage.getItem('token');
+
     const fetchNotifications = async () => {
       try {
-        const res = await callGAS(apiUrl, 'getRecentNotifications', {
-          sinceTimestamp: lastTimestampRef.current
-        });
+        const res = await callGAS(
+          apiUrl,
+          'getRecentNotifications',
+          { sinceTimestamp: lastTimestampRef.current },
+          userToken
+        );
 
         if (isMounted && res && res.success && Array.isArray(res.notifications) && res.notifications.length > 0) {
           lastTimestampRef.current = res.latestTimestamp || new Date().toISOString();
@@ -102,13 +138,13 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
     };
 
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 5000);
+    const interval = setInterval(fetchNotifications, 4000);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [isBoss, apiUrl, isMuted]);
+  }, [isBoss, apiUrl, isMuted, user]);
 
   // 若不是 BOSS 老闆角色，完全不渲染並停止一切排程
   if (!isBoss) return null;
@@ -173,6 +209,18 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
           </div>
         </div>
       )}
+
+      {/* 🔊 BOSS 專屬：輕量全時段測試通知按鈕 (點擊解鎖聲音權限與測試彈窗) */}
+      <div className="fixed bottom-4 left-4 z-[9990] opacity-80 hover:opacity-100 transition-opacity">
+        <button
+          onClick={handleTestNotification}
+          className="bg-slate-900/80 text-blue-400 hover:text-white border border-blue-500/30 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-lg backdrop-blur-sm transition-all active:scale-95"
+          title="點擊播放測試音效並解鎖瀏覽器聲音通知"
+        >
+          <Bell size={13} className="animate-bounce" />
+          <span>🔊 測試下單音效</span>
+        </button>
+      </div>
     </>
   );
 }
