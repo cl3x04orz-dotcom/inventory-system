@@ -10,8 +10,8 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
   // 初始化時間戳記錄 (設為 30 秒前，避免剛開網頁漏掉剛成立的訂單)
   const lastTimestampRef = useRef(new Date(Date.now() - 30000).toISOString());
 
-  // 🛡️ 權限過濾：目前僅開通 BOSS (老闆) 角色接收下單通知
-  const isBoss = user && (user.role === 'BOSS' || user.role === 'SUPER_ADMIN');
+  // 🛡️ 權限過濾：開放 BOSS、SUPER_ADMIN 與 ADMIN 角色接收與訂閱下單離線推播
+  const isBoss = user && (user.role === 'BOSS' || user.role === 'SUPER_ADMIN' || user.role === 'ADMIN');
 
   // 播放 Web Audio API 提示音 (無需外部音效檔，相容所有瀏覽器)
   const playChimeSound = () => {

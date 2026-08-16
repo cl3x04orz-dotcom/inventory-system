@@ -66,13 +66,13 @@ export const WebPushService = {
    */
   async subscribeBoss(payload: any, user: any) {
     const userRole = String(user?.role || user?.userRole || user?.type || '').toUpperCase();
-    const isBossOrSuper = userRole === 'BOSS' || userRole === 'SUPER_ADMIN';
+    const isBossOrAdmin = userRole === 'BOSS' || userRole === 'SUPER_ADMIN' || userRole === 'ADMIN';
 
     console.log('[WebPush] subscribeBoss request by user:', user?.username || user?.id, 'Role:', userRole);
 
-    if (!user || !isBossOrSuper) {
+    if (!user || !isBossOrAdmin) {
       console.warn('[WebPush] Auth failed for subscribeBoss. Current User:', user);
-      return { success: false, message: '權限不足 (僅 BOSS 帳號可訂閱推播)' };
+      return { success: false, message: '權限不足 (僅 BOSS、SUPER_ADMIN 或 ADMIN 帳號可訂閱推播)' };
     }
 
     const { subscription } = payload || {};
