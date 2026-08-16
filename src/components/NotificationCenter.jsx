@@ -116,8 +116,11 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
       try {
         const userToken = user?.token || user?.accessToken || safeLocalStorage.getItem('token');
         
-        // 1. 註冊公用 Service Worker 腳本 sw.js
-        const reg = await navigator.serviceWorker.register('/sw.js');
+        // 1. 註冊公用 Service Worker 腳本 sw.js (動態配合 GitHub Pages 子路徑)
+        const swUrl = `${import.meta.env.BASE_URL || '/'}sw.js`.replace(/\/+/g, '/');
+        const reg = await navigator.serviceWorker.register(swUrl, {
+          scope: import.meta.env.BASE_URL || '/'
+        });
         console.log('[WebPush] Service Worker registered successfully:', reg.scope);
 
         // 2. 請求瀏覽器桌面通知權限
