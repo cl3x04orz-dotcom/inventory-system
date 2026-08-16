@@ -50,15 +50,31 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
     if (!('Notification' in window)) return;
     if (Notification.permission === 'granted') {
       try {
-        const n = new Notification(notif.title || '🛒 有人線上下單囉！', {
-          body: notif.body || `顧客：${notif.customerName} | 金額：$${notif.totalAmount} 元 (${notif.sourceGroup || '線上下單'})`,
-          icon: '/favicon.ico',
-          tag: notif.id || 'test_notif'
-        });
-        n.onclick = () => {
-          window.focus();
-          if (typeof setPage === 'function') setPage('pendingOrders');
-        };
+        const title = notif.title || '🛒 有人線上下單囉！';
+        const body = notif.body || `顧客：${notif.customerName} | 金額：$${notif.totalAmount} 元 (${notif.sourceGroup || '線上下單'})`;
+        const icon = './logo192.png';
+
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.ready.then(reg => {
+            reg.showNotification(title, {
+              body,
+              icon,
+              badge: icon,
+              vibrate: [200, 100, 200, 100, 200],
+              tag: notif.id || `notif_${Date.now()}`,
+              renotify: true,
+              data: { url: './#pendingOrders' }
+            });
+          }).catch(() => {
+            new Notification(title, { body, icon, tag: notif.id || 'notif' });
+          });
+        } else {
+          const n = new Notification(title, { body, icon, tag: notif.id || 'notif' });
+          n.onclick = () => {
+            window.focus();
+            if (typeof setPage === 'function') setPage('pendingOrders');
+          };
+        }
       } catch (e) {
         console.warn('[Notification] Desktop notification error:', e);
       }

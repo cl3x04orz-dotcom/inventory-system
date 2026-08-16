@@ -26,8 +26,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body || '收到新訂單，點擊進行審核',
-    icon: '/logo.png',
-    badge: '/logo.png',
+    icon: './logo192.png',
+    badge: './logo192.png',
     vibrate: [200, 100, 200, 100, 200],
     tag: data.orderId || `push_${Date.now()}`,
     renotify: true,
