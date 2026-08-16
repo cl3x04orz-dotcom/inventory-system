@@ -9,18 +9,22 @@ self.addEventListener('activate', (event) => {
 
 // 監聽來自 Apple/Google 伺服器發射的離線 Push 訊號
 self.addEventListener('push', (event) => {
+  console.log('[PUSH Trace] 1. Push event received in Service Worker!', event);
+
   let data = {
     title: '🛒 有人線上下單囉！',
     body: '收到最新線上下單，請點擊開啟審核',
-    url: '/#pendingOrders',
+    url: './#pendingOrders',
     orderId: ''
   };
 
   if (event.data) {
     try {
       data = event.data.json();
+      console.log('[PUSH Trace] 2. Payload parsed:', data);
     } catch (e) {
       data.body = event.data.text();
+      console.log('[PUSH Trace] 2. Payload text parsed:', data.body);
     }
   }
 
@@ -32,12 +36,14 @@ self.addEventListener('push', (event) => {
     tag: data.orderId || `push_${Date.now()}`,
     renotify: true,
     data: {
-      url: data.url || '/#pendingOrders'
+      url: data.url || './#pendingOrders'
     },
     actions: [
       { action: 'open', title: '一鍵開啟審核 ➔' }
     ]
   };
+
+  console.log('[PUSH Trace] 3. Calling showNotification with options:', options);
 
   event.waitUntil(
     self.registration.showNotification(data.title, options)
