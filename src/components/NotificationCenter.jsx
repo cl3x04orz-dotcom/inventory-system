@@ -195,17 +195,52 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
         const swUrl = './sw.js';
         const reg = await navigator.serviceWorker.register(swUrl);
         const sub = await reg.pushManager.getSubscription();
+        
+        const userToken = user?.token || user?.accessToken || safeLocalStorage.getItem('token');
+        if (!userToken) return;
+
+        // 取得後端最新公鑰，用於比對與確保同步
+        const keyRes = await callGAS(apiUrl, 'getWebPushPublicKey', {}, userToken);
+        if (!keyRes || !keyRes.success || !keyRes.publicKey) return;
+
+        const serverKeyUint8 = urlBase64ToUint8Array(keyRes.publicKey);
+
         if (sub) {
-          setPushSubscribed(true);
-          // 自動向後端同步，確保 DB 中的推播訂閱絕對不遺失
-          const userToken = user?.token || user?.accessToken || safeLocalStorage.getItem('token');
-          if (userToken) {
+          // 比對金鑰：若金鑰不匹配（過期或伺服器重置），自動退訂並重新訂閱新金鑰
+          const clientKeyUint8 = new Uint8Array(sub.options.applicationServerKey);
+          let keysMatch = serverKeyUint8.byteLength === clientKeyUint8.byteLength;
+          if (keysMatch) {
+            for (let i = 0; i < serverKeyUint8.byteLength; i++) {
+              if (serverKeyUint8[i] !== clientKeyUint8[i]) {
+                keysMatch = false;
+                break;
+              }
+            }
+          }
+
+          if (keysMatch) {
+            setPushSubscribed(true);
+            // 自動向後端同步，確保 DB 中的推播訂閱絕對不遺失
             await callGAS(apiUrl, 'subscribeWebPush', { subscription: sub.toJSON() }, userToken);
             console.log('[WebPush] Auto-synced active subscription with backend DB.');
+          } else {
+            console.log('[WebPush] VAPID keys mismatch detected. Re-subscribing device...');
+            try {
+              await sub.unsubscribe();
+              const newSub = await reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: serverKeyUint8
+              });
+              await callGAS(apiUrl, 'subscribeWebPush', { subscription: newSub.toJSON() }, userToken);
+              setPushSubscribed(true);
+              console.log('[WebPush] Successfully re-subscribed with new VAPID keys.');
+            } catch (reSubErr) {
+              console.warn('[WebPush] Auto re-subscribe failed:', reSubErr);
+            }
           }
         }
       } catch (e) {
-        console.warn('[WebPush] Auto subscription sync failed:', e);
+        console.warn('[WebPush] Auto subscription check or sync failed:', e);
       }
     };
 
