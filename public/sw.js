@@ -11,32 +11,40 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('push', (event) => {
   console.log('[PUSH Trace] 1. Push event received in Service Worker!', event);
 
-  let data = {
+  const defaultData = {
     title: '🛒 有人線上下單囉！',
     body: '收到最新線上下單，請點擊開啟審核',
     url: './#pendingOrders',
     orderId: ''
   };
 
+  let data = { ...defaultData };
+
   if (event.data) {
     try {
-      data = event.data.json();
-      console.log('[PUSH Trace] 2. Payload parsed:', data);
+      const parsed = event.data.json();
+      console.log('[PUSH Trace] 2. Payload parsed:', parsed);
+      data = {
+        title: parsed.title || defaultData.title,
+        body: parsed.body || defaultData.body,
+        url: parsed.url || defaultData.url,
+        orderId: parsed.orderId || defaultData.orderId
+      };
     } catch (e) {
-      data.body = event.data.text();
+      data.body = event.data.text() || defaultData.body;
       console.log('[PUSH Trace] 2. Payload text parsed:', data.body);
     }
   }
 
   const options = {
-    body: data.body || '收到新訂單，點擊進行審核',
+    body: data.body,
     icon: './logo192.png',
     badge: './logo192.png',
     vibrate: [200, 100, 200, 100, 200],
     tag: data.orderId || `push_${Date.now()}`,
     renotify: true,
     data: {
-      url: data.url || './#pendingOrders'
+      url: data.url
     },
     actions: [
       { action: 'open', title: '一鍵開啟審核 ➔' }

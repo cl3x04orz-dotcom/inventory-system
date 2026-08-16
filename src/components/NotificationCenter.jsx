@@ -185,7 +185,7 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
     }
   };
 
-  // 註冊 Service Worker (sw.js) 並自動嘗試檢查綁定
+  // 註冊 Service Worker (sw.js) 並自動嘗試檢查與同步綁定
   useEffect(() => {
     if (!isBoss || !apiUrl) return;
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
@@ -195,12 +195,22 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
         const swUrl = './sw.js';
         const reg = await navigator.serviceWorker.register(swUrl);
         const sub = await reg.pushManager.getSubscription();
-        if (sub) setPushSubscribed(true);
-      } catch (e) {}
+        if (sub) {
+          setPushSubscribed(true);
+          // 自動向後端同步，確保 DB 中的推播訂閱絕對不遺失
+          const userToken = user?.token || user?.accessToken || safeLocalStorage.getItem('token');
+          if (userToken) {
+            await callGAS(apiUrl, 'subscribeWebPush', { subscription: sub.toJSON() }, userToken);
+            console.log('[WebPush] Auto-synced active subscription with backend DB.');
+          }
+        }
+      } catch (e) {
+        console.warn('[WebPush] Auto subscription sync failed:', e);
+      }
     };
 
     checkPushSub();
-  }, [isBoss, apiUrl]);
+  }, [isBoss, apiUrl, user]);
 
   // 定時輪詢新訂單通知 (每 4 秒一次)
   useEffect(() => {
