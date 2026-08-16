@@ -13,10 +13,13 @@ import { superadminService } from '../services/superadmin.service.js';
 import { PromotionService } from '../services/promotion.service.js';
 import { StoreSettingService } from '../services/storesetting.service.js';
 import { SaleCommandService } from '../services/sale.command.service.js';
+import { NotificationService } from '../services/notification.service.js';
 import { callGASFromNode } from '../utils/gasClient.js';
 
 export async function apiRouter(action: string, payload: any, user: any): Promise<any> {
   switch (action) {
+    case 'getRecentNotifications':
+      return NotificationService.getNotificationsSince(payload, user);
     case 'getStoreSetting':
       return StoreSettingService.getStoreSetting(payload);
     case 'saveStoreSetting':

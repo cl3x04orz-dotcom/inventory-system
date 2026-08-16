@@ -33,6 +33,7 @@ import StoreSettingsPage from './pages/StoreSettingsPage';
 import MemberManagementPage from './pages/MemberManagementPage';
 import SubscriptionManagementPage from './pages/SubscriptionManagementPage';
 import SuperAdminPage from './pages/SuperAdminPage';
+import NotificationCenter from './components/NotificationCenter';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './contexts/ThemeContext';
 import ThemeToggle from './components/ThemeToggle';
@@ -982,6 +983,7 @@ function AppContent() {
                         {page === 'memberManagement' && <MemberManagementPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'subscriptionManagement' && <SubscriptionManagementPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'superAdmin' && (user.role === 'SUPER_ADMIN' || user.role === 'BOSS') && <SuperAdminPage user={user} apiUrl={GAS_API_URL} />}
+                        <NotificationCenter user={user} apiUrl={GAS_API_URL} setPage={handlePageChange} />
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full text-slate-400">

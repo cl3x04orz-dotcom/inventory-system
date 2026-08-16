@@ -3,6 +3,7 @@ import { prisma, runInTransaction } from '../database/context.js';
 import { ProductService, verifyAndDeductProductQuota } from './product.service.js';
 import { deductInventory } from './sales.service.js';
 import { calculateItemSubtotal } from './pricing.service.js';
+import { NotificationService } from './notification.service.js';
 
 function generateOrderId(): string {
   const now = new Date();
@@ -1234,6 +1235,18 @@ export const GroupBuyService = {
         });
       }
     }, { maxWait: 15000, timeout: 30000 });
+
+    // 🔔 廣播新訂單通知 (通知 BOSS 老闆角色)
+    try {
+      NotificationService.notifyNewOrder({
+        orderId,
+        customerName: String(customerName || lineDisplayName || '顧客').trim(),
+        totalAmount: Math.round(Number(totalAmount)) || 0,
+        sourceGroup: commNameSnap || '線上下單'
+      });
+    } catch (err: any) {
+      console.warn('[Notification] Failed to emit notifyNewOrder:', err.message);
+    }
 
     return { success: true, orderId, orderNo: orderId };
   },
