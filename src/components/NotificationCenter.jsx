@@ -128,12 +128,10 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
       }
 
       const userToken = user?.token || user?.accessToken || safeLocalStorage.getItem('token');
-      const swUrl = `${import.meta.env.BASE_URL || '/'}sw.js`.replace(/\/+/g, '/');
+      const swUrl = './sw.js';
 
       // 2. 註冊 Service Worker
-      const reg = await navigator.serviceWorker.register(swUrl, {
-        scope: import.meta.env.BASE_URL || '/'
-      });
+      const reg = await navigator.serviceWorker.register(swUrl);
       await navigator.serviceWorker.ready;
 
       // 3. 取得 VAPID 公鑰
@@ -178,10 +176,8 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
 
     const checkPushSub = async () => {
       try {
-        const swUrl = `${import.meta.env.BASE_URL || '/'}sw.js`.replace(/\/+/g, '/');
-        const reg = await navigator.serviceWorker.register(swUrl, {
-          scope: import.meta.env.BASE_URL || '/'
-        });
+        const swUrl = './sw.js';
+        const reg = await navigator.serviceWorker.register(swUrl);
         const sub = await reg.pushManager.getSubscription();
         if (sub) setPushSubscribed(true);
       } catch (e) {}

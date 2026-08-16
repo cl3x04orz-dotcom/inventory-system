@@ -6,7 +6,7 @@ import tailwindcss from '@tailwindcss/postcss'
 export default defineConfig(({ mode }) => {
   const isProd = mode === 'production';
   return {
-    base: isProd ? 'https://cl3x04orz-dotcom.github.io/inventory-system/' : '/inventory-system/',
+    base: '/inventory-system/',
     plugins: [
       react()
     ],
