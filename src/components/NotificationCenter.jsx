@@ -163,7 +163,10 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
       });
 
       // 5. 傳送至後端儲存
-      await callGAS(apiUrl, 'subscribeWebPush', { subscription: subscription.toJSON() }, userToken);
+      const subRes = await callGAS(apiUrl, 'subscribeWebPush', { subscription: subscription.toJSON() }, userToken);
+      if (!subRes || subRes.success === false) {
+        throw new Error(subRes?.message || '後端儲存離線推播訂閱失敗');
+      }
 
       setPushSubscribed(true);
       
@@ -221,8 +224,10 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
           if (keysMatch) {
             setPushSubscribed(true);
             // 自動向後端同步，確保 DB 中的推播訂閱絕對不遺失
-            await callGAS(apiUrl, 'subscribeWebPush', { subscription: sub.toJSON() }, userToken);
-            console.log('[WebPush] Auto-synced active subscription with backend DB.');
+            const syncRes = await callGAS(apiUrl, 'subscribeWebPush', { subscription: sub.toJSON() }, userToken);
+            if (syncRes && syncRes.success) {
+              console.log('[WebPush] Auto-synced active subscription with backend DB.');
+            }
           } else {
             console.log('[WebPush] VAPID keys mismatch detected. Re-subscribing device...');
             try {
@@ -231,12 +236,29 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
                 userVisibleOnly: true,
                 applicationServerKey: serverKeyUint8
               });
-              await callGAS(apiUrl, 'subscribeWebPush', { subscription: newSub.toJSON() }, userToken);
-              setPushSubscribed(true);
-              console.log('[WebPush] Successfully re-subscribed with new VAPID keys.');
+              const syncRes = await callGAS(apiUrl, 'subscribeWebPush', { subscription: newSub.toJSON() }, userToken);
+              if (syncRes && syncRes.success) {
+                setPushSubscribed(true);
+                console.log('[WebPush] Successfully re-subscribed with new VAPID keys.');
+              }
             } catch (reSubErr) {
               console.warn('[WebPush] Auto re-subscribe failed:', reSubErr);
             }
+          }
+        } else if (Notification.permission === 'granted') {
+          console.log('[WebPush] Notification permission granted but subscription is null. Auto-subscribing...');
+          try {
+            const newSub = await reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: serverKeyUint8
+            });
+            const syncRes = await callGAS(apiUrl, 'subscribeWebPush', { subscription: newSub.toJSON() }, userToken);
+            if (syncRes && syncRes.success) {
+              setPushSubscribed(true);
+              console.log('[WebPush] Auto-subscribed successfully on page load!');
+            }
+          } catch (autoErr) {
+            console.warn('[WebPush] Auto background subscription error:', autoErr);
           }
         }
       } catch (e) {

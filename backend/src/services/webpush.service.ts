@@ -65,14 +65,14 @@ export const WebPushService = {
    * BOSS 綁定設備背景離線推播憑證
    */
   async subscribeBoss(payload: any, user: any) {
-    const userRole = user?.role || user?.userRole || user?.type;
-    const isBossOrAdmin = userRole === 'BOSS' || userRole === 'SUPER_ADMIN' || userRole === 'admin' || user?.isSuperAdmin;
+    const userRole = String(user?.role || user?.userRole || user?.type || '').toUpperCase();
+    const isBossOrSuper = userRole === 'BOSS' || userRole === 'SUPER_ADMIN';
 
     console.log('[WebPush] subscribeBoss request by user:', user?.username || user?.id, 'Role:', userRole);
 
-    if (!user || !isBossOrAdmin) {
+    if (!user || !isBossOrSuper) {
       console.warn('[WebPush] Auth failed for subscribeBoss. Current User:', user);
-      return { success: false, message: '權限不足 (僅 BOSS 可訂閱推播)' };
+      return { success: false, message: '權限不足 (僅 BOSS 帳號可訂閱推播)' };
     }
 
     const { subscription } = payload || {};
