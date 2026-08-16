@@ -2818,7 +2818,136 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     );
   }
 
-  // ── 🎁 贈品選擇 Bottom Sheet 抽屜組件 ─────────────────────────────
+  // ── 🍨 多規格口味選擇彈窗組件 ───────────────────────────────────────
+  const renderFlavorModal = () => {
+    if (!flavorModalProduct) return null;
+    return (
+      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-primary)] shadow-2xl w-full max-w-sm flex flex-col overflow-hidden glass-panel">
+          <div className="p-4 border-b border-[var(--border-primary)] flex justify-between items-center bg-[var(--bg-tertiary)]">
+            <div>
+              <h3 className="text-base font-bold text-[var(--text-primary)]">
+                {flavorModalProduct.name}
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                請選擇規格口味與數量
+              </p>
+            </div>
+            <button
+              onClick={() => setFlavorModalProduct(null)}
+              className="text-[var(--text-secondary)] hover:text-red-500 p-1.5 rounded-lg hover:bg-[var(--bg-hover)]"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+
+          <div className="p-4 space-y-4 max-h-[50vh] overflow-y-auto">
+            {flavorModalProduct.flavor_choices.map((flavor) => {
+              const count = tempFlavorQty[flavor] || 0;
+              return (
+                <div
+                  key={flavor}
+                  className="flex justify-between items-center py-1"
+                >
+                  <span className="font-semibold text-sm text-[var(--text-primary)]">
+                    {flavor}
+                  </span>
+                  <div className="flex items-center gap-1 bg-[var(--bg-primary)] rounded-lg p-0.5 border border-[var(--border-primary)] shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateTempFlavorQty(flavor, -1)}
+                      className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-100 active:scale-90"
+                    >
+                      <Minus size={12} />
+                    </button>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      min="0"
+                      max="99"
+                      value={count}
+                      onChange={(e) => handleSetTempFlavorQty(flavor, e.target.value)}
+                      onBlur={(e) => {
+                        if (e.target.value === "" || isNaN(parseInt(e.target.value, 10))) {
+                          handleSetTempFlavorQty(flavor, 0);
+                        }
+                      }}
+                      onFocus={(e) => e.target.select()}
+                      className="w-8 text-center font-bold font-mono text-sm bg-transparent border-0 p-0 focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateTempFlavorQty(flavor, 1)}
+                      className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-100 active:scale-90"
+                    >
+                      <Plus size={12} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* 總計與優惠提示 */}
+            <div className="bg-[var(--bg-tertiary)] p-3 rounded-xl border border-[var(--border-primary)] text-xs space-y-1 mt-2">
+              <div className="flex justify-between font-bold text-[var(--text-primary)]">
+                <span>本次已選總數：</span>
+                <span className="font-mono text-sm text-blue-600">
+                  {Object.values(tempFlavorQty).reduce((a, b) => a + b, 0)} 件
+                </span>
+              </div>
+              {flavorModalProduct.has_volume_pricing &&
+                flavorModalProduct.volume_pricing_settings && (() => {
+                  let s = flavorModalProduct.volume_pricing_settings;
+                  if (typeof s === 'string') {
+                    try { s = JSON.parse(s); } catch (e) {}
+                  }
+                  if (!s) return null;
+                  const tiers = Array.isArray(s.tiers) && s.tiers.length > 0
+                    ? s.tiers.filter(t => t.target_quantity && t.package_price)
+                    : (s.target_quantity ? [{ target_quantity: s.target_quantity, package_price: s.package_price }] : []);
+                  if (tiers.length === 0) return null;
+                  const tiersText = tiers.map(t => `任選 ${t.target_quantity} 入 $${t.package_price}`).join(' / ');
+                  return (
+                    <div className="text-red-500 font-semibold mt-1">
+                      ※ 本商品享組合價：{tiersText}（可口味混搭）
+                    </div>
+                  );
+                })()}
+            </div>
+          </div>
+
+          <div className="p-4 border-t border-[var(--border-primary)] flex gap-3 bg-[var(--bg-tertiary)]">
+            <button
+              onClick={() => setFlavorModalProduct(null)}
+              className="btn-secondary py-2.5 rounded-xl text-sm font-bold flex-1 transition-all duration-100 active:scale-95"
+            >
+              取消
+            </button>
+            <button
+              onClick={handleConfirmFlavors}
+              className="btn-primary py-2.5 rounded-xl text-sm font-bold flex-1 shadow-md shadow-blue-500/20 transition-all duration-100 active:scale-95"
+            >
+              確認加入
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ── 🎁 贈品選擇 Bottom Sheet 抽屜組件 ─────────────────────────────
   const renderGiftModal = () => {
     if (!showGiftModal) return null;
@@ -3476,6 +3605,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
           </button>
         </div>
         {renderGiftModal()}
+        {renderFlavorModal()}
       </div>
     );
   }
@@ -5512,131 +5642,7 @@ ${freeNote(newFee, newMin)}
       {renderGiftModal()}
 
       {/* 多規格口味選擇彈窗 */}
-      {flavorModalProduct && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-primary)] shadow-2xl w-full max-w-sm flex flex-col overflow-hidden glass-panel">
-            <div className="p-4 border-b border-[var(--border-primary)] flex justify-between items-center bg-[var(--bg-tertiary)]">
-              <div>
-                <h3 className="text-base font-bold text-[var(--text-primary)]">
-                  {flavorModalProduct.name}
-                </h3>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                  請選擇規格口味與數量
-                </p>
-              </div>
-              <button
-                onClick={() => setFlavorModalProduct(null)}
-                className="text-[var(--text-secondary)] hover:text-red-500 p-1.5 rounded-lg hover:bg-[var(--bg-hover)]"
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            </div>
-
-            <div className="p-4 space-y-4 max-h-[50vh] overflow-y-auto">
-              {flavorModalProduct.flavor_choices.map((flavor) => {
-                const count = tempFlavorQty[flavor] || 0;
-                return (
-                  <div
-                    key={flavor}
-                    className="flex justify-between items-center py-1"
-                  >
-                    <span className="font-semibold text-sm text-[var(--text-primary)]">
-                      {flavor}
-                    </span>
-                    <div className="flex items-center gap-1 bg-[var(--bg-primary)] rounded-lg p-0.5 border border-[var(--border-primary)] shadow-sm">
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateTempFlavorQty(flavor, -1)}
-                        className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-100 active:scale-90"
-                      >
-                        <Minus size={12} />
-                      </button>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        min="0"
-                        max="99"
-                        value={count}
-                        onChange={(e) => handleSetTempFlavorQty(flavor, e.target.value)}
-                        onBlur={(e) => {
-                          if (e.target.value === "" || isNaN(parseInt(e.target.value, 10))) {
-                            handleSetTempFlavorQty(flavor, 0);
-                          }
-                        }}
-                        onFocus={(e) => e.target.select()}
-                        className="w-8 text-center font-bold font-mono text-sm bg-transparent border-0 p-0 focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateTempFlavorQty(flavor, 1)}
-                        className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-100 active:scale-90"
-                      >
-                        <Plus size={12} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* 總計與優惠提示 */}
-              <div className="bg-[var(--bg-tertiary)] p-3 rounded-xl border border-[var(--border-primary)] text-xs space-y-1 mt-2">
-                <div className="flex justify-between font-bold text-[var(--text-primary)]">
-                  <span>本次已選總數：</span>
-                  <span className="font-mono text-sm text-blue-600">
-                    {Object.values(tempFlavorQty).reduce((a, b) => a + b, 0)} 件
-                  </span>
-                </div>
-                {flavorModalProduct.has_volume_pricing &&
-                  flavorModalProduct.volume_pricing_settings && (() => {
-                    let s = flavorModalProduct.volume_pricing_settings;
-                    if (typeof s === 'string') {
-                      try { s = JSON.parse(s); } catch (e) {}
-                    }
-                    if (!s) return null;
-                    const tiers = Array.isArray(s.tiers) && s.tiers.length > 0
-                      ? s.tiers.filter(t => t.target_quantity && t.package_price)
-                      : (s.target_quantity ? [{ target_quantity: s.target_quantity, package_price: s.package_price }] : []);
-                    if (tiers.length === 0) return null;
-                    const tiersText = tiers.map(t => `任選 ${t.target_quantity} 入 $${t.package_price}`).join(' / ');
-                    return (
-                      <div className="text-red-500 font-semibold mt-1">
-                        ※ 本商品享組合價：{tiersText}（可口味混搭）
-                      </div>
-                    );
-                  })()}
-              </div>
-            </div>
-
-            <div className="p-4 border-t border-[var(--border-primary)] flex gap-3 bg-[var(--bg-tertiary)]">
-              <button
-                onClick={() => setFlavorModalProduct(null)}
-                className="btn-secondary py-2.5 rounded-xl text-sm font-bold flex-1 transition-all duration-100 active:scale-95"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleConfirmFlavors}
-                className="btn-primary py-2.5 rounded-xl text-sm font-bold flex-1 shadow-md shadow-blue-500/20 transition-all duration-100 active:scale-95"
-              >
-                確認加入
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {renderFlavorModal()}
       {renderBottomNav()}
       
       {/* 自訂美化彈窗提示 */}
