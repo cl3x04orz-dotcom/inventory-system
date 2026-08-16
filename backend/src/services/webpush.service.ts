@@ -33,7 +33,7 @@ async function initVapidKeys() {
     }
 
     webpush.setVapidDetails(
-      'mailto:boss@inventory-system.internal',
+      'https://cl3x04orz-dotcom.github.io/inventory-system/',
       keys.publicKey,
       keys.privateKey
     );
@@ -45,7 +45,7 @@ async function initVapidKeys() {
     console.error('[WebPush] Error initializing VAPID keys:', err.message);
     const fallbackKeys = { publicKey: DEFAULT_VAPID_PUBLIC, privateKey: DEFAULT_VAPID_PRIVATE };
     try {
-      webpush.setVapidDetails('mailto:boss@inventory-system.internal', fallbackKeys.publicKey, fallbackKeys.privateKey);
+      webpush.setVapidDetails('https://cl3x04orz-dotcom.github.io/inventory-system/', fallbackKeys.publicKey, fallbackKeys.privateKey);
     } catch (e) {}
     currentPublicVapidKey = fallbackKeys.publicKey;
     vapidKeysLoaded = true;
