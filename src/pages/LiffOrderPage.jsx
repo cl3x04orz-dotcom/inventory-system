@@ -2314,24 +2314,20 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
       const finalTotal = useWallet ? Math.max(0, orderTotal - maxDeduction) : orderTotal;
       setSuccessOrderTotal(finalTotal);
 
-      // 自動背景發送明細：僅限一般散客，且在 1對1 官方聊天室 (utou) 中點開
-      const isGeneral = isGeneralUser || !selectedBuilding || selectedBuilding === "其它";
-      if (isGeneral && isLiffInitialized && window.liff && window.liff.isInClient()) {
-        const context = window.liff.getContext();
-        if (context && context.type === 'utou') {
-          try {
-            const text = `訂單已提交！\n【付款方式】${paymentMethod}\n【訂單編號】#${res.orderId || ""}\n【訂購姓名】${customerName}\n【合計金額】$${finalTotal}\n【轉帳後五碼】${transferLastFive || "無"}\n※ 詳細明細小幫手已在後台收到囉！`;
-            await window.liff.sendMessages([
-              {
-                type: "text",
-                text: text
-              }
-            ]);
-            setIsMsgSentAuto(true);
-            console.log("LIFF message sent automatically in 1-on-1 chat");
-          } catch (e) {
-            console.error("Failed to auto-send LIFF message:", e);
-          }
+      // 自動背景發送明細：只要在 LINE App 內點開 (包含 1對1 聊天室、圖文選單 Rich Menu 等)，下單成功即自動發送
+      if (isLiffInitialized && window.liff && window.liff.isInClient()) {
+        try {
+          const text = `訂單已提交！\n【付款方式】${paymentMethod}\n【訂單編號】#${res.orderId || ""}\n【訂購姓名】${customerName}\n【合計金額】$${finalTotal}\n【轉帳後五碼】${transferLastFive || "無"}\n※ 詳細明細小幫手已在後台收到囉！`;
+          await window.liff.sendMessages([
+            {
+              type: "text",
+              text: text
+            }
+          ]);
+          setIsMsgSentAuto(true);
+          console.log("LIFF message sent automatically in 1-on-1 chat");
+        } catch (e) {
+          console.error("Failed to auto-send LIFF message:", e);
         }
       }
 
