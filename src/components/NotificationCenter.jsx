@@ -375,36 +375,6 @@ export default function NotificationCenter({ user, apiUrl, setPage }) {
         </div>
       )}
 
-      {/* 🔊 BOSS 專屬：全時段離線背景推播啟用按鈕與測試通知 */}
-      <div className="fixed bottom-4 left-4 z-[9990] opacity-90 hover:opacity-100 transition-opacity flex flex-col gap-2">
-        <button
-          onClick={handleEnablePushNotification}
-          disabled={pushLoading}
-          className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-lg backdrop-blur-sm transition-all active:scale-95 border ${
-            pushSubscribed
-              ? "bg-emerald-950/90 text-emerald-300 border-emerald-500/50 hover:bg-emerald-900"
-              : "bg-amber-950/90 text-amber-300 border-amber-500/60 animate-bounce hover:bg-amber-900"
-          }`}
-          title="點擊解鎖並開啟全時段離線背景推播 (即使關閉網頁也能收到 OS 系統卡片與音效)"
-        >
-          <Bell size={13} className={pushSubscribed ? "" : "animate-spin"} />
-          <span>
-            {pushLoading
-              ? "設定中..."
-              : pushSubscribed
-              ? "✅ 已開啟全時段離線背景推播"
-              : "🔔 點我開啟關閉網頁背景推播"}
-          </span>
-        </button>
-        <button
-          onClick={handleTestNotification}
-          className="bg-slate-900/80 text-blue-400 hover:text-white border border-blue-500/30 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-lg backdrop-blur-sm transition-all active:scale-95"
-          title="點擊播放測試音效並解鎖瀏覽器聲音通知"
-        >
-          <Bell size={13} className="animate-bounce" />
-          <span>🔊 測試下單音效</span>
-        </button>
-      </div>
     </>
   );
 }

@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, UserPlus, Trash2, Save, RefreshCw, AlertTriangle, CheckSquare, KeyRound } from 'lucide-react';
+import { Shield, UserPlus, Trash2, Save, RefreshCw, AlertTriangle, CheckSquare, KeyRound, Bell, Volume2 } from 'lucide-react';
 import { callGAS } from '../utils/api';
+
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
 
 export default function PermissionControlPage({ user, apiUrl }) {
     const [users, setUsers] = useState([]);
@@ -11,6 +22,8 @@ export default function PermissionControlPage({ user, apiUrl }) {
     const [editingUser, setEditingUser] = useState(null); // The user currently being edited for permissions
     const [passwordModal, setPasswordModal] = useState(null); // { username } when changing password
     const [newPassword, setNewPassword] = useState('');
+    const [pushSubscribed, setPushSubscribed] = useState(false);
+    const [pushLoading, setPushLoading] = useState(false);
 
     const AVAILABLE_PERMISSIONS = [
         {
@@ -80,6 +93,93 @@ export default function PermissionControlPage({ user, apiUrl }) {
         }
     ];
 
+    const playChimeSound = () => {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx = new AudioCtx();
+            const playTone = (freq, startTime, duration) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, ctx.currentTime + startTime);
+                gain.gain.setValueAtTime(0, ctx.currentTime + startTime);
+                gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + startTime + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + duration);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(ctx.currentTime + startTime);
+                osc.stop(ctx.currentTime + startTime + duration);
+            };
+            playTone(880, 0, 0.3);
+            playTone(1320, 0.2, 0.5);
+        } catch (e) {
+            console.warn('Audio chime play error:', e);
+        }
+    };
+
+    const handleEnablePushNotificationInPage = async () => {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+            alert('您的瀏覽器不支援 Web Push 離線推播功能');
+            return;
+        }
+        setPushLoading(true);
+        try {
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') {
+                alert('請在瀏覽器設定中允許「通知」權限，才能啟用離線背景推播！');
+                setPushLoading(false);
+                return;
+            }
+            const swUrl = './sw.js';
+            const reg = await navigator.serviceWorker.register(swUrl);
+            await navigator.serviceWorker.ready;
+
+            const userToken = user?.token;
+            const keyRes = await callGAS(apiUrl, 'getWebPushPublicKey', {}, userToken);
+            if (!keyRes || !keyRes.success || !keyRes.publicKey) {
+                throw new Error('無法取得推播加密公鑰');
+            }
+
+            const subscription = await reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(keyRes.publicKey)
+            });
+
+            const subRes = await callGAS(apiUrl, 'subscribeWebPush', { subscription: subscription.toJSON() }, userToken);
+            if (!subRes || subRes.success === false) {
+                throw new Error(subRes?.message || '後端儲存離線推播訂閱失敗');
+            }
+
+            setPushSubscribed(true);
+            if (reg.showNotification) {
+                reg.showNotification('🎉 離線背景推播啟用成功！', {
+                    body: '這台設備已成功綁定！即使完全關閉 WEB 網頁，有人下單時也會跳出音效與通知卡片！',
+                    icon: `${import.meta.env.BASE_URL || '/'}logo.png`.replace(/\/+/g, '/'),
+                    vibrate: [200, 100, 200]
+                });
+            }
+            alert('🎉 離線背景推播已成功開啟！即使關閉網頁也能收到下單通知！');
+        } catch (err) {
+            console.error('[WebPush] Enable error:', err);
+            alert('離線推播綁定提示: ' + (err.message || '請確認通知權限已開啟'));
+        } finally {
+            setPushLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if ('serviceWorker' in navigator && 'PushManager' in window) {
+            navigator.serviceWorker.getRegistration('./sw.js').then(reg => {
+                if (reg) {
+                    reg.pushManager.getSubscription().then(sub => {
+                        if (sub) setPushSubscribed(true);
+                    });
+                }
+            });
+        }
+    }, []);
+
     const handleAddUser = async () => {
         if (!newUser.username || !newUser.password) {
             alert('請輸入帳號與密碼');
@@ -89,7 +189,6 @@ export default function PermissionControlPage({ user, apiUrl }) {
         setProcessMessage('資料存檔中 請稍候...');
         try {
             await callGAS(apiUrl, 'addUser', newUser, user.token);
-            // alert('新增成功');
             setNewUser({ username: '', password: '', role: 'VIEWER' });
             await fetchUsers();
             alert('新增成功');
@@ -110,6 +209,21 @@ export default function PermissionControlPage({ user, apiUrl }) {
             alert('刪除成功');
         } catch (error) {
             alert('刪除失敗: ' + error.message);
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const handleUpdateRole = async (targetUsername, newRole) => {
+        setProcessing(true);
+        setProcessMessage('更新使用者角色中 請稍候...');
+        try {
+            const res = await callGAS(apiUrl, 'updateUserRole', { username: targetUsername, role: newRole }, user.token);
+            if (res && res.error) throw new Error(res.error);
+            await fetchUsers();
+            alert(`使用者 ${targetUsername} 的權限角色已成功更新！`);
+        } catch (error) {
+            alert('角色更新失敗: ' + error.message);
         } finally {
             setProcessing(false);
         }
@@ -178,7 +292,6 @@ export default function PermissionControlPage({ user, apiUrl }) {
                 permissions: editingUser.permissions
             }, user.token);
 
-            // alert('權限更新成功');
             setEditingUser(null);
             await fetchUsers();
             alert('權限更新成功');
@@ -204,20 +317,37 @@ export default function PermissionControlPage({ user, apiUrl }) {
         if (!editingUser) return;
         const currentPerms = editingUser.permissions || [];
         const groupKeys = groupItems.map(item => item.key);
-        const allSelected = groupKeys.every(key => currentPerms.includes(key));
+        const isAllSelected = groupKeys.every(key => currentPerms.includes(key));
 
-        if (allSelected) {
-            // Deselect all in group
-            setEditingUser({ ...editingUser, permissions: currentPerms.filter(p => !groupKeys.includes(p)) });
+        if (isAllSelected) {
+            setEditingUser({
+                ...editingUser,
+                permissions: currentPerms.filter(p => !groupKeys.includes(p))
+            });
         } else {
-            // Select all in group
-            const otherPerms = currentPerms.filter(p => !groupKeys.includes(p));
-            setEditingUser({ ...editingUser, permissions: [...otherPerms, ...groupKeys] });
+            const newPerms = new Set([...currentPerms, ...groupKeys]);
+            setEditingUser({
+                ...editingUser,
+                permissions: Array.from(newPerms)
+            });
+        }
+    };
+
+    const toggleSelectAll = () => {
+        if (!editingUser) return;
+        const allKeys = AVAILABLE_PERMISSIONS.flatMap(g => g.items.map(i => i.key));
+        const currentPerms = editingUser.permissions || [];
+        const isAllSelected = allKeys.length > 0 && allKeys.every(k => currentPerms.includes(k));
+
+        if (isAllSelected) {
+            setEditingUser({ ...editingUser, permissions: [] });
+        } else {
+            setEditingUser({ ...editingUser, permissions: allKeys });
         }
     };
 
     return (
-        <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6 flex flex-col h-[calc(100vh-6rem)]">
+        <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6 pb-20">
             {/* Global Processing Overlay */}
             {processing && (
                 <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-[60] flex items-center justify-center animate-in fade-in duration-200">
@@ -251,6 +381,41 @@ export default function PermissionControlPage({ user, apiUrl }) {
                     )}
                     <button onClick={fetchUsers} className="btn-secondary p-2 rounded-xl">
                         <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                    </button>
+                </div>
+            </div>
+
+            {/* 🔔 離線推播與下單音效設定面板 */}
+            <div className="glass-panel p-4 md:p-6 border-l-4 border-l-blue-500 shrink-0 space-y-3">
+                <h3 className="font-bold text-base md:text-lg flex items-center gap-2 text-[var(--text-primary)]">
+                    <Bell size={18} className="text-blue-500" /> 離線推播與下單音效設定
+                </h3>
+                <p className="text-xs text-[var(--text-tertiary)]">管理此設備的全時段離線背景通知權限與測試下單響聲音效</p>
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                    <button
+                        onClick={handleEnablePushNotificationInPage}
+                        disabled={pushLoading}
+                        className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition-all active:scale-95 border ${
+                            pushSubscribed
+                                ? "bg-emerald-950/90 text-emerald-300 border-emerald-500/50 hover:bg-emerald-900"
+                                : "bg-amber-950/90 text-amber-300 border-amber-500/60 animate-bounce hover:bg-amber-900"
+                        }`}
+                    >
+                        <Bell size={15} className={pushSubscribed ? "" : "animate-spin"} />
+                        <span>
+                            {pushLoading
+                                ? "設定中..."
+                                : pushSubscribed
+                                ? "✅ 已開啟全時段離線背景推播"
+                                : "🔔 點我開啟離線背景推播"}
+                        </span>
+                    </button>
+                    <button
+                        onClick={playChimeSound}
+                        className="px-4 py-2.5 bg-slate-900/80 text-blue-400 hover:text-white border border-blue-500/40 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition-all active:scale-95"
+                    >
+                        <Volume2 size={15} className="animate-bounce" />
+                        <span>🔊 測試下單音效</span>
                     </button>
                 </div>
             </div>
@@ -302,7 +467,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
                         <label className="text-xs text-[var(--text-secondary)] uppercase font-bold px-1">權限角色 (Role)</label>
                         <select
                             id="input-new-role"
-                            className="input-field w-full"
+                            className="input-field w-full cursor-pointer"
                             value={newUser.role}
                             onChange={e => setNewUser({ ...newUser, role: e.target.value })}
                             onKeyDown={(e) => {
@@ -315,6 +480,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                 }
                             }}
                         >
+                            <option value="SUPER_ADMIN">超級管理員 (SUPER_ADMIN)</option>
                             <option value="BOSS">老闆 (BOSS)</option>
                             <option value="ADMIN">管理員 (ADMIN)</option>
                             <option value="EMPLOYEE">員工 (EMPLOYEE)</option>
@@ -339,14 +505,14 @@ export default function PermissionControlPage({ user, apiUrl }) {
             </div>
 
             {/* User List */}
-            <div className="glass-panel p-0 overflow-hidden flex-1 flex flex-col">
-                <div className="overflow-y-auto flex-1">
+            <div className="glass-panel p-0 overflow-hidden min-h-[350px]">
+                <div className="overflow-x-auto">
                     {/* Desktop Table View */}
                     <table className="hidden md:table w-full text-left text-sm">
                         <thead className="bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-xs uppercase sticky top-0 z-10">
                             <tr>
                                 <th className="p-4">帳號 (Username)</th>
-                                <th className="p-4">角色 (Role)</th>
+                                <th className="p-4">角色 (Role - 點擊切換)</th>
                                 <th className="p-4 text-center">狀態 (Status)</th>
                                 <th className="p-4 text-center">操作</th>
                             </tr>
@@ -357,14 +523,29 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                     <tr key={idx} className="hover:bg-[var(--bg-secondary)] transition-colors">
                                         <td className="p-4 text-[var(--text-primary)] font-bold">{u.username}</td>
                                         <td className="p-4">
-                                            <span className={`px-2 py-1 rounded text-xs font-bold border ${u.role === 'BOSS' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                                                u.role === 'ADMIN' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' :
-                                                    u.role === 'EMPLOYEE' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
-                                                        u.role === 'VIEWER' ? 'bg-slate-500/10 text-[var(--text-secondary)] border-slate-500/20' :
-                                                            'bg-slate-500/10 text-[var(--text-secondary)] border-slate-500/20'
-                                                }`}>
-                                                {u.role}
-                                            </span>
+                                            {u.username === 'admin' ? (
+                                                <span className="px-2.5 py-1 rounded text-xs font-bold border bg-purple-950/30 text-purple-400 border-purple-500/40">
+                                                    超級管理員 (SUPER_ADMIN)
+                                                </span>
+                                            ) : (
+                                                <select
+                                                    value={u.role || 'VIEWER'}
+                                                    onChange={(e) => handleUpdateRole(u.username, e.target.value)}
+                                                    className={`px-2 py-1 rounded text-xs font-bold border bg-transparent cursor-pointer transition-colors ${
+                                                        u.role === 'SUPER_ADMIN' ? 'text-purple-400 border-purple-500/40 bg-purple-950/30' :
+                                                        u.role === 'BOSS' ? 'text-amber-400 border-amber-500/40 bg-amber-950/30' :
+                                                        u.role === 'ADMIN' ? 'text-rose-400 border-rose-500/40 bg-rose-950/30' :
+                                                        u.role === 'EMPLOYEE' ? 'text-blue-400 border-blue-500/40 bg-blue-950/30' :
+                                                        'text-slate-400 border-slate-500/40 bg-slate-950/30'
+                                                    }`}
+                                                >
+                                                    <option value="SUPER_ADMIN" className="bg-[var(--bg-primary)] text-purple-400">超級管理員 (SUPER_ADMIN)</option>
+                                                    <option value="BOSS" className="bg-[var(--bg-primary)] text-amber-400">老闆 (BOSS)</option>
+                                                    <option value="ADMIN" className="bg-[var(--bg-primary)] text-rose-400">管理員 (ADMIN)</option>
+                                                    <option value="EMPLOYEE" className="bg-[var(--bg-primary)] text-blue-400">員工 (EMPLOYEE)</option>
+                                                    <option value="VIEWER" className="bg-[var(--bg-primary)] text-slate-400">檢視者 (VIEWER)</option>
+                                                </select>
+                                            )}
                                         </td>
                                         <td className="p-4 text-center">
                                             {u.status === 'ACTIVE' ? (
@@ -443,28 +624,19 @@ export default function PermissionControlPage({ user, apiUrl }) {
                     <div className="md:hidden divide-y divide-[var(--border-primary)]">
                         {users.length > 0 ? (
                             users.map((u, idx) => (
-                                <div key={idx} className="p-6 bg-[var(--bg-primary)] hover:bg-[var(--bg-secondary)] transition-colors border-b border-[var(--border-primary)] last:border-0 shadow-sm">
+                                <div key={idx} className="p-6 bg-[var(--bg-primary)] hover:bg-[var(--bg-secondary)] transition-colors border-b border-[var(--border-primary)] last:border-0 shadow-sm space-y-3">
                                     <div className="flex justify-between items-center">
-                                        <div className="space-y-2">
+                                        <div className="space-y-1">
                                             <div className="text-lg font-extrabold text-[var(--text-primary)] leading-tight">{u.username}</div>
-                                            <div className="flex items-center gap-3">
-                                                <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold border ${u.role === 'BOSS' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                                                    u.role === 'ADMIN' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' :
-                                                        u.role === 'EMPLOYEE' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
-                                                            'bg-slate-500/10 text-[var(--text-secondary)] border-slate-500/20'
-                                                    }`}>
-                                                    {u.role}
+                                            {u.status === 'ACTIVE' ? (
+                                                <span className="flex items-center gap-1.5 text-emerald-500 font-bold text-[11px]">
+                                                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span> ACTIVE
                                                 </span>
-                                                {u.status === 'ACTIVE' ? (
-                                                    <span className="flex items-center gap-1.5 text-emerald-500 font-bold text-[11px]">
-                                                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span> ACTIVE
-                                                    </span>
-                                                ) : (
-                                                    <span className="flex items-center gap-1.5 text-[var(--text-tertiary)] font-bold text-[11px]">
-                                                        <span className="w-2 h-2 rounded-full bg-slate-300"></span> {u.status || 'OFF'}
-                                                    </span>
-                                                )}
-                                            </div>
+                                            ) : (
+                                                <span className="flex items-center gap-1.5 text-[var(--text-tertiary)] font-bold text-[11px]">
+                                                    <span className="w-2 h-2 rounded-full bg-slate-300"></span> {u.status || 'OFF'}
+                                                </span>
+                                            )}
                                         </div>
 
                                         {u.username !== 'admin' && (
@@ -481,6 +653,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                                             'system': ['system_config'],
                                                             'inventory_history': ['inventory_adjust_history', 'inventory_stocktake_history']
                                                         };
+
                                                         Object.keys(legacyMap).forEach(legacyKey => {
                                                             if (currentPerms.includes(legacyKey)) {
                                                                 currentPerms = currentPerms.filter(p => p !== legacyKey);
@@ -489,26 +662,55 @@ export default function PermissionControlPage({ user, apiUrl }) {
                                                                 });
                                                             }
                                                         });
+
                                                         setEditingUser({ username: u.username, permissions: currentPerms });
                                                     }}
-                                                    className="w-12 h-12 flex items-center justify-center text-[var(--accent-blue)] bg-[var(--bg-secondary)] rounded-xl active:scale-90 transition-transform shadow-sm"
+                                                    className="p-2 text-[var(--text-tertiary)] hover:text-[var(--accent-blue)] transition-colors"
+                                                    title="設定權限"
                                                 >
-                                                    <Shield size={22} />
+                                                    <Shield size={18} />
                                                 </button>
                                                 <button
                                                     onClick={() => { setPasswordModal({ username: u.username }); setNewPassword(''); }}
-                                                    className="w-12 h-12 flex items-center justify-center text-amber-400 bg-[var(--bg-secondary)] rounded-xl active:scale-90 transition-transform shadow-sm"
+                                                    className="p-2 text-[var(--text-tertiary)] hover:text-amber-400 transition-colors"
                                                     title="更改密碼"
                                                 >
-                                                    <KeyRound size={22} />
+                                                    <KeyRound size={18} />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDeleteUser(u.username)}
-                                                    className="w-12 h-12 flex items-center justify-center text-rose-500 bg-[var(--bg-secondary)] rounded-xl active:scale-90 transition-transform shadow-sm"
+                                                    className="p-2 text-[var(--text-tertiary)] hover:text-rose-400 transition-colors"
+                                                    title="刪除"
                                                 >
-                                                    <Trash2 size={22} />
+                                                    <Trash2 size={18} />
                                                 </button>
                                             </div>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-[var(--text-secondary)] font-bold">角色：</span>
+                                        {u.username === 'admin' ? (
+                                            <span className="px-2.5 py-0.5 rounded text-[11px] font-bold border bg-purple-950/30 text-purple-400 border-purple-500/40">
+                                                超級管理員 (SUPER_ADMIN)
+                                            </span>
+                                        ) : (
+                                            <select
+                                                value={u.role || 'VIEWER'}
+                                                onChange={(e) => handleUpdateRole(u.username, e.target.value)}
+                                                className={`px-2 py-1 rounded text-xs font-bold border bg-transparent cursor-pointer transition-colors ${
+                                                    u.role === 'SUPER_ADMIN' ? 'text-purple-400 border-purple-500/40 bg-purple-950/30' :
+                                                    u.role === 'BOSS' ? 'text-amber-400 border-amber-500/40 bg-amber-950/30' :
+                                                    u.role === 'ADMIN' ? 'text-rose-400 border-rose-500/40 bg-rose-950/30' :
+                                                    u.role === 'EMPLOYEE' ? 'text-blue-400 border-blue-500/40 bg-blue-950/30' :
+                                                    'text-slate-400 border-slate-500/40 bg-slate-950/30'
+                                                }`}
+                                            >
+                                                <option value="SUPER_ADMIN" className="bg-[var(--bg-primary)] text-purple-400">超級管理員 (SUPER_ADMIN)</option>
+                                                <option value="BOSS" className="bg-[var(--bg-primary)] text-amber-400">老闆 (BOSS)</option>
+                                                <option value="ADMIN" className="bg-[var(--bg-primary)] text-rose-400">管理員 (ADMIN)</option>
+                                                <option value="EMPLOYEE" className="bg-[var(--bg-primary)] text-blue-400">員工 (EMPLOYEE)</option>
+                                                <option value="VIEWER" className="bg-[var(--bg-primary)] text-slate-400">檢視者 (VIEWER)</option>
+                                            </select>
                                         )}
                                     </div>
                                 </div>
@@ -522,101 +724,79 @@ export default function PermissionControlPage({ user, apiUrl }) {
                 </div>
             </div>
 
-            {/* Permission Editor Modal */}
+            {/* Permission Edit Modal */}
             {editingUser && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
-                        <div className="p-6 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
-                            <h3 className="text-xl font-bold text-[var(--text-primary)] flex items-center gap-2">
-                                <Shield className="text-[var(--accent-blue)]" /> 設定權限 ({editingUser.username})
-                            </h3>
-                            <p className="text-[var(--text-secondary)] text-sm mt-1">勾選該使用者可存取的功能模組 (BOSS 擁有預設全權限)</p>
+                    <div className="bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl animate-in zoom-in-95 duration-150">
+                        <div className="p-4 md:p-6 border-b border-[var(--border-primary)] flex justify-between items-center">
+                            <div>
+                                <h3 className="font-bold text-lg text-[var(--text-primary)]">設定使用者細部權限</h3>
+                                <p className="text-xs text-[var(--text-secondary)]">帳號: <span className="font-bold text-[var(--accent-blue)]">{editingUser.username}</span></p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={toggleSelectAll}
+                                    className="px-3 py-1.5 bg-[var(--bg-secondary)] hover:bg-[var(--border-primary)] text-[var(--text-primary)] rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors"
+                                >
+                                    <CheckSquare size={14} />
+                                    {AVAILABLE_PERMISSIONS.flatMap(g => g.items.map(i => i.key)).every(k => (editingUser.permissions || []).includes(k))
+                                        ? '取消全選'
+                                        : '一鍵全選'}
+                                </button>
+                                <button
+                                    onClick={() => setEditingUser(null)}
+                                    className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1"
+                                >
+                                    ✕
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="p-6 space-y-6 max-h-[65vh] overflow-y-auto custom-scrollbar">
-                            {AVAILABLE_PERMISSIONS.map(group => {
+                        <div className="p-4 md:p-6 overflow-y-auto flex-1 space-y-6">
+                            {AVAILABLE_PERMISSIONS.map((group, gIdx) => {
                                 const groupKeys = group.items.map(i => i.key);
-                                const isGroupAllSelected = groupKeys.every(k => editingUser.permissions?.includes(k));
-                                const isGroupSomeSelected = groupKeys.some(k => editingUser.permissions?.includes(k)) && !isGroupAllSelected;
+                                const currentPerms = editingUser.permissions || [];
+                                const isGroupAllSelected = groupKeys.every(k => currentPerms.includes(k));
+                                const isGroupSomeSelected = groupKeys.some(k => currentPerms.includes(k)) && !isGroupAllSelected;
 
                                 return (
-                                    <div key={group.group} className="space-y-3">
-                                        <div
-                                            className="flex items-center justify-between px-1 cursor-pointer group/title"
-                                            onClick={() => toggleGroup(group.items)}
-                                        >
-                                            <h4 className="text-xs font-bold text-[var(--text-tertiary)] uppercase tracking-widest flex items-center gap-2 group-hover/title:text-[var(--accent-blue)] transition-colors">
+                                    <div key={gIdx} className="space-y-3 bg-[var(--bg-secondary)]/30 p-4 rounded-xl border border-[var(--border-primary)]/50">
+                                        <div className="flex justify-between items-center border-b border-[var(--border-primary)]/50 pb-2">
+                                            <h4 className="font-bold text-sm text-[var(--accent-blue)] flex items-center gap-2">
                                                 {group.group}
                                             </h4>
-                                            <span className="text-[10px] text-[var(--accent-blue)] font-bold opacity-0 group-hover/title:opacity-100 transition-opacity">
-                                                {isGroupAllSelected ? '取消全選' : '全選'}
-                                            </span>
+                                            <button
+                                                onClick={() => toggleGroup(group.items)}
+                                                className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium flex items-center gap-1"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isGroupAllSelected}
+                                                    ref={el => { if (el) el.indeterminate = isGroupSomeSelected; }}
+                                                    onChange={() => { }}
+                                                    className="rounded border-[var(--border-primary)] cursor-pointer"
+                                                />
+                                                {isGroupAllSelected ? '取消本組' : '全選本組'}
+                                            </button>
                                         </div>
-
-                                        <div className="grid grid-cols-1 gap-2">
-                                            {group.items.map((perm, pIdx) => {
-                                                const uniqueId = `perm-item-${perm.key}`;
-
-                                                const handleKeyDown = (e) => {
-                                                    const validKeys = ['Enter', ' ', 'ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft'];
-                                                    if (!validKeys.includes(e.key)) return;
-                                                    e.preventDefault();
-
-                                                    // Flatten all permission keys to find next/prev
-                                                    const allKeys = [];
-                                                    AVAILABLE_PERMISSIONS.forEach(g => {
-                                                        g.items.forEach(i => allKeys.push(i.key));
-                                                    });
-
-                                                    const currentIndex = allKeys.indexOf(perm.key);
-
-                                                    if (e.key === 'Enter' || e.key === ' ') {
-                                                        togglePermission(perm.key);
-                                                        // Move to next after toggle
-                                                        if (currentIndex < allKeys.length - 1) {
-                                                            const nextKey = allKeys[currentIndex + 1];
-                                                            document.getElementById(`perm-item-${nextKey}`)?.focus();
-                                                        }
-                                                    } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-                                                        if (currentIndex < allKeys.length - 1) {
-                                                            const nextKey = allKeys[currentIndex + 1];
-                                                            document.getElementById(`perm-item-${nextKey}`)?.focus();
-                                                        }
-                                                    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-                                                        if (currentIndex > 0) {
-                                                            const prevKey = allKeys[currentIndex - 1];
-                                                            document.getElementById(`perm-item-${prevKey}`)?.focus();
-                                                        }
-                                                    }
-                                                };
-
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            {group.items.map((item, iIdx) => {
+                                                const isChecked = currentPerms.includes(item.key);
                                                 return (
                                                     <label
-                                                        key={perm.key}
-                                                        id={uniqueId}
-                                                        tabIndex="0"
-                                                        onKeyDown={handleKeyDown}
-                                                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group outline-none ring-offset-2 focus:ring-2 focus:ring-[var(--accent-blue)]/50 ${editingUser.permissions?.includes(perm.key)
-                                                            ? 'bg-[var(--bg-secondary)] border-[var(--border-primary)] shadow-sm'
-                                                            : 'bg-[var(--bg-secondary)] border-[var(--border-primary)] hover:bg-[var(--bg-hover)]'
+                                                        key={iIdx}
+                                                        className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer select-none ${isChecked
+                                                            ? 'bg-[var(--accent-blue)]/10 border-[var(--accent-blue)]/40 text-[var(--text-primary)] font-bold'
+                                                            : 'bg-[var(--bg-primary)] border-[var(--border-primary)] text-[var(--text-secondary)] hover:border-[var(--text-tertiary)]'
                                                             }`}
                                                     >
-                                                        <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${editingUser.permissions?.includes(perm.key)
-                                                            ? 'bg-[var(--accent-blue)] border-[var(--accent-blue)] text-white scale-110'
-                                                            : 'bg-[var(--bg-primary)] border-[var(--border-primary)] group-hover:border-[var(--accent-blue)]/50'
-                                                            }`}>
-                                                            {editingUser.permissions?.includes(perm.key) && <CheckSquare size={12} fill="currentColor" />}
-                                                        </div>
                                                         <input
                                                             type="checkbox"
-                                                            className="hidden"
-                                                            checked={editingUser.permissions?.includes(perm.key)}
-                                                            onChange={() => togglePermission(perm.key)}
+                                                            checked={isChecked}
+                                                            onChange={() => togglePermission(item.key)}
+                                                            className="rounded border-[var(--border-primary)] text-[var(--accent-blue)] focus:ring-[var(--accent-blue)]"
                                                         />
-                                                        <span className={`text-sm transition-colors ${editingUser.permissions?.includes(perm.key) ? 'text-[var(--text-primary)] font-bold' : 'text-[var(--text-secondary)]'
-                                                            }`}>
-                                                            {perm.label}
-                                                        </span>
+                                                        <span className="text-xs">{item.label}</span>
                                                     </label>
                                                 );
                                             })}
@@ -626,65 +806,59 @@ export default function PermissionControlPage({ user, apiUrl }) {
                             })}
                         </div>
 
-                        <div className="p-6 border-t border-[var(--border-primary)] flex justify-end gap-3 bg-[var(--bg-secondary)]">
+                        <div className="p-4 md:p-6 border-t border-[var(--border-primary)] flex justify-end gap-3 bg-[var(--bg-secondary)]/20 rounded-b-2xl">
                             <button
                                 onClick={() => setEditingUser(null)}
-                                className="px-4 py-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/5 transition-colors"
+                                className="btn-secondary"
                             >
                                 取消
                             </button>
                             <button
                                 onClick={handleSavePermissions}
-                                className="btn-primary px-6 py-2"
+                                className="btn-primary flex items-center gap-2"
                             >
-                                儲存設定
+                                <Save size={16} /> 儲存變更
                             </button>
                         </div>
                     </div>
                 </div>
             )}
+
             {/* Password Change Modal */}
             {passwordModal && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
-                        <div className="p-6 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
-                            <h3 className="text-xl font-bold text-[var(--text-primary)] flex items-center gap-2">
-                                <KeyRound className="text-amber-400" /> 更改密碼
-                            </h3>
-                            <p className="text-[var(--text-secondary)] text-sm mt-1">為 <span className="font-bold text-[var(--text-primary)]">{passwordModal.username}</span> 設定新密碼</p>
+                    <div className="bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-2xl max-w-md w-full p-6 shadow-2xl animate-in zoom-in-95 duration-150 space-y-4">
+                        <h3 className="font-bold text-lg text-[var(--text-primary)]">更改密碼</h3>
+                        <p className="text-xs text-[var(--text-secondary)]">使用者: <span className="font-bold text-amber-500">{passwordModal.username}</span></p>
+
+                        <div className="space-y-1">
+                            <label className="text-xs text-[var(--text-secondary)] font-bold">新密碼</label>
+                            <input
+                                type="password"
+                                className="input-field w-full"
+                                value={newPassword}
+                                onChange={e => setNewPassword(e.target.value)}
+                                placeholder="輸入新密碼"
+                            />
                         </div>
-                        <div className="p-6 space-y-4">
-                            <div className="space-y-1">
-                                <label className="text-xs text-[var(--text-secondary)] uppercase font-bold px-1">新密碼</label>
-                                <input
-                                    id="input-new-pwd"
-                                    type="password"
-                                    className="input-field w-full"
-                                    value={newPassword}
-                                    onChange={e => setNewPassword(e.target.value)}
-                                    onKeyDown={e => { if (e.key === 'Enter') handleChangePassword(); }}
-                                    placeholder="輸入新密碼"
-                                    autoFocus
-                                />
-                            </div>
-                        </div>
-                        <div className="p-6 border-t border-[var(--border-primary)] flex justify-end gap-3 bg-[var(--bg-secondary)]">
+
+                        <div className="flex justify-end gap-3 pt-2">
                             <button
-                                onClick={() => { setPasswordModal(null); setNewPassword(''); }}
-                                className="px-4 py-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/5 transition-colors"
+                                onClick={() => setPasswordModal(null)}
+                                className="btn-secondary"
                             >
                                 取消
                             </button>
                             <button
                                 onClick={handleChangePassword}
-                                className="btn-primary px-6 py-2"
+                                className="btn-primary"
                             >
-                                儲存
+                                確定修改
                             </button>
                         </div>
                     </div>
                 </div>
             )}
-        </div >
+        </div>
     );
 }

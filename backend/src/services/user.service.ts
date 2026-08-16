@@ -161,6 +161,20 @@ export const UserService = {
     return { success: true };
   },
 
+  async updateUserRole(payload: any) {
+    const { username, role } = payload;
+    if (!username || !role) return { error: 'Missing parameters' };
+
+    await prisma.user.update({
+      where: { username: String(username).trim() },
+      data: {
+        role: String(role).trim().toUpperCase()
+      }
+    });
+
+    return { success: true };
+  },
+
   async updateUserStatus(payload: any) {
     const { username, status } = payload;
     if (!username || !status) return { error: 'Missing parameters' };

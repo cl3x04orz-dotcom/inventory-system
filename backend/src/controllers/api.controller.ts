@@ -53,6 +53,8 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       return UserService.deleteUser(payload);
     case 'updateUserPermissions':
       return UserService.updateUserPermissions(payload);
+    case 'updateUserRole':
+      return UserService.updateUserRole(payload);
     case 'updateUserStatus':
       return UserService.updateUserStatus(payload);
     case 'updateUserPassword':
