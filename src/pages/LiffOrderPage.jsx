@@ -325,7 +325,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                 alert('購物車是空的');
                 return;
             }
-            handleProceedToForm();
+            setStep("confirm");
         }} className={`flex flex-col items-center justify-center flex-1 h-full relative ${step === 'form' || step === 'confirm' ? 'text-blue-600' : 'text-[var(--text-tertiary)]'}`}>
           <div className="relative">
             <ShoppingCart size={22} />
@@ -5471,16 +5471,19 @@ ${freeNote(newFee, newMin)}
 
               {/* 購物車核心按鈕列 */}
               <div className="px-4 py-3 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="relative bg-blue-100 text-blue-600 p-2.5 rounded-full">
+                <div 
+                  onClick={() => setStep("confirm")}
+                  className="flex items-center gap-3 cursor-pointer select-none group"
+                >
+                  <div className="relative bg-blue-100 text-blue-600 p-2.5 rounded-full group-hover:scale-105 transition-transform">
                     <ShoppingCart size={20} />
                     <span className="absolute -top-1 -right-1.5 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold border-2 border-white">
                       {totalQty}
                     </span>
                   </div>
                   <div>
-                    <div className="text-[10px] text-[var(--text-secondary)] font-semibold">
-                      已選 {totalQty} 件
+                    <div className="text-[10px] text-[var(--text-secondary)] font-semibold flex items-center gap-1">
+                      已選 {totalQty} 件 <span className="text-blue-500 font-bold">查看購物車</span>
                     </div>
                     <div className="text-2xl font-black text-blue-600 font-mono">
                       ${cartTotal}
