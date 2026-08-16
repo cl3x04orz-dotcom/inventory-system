@@ -2247,7 +2247,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                 if (validEntries.length > 0 || Object.keys(mGifts).length > 0) {
                   details[name] = validEntries.map(([pid, qty]) => {
                     const prod = products.find(p => p.id === pid);
-                    const sub = prod ? calcProductSubtotal(prod, qty) : 0;
+                    const sub = prod ? calculateProductSubtotal(prod, qty) : 0;
                     const price = qty > 0 ? Math.round(sub / qty) : (prod ? (Number(prod.single_price) || Number(prod.price)) : 0);
                     const rem = prod?.has_flavor_attributes ? getFlavorRemark(pid, {}, { [name]: groupFlavorSelections[name] }, true) : "";
                     return {
@@ -2483,7 +2483,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         let recipientSubtotal = 0;
         validItems.forEach(([productId, qty]) => {
           const product = products.find((p) => p.id === productId);
-          const subtotal = product ? calcProductSubtotal(product, qty) : 0;
+          const subtotal = product ? calculateProductSubtotal(product, qty) : 0;
           const rem = product?.has_flavor_attributes ? getFlavorRemark(productId, {}, { [name]: groupFlavorSelections[name] }, true) : "";
           const remDisplay = rem ? ` ${rem}` : "";
 
