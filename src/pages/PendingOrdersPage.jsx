@@ -1245,10 +1245,15 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         const idStr = String(item.productId || '').toLowerCase().trim();
         const remarkStr = String(item.remark || '').toLowerCase().trim();
 
+        // 徹底清除半形/全形/中括號內容與殘留括號，精確還原基礎商品名稱
         const getBaseProductName = (fullName) => {
             if (!fullName) return '';
             return String(fullName)
-                .replace(/[\(\（\[【].*?[\)\］】\)]/g, '')
+                .replace(/\s*\([\s\S]*?\)/g, '')   // 移除半形括號內容 ( ... )
+                .replace(/\s*（[\s\S]*?）/g, '')   // 移除全形括號內容 （ ... ）
+                .replace(/\s*【[\s\S]*?】/g, '')   // 移除中括號內容 【 ... 】
+                .replace(/\s*\[[\s\S]*?\]/g, '')   // 移除方括號內容 [ ... ]
+                .replace(/[\(\（\[【\)\］】\]]/g, '') // 徹底掃除殘留括號
                 .trim();
         };
         const baseNameStr = getBaseProductName(nameStr).toLowerCase().trim();
@@ -1438,9 +1443,11 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         const processItem = (item) => {
             if (!item || !item.productName) return;
             const cleanBase = String(item.productName)
-                .replace(/\s*\(\s*【?口味備註：.*$/gi, '')
-                .replace(/\s*【口味備註：.*$/gi, '')
-                .replace(/[\(\（\[【].*?[\)\］】\)]/g, '')
+                .replace(/\s*\([\s\S]*?\)/g, '')
+                .replace(/\s*（[\s\S]*?）/g, '')
+                .replace(/\s*【[\s\S]*?】/g, '')
+                .replace(/\s*\[[\s\S]*?\]/g, '')
+                .replace(/[\(\（\[【\)\］】\]]/g, '')
                 .trim();
 
             if (!cleanBase) return;
