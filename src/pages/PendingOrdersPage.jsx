@@ -1245,14 +1245,16 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         const idStr = String(item.productId || '').toLowerCase().trim();
         const remarkStr = String(item.remark || '').toLowerCase().trim();
 
-        // 徹底清除半形/全形/中括號內容與殘留括號，精確還原基礎商品名稱
+        // 徹底清除半形/全形/中括號內容、逗號號贅字、數量標記 (x1, x2, *1) 與殘留括號，精確還原基礎商品名稱
         const getBaseProductName = (fullName) => {
             if (!fullName) return '';
             return String(fullName)
+                .split(/[,，]/)[0]                  // 遇到逗號直接截取前半段主品名 (如 "植物優格, 橘瓣蘆薈" -> "植物優格")
                 .replace(/\s*\([\s\S]*?\)/g, '')   // 移除半形括號內容 ( ... )
                 .replace(/\s*（[\s\S]*?）/g, '')   // 移除全形括號內容 （ ... ）
                 .replace(/\s*【[\s\S]*?】/g, '')   // 移除中括號內容 【 ... 】
                 .replace(/\s*\[[\s\S]*?\]/g, '')   // 移除方括號內容 [ ... ]
+                .replace(/[xX*×]\s*\d+/g, '')       // 移除 x1, x2 數量標記
                 .replace(/[\(\（\[【\)\］】\]]/g, '') // 徹底掃除殘留括號
                 .trim();
         };
@@ -1260,9 +1262,25 @@ export default function PendingOrdersPage({ user, apiUrl }) {
 
         const keywords = searchTerm.toLowerCase().trim().split(/\s+/).filter(Boolean);
 
+        // 智慧主品項邊界比對：判斷名稱是否等於 kw，或者以 kw 開頭且後續接非文字分隔符 (如空格、連字號、斜線、括號)
+        const isExactProductSeriesMatch = (str, kw) => {
+            if (!str || !kw) return false;
+            if (str === kw) return true;
+            if (str.startsWith(kw)) {
+                const nextChar = str.slice(kw.length, kw.length + 1);
+                // 若後續字元為空或標點符號/空格，即為同系列品項 (如 "禾香優格飲-藍莓" 比對 "禾香優格飲")
+                // 但若後續字元為中文字 (如 "禾香優格飲" 比對 "禾香優格")，則回傳 false 避免跨品項混淆
+                return !nextChar || /[\s\-_/\(\（\[【\)\］】\]:\：,，]/.test(nextChar);
+            }
+            return false;
+        };
+
         const matchesAllKeywords = keywords.every(kw => {
             if (isExact) {
-                return nameStr === kw || idStr === kw || baseNameStr === kw || remarkStr.includes(kw);
+                return isExactProductSeriesMatch(nameStr, kw) ||
+                       isExactProductSeriesMatch(baseNameStr, kw) ||
+                       idStr === kw ||
+                       remarkStr.includes(kw);
             }
             return nameStr.includes(kw) || idStr.includes(kw) || remarkStr.includes(kw);
         });
@@ -1435,34 +1453,64 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         });
     }, [filteredOrders, normalizeOrder]);
 
-    // 組合 [主商品名稱] + [空格] + [口味] 下拉選單 (例如 "禾香優格飲", "禾香優格飲 藍莓", "禾香優格飲 芒果")
+    // 組合 [主商品名稱] + [空格] + [口味] 下拉選單 (例如 "植物優格", "植物優格 草莓", "植物優格 橘子")
     const uniqueProductNames = React.useMemo(() => {
         if (!orders || orders.length === 0) return [];
         const namesSet = new Set();
 
         const processItem = (item) => {
             if (!item || !item.productName) return;
-            const cleanBase = String(item.productName)
+            const rawName = String(item.productName);
+
+            // 1. 強效過濾並截取主商品名稱 (絕不包含 "口味備註"、":"、"："、逗號、括號與 x1)
+            const cleanBase = rawName
+                .split(/[,，:\：]/)[0]
                 .replace(/\s*\([\s\S]*?\)/g, '')
                 .replace(/\s*（[\s\S]*?）/g, '')
                 .replace(/\s*【[\s\S]*?】/g, '')
                 .replace(/\s*\[[\s\S]*?\]/g, '')
+                .replace(/口味備註[\s\S]*$/gi, '') // 強制斬斷 口味備註 之後的一切
+                .replace(/[xX*×]\s*\d+/g, '')
                 .replace(/[\(\（\[【\)\］】\]]/g, '')
                 .trim();
 
             if (!cleanBase) return;
-            // 1. 加入主商品名稱 (如 "禾香優格飲")
             namesSet.add(cleanBase);
 
-            // 2. 提取口味備註並結合主商品名稱 (如 "禾香優格飲 藍莓", "禾香優格飲 芒果")
+            // 2. 提取純口味單字 (絕不包含 "口味備註" 贅字與長句子)
             const remarkStr = String(item.remark || item.productName || '');
-            if (remarkStr.includes('口味備註') || remarkStr.includes('x') || remarkStr.includes('X')) {
-                const remarkMatch = remarkStr.match(/【?口味備註：?\s*([^】\)]+)/i);
-                const targetStr = remarkMatch ? remarkMatch[1] : remarkStr;
-                const parts = targetStr.split(/[,，;\s]+/);
+            if (remarkStr) {
+                // 砍掉 口味備註： 並替括號為空格
+                const targetContent = remarkStr
+                    .replace(/^.*【?口味備註：?\s*/i, '')
+                    .replace(/【|】|\(|\)|（|）/g, ' ');
+
+                // 依據逗號、分號、空格拆分成獨立口味單字
+                const parts = targetContent.split(/[,，;\s]+/);
                 parts.forEach(part => {
-                    const flavorName = part.replace(/[xX*×]\s*\d+.*$/, '').replace(/【|】/g, '').trim();
-                    if (flavorName && flavorName.length < 12 && !flavorName.includes('口味備註')) {
+                    const flavorName = part
+                        .replace(/[xX*×]\s*\d+.*$/, '') // 去除 x1 數量
+                        .replace(/[\:\：,\(（【\)\］】\]]/g, '')
+                        .trim();
+
+                    // 排除非口味的屬性詞 (如：無糖, 原味, 罐, 盒...)
+                    const isInvalidWord = [
+                        '無糖', '微糖', '半糖', '全糖', '少糖', '原味', '無添加', '口味備註', '備註',
+                        '大', '小', '中', '盒', '罐', '瓶', '包', '組', '件', '入', '箱'
+                    ].some(w => flavorName === w || flavorName.includes('備註') || flavorName.includes('糖'));
+
+                    // 條件：必須是不含 "口味備註"/無糖等屬性詞、長度介於 1~8 字、非主品名、且非純數字的純口味
+                    if (
+                        flavorName &&
+                        flavorName.length >= 1 &&
+                        flavorName.length <= 8 &&
+                        !isInvalidWord &&
+                        !flavorName.includes('：') &&
+                        !flavorName.includes(':') &&
+                        !/^\d+$/.test(flavorName) &&
+                        flavorName !== cleanBase &&
+                        !cleanBase.includes(flavorName)
+                    ) {
                         namesSet.add(`${cleanBase} ${flavorName}`);
                     }
                 });
@@ -1474,7 +1522,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             order.recipients?.forEach(r => r.items?.forEach(processItem));
         });
 
-        return Array.from(namesSet).sort((a, b) => a.localeCompare(b, 'zh-TW'));
+        // 最後過濾：防護網，100% 確保全站選單中絕不出現 "口味備註" 或 "無糖" 等單字
+        return Array.from(namesSet)
+            .filter(name => !name.endsWith('無糖') && !name.includes('口味備註') && !name.includes('備註：'))
+            .sort((a, b) => a.localeCompare(b, 'zh-TW'));
     }, [orders]);
 
     // 關鍵字即時符合的商品/口味下拉選項 (輸入如 "禾香" 自動帶出 "禾香優格飲"、"禾香優格飲 藍莓"...)
