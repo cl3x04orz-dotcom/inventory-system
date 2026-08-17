@@ -2030,7 +2030,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     <div className="relative w-full sm:w-48 shrink-0">
                         <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={16} />
                         <select
-                            className="w-full text-xs md:text-sm py-2 pl-9 pr-8 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] appearance-none focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all cursor-pointer truncate"
+                            className="w-full h-[40px] text-xs md:text-sm pl-9 pr-8 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] appearance-none focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all cursor-pointer truncate"
                             value={selectedBuilding}
                             onChange={(e) => setSelectedBuilding(e.target.value)}
                         >
@@ -2046,7 +2046,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     <div className="relative w-full sm:w-44 shrink-0">
                         <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={16} />
                         <select
-                            className="w-full text-xs md:text-sm py-2 pl-9 pr-8 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] appearance-none focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all cursor-pointer truncate"
+                            className="w-full h-[40px] text-xs md:text-sm pl-9 pr-8 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] appearance-none focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all cursor-pointer truncate"
                             value={selectedPaymentMethod}
                             onChange={(e) => setSelectedPaymentMethod(e.target.value)}
                         >
@@ -2064,7 +2064,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         <input
                             type="text"
                             placeholder="搜尋編號、姓名、電話..."
-                            className="w-full pl-9 pr-3 text-xs md:text-sm py-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-medium text-[var(--text-primary)] focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all"
+                            className="w-full h-[40px] pl-9 pr-3 text-xs md:text-sm bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-medium text-[var(--text-primary)] focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -2077,7 +2077,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             <input
                                 type="text"
                                 placeholder="查詢商品 (如: 禾香優格)..."
-                                className="w-full pl-9 pr-8 text-xs md:text-sm py-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-medium text-[var(--text-primary)] focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all"
+                                className="w-full h-[40px] pl-9 pr-8 text-xs md:text-sm bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-medium text-[var(--text-primary)] focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all"
                                 value={productSearchTerm}
                                 onFocus={() => setShowProductAutocomplete(true)}
                                 onChange={(e) => {
@@ -2104,7 +2104,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         <button
                             type="button"
                             onClick={() => setIsExactProductMatch(!isExactProductMatch)}
-                            className={`px-3 py-2 rounded-xl text-xs font-bold shrink-0 transition-all flex items-center gap-1 border h-[38px] active:scale-95 ${
+                            className={`px-3 rounded-xl text-xs font-bold shrink-0 transition-all flex items-center gap-1 border h-[40px] active:scale-95 ${
                                 isExactProductMatch
                                     ? "bg-emerald-600 text-white border-emerald-500 shadow-sm"
                                     : "bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-slate-400"
@@ -2153,29 +2153,29 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         )}
                     </div>
 
-                    {/* 出貨/確認日期起迄區間與滿版依附快捷按鈕 (100% 填滿寬度 + 手機邊界防護) */}
+                    {/* 出貨/確認日期起迄區間與滿版依附快捷按鈕 (100% 統一 h-[40px] + 起始/結束日期浮動提示文字) */}
                     <div className="flex flex-col gap-1.5 w-full sm:flex-1 sm:min-w-[280px]">
-                        {/* 上層：日期區間搜尋 (100% 滿版填滿，修復 iOS 手機版爆邊問題) */}
+                        {/* 上層：日期區間搜尋 (統一 h-[40px] 框框高度 + 乾淨原生日期顯示) */}
                         <div className="flex items-center gap-1.5 sm:gap-2 w-full max-w-full overflow-hidden">
                             <div className="relative flex-1 min-w-0">
-                                <Calendar className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={14} />
+                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none z-10" size={15} />
                                 <input
                                     type="date"
-                                    className="w-full min-w-0 box-border pl-7 sm:pl-9 pr-1 sm:pr-2 text-[11px] sm:text-xs md:text-sm h-[38px] bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 shadow-2xs transition-all cursor-pointer appearance-none"
+                                    className="w-full min-w-0 box-border h-[40px] pl-9 pr-2 text-xs md:text-sm bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 shadow-2xs transition-all cursor-pointer appearance-none"
                                     value={startDate}
                                     onChange={(e) => setStartDate(e.target.value)}
-                                    title="選擇起始日期 (起)"
+                                    title="選擇日期 (起)"
                                 />
                             </div>
                             <span className="text-xs font-black text-slate-400 shrink-0">~</span>
                             <div className="relative flex-1 min-w-0">
-                                <Calendar className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={14} />
+                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none z-10" size={15} />
                                 <input
                                     type="date"
-                                    className="w-full min-w-0 box-border pl-7 sm:pl-9 pr-1 sm:pr-2 text-[11px] sm:text-xs md:text-sm h-[38px] bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 shadow-2xs transition-all cursor-pointer appearance-none"
+                                    className="w-full min-w-0 box-border h-[40px] pl-9 pr-2 text-xs md:text-sm bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 shadow-2xs transition-all cursor-pointer appearance-none"
                                     value={endDate}
                                     onChange={(e) => setEndDate(e.target.value)}
-                                    title="選擇結束日期 (迄)"
+                                    title="選擇日期 (迄)"
                                 />
                             </div>
                         </div>
