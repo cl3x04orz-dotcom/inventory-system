@@ -2153,15 +2153,15 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         )}
                     </div>
 
-                    {/* 出貨/確認日期起迄區間與滿版依附快捷按鈕 (100% 填滿寬度與齊平對齊) */}
+                    {/* 出貨/確認日期起迄區間與滿版依附快捷按鈕 (100% 填滿寬度 + 手機邊界防護) */}
                     <div className="flex flex-col gap-1.5 w-full sm:flex-1 sm:min-w-[280px]">
-                        {/* 上層：日期區間搜尋 (100% 滿版填滿，與上方搜尋框完美齊平) */}
-                        <div className="flex items-center gap-2 w-full">
+                        {/* 上層：日期區間搜尋 (100% 滿版填滿，修復 iOS 手機版爆邊問題) */}
+                        <div className="flex items-center gap-1.5 sm:gap-2 w-full max-w-full overflow-hidden">
                             <div className="relative flex-1 min-w-0">
-                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={15} />
+                                <Calendar className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={14} />
                                 <input
                                     type="date"
-                                    className="w-full box-border pl-9 pr-2 text-xs md:text-sm h-[38px] bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 shadow-2xs transition-all cursor-pointer"
+                                    className="w-full min-w-0 box-border pl-7 sm:pl-9 pr-1 sm:pr-2 text-[11px] sm:text-xs md:text-sm h-[38px] bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 shadow-2xs transition-all cursor-pointer appearance-none"
                                     value={startDate}
                                     onChange={(e) => setStartDate(e.target.value)}
                                     title="選擇起始日期 (起)"
@@ -2169,10 +2169,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             </div>
                             <span className="text-xs font-black text-slate-400 shrink-0">~</span>
                             <div className="relative flex-1 min-w-0">
-                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={15} />
+                                <Calendar className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={14} />
                                 <input
                                     type="date"
-                                    className="w-full box-border pl-9 pr-2 text-xs md:text-sm h-[38px] bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 shadow-2xs transition-all cursor-pointer"
+                                    className="w-full min-w-0 box-border pl-7 sm:pl-9 pr-1 sm:pr-2 text-[11px] sm:text-xs md:text-sm h-[38px] bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 shadow-2xs transition-all cursor-pointer appearance-none"
                                     value={endDate}
                                     onChange={(e) => setEndDate(e.target.value)}
                                     title="選擇結束日期 (迄)"
@@ -2683,11 +2683,6 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                                                 <span className="font-black text-[var(--text-primary)]">
                                                                                     {cleanName}
                                                                                     {isBundle && <span className="text-[10px] font-extrabold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md ml-1.5">捆裝 {bundleSize}入</span>}
-                                                                                    {isHighlighted && (
-                                                                                        <span className="px-1.5 py-0.5 bg-amber-500 text-white rounded text-[10px] font-bold ml-1.5 shadow-2xs">
-                                                                                            🎯 搜尋目標 (符合 {matchedQty} 罐)
-                                                                                        </span>
-                                                                                    )}
                                                                                 </span>
                                                                                 <span className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-extrabold">
                                                                                     x {item.qty} {isBundle ? '組' : '瓶'}
@@ -2716,6 +2711,14 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                                     </div>
                                                                 );
                                                             })()}
+                                                            {/* 🎯 移動至右下角獨立列，避免擠壓手機版檔頭畫面 */}
+                                                            {isHighlighted && (
+                                                                <div className="flex justify-end mt-2 pt-1 border-t border-amber-500/20">
+                                                                    <span className="px-2 py-0.5 bg-amber-500 text-white rounded-md text-[10px] sm:text-xs font-black shadow-2xs flex items-center gap-1">
+                                                                        🎯 搜尋目標 (符合 {matchedQty} 罐)
+                                                                    </span>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     );
                                                 })}
