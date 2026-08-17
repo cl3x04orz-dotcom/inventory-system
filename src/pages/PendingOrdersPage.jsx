@@ -217,6 +217,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     // 搜尋與篩選
     const [searchTerm, setSearchTerm] = useState('');
     const [productSearchTerm, setProductSearchTerm] = useState('');
+    const [isExactProductMatch, setIsExactProductMatch] = useState(false); // 🎯 精確全名相符切換 (避免「禾香優格」被「禾香優格飲」誤觸發)
     const [expandedOrderIds, setExpandedOrderIds] = useState(new Set());
     const [dateFilter, setDateFilter] = useState(''); // 出貨日期篩選
     const [startDate, setStartDate] = useState('');   // 起始日期篩選
@@ -1340,18 +1341,23 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             if (!matchesGeneral) return false;
         }
 
-        // 商品名稱特化搜尋
+        // 商品名稱特化搜尋 (支援子字串模糊 vs 精確全名相符)
         if (productSearchTerm) {
             const pSearch = productSearchTerm.toLowerCase().trim();
+            const checkMatch = (targetName, targetId) => {
+                const nameStr = String(targetName || '').toLowerCase().trim();
+                const idStr = String(targetId || '').toLowerCase().trim();
+                if (isExactProductMatch) {
+                    return nameStr === pSearch || idStr === pSearch;
+                }
+                return nameStr.includes(pSearch) || idStr.includes(pSearch);
+            };
+
             const hasMatchingProductInItems = order.items?.some(item =>
-                String(item.productName || '').toLowerCase().includes(pSearch) ||
-                String(item.productId || '').toLowerCase().includes(pSearch)
+                checkMatch(item.productName, item.productId)
             );
             const hasMatchingProductInRecipients = order.recipients?.some(r =>
-                r.items?.some(ri =>
-                    String(ri.productName || '').toLowerCase().includes(pSearch) ||
-                    String(ri.productId || '').toLowerCase().includes(pSearch)
-                )
+                r.items?.some(ri => checkMatch(ri.productName, ri.productId))
             );
             if (!hasMatchingProductInItems && !hasMatchingProductInRecipients) {
                 return false;
@@ -1374,32 +1380,60 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         });
     }, [filteredOrders, normalizeOrder]);
 
-    // 商品特化搜尋小卡片統計數據
+    // 動態提取目前載入的所有訂單中出現過的商品全名清單 (排序用於下拉選單快選)
+    const uniqueProductNames = React.useMemo(() => {
+        if (!orders || orders.length === 0) return [];
+        const namesSet = new Set();
+        orders.forEach(order => {
+            if (order.items && Array.isArray(order.items)) {
+                order.items.forEach(item => {
+                    if (item.productName && item.productName.trim()) {
+                        namesSet.add(item.productName.trim());
+                    }
+                });
+            }
+            if (order.recipients && Array.isArray(order.recipients)) {
+                order.recipients.forEach(r => {
+                    r.items?.forEach(ri => {
+                        if (ri.productName && ri.productName.trim()) {
+                            namesSet.add(ri.productName.trim());
+                        }
+                    });
+                });
+            }
+        });
+        return Array.from(namesSet).sort((a, b) => a.localeCompare(b, 'zh-TW'));
+    }, [orders]);
+
+    // 商品特化搜尋小卡片統計數據 (支援精確相符與模糊相符統計)
     const productSearchSummary = React.useMemo(() => {
         if (!productSearchTerm.trim()) return null;
         const pSearch = productSearchTerm.toLowerCase().trim();
         let totalMatchQty = 0;
         let matchingOrdersCount = 0;
 
+        const checkMatch = (targetName, targetId) => {
+            const nameStr = String(targetName || '').toLowerCase().trim();
+            const idStr = String(targetId || '').toLowerCase().trim();
+            if (isExactProductMatch) {
+                return nameStr === pSearch || idStr === pSearch;
+            }
+            return nameStr.includes(pSearch) || idStr.includes(pSearch);
+        };
+
         sortedFilteredOrders.forEach(order => {
             let orderMatchingQty = 0;
 
             if (order.items && order.items.length > 0) {
                 order.items.forEach(item => {
-                    if (
-                        String(item.productName || '').toLowerCase().includes(pSearch) ||
-                        String(item.productId || '').toLowerCase().includes(pSearch)
-                    ) {
+                    if (checkMatch(item.productName, item.productId)) {
                         orderMatchingQty += (Number(item.qty) || 0);
                     }
                 });
             } else if (order.recipients && order.recipients.length > 0) {
                 order.recipients.forEach(r => {
                     r.items?.forEach(ri => {
-                        if (
-                            String(ri.productName || '').toLowerCase().includes(pSearch) ||
-                            String(ri.productId || '').toLowerCase().includes(pSearch)
-                        ) {
+                        if (checkMatch(ri.productName, ri.productId)) {
                             orderMatchingQty += (Number(ri.qty) || 0);
                         }
                     });
@@ -1415,9 +1449,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         return {
             keyword: productSearchTerm.trim(),
             matchingOrdersCount,
-            totalMatchQty
+            totalMatchQty,
+            isExact: isExactProductMatch
         };
-    }, [sortedFilteredOrders, productSearchTerm]);
+    }, [sortedFilteredOrders, productSearchTerm, isExactProductMatch]);
 
     // 折疊與展開操作
     const toggleExpandOrder = (orderId) => {
@@ -1910,47 +1945,64 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         />
                     </div>
 
-                    {/* 商品名稱特化查詢 */}
-                    <div className="relative w-full sm:flex-1 sm:min-w-[180px]">
-                        <PackageSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} />
-                        <input
-                            type="text"
-                            placeholder="查詢商品 (如: 崙背)..."
-                            className="w-full pl-9 pr-8 text-xs md:text-sm py-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-medium text-[var(--text-primary)] focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all"
-                            value={productSearchTerm}
-                            onChange={(e) => setProductSearchTerm(e.target.value)}
-                        />
-                        {productSearchTerm && (
-                            <button
-                                type="button"
-                                onClick={() => setProductSearchTerm('')}
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
-                                title="清空商品搜尋"
-                            >
-                                <X size={14} />
-                            </button>
-                        )}
+                    {/* 商品名稱特化查詢與精確切換按鈕 */}
+                    <div className="flex items-center gap-2 w-full sm:flex-1 sm:min-w-[240px]">
+                        <div className="relative flex-1">
+                            <PackageSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} />
+                            <input
+                                type="text"
+                                placeholder="查詢商品 (如: 禾香優格)..."
+                                className="w-full pl-9 pr-8 text-xs md:text-sm py-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-medium text-[var(--text-primary)] focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all"
+                                value={productSearchTerm}
+                                onChange={(e) => setProductSearchTerm(e.target.value)}
+                            />
+                            {productSearchTerm && (
+                                <button
+                                    type="button"
+                                    onClick={() => setProductSearchTerm('')}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                                    title="清空商品搜尋"
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* 精確相符開關按鈕 */}
+                        <button
+                            type="button"
+                            onClick={() => setIsExactProductMatch(!isExactProductMatch)}
+                            className={`px-3 py-2 rounded-xl text-xs font-bold shrink-0 transition-all flex items-center gap-1 border h-[38px] active:scale-95 ${
+                                isExactProductMatch
+                                    ? "bg-emerald-600 text-white border-emerald-500 shadow-sm"
+                                    : "bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-slate-400"
+                            }`}
+                            title={isExactProductMatch ? "目前為【精確 OFF】模式，點擊切換為模糊包含搜尋" : "目前為【模糊包含】模式，點擊開啟【精確 ON】隔離搜尋"}
+                        >
+                            <span>{isExactProductMatch ? "精確 ON" : "精確 OFF"}</span>
+                        </button>
                     </div>
 
-                    {/* 出貨/確認日期起迄區間篩選與快捷按鈕 */}
-                    <div className="flex items-center gap-2 shrink-0 max-w-full overflow-x-auto py-0.5">
-                        <div className="flex items-center gap-1.5 shrink-0">
-                            <div className="relative w-36 shrink-0 min-w-0">
-                                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={14} />
+                    {/* 出貨/確認日期起迄區間與滿版依附快捷按鈕 (100% 填滿寬度與齊平對齊) */}
+                    <div className="flex flex-col gap-1.5 w-full sm:flex-1 sm:min-w-[280px]">
+                        {/* 上層：日期區間搜尋 (100% 滿版填滿，與上方搜尋框完美齊平) */}
+                        <div className="flex items-center gap-2 w-full">
+                            <div className="relative flex-1 min-w-0">
+                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={15} />
                                 <input
                                     type="date"
-                                    className="w-full max-w-full box-border pl-8 pr-2 text-xs py-1.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 shadow-2xs transition-all appearance-none"
+                                    className="w-full box-border pl-9 pr-2 text-xs md:text-sm h-[38px] bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 shadow-2xs transition-all cursor-pointer"
                                     value={startDate}
                                     onChange={(e) => setStartDate(e.target.value)}
                                     title="選擇起始日期 (起)"
                                 />
                             </div>
-                            <span className="text-xs font-black text-slate-400">~</span>
-                            <div className="relative w-36 shrink-0 min-w-0">
-                                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={14} />
+                            <span className="text-xs font-black text-slate-400 shrink-0">~</span>
+                            <div className="relative flex-1 min-w-0">
+                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" size={15} />
                                 <input
                                     type="date"
-                                    className="w-full max-w-full box-border pl-8 pr-2 text-xs py-1.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 shadow-2xs transition-all appearance-none"
+                                    className="w-full box-border pl-9 pr-2 text-xs md:text-sm h-[38px] bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-bold text-[var(--text-primary)] focus:outline-none focus:border-blue-500 shadow-2xs transition-all cursor-pointer"
                                     value={endDate}
                                     onChange={(e) => setEndDate(e.target.value)}
                                     title="選擇結束日期 (迄)"
@@ -1958,45 +2010,47 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             </div>
                         </div>
 
-                        {/* 快捷按鈕群：今天 / 明天 / 後天 / 大後天 (清爽高對比明亮主題) */}
-                        <div className="flex items-center gap-1.5 shrink-0 bg-slate-50 p-1.5 rounded-2xl border border-slate-200/90 shadow-2xs">
-                            <span className="text-xs font-black text-slate-600 pl-1 pr-0.5 whitespace-nowrap">快速選擇：</span>
-                            {[
-                                { label: '今天', offset: 0 },
-                                { label: '明天', offset: 1 },
-                                { label: '後天', offset: 2 },
-                                { label: '大後天', offset: 3 },
-                            ].map((item) => {
-                                const targetDate = getRelativeDateStr(item.offset);
-                                const isActive = startDate === targetDate && endDate === targetDate;
-                                return (
-                                    <button
-                                        key={item.label}
-                                        type="button"
-                                        onClick={() => {
-                                            if (isActive) {
-                                                setStartDate('');
-                                                setEndDate('');
-                                            } else {
-                                                setStartDate(targetDate);
-                                                setEndDate(targetDate);
-                                            }
-                                        }}
-                                        className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer border ${
-                                            isActive
-                                                ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs scale-105 font-black'
-                                                : 'bg-white border-slate-200/90 text-slate-700 hover:bg-slate-100 hover:text-slate-900 shadow-2xs font-bold'
-                                        }`}
-                                    >
-                                        {item.label}
-                                    </button>
-                                );
-                            })}
+                        {/* 下層：快捷按鈕滿版均分填滿 (解決右側留白問題) */}
+                        <div className="flex items-center gap-1.5 w-full pt-0.5">
+                            <span className="text-xs font-bold text-[var(--text-tertiary)] shrink-0 whitespace-nowrap">快捷：</span>
+                            <div className="grid grid-cols-4 gap-1.5 flex-1">
+                                {[
+                                    { label: '今天', offset: 0 },
+                                    { label: '明天', offset: 1 },
+                                    { label: '後天', offset: 2 },
+                                    { label: '大後天', offset: 3 },
+                                ].map((item) => {
+                                    const targetDate = getRelativeDateStr(item.offset);
+                                    const isActive = startDate === targetDate && endDate === targetDate;
+                                    return (
+                                        <button
+                                            key={item.label}
+                                            type="button"
+                                            onClick={() => {
+                                                if (isActive) {
+                                                    setStartDate('');
+                                                    setEndDate('');
+                                                } else {
+                                                    setStartDate(targetDate);
+                                                    setEndDate(targetDate);
+                                                }
+                                            }}
+                                            className={`w-full py-1 text-xs font-bold rounded-lg transition-all cursor-pointer border text-center truncate ${
+                                                isActive
+                                                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs font-black'
+                                                    : 'bg-[var(--bg-primary)] border-[var(--border-primary)] text-[var(--text-primary)] hover:bg-slate-200 dark:hover:bg-slate-700'
+                                            }`}
+                                        >
+                                            {item.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                             {(startDate || endDate) && (
                                 <button
                                     type="button"
                                     onClick={() => { setStartDate(''); setEndDate(''); }}
-                                    className="px-2.5 py-1.5 text-xs font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shrink-0 cursor-pointer ml-0.5"
+                                    className="px-2 py-1 text-xs font-bold text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-all shrink-0 cursor-pointer whitespace-nowrap"
                                     title="清空日期選擇"
                                 >
                                     清空
@@ -2004,18 +2058,6 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             )}
                         </div>
                     </div>
-
-                    {/* 導入今日定期配 */}
-                    {activeTab === 'PENDING' && (
-                        <button
-                            onClick={handleImportSubscriptions}
-                            className="w-full sm:w-auto justify-center bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold text-xs px-3.5 py-2 rounded-xl border border-amber-500/20 flex items-center gap-1.5 transition-all whitespace-nowrap shadow-2xs"
-                            title="導入今日定期配計畫到此大樓"
-                        >
-                            <Calendar size={15} />
-                            ⚡ 導入今日定期配
-                        </button>
-                    )}
                 </div>
             </div>
 
@@ -2045,26 +2087,31 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 </div>
             )}
 
-            {/* 商品專屬查詢統計小卡片 */}
+            {/* 商品專屬查詢統計小卡片 (明亮淺色主題，避免深色模式造成視效混亂) */}
             {productSearchSummary && (
-                <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-700/50 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm animate-in fade-in duration-200">
+                <div className="bg-emerald-50/90 border border-emerald-200/80 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm animate-in fade-in duration-200">
                     <div className="flex items-center gap-3">
-                        <div className="p-3 bg-emerald-600 text-white rounded-xl shadow-sm">
+                        <div className="p-3 bg-emerald-600 text-white rounded-xl shadow-sm shrink-0">
                             <PackageSearch size={24} />
                         </div>
                         <div>
-                            <div className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
-                                📦 商品查詢統計：「<span className="font-extrabold underline">{productSearchSummary.keyword}</span>」
+                            <div className="text-xs font-bold text-emerald-900 flex items-center flex-wrap gap-2">
+                                <span>📦 商品查詢統計：「<span className="font-extrabold underline text-emerald-950">{productSearchSummary.keyword}</span>」</span>
+                                {productSearchSummary.isExact && (
+                                    <span className="px-2 py-0.5 bg-emerald-600 text-white rounded-full text-[10px] font-bold shadow-xs">
+                                        🎯 精確全名相符模式
+                                    </span>
+                                )}
                             </div>
-                            <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 mt-0.5">
-                                含有此商品的訂單共 <span className="font-extrabold font-mono text-base">{productSearchSummary.matchingOrdersCount}</span> 筆
+                            <div className="text-sm font-semibold text-emerald-800 mt-0.5">
+                                含有此商品的訂單共 <span className="font-extrabold font-mono text-base text-emerald-950">{productSearchSummary.matchingOrdersCount}</span> 筆
                             </div>
                         </div>
                     </div>
-                    <div className="text-right bg-white dark:bg-slate-900 px-5 py-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800 shadow-sm flex items-center justify-between sm:block">
-                        <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 block">該商品訂購數量總計</span>
-                        <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                            {productSearchSummary.totalMatchQty} <span className="text-xs font-normal">瓶/件</span>
+                    <div className="text-right bg-white px-5 py-2.5 rounded-xl border border-emerald-200 shadow-sm flex items-center justify-between sm:block shrink-0">
+                        <span className="text-xs font-bold text-emerald-800 block">該商品訂購數量總計</span>
+                        <span className="text-2xl font-black text-emerald-600 font-mono">
+                            {productSearchSummary.totalMatchQty} <span className="text-xs font-normal text-emerald-800">瓶/件</span>
                         </span>
                     </div>
                 </div>
