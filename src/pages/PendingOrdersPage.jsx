@@ -218,6 +218,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [productSearchTerm, setProductSearchTerm] = useState('');
     const [isExactProductMatch, setIsExactProductMatch] = useState(false); // 🎯 精確全名相符切換 (避免「禾香優格」被「禾香優格飲」誤觸發)
+    const [showProductAutocomplete, setShowProductAutocomplete] = useState(false); // 🔍 打字自動浮出商品與口味選單
     const [expandedOrderIds, setExpandedOrderIds] = useState(new Set());
     const [dateFilter, setDateFilter] = useState(''); // 出貨日期篩選
     const [startDate, setStartDate] = useState('');   // 起始日期篩選
@@ -1341,14 +1342,22 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             if (!matchesGeneral) return false;
         }
 
-        // 商品名稱特化搜尋 (支援子字串模糊 vs 精確全名相符)
+        // 商品名稱特化搜尋 (支援子字串模糊 vs 聰明精確全名相符)
         if (productSearchTerm) {
             const pSearch = productSearchTerm.toLowerCase().trim();
+            const getBaseProductName = (fullName) => {
+                if (!fullName) return '';
+                return String(fullName)
+                    .replace(/[\(\（\[【].*?[\)\］】\)]/g, '')
+                    .trim();
+            };
+
             const checkMatch = (targetName, targetId) => {
                 const nameStr = String(targetName || '').toLowerCase().trim();
                 const idStr = String(targetId || '').toLowerCase().trim();
+                const baseNameStr = getBaseProductName(nameStr).toLowerCase().trim();
                 if (isExactProductMatch) {
-                    return nameStr === pSearch || idStr === pSearch;
+                    return nameStr === pSearch || idStr === pSearch || baseNameStr === pSearch;
                 }
                 return nameStr.includes(pSearch) || idStr.includes(pSearch);
             };
@@ -1380,7 +1389,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         });
     }, [filteredOrders, normalizeOrder]);
 
-    // 動態提取目前載入的所有訂單中出現過的商品全名清單 (排序用於下拉選單快選)
+    // 動態提取目前載入的所有訂單中出現過的商品全名與口味清單 (用於打字關鍵字下拉選單)
     const uniqueProductNames = React.useMemo(() => {
         if (!orders || orders.length === 0) return [];
         const namesSet = new Set();
@@ -1405,18 +1414,33 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         return Array.from(namesSet).sort((a, b) => a.localeCompare(b, 'zh-TW'));
     }, [orders]);
 
-    // 商品特化搜尋小卡片統計數據 (支援精確相符與模糊相符統計)
+    // 關鍵字即時符合的商品/口味下拉選項 (輸入如 "禾香" 自動帶出 "禾香鮮乳"、"禾香優格 (原味)"...)
+    const matchingAutocompleteList = React.useMemo(() => {
+        if (!productSearchTerm.trim() || uniqueProductNames.length === 0) return [];
+        const pSearch = productSearchTerm.toLowerCase().trim();
+        return uniqueProductNames.filter(pName => pName.toLowerCase().includes(pSearch)).slice(0, 10);
+    }, [uniqueProductNames, productSearchTerm]);
+
+    // 商品特化搜尋小卡片統計數據 (支援聰明精確相符與模糊相符統計)
     const productSearchSummary = React.useMemo(() => {
         if (!productSearchTerm.trim()) return null;
         const pSearch = productSearchTerm.toLowerCase().trim();
         let totalMatchQty = 0;
         let matchingOrdersCount = 0;
 
+        const getBaseProductName = (fullName) => {
+            if (!fullName) return '';
+            return String(fullName)
+                .replace(/[\(\（\[【].*?[\)\］】\)]/g, '')
+                .trim();
+        };
+
         const checkMatch = (targetName, targetId) => {
             const nameStr = String(targetName || '').toLowerCase().trim();
             const idStr = String(targetId || '').toLowerCase().trim();
+            const baseNameStr = getBaseProductName(nameStr).toLowerCase().trim();
             if (isExactProductMatch) {
-                return nameStr === pSearch || idStr === pSearch;
+                return nameStr === pSearch || idStr === pSearch || baseNameStr === pSearch;
             }
             return nameStr.includes(pSearch) || idStr.includes(pSearch);
         };
@@ -1946,7 +1970,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     </div>
 
                     {/* 商品名稱特化查詢與精確切換按鈕 */}
-                    <div className="flex items-center gap-2 w-full sm:flex-1 sm:min-w-[240px]">
+                    <div className="flex items-center gap-2 w-full sm:flex-1 sm:min-w-[240px] relative">
                         <div className="relative flex-1">
                             <PackageSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} />
                             <input
@@ -1954,17 +1978,62 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                 placeholder="查詢商品 (如: 禾香優格)..."
                                 className="w-full pl-9 pr-8 text-xs md:text-sm py-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl font-medium text-[var(--text-primary)] focus:outline-none focus:border-blue-500 focus:bg-[var(--bg-secondary)] shadow-2xs transition-all"
                                 value={productSearchTerm}
-                                onChange={(e) => setProductSearchTerm(e.target.value)}
+                                onFocus={() => setShowProductAutocomplete(true)}
+                                onChange={(e) => {
+                                    setProductSearchTerm(e.target.value);
+                                    setShowProductAutocomplete(true);
+                                }}
                             />
                             {productSearchTerm && (
                                 <button
                                     type="button"
-                                    onClick={() => setProductSearchTerm('')}
+                                    onClick={() => {
+                                        setProductSearchTerm('');
+                                        setShowProductAutocomplete(false);
+                                    }}
                                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
                                     title="清空商品搜尋"
                                 >
                                     <X size={14} />
                                 </button>
+                            )}
+
+                            {/* 🔍 打字關鍵字即時符合的商品與口味浮動下拉選單 */}
+                            {showProductAutocomplete && matchingAutocompleteList.length > 0 && (
+                                <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl shadow-2xl z-[70] overflow-hidden divide-y divide-[var(--border-primary)] animate-in fade-in duration-150">
+                                    <div className="px-3 py-1.5 text-[10px] font-extrabold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 flex justify-between items-center">
+                                        <span>🔍 點擊即帶入並自動啟動【精確 ON】：</span>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowProductAutocomplete(false);
+                                            }}
+                                            className="text-slate-400 hover:text-slate-600 p-0.5"
+                                        >
+                                            <X size={12} />
+                                        </button>
+                                    </div>
+                                    <div className="max-h-56 overflow-y-auto">
+                                        {matchingAutocompleteList.map((pName, pIdx) => (
+                                            <button
+                                                key={pIdx}
+                                                type="button"
+                                                className="w-full text-left px-3.5 py-2.5 text-xs md:text-sm font-bold text-[var(--text-primary)] hover:bg-emerald-50 dark:hover:bg-emerald-950/50 hover:text-emerald-600 transition-colors flex items-center justify-between group cursor-pointer"
+                                                onClick={() => {
+                                                    setProductSearchTerm(pName);
+                                                    setIsExactProductMatch(true); // 點擊自動開啟精確模式！
+                                                    setShowProductAutocomplete(false);
+                                                }}
+                                            >
+                                                <span className="truncate group-hover:underline">{pName}</span>
+                                                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-extrabold shrink-0 ml-2 bg-emerald-100 dark:bg-emerald-900/60 px-1.5 py-0.5 rounded-md">
+                                                    🎯 帶入精確過濾
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             )}
                         </div>
 
@@ -2484,8 +2553,19 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                 </div>
 
                                                 <div className="divide-y divide-[var(--border-primary)] divide-dashed space-y-3">
-                                                    {order.items.map((item, idx) => (
-                                                        <div key={idx} className="flex flex-col pt-2.5 first:pt-0">
+                                                    {order.items.map((item, idx) => {
+                                                        const pSearch = productSearchTerm.toLowerCase().trim();
+                                                        const nameStr = String(item.productName || '').toLowerCase().trim();
+                                                        const idStr = String(item.productId || '').toLowerCase().trim();
+                                                        const baseNameStr = nameStr.replace(/[\(\（\[【].*?[\)\］】\)]/g, '').trim();
+                                                        const isHighlighted = productSearchTerm.trim() && (
+                                                            isExactProductMatch
+                                                                ? (nameStr === pSearch || idStr === pSearch || baseNameStr === pSearch)
+                                                                : (nameStr.includes(pSearch) || idStr.includes(pSearch))
+                                                        );
+
+                                                        return (
+                                                        <div key={idx} className={`flex flex-col transition-all rounded-xl ${isHighlighted ? "bg-amber-100/90 dark:bg-amber-950/70 border-2 border-amber-400 p-3 my-1.5 shadow-md text-amber-950 dark:text-amber-100" : "pt-2.5 first:pt-0"}`}>
                                                             {(() => {
                                                                 const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
                                                                 const isBundle = prod ? prod.isBundle : false;
@@ -2507,6 +2587,11 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                                                 <span className="font-extrabold text-[var(--text-primary)]">
                                                                                     {cleanName}
                                                                                     {isBundle && <span className="text-[10px] font-extrabold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md ml-1.5">捆裝 {bundleSize}入</span>}
+                                                                                    {isHighlighted && (
+                                                                                        <span className="px-2 py-0.5 bg-amber-500 text-white rounded-md text-[10px] font-black shadow-xs ml-1.5 inline-flex items-center gap-0.5">
+                                                                                            🎯 搜尋目標
+                                                                                        </span>
+                                                                                    )}
                                                                                 </span>
                                                                                 <span className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-extrabold">
                                                                                     x {item.qty} {isBundle ? '組' : '瓶'}
@@ -2536,7 +2621,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                                 );
                                                             })()}
                                                         </div>
-                                                    ))}
+                                                    );
+                                                })}
                                                 </div>
                                                     {(() => {
                                                         const totals = computeOrderTotals(order, buildingSettingsList, groupBindings);
