@@ -946,29 +946,46 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
   // ── 社區白名單與搜尋過濾邏輯 ───────────────────────────────────────────────
   const filteredProducts = useMemo(() => {
-    let list = products;
+    // 統整顧客當前的所有可能社區識別標籤 (ID 與 大樓/社區名稱)
+    const activeIdentifiers = new Set();
+    if (selectedCommunityId) activeIdentifiers.add(String(selectedCommunityId).trim());
+    if (selectedBuilding && !["一般用戶", "一般散客", "上線下單", "線上下單", "一般常態", "常態零售", "其它"].includes(selectedBuilding)) {
+      activeIdentifiers.add(String(selectedBuilding).trim());
+    }
+    if (currentCommunity) {
+      if (currentCommunity.CommunityId || currentCommunity.communityId) {
+        activeIdentifiers.add(String(currentCommunity.CommunityId || currentCommunity.communityId).trim());
+      }
+      if (currentCommunity.CommunityName || currentCommunity.communityName) {
+        activeIdentifiers.add(String(currentCommunity.CommunityName || currentCommunity.communityName).trim());
+      }
+    }
+    if (Array.isArray(allCommunities) && selectedCommunityId) {
+      const match = allCommunities.find(c => (c.CommunityId || c.communityId) === selectedCommunityId);
+      if (match) {
+        if (match.CommunityName || match.communityName) activeIdentifiers.add(String(match.CommunityName || match.communityName).trim());
+        if (match.CommunityId || match.communityId) activeIdentifiers.add(String(match.CommunityId || match.communityId).trim());
+      }
+    }
+
+    const activeList = Array.from(activeIdentifiers);
 
     // 1. 社區白名單過濾 (Allowed Communities Filtering)
-    if (selectedCommunityId && Array.isArray(allCommunities) && allCommunities.length > 0) {
-      const commMatch = allCommunities.find(c => (c.CommunityId || c.communityId) === selectedCommunityId);
-      const activeCommId = String(selectedCommunityId).trim();
-      const activeCommName = commMatch ? String(commMatch.CommunityName || commMatch.communityName || '').trim() : "";
-
-      list = list.filter(p => {
-        const allowed = p.allowedCommunityIds || p.allowed_community_ids;
-        if (Array.isArray(allowed) && allowed.length > 0) {
-          const allowedStrings = allowed.map(String);
-          return allowedStrings.includes(activeCommId) || (activeCommName && allowedStrings.includes(activeCommName));
-        }
-        return true; // 未設定白名單 → 全社區開放
-      });
-    }
+    let list = products.filter(p => {
+      const allowed = p.allowedCommunityIds || p.allowed_community_ids;
+      if (Array.isArray(allowed) && allowed.length > 0) {
+        const allowedStrings = allowed.map(s => String(s).trim());
+        // 當商品設有白名單時：顧客社區識別標籤必須至少有一個匹配白名單
+        return activeList.some(id => allowedStrings.includes(id));
+      }
+      return true; // 未設定白名單 (空陣列/null) ➔ 全社區開放
+    });
 
     // 2. 關鍵字搜尋過濾
     if (!searchQuery.trim()) return list;
     const query = searchQuery.toLowerCase().trim();
     return list.filter((p) => p.name && p.name.toLowerCase().includes(query));
-  }, [products, searchQuery, selectedCommunityId, allCommunities]);
+  }, [products, searchQuery, selectedCommunityId, selectedBuilding, currentCommunity, allCommunities]);
 
   // ── 分類邏輯 ─────────────────────────────────────────────────
   const categories = useMemo(() => {
