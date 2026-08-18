@@ -887,16 +887,8 @@ export const GroupBuyService = {
       return p;
     });
 
-    // 社區白名單過濾：當 allowedCommunityIds 不為空時，只有白名單內的社區才看得到 (獨立於 maxTotalQty)
-    const communityId = String(targetComm.communityId || '').trim();
-    const communityName = String(targetComm.communityName || '').trim();
-    const products = mappedProducts.filter((p: any) => {
-      if (Array.isArray(p.allowedCommunityIds) && p.allowedCommunityIds.length > 0) {
-        const allowedStrings = p.allowedCommunityIds.map((id: any) => String(id).trim());
-        return allowedStrings.includes(communityId) || (communityName && allowedStrings.includes(communityName));
-      }
-      return true; // 無白名單設定 → 全社區可見
-    });
+    // 線上商城 LIFF 回傳完整活躍商品清單 (包含 allowedCommunityIds)，由前端 LiffOrderPage 依顧客切換社區進行動態過濾
+    const products = mappedProducts;
 
     const community = {
       CommunityId: targetComm.communityId,

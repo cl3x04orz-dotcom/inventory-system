@@ -944,6 +944,26 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     selectedBuilding === "一般常態" ||
     selectedBuilding === "常態零售";
 
+  // ── 安全解析白名單陣列 ───────────────────────────────────────────────
+  const parseAllowedCommunities = (val) => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val.map(String).map(s => s.trim());
+    if (typeof val === 'string') {
+      let str = val.trim();
+      if (str.startsWith('[') && str.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(str);
+          if (Array.isArray(parsed)) return parsed.map(String).map(s => s.trim());
+        } catch (e) {}
+      }
+      if (str.includes(',')) {
+        return str.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      return [str];
+    }
+    return [];
+  };
+
   // ── 社區白名單與搜尋過濾邏輯 ───────────────────────────────────────────────
   const filteredProducts = useMemo(() => {
     // 統整顧客當前的所有可能社區識別標籤 (ID 與 大樓/社區名稱)
@@ -972,11 +992,11 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
     // 1. 社區白名單過濾 (Allowed Communities Filtering)
     let list = products.filter(p => {
-      const allowed = p.allowedCommunityIds || p.allowed_community_ids;
-      if (Array.isArray(allowed) && allowed.length > 0) {
-        const allowedStrings = allowed.map(s => String(s).trim());
+      const allowedRaw = p.allowedCommunityIds || p.allowed_community_ids;
+      const allowed = parseAllowedCommunities(allowedRaw);
+      if (allowed.length > 0) {
         // 當商品設有白名單時：顧客社區識別標籤必須至少有一個匹配白名單
-        return activeList.some(id => allowedStrings.includes(id));
+        return activeList.some(id => allowed.includes(id));
       }
       return true; // 未設定白名單 (空陣列/null) ➔ 全社區開放
     });
