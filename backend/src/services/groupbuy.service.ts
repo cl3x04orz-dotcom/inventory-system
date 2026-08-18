@@ -888,11 +888,12 @@ export const GroupBuyService = {
     });
 
     // 社區白名單過濾：當 allowedCommunityIds 不為空時，只有白名單內的社區才看得到 (獨立於 maxTotalQty)
-    const communityId = targetComm.communityId;
-    const communityName = targetComm.communityName;
+    const communityId = String(targetComm.communityId || '').trim();
+    const communityName = String(targetComm.communityName || '').trim();
     const products = mappedProducts.filter((p: any) => {
       if (Array.isArray(p.allowedCommunityIds) && p.allowedCommunityIds.length > 0) {
-        return p.allowedCommunityIds.includes(communityId) || (communityName && p.allowedCommunityIds.includes(communityName));
+        const allowedStrings = p.allowedCommunityIds.map((id: any) => String(id).trim());
+        return allowedStrings.includes(communityId) || (communityName && allowedStrings.includes(communityName));
       }
       return true; // 無白名單設定 → 全社區可見
     });

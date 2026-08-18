@@ -944,12 +944,31 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     selectedBuilding === "一般常態" ||
     selectedBuilding === "常態零售";
 
-  // ── 搜尋過濾邏輯 ───────────────────────────────────────────────
+  // ── 社區白名單與搜尋過濾邏輯 ───────────────────────────────────────────────
   const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return products;
+    let list = products;
+
+    // 1. 社區白名單過濾 (Allowed Communities Filtering)
+    if (selectedCommunityId && Array.isArray(allCommunities) && allCommunities.length > 0) {
+      const commMatch = allCommunities.find(c => (c.CommunityId || c.communityId) === selectedCommunityId);
+      const activeCommId = String(selectedCommunityId).trim();
+      const activeCommName = commMatch ? String(commMatch.CommunityName || commMatch.communityName || '').trim() : "";
+
+      list = list.filter(p => {
+        const allowed = p.allowedCommunityIds || p.allowed_community_ids;
+        if (Array.isArray(allowed) && allowed.length > 0) {
+          const allowedStrings = allowed.map(String);
+          return allowedStrings.includes(activeCommId) || (activeCommName && allowedStrings.includes(activeCommName));
+        }
+        return true; // 未設定白名單 → 全社區開放
+      });
+    }
+
+    // 2. 關鍵字搜尋過濾
+    if (!searchQuery.trim()) return list;
     const query = searchQuery.toLowerCase().trim();
-    return products.filter((p) => p.name.toLowerCase().includes(query));
-  }, [products, searchQuery]);
+    return list.filter((p) => p.name && p.name.toLowerCase().includes(query));
+  }, [products, searchQuery, selectedCommunityId, allCommunities]);
 
   // ── 分類邏輯 ─────────────────────────────────────────────────
   const categories = useMemo(() => {
