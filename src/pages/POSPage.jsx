@@ -67,41 +67,173 @@ function getAppliedTiersBreakdown(qty, settings) {
 
 function calculateCartSubtotal(cartItems) {
   if (!Array.isArray(cartItems) || cartItems.length === 0) return 0;
-  let totalSum = 0;
+  
+  const groups = {};
+  let nonVolumeSum = 0;
+  let manualDiscountsSum = 0;
+
   cartItems.forEach(item => {
     const qty = Number(item.qty || 0);
     const unitPrice = Number(item.unitPrice || 0);
+    manualDiscountsSum += Number(item.discountAmount || 0);
+
+    if (qty <= 0) return;
+
     if (item.has_volume_pricing && item.volume_pricing_settings) {
-      totalSum += calcItemVolumeSubtotal(qty, unitPrice, item.volume_pricing_settings) - (item.discountAmount || 0);
-    } else {
-      totalSum += (qty * unitPrice) - (item.discountAmount || 0);
+      const tiers = getTiers(item.volume_pricing_settings);
+      if (tiers.length > 0) {
+        const sig = JSON.stringify(tiers);
+        const groupKey = `${unitPrice}_${sig}`;
+        if (!groups[groupKey]) {
+          groups[groupKey] = { unitPrice, tiers, items: [] };
+        }
+        groups[groupKey].items.push(item);
+        return;
+      }
     }
+    nonVolumeSum += qty * unitPrice;
   });
-  return Math.max(0, totalSum);
+
+  let volumeGroupsSum = 0;
+
+  Object.values(groups).forEach(group => {
+    let groupLeftoverQty = 0;
+
+    // 1. 同商品優先自組整組
+    group.items.forEach(item => {
+      let rem = Number(item.qty || 0);
+      for (const tier of group.tiers) {
+        if (rem >= tier.target_quantity) {
+          const count = Math.floor(rem / tier.target_quantity);
+          volumeGroupsSum += count * tier.package_price;
+          rem %= tier.target_quantity;
+        }
+      }
+      groupLeftoverQty += rem;
+    });
+
+    // 2. 剩餘散件跨商品混搭
+    let remLeftover = groupLeftoverQty;
+    for (const tier of group.tiers) {
+      if (remLeftover >= tier.target_quantity) {
+        const count = Math.floor(remLeftover / tier.target_quantity);
+        volumeGroupsSum += count * tier.package_price;
+        remLeftover %= tier.target_quantity;
+      }
+    }
+    volumeGroupsSum += remLeftover * group.unitPrice;
+  });
+
+  return Math.max(0, nonVolumeSum + volumeGroupsSum - manualDiscountsSum);
 }
 
 /**
- * 計算購物車中各單項商品分配到的折抵後金額與省下金額
+ * 計算購物車中各單項商品分配到的折抵後金額與省下金額 
+ * (同商品優先自組整組，剩餘散件才進行跨商品混搭多件特價)
  */
 function getItemDiscountedInfo(item, cartItems) {
-  const originalTotal = Number(item.unitPrice || 0) * Number(item.qty || 0);
   const qty = Number(item.qty || 0);
   const unitPrice = Number(item.unitPrice || 0);
-  const settings = item.volume_pricing_settings;
+  const originalTotal = unitPrice * qty;
 
-  if (!item.has_volume_pricing || !settings || getTiers(settings).length === 0 || qty <= 0) {
-    const finalTotal = Math.max(0, originalTotal - (item.discountAmount || 0));
-    return { discountedTotal: finalTotal, savings: item.discountAmount || 0, formattedDiscountedTotal: `$${finalTotal.toLocaleString()}` };
+  if (qty <= 0) {
+    return { discountedTotal: 0, savings: 0, formattedDiscountedTotal: '$0', effectiveAppliedQty: 0 };
   }
 
-  const volumeSubtotal = calcItemVolumeSubtotal(qty, unitPrice, settings);
-  const discountedTotal = Math.max(0, volumeSubtotal - (item.discountAmount || 0));
-  const savings = originalTotal - discountedTotal;
+  if (!item.has_volume_pricing || !item.volume_pricing_settings) {
+    const finalTotal = Math.max(0, originalTotal - (item.discountAmount || 0));
+    return { discountedTotal: finalTotal, savings: item.discountAmount || 0, formattedDiscountedTotal: `$${finalTotal.toLocaleString()}`, effectiveAppliedQty: 0 };
+  }
+
+  const tiers = getTiers(item.volume_pricing_settings);
+  if (tiers.length === 0) {
+    const finalTotal = Math.max(0, originalTotal - (item.discountAmount || 0));
+    return { discountedTotal: finalTotal, savings: item.discountAmount || 0, formattedDiscountedTotal: `$${finalTotal.toLocaleString()}`, effectiveAppliedQty: 0 };
+  }
+
+  // 1. 找出同混搭群組 (同 unitPrice + 同 tiers)
+  const sig = JSON.stringify(tiers);
+  const groupItems = (cartItems || []).filter(i => {
+    const iQty = Number(i.qty || 0);
+    if (iQty <= 0) return false;
+    if (!i.has_volume_pricing || !i.volume_pricing_settings) return false;
+    const iTiers = getTiers(i.volume_pricing_settings);
+    return Number(i.unitPrice || 0) === unitPrice && JSON.stringify(iTiers) === sig;
+  });
+
+  // 2. 收集各商品的「自身整組 (Self Bundles)」與「剩餘散件 (Leftover Qty)」
+  let groupLeftoverQtySum = 0;
+
+  const itemStats = groupItems.map(gi => {
+    const gQty = Number(gi.qty || 0);
+    let rem = gQty;
+    let selfSubtotal = 0;
+    let selfBundledQty = 0;
+
+    for (const tier of tiers) {
+      if (rem >= tier.target_quantity) {
+        const count = Math.floor(rem / tier.target_quantity);
+        selfSubtotal += count * tier.package_price;
+        selfBundledQty += count * tier.target_quantity;
+        rem %= tier.target_quantity;
+      }
+    }
+
+    groupLeftoverQtySum += rem;
+
+    return {
+      productId: gi.productId,
+      qty: gQty,
+      selfSubtotal,
+      selfBundledQty,
+      leftoverQty: rem
+    };
+  });
+
+  // 3. 計算散件跨商品混搭的優惠 (Leftover Mix-and-Match)
+  const leftoverOriginalTotal = groupLeftoverQtySum * unitPrice;
+  let remLeftover = groupLeftoverQtySum;
+  let leftoverSubtotal = 0;
+
+  for (const tier of tiers) {
+    if (remLeftover >= tier.target_quantity) {
+      const count = Math.floor(remLeftover / tier.target_quantity);
+      leftoverSubtotal += count * tier.package_price;
+      remLeftover %= tier.target_quantity;
+    }
+  }
+  leftoverSubtotal += remLeftover * unitPrice;
+  const leftoverSavings = leftoverOriginalTotal - leftoverSubtotal;
+
+  // 4. 計算當前 item 的最終小計與省下金額
+  const myStat = itemStats.find(s => s.productId === item.productId) || {
+    selfSubtotal: 0,
+    selfBundledQty: 0,
+    leftoverQty: 0
+  };
+
+  let myLeftoverSavings = 0;
+  if (leftoverSavings > 0 && leftoverOriginalTotal > 0) {
+    myLeftoverSavings = ((myStat.leftoverQty * unitPrice) / leftoverOriginalTotal) * leftoverSavings;
+  }
+
+  const myLeftoverSubtotal = Math.max(0, (myStat.leftoverQty * unitPrice) - myLeftoverSavings);
+  const rawDiscountedTotal = myStat.selfSubtotal + myLeftoverSubtotal - (item.discountAmount || 0);
+  const discountedTotal = Math.max(0, rawDiscountedTotal);
+  const totalSavings = originalTotal - discountedTotal;
+
+  const hasDecimals = Math.abs(discountedTotal - Math.round(discountedTotal)) > 0.001;
+  const formattedDiscountedTotal = hasDecimals
+    ? `$${discountedTotal.toFixed(2)}`
+    : `$${Math.round(discountedTotal).toLocaleString()}`;
+
+  const effectiveAppliedQty = myStat.selfBundledQty + (myLeftoverSavings > 0 ? myStat.leftoverQty : 0);
 
   return {
     discountedTotal,
-    savings: Math.max(0, savings),
-    formattedDiscountedTotal: `$${discountedTotal.toLocaleString()}`
+    savings: Math.max(0, totalSavings),
+    formattedDiscountedTotal,
+    effectiveAppliedQty
   };
 }
 
@@ -659,7 +791,7 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
           ) : (
             cartItems.map((item) => {
               const originalTotal = (item.unitPrice || 0) * (item.qty || 0);
-              const { savings, formattedDiscountedTotal } = getItemDiscountedInfo(item, cartItems);
+              const { savings, formattedDiscountedTotal, effectiveAppliedQty } = getItemDiscountedInfo(item, cartItems);
 
               return (
                 <div key={item.productId} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-200 hover:border-indigo-300 transition-colors">
@@ -672,7 +804,7 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                         </span>
                       )}
                       {item.has_volume_pricing && (() => {
-                        const breakdown = getAppliedTiersBreakdown(item.qty, item.volume_pricing_settings);
+                        const breakdown = getAppliedTiersBreakdown(effectiveAppliedQty || 0, item.volume_pricing_settings);
                         if (breakdown.applied.length === 0) {
                           const tiers = getTiers(item.volume_pricing_settings);
                           const nextTier = tiers[tiers.length - 1];

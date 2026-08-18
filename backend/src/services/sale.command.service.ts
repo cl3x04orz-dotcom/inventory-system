@@ -1,6 +1,6 @@
 import { prisma, runInTransaction } from '../database/context.js';
 import { InventoryService } from './inventory.service.js';
-import { PricingService, CartItemInput, calculateItemSubtotal } from './pricing.service.js';
+import { PricingService, CartItemInput, calculateItemDiscountedInfos } from './pricing.service.js';
 import { generateReceiptNo } from '../utils/receipt.util.js';
 
 export interface CreateRetailSalePayload {
@@ -35,7 +35,7 @@ export interface CreateRetailSalePayload {
 
 export const SaleCommandService = {
   /**
-   * 建立一筆 POS 門市零售結帳訂單
+   * 建立一筆 POS 門市零售結帳訂單 (POS 專用寫入模式)
    */
   async createRetailSale(payload: CreateRetailSalePayload) {
     const {
@@ -48,7 +48,7 @@ export const SaleCommandService = {
       receivedAmount = 0
     } = payload;
 
-    // 1. 透過 PricingService 計算精準金額 (包含多件組合價)
+    // 1. 透過 PricingService 計算精準總價與全品項分配金額
     const calcInput: CartItemInput[] = items.map(i => ({
       productId: i.productId,
       productName: i.productName,
@@ -64,6 +64,8 @@ export const SaleCommandService = {
       receivedAmount
     });
 
+    const itemDiscountedMap = calculateItemDiscountedInfos(calcInput);
+
     // 2. 用 DB Transaction 包裹整個結帳與庫存異動
     return await runInTransaction(async () => {
       const receiptNo = await generateReceiptNo(storeCode);
@@ -72,7 +74,7 @@ export const SaleCommandService = {
 
       // (A) 建立 Sales 主單與明細
       // 🔑 原貨 (original) 設為 0，商品出貨只記錄在領貨 (picked)
-      // 🔑 單價與小計依照組合價算出 (例: 55/3 = 18.3333)
+      // 🔑 單價與小計依照 POS 組合價精算分攤 (例: 55/3 = 18.3333)
       const sale = await prisma.sales.create({
         data: {
           saleId,
@@ -100,33 +102,25 @@ export const SaleCommandService = {
               const bundleSize = Number(item.bundleSize || 1);
               const totalPickedQty = isBundle && bundleSize > 1 ? item.qty * bundleSize : item.qty;
 
-              // 🔑 計算實際組合價小計與折扣
-              const lineSubtotal = calculateItemSubtotal({
-                productId: item.productId,
-                productName: item.productName,
-                unitPrice: item.unitPrice,
-                qty: item.qty,
-                discountAmount: item.discountAmount,
-                has_volume_pricing: item.has_volume_pricing,
-                volume_pricing_settings: item.volume_pricing_settings
-              });
+              const discInfo = itemDiscountedMap.get(item.productId) || {
+                discountedTotal: item.unitPrice * item.qty - (item.discountAmount || 0),
+                savings: item.discountAmount || 0
+              };
 
-              const originalLineTotal = item.unitPrice * item.qty;
-              const lineDiscount = Math.max(0, originalLineTotal - lineSubtotal) + (item.discountAmount || 0);
-
-              // 🔑 依單件算出的平均成交單價 (例 $100 / 6 = 16.6667)
+              const lineSubtotal = discInfo.discountedTotal;
+              const lineDiscount = discInfo.savings;
               const effectiveUnitPrice = totalPickedQty > 0 ? Number((lineSubtotal / totalPickedQty).toFixed(4)) : item.unitPrice;
 
               return {
                 productId: item.productId,
                 productName: item.productName,
-                picked: totalPickedQty, // 領貨處記錄實際出貨數量 (扣庫存: 6件)
+                picked: totalPickedQty, // 領貨處記錄實際出貨數量
                 original: 0,            // 原貨不用重複記錄，設為 0
-                sold: totalPickedQty,   // 實售數量 (單件數量: 6件)
-                unitPrice: effectiveUnitPrice, // 🔑 依單件算出的平均成交單價 (例 16.6667)
+                sold: totalPickedQty,   // 實售數量
+                unitPrice: effectiveUnitPrice, // 🔑 依單件算出的平均成交單價
                 unitCost: item.unitCost || 0,
                 discountAmount: lineDiscount,  // 🔑 多件/組合折抵金額
-                subtotal: lineSubtotal,        // 🔑 實際成交小計 (例 $100)
+                subtotal: lineSubtotal,        // 🔑 實際成交小計 ($18.3333 * 3 = $55)
                 storeCode
               };
             })
