@@ -226,17 +226,13 @@ export const ProductService = {
       }
     }
 
-    // 解析 allowedCommunityIds：只在 maxTotalQty 有傳入時才處理
+    // 解析 allowedCommunityIds：獨立處理 (不干擾 maxTotalQty)
     let parsedAllowedIds: string[] | undefined = undefined;
-    if (parsedMaxTotalQty !== undefined) {
-      if (parsedMaxTotalQty === null) {
-        // 清除限額 → 白名單強制清空
+    if (allowedCommunityIds !== undefined) {
+      if (Array.isArray(allowedCommunityIds)) {
+        parsedAllowedIds = allowedCommunityIds.map(String);
+      } else if (allowedCommunityIds === null || allowedCommunityIds === '') {
         parsedAllowedIds = [];
-      } else {
-        // 有限額 → 存入前端傳來的白名單（可為空陣列代表全社區開放）
-        parsedAllowedIds = Array.isArray(allowedCommunityIds)
-          ? allowedCommunityIds.map(String)
-          : [];
       }
     }
 

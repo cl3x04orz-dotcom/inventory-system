@@ -887,13 +887,14 @@ export const GroupBuyService = {
       return p;
     });
 
-    // 社區白名單過濾：有 maxTotalQty 且 allowedCommunityIds 不為空時，只有白名單內的社區才看得到
+    // 社區白名單過濾：當 allowedCommunityIds 不為空時，只有白名單內的社區才看得到 (獨立於 maxTotalQty)
     const communityId = targetComm.communityId;
     const communityName = targetComm.communityName;
     const products = mappedProducts.filter((p: any) => {
-      if (p.maxTotalQty === null || p.maxTotalQty === undefined) return true; // 無限額 → 不受限
-      if (!p.allowedCommunityIds || p.allowedCommunityIds.length === 0) return true; // 有限額但無白名單 → 全社區可見
-      return p.allowedCommunityIds.includes(communityId) || (communityName && p.allowedCommunityIds.includes(communityName)); // 有白名單 → 只有白名單社區可見
+      if (Array.isArray(p.allowedCommunityIds) && p.allowedCommunityIds.length > 0) {
+        return p.allowedCommunityIds.includes(communityId) || (communityName && p.allowedCommunityIds.includes(communityName));
+      }
+      return true; // 無白名單設定 → 全社區可見
     });
 
     const community = {
