@@ -12,6 +12,7 @@ import {
   ArrowRight,
   RefreshCw,
   ChevronLeft,
+  ChevronRight,
   ChevronDown,
   CreditCard,
   Banknote,
@@ -24,6 +25,10 @@ import {
   Calendar,
   Trash2,
   Gift,
+  Headphones,
+  ShieldCheck,
+  Mail,
+  X,
 } from "lucide-react";
 import { callGAS, memberApi } from "../utils/api";
 import { copyToClipboard } from '../utils/clipboard';
@@ -53,6 +58,101 @@ const BANK_INFO = {
 const LINE_PAY_URL = "https://line.me/ti/p/kjGUUdBqLE";
 const LINE_CONTACT_URL = "https://line.me/R/ti/p/@839rpabi";
 const LS_KEY = "mlw_customer"; // LocalStorage key
+
+// ── 法規與商城定型化政策文案 ─────────────────────────────────────
+const POLICY_CONTENT_MAP = {
+  shopping_notice: {
+    icon: '🛒',
+    title: '購物須知',
+    content: [
+      `1.【服務範疇與訂購】\n本商城「米立微 MilkZeroWaste」（米立微有限公司，統一編號：93545674）提供飲品、乳品及其他優選商品之線上預購服務，並依不同團購活動提供店面取貨、指定地點取貨及大樓團購配送。\n\n實際供應商品、取貨方式、配送範圍及相關活動內容，以商品頁面及下單時顯示之資訊為準。\n\n完成訂購前，請確認商品名稱、規格、數量、價格及取貨／配送方式是否正確。`,
+      `2.【訂單確認與通知】\n完成線上送出訂單後，系統將提供訂單確認資訊，並可能透過 LINE 或其他方式發送訂單明細通知。\n\n請您務必確認訂購品項、數量、金額及取貨／配送資訊。\n\n如發現訂單資料有誤，請儘速聯繫客服。`,
+      `3.【付款方式】\n本商城提供之付款方式以結帳頁面實際顯示為準。\n\n目前提供 LINE Pay 等線上付款方式。實際付款結果及訂單狀態，請以網站及付款服務顯示為準。\n\n如遇付款成功但訂單狀態異常，請勿重複付款，並儘速聯繫客服。`,
+      `4.【取貨與配送】\n本商城目前提供：\n• 店面取貨\n• 指定地點取貨\n• 大樓團購配送\n\n實際取貨地點、時間及配送安排，以商品頁面、團購活動及訂單通知所載內容為準。\n\n目前不提供一般宅配服務。`,
+      `5.【商品保存】\n低溫乳品及其他需要冷藏保存之商品，於取貨或收到商品後，請依商品包裝所標示之保存方式及保存溫度儘速妥善保存，以維持商品品質。\n\n若商品於取貨或配送時有明顯破損、滲漏、短少或品項錯誤，請儘速聯繫客服。`,
+      `6.【商品缺貨或供應異常】\n如因供應商缺貨、物流、天候或其他不可預期因素，導致商品無法依原訂單供應，我們將視實際情況與您聯繫，並依相關規定提供替換商品、退款或其他合理處理方式。`,
+      `7.【退換貨及退款】\n如商品有瑕疵、破損、短少、品項錯誤或其他異常情況，請儘速聯繫客服。\n\n食品及飲品之退換貨、退款及通訊交易解除權，依相關法令及本商城「退換貨／退款政策」辦理。\n\n詳細內容請參閱「退換貨／退款政策」。`,
+      `8.【客服聯絡方式】\n如有訂單、商品、付款、取貨或配送相關問題，請聯繫：\n客服電話：0911-899-752\n客服 Email：milkzerowaste@gmail.com\n營業地址：台南市永康區永大路二段386-6號`
+    ]
+  },
+  refund_policy: {
+    icon: '🔄',
+    title: '退換貨／退款政策',
+    content: [
+      `1.【生鮮食品及冷藏商品之解除權例外】\n本商城部分商品屬於易於腐敗、保存期限較短或解約時即將逾期之食品及飲品，例如鮮乳、優酪乳等。\n\n依《消費者保護法》第19條及《通訊交易解除權合理例外情事適用準則》第2條規定，符合前述條件之商品，經本商城於交易前明確告知後，得排除消費者7日無條件解除契約之權利。\n\n因此，屬於上述合理例外情事之商品，不適用7日無條件退貨。\n\n但若商品本身具有瑕疵、破損、變質、失溫、品項錯誤或其他可歸責於本商城之問題，仍不影響消費者依法所享有之相關權利。`,
+      `2.【商品瑕疵與異常處理】\n若您於取貨或收到商品後發現商品有以下情況：\n• 商品包裝破損\n• 商品滲漏\n• 商品疑似失溫\n• 商品變質或有異常\n• 商品品項錯誤\n• 商品數量短少\n• 其他商品本身之瑕疵\n\n請於發現問題後儘速聯繫我們。\n\n為協助確認商品狀況，請提供訂單編號、商品照片或影片，以及問題說明。\n\n客服電話：0911-899-752\n客服 Email：milkzerowaste@gmail.com`,
+      `3.【商品異常之處理方式】\n經確認商品確有瑕疵、破損、品項錯誤、短少或其他可歸責於本商城之問題後，我們將依實際情況提供：\n• 商品補發或更換\n• 部分退款\n• 全額退款\n• 其他合理之處理方式\n\n實際處理方式將依商品狀況、訂單內容及相關法令判斷。`,
+      `4.【退款方式與時間】\n符合退款條件之訂單，將依原付款方式或適當方式辦理退款。\n\n使用 LINE Pay 等線上付款方式完成付款者，退款將依相關付款服務之作業流程辦理。\n\n本商城原則上於確認退款條件後 3～5 個工作天內完成退款作業；實際款項入帳時間仍可能受到 LINE Pay、金融機構或其他付款服務商作業時間影響。`,
+      `5.【商品保存與消費者責任】\n商品完成店面取貨、指定地點取貨或大樓團購配送後，請依商品包裝標示之保存方式及保存溫度妥善保存。\n\n如商品於交付後因消費者未依商品標示之方式保存，或其他可歸責於消費者之原因導致商品變質或損壞，相關退換貨或退款將依實際情況判斷。`,
+      `6.【退換貨注意事項】\n如發現商品異常，請盡可能保留：\n1. 問題商品。\n2. 商品完整包裝。\n3. 商品標示及有效日期。\n4. 商品異常照片或影片。\n5. 訂單相關資訊。\n\n上述資料有助於我們確認商品狀況及釐清責任。`,
+      `7.【客服聯絡方式】\n米立微 MilkZeroWaste\n米立微有限公司\n統一編號：93545674\n客服電話：0911-899-752\n客服 Email：milkzerowaste@gmail.com\n營業地址：台南市永康區永大路二段386-6號\n\n如本政策與中華民國現行強制性法令有所不同，依相關法令規定辦理。`
+    ]
+  },
+  shipping_policy: {
+    icon: '🚚',
+    title: '配送／取貨說明',
+    content: [
+      `1.【配送方式】\n本商城目前提供以下商品交付方式：\n• 🏪 店面取貨\n• 📍 指定地點取貨\n• 🏢 大樓團購配送\n\n實際可選擇之取貨／配送方式，依商品、團購活動及下單時所顯示之選項為準。\n\n目前不提供一般宅配服務。`,
+      `2.【配送區域與運費】\n大樓團購及指定地點配送之服務範圍，依本商城實際開團之合作社區及指定配送區域為準。\n\n各配送區域之運費、免運門檻及配送條件，將於商品頁面、團購活動頁面或結帳時顯示。\n\n如訂單未達免運門檻，將依下單時所顯示之配送費用計算。`,
+      `3.【店面取貨】\n選擇店面取貨者，請於訂單指定之取貨時間至以下地址領取：\n台南市永康區永大路二段386-6號\n\n實際取貨時間及相關注意事項，以訂單通知或網站公告為準。\n\n領取商品時，建議確認商品品項及數量是否正確。`,
+      `4.【指定地點取貨】\n選擇指定地點取貨者，請依訂單或團購活動所載之指定地點及時間領取商品。\n\n不同團購活動之取貨地點及時間可能不同，請依當次活動及訂單通知為準。`,
+      `5.【大樓團購配送】\n參與合作社區或大樓團購者，商品將依該次團購活動所安排之日期、時段及指定地點進行配送。\n\n請於配送時段留意相關通知，並確保有人員可以配合收取商品。`,
+      `6.【無法聯繫或無法取貨】\n如配送人員抵達指定地點後無法聯繫收貨人，將透過電話或其他適當方式嘗試聯繫。\n\n若於合理等候時間內仍無法聯繫，且現場無適當之冷藏保存條件，為維護食品安全，配送人員可能將商品帶回門市或其他適當場所保存。\n\n如需再次配送，可能產生額外配送費用，實際處理方式將依訂單情況及配送條件與消費者聯繫確認。`,
+      `7.【食品保存】\n食品及飲品完成取貨或配送後，消費者應依商品包裝標示之保存方式及保存溫度儘速妥善保存。\n\n需要冷藏之商品，請於取貨或收到後儘速冷藏。\n\n如因消費者未依商品標示妥善保存，導致商品變質或其他問題，將依實際情況判斷責任。`,
+      `8.【配送異常】\n如商品於取貨或配送時發現有：\n• 商品破損\n• 包裝滲漏\n• 商品短少\n• 品項錯誤\n• 商品明顯異常\n\n請儘速與客服聯繫，並保留商品及相關包裝，以利確認及後續處理。`,
+      `9.【客服聯絡方式】\n如有配送、取貨或訂單相關問題，請聯繫：\n客服電話：0911-899-752\n客服 Email：milkzerowaste@gmail.com\n營業地址：台南市永康區永大路二段386-6號`
+    ]
+  },
+  payment_policy: {
+    icon: '💳',
+    title: '付款方式說明',
+    content: [
+      `1.【銀行轉帳】\n下單時請選擇「銀行轉帳」付款方式，完成訂單後，系統將提供指定銀行帳號及應付金額。請依訂單資訊完成轉帳，並於轉帳完成後，依網站提示輸入「轉帳帳號後五碼」，或透過客服提供相關付款資訊，以利本商城進行款項核對。款項確認後，訂單將依流程進行後續處理。\n\n銀行轉帳注意事項：\n• 請確認轉帳金額與訂單應付金額一致。\n• 完成轉帳後，請提供帳號後五碼，以利會計進行對帳。\n• 如轉帳金額與訂單金額不一致，請儘速聯繫客服確認。\n• 若款項尚未完成核對，訂單處理時間可能受到影響。`,
+      `2.【奶包金儲值扣抵】\n會員可使用帳號內已儲值之「奶包金」進行商品消費扣抵，可依訂單需求進行全額或部分扣抵。\n\n奶包金無折現功能，且無使用期限，會員可依需求使用。\n\n若訂單使用奶包金進行扣抵，其實際可使用金額及扣抵方式，以結帳頁面顯示為準。\n\n如訂單取消或符合退款條件，奶包金之返還方式將依本商城相關退款規定辦理。`,
+      `3.【LINE Pay】\n本商城支援 LINE Pay 即時付款服務。\n\n下單時請選擇「LINE Pay」付款方式，並依付款頁面提示完成付款。付款成功後，系統將依付款結果更新訂單付款狀態。\n\n如遇付款完成但訂單狀態未更新，請勿重複付款，並儘速聯繫客服協助確認。\n\nLINE Pay 實際付款流程及相關服務規範，依 LINE Pay 服務提供者之規定辦理。`,
+      `4.【現金付款】\n本商城部分訂單提供現金付款方式，適用於店面取貨、指定地點取貨或其他本商城指定之付款情況。下單時若結帳頁面提供「現金付款」選項，即可選擇現金付款。請於取貨或指定付款時間，依訂單應付金額支付現金。\n\n現金付款注意事項：\n• 請依訂單顯示之應付金額準備現金。\n• 建議準備接近訂單金額之現金，以利取貨流程順利進行。\n• 現金付款是否適用於特定商品、團購活動、取貨方式或指定地點，以商品頁面、結帳頁面及活動公告為準。\n• 如選擇現金付款但未於指定時間完成付款，可能影響訂單保留及後續處理。`,
+      `5.【付款確認與訂單處理】\n完成付款後，請確認訂單之付款狀態是否正確。不同付款方式之付款確認時間可能有所不同，訂單將於付款確認後依商城作業流程進行後續處理。\n\n如發生付款成功但訂單狀態異常、已扣款但訂單顯示未付款、銀行轉帳後無法核對、重複付款或付款金額與訂單金額不一致等情況，請勿重複付款，並儘速聯繫客服協助確認。`,
+      `6.【客服聯絡方式】\n米立微 MilkZeroWaste\n米立微有限公司\n統一編號：93545674\n客服電話：0911-899-752\n客服 Email：milkzerowaste@gmail.com\n營業地址：台南市永康區永大路二段386-6號`
+    ]
+  },
+  privacy_policy: {
+    icon: '🔒',
+    title: '隱私權保護政策',
+    content: [
+      `米立微有限公司（以下簡稱「本公司」，統一編號：93545674）非常重視您的個人資料及隱私權。為維護您的權益，請詳閱以下隱私權保護政策內容。本政策將說明本公司如何蒐集、處理及利用您於使用本商城服務時所提供之個人資料。`,
+      `1.【個人資料收集類別】\n當您使用本商城進行瀏覽、註冊會員、訂購商品、付款、取貨、配送、客服聯繫或參與相關活動時，我們可能依實際服務需要蒐集您的姓名、聯絡電話、Email、送貨或取貨相關資訊、LINE 帳號識別碼、訂單及交易紀錄，以及其他您主動提供之必要資料。`,
+      `2.【資料利用目的】\n本公司蒐集之個人資料，主要用於會員管理、訂單處理、商品取貨及配送、付款及金流對帳、退款處理、客服服務、訂單及服務通知、消費者聯繫、帳務處理、服務改善及內部統計分析等與本商城營運相關之用途。`,
+      `3.【資料提供與第三方使用】\n為完成訂單、付款、配送、通知或提供相關服務，本公司可能於必要範圍內，將相關資料提供予合作之金流、物流、配送、通訊或其他服務提供者使用。除法令另有規定或取得您的同意外，本公司不會任意將您的個人資料出租、出售或提供予無關之第三方。`,
+      `4.【資料保存與安全】\n本公司將依相關法令及業務所需之期間保存您的個人資料，並採取合理之技術及管理措施，防止個人資料遭未經授權之存取、竄改、洩漏、遺失或其他不當使用。當資料已無保存必要時，本公司將依相關規定進行刪除、停止使用或其他適當處理。`,
+      `5.【個人資料之權利】\n您依法得向本公司申請查詢、閱覽、補充、更正您的個人資料，並得依法請求停止蒐集、處理、利用或刪除個人資料。但如依法令或因本公司業務執行必要而有保存之必要者，得依相關規定辦理。`,
+      `6.【會員帳號與資料正確性】\n為確保訂單、付款、取貨及配送服務正常進行，請您提供正確、完整且最新之個人資料。如您提供之資料有變更，建議儘速於會員帳號內更新或聯繫客服協助處理。因資料錯誤、不完整或未及時更新所造成之訂單或服務問題，可能影響相關服務之正常進行。`,
+      `7.【LINE 及第三方服務】\n本商城可能使用 LINE、LINE Pay、物流、金流或其他第三方服務，以提供會員通知、付款、訂單處理或相關服務。相關資料之蒐集、處理及利用，除適用本政策外，亦可能受各該第三方服務提供者之隱私權政策及相關規範所約束。`,
+      `8.【Cookie 及網站使用紀錄】\n本商城可能使用 Cookie 或其他類似技術，以維持會員登入狀態、記錄購物車內容、改善網站功能及使用體驗，並進行網站流量及使用情形之統計分析。您可依所使用之瀏覽器設定管理或限制 Cookie，但部分網站功能可能因此受到影響。`,
+      `9.【政策修訂】\n本公司得因法令變更、服務內容調整或營運需要，適時修訂本隱私權保護政策。政策修訂後將公告於本商城網站，更新後之內容自公告日起生效。建議您定期查看本政策，以了解最新內容。`,
+      `10.【客服聯絡方式】\n如您對本隱私權保護政策、個人資料蒐集、處理或利用方式有任何疑問，或欲行使相關個人資料權利，請聯繫本公司客服。\n\n米立微 MilkZeroWaste\n米立微有限公司\n統一編號：93545674\n客服電話：0911-899-752\n客服 Email：milkzerowaste@gmail.com\n營業地址：台南市永康區永大路二段386-6號`
+    ]
+  },
+  terms_of_service: {
+    icon: '📜',
+    title: '網站服務條款',
+    content: [
+      `歡迎使用米立微 MilkZeroWaste 線上商城（以下簡稱「本網站」）。本網站由米立微有限公司（以下簡稱「本公司」，統一編號：93545674）營運。為保障您的權益，請您於使用本網站前詳閱以下服務條款。當您使用本網站服務，即表示您已閱讀、瞭解並同意接受本條款之內容。`,
+      `1.【條款認知與接受】\n當您存取、瀏覽、註冊會員、訂購商品或使用本網站提供之任何服務時，即表示您已閱讀、瞭解並同意接受本服務條款及本網站相關政策。若您不同意本條款內容，請停止使用本網站相關服務。`,
+      `2.【會員註冊與帳號】\n使用本網站部分功能可能需要註冊會員。註冊時請提供真實、正確及完整之資料，並於資料異動時適時更新。會員應妥善保管自己的帳號及相關登入資訊，如發現帳號遭他人未經授權使用，請儘速聯繫本公司客服。`,
+      `3.【使用者義務】\n您承諾於使用本網站時，遵守中華民國相關法令及本網站規定，不得利用本網站從事任何違法、詐欺、干擾系統運作、侵害他人權益或其他不當行為，亦不得以任何方式影響本網站正常營運。`,
+      `4.【訂單與商品資訊】\n本網站所提供之商品名稱、圖片、規格、價格、庫存、活動內容及其他商品資訊，均以網站實際顯示內容為準。完成訂購前，請確認商品名稱、規格、數量、價格及取貨或配送方式是否正確。若因商品供應、庫存、系統錯誤或其他不可預期因素導致訂單無法成立或履行，本公司將視實際情況與您聯繫並提供適當處理方式。`,
+      `5.【訂單成立與取消】\n您完成訂單送出後，系統將提供訂單相關資訊，但不代表本公司已無條件接受該訂單。訂單是否成立及後續處理，將依付款狀態、商品供應及本網站系統所顯示之訂單狀態為準。如有商品缺貨、供應異常、付款異常或其他無法履行訂單之情況，本公司得與您聯繫處理。`,
+      `6.【付款方式】\n本網站提供銀行轉帳、奶包金儲值扣抵、LINE Pay 及現金付款等方式，實際可使用之付款方式以商品頁面及結帳頁面顯示為準。各付款方式之使用規則，依本網站「付款方式」相關說明辦理。`,
+      `7.【取貨與配送】\n本網站提供店面取貨、指定地點取貨及大樓團購配送等服務，實際取貨地點、時間、配送範圍及相關安排，以商品頁面、團購活動及訂單通知所載內容為準。本網站目前不提供一般宅配服務。`,
+      `8.【智慧財產權聲明】\n本網站所包含之商標、Logo、商品圖片、攝影作品、文字、版面設計、網頁介面、程式、資料庫及其他內容，其智慧財產權除依法屬於第三方者外，均為本公司或合法權利人所有，受著作權法、商標法及其他相關智慧財產權法令保護。未經本公司或合法權利人事前書面授權，不得擅自複製、修改、重製、公開傳輸、散布、轉載、改作或以其他方式利用。`,
+      `9.【網站服務中斷或異常】\n本公司將盡合理努力維持本網站正常運作，但因系統維護、設備故障、網路異常、第三方服務中斷、天災、不可抗力或其他非本公司可控制之因素，可能造成網站暫時無法使用、資料傳輸延遲或服務中斷。本公司將於合理範圍內盡力恢復服務。`,
+      `10.【個人資料與隱私權】\n本網站對於會員及使用者個人資料之蒐集、處理及利用，依本網站「隱私權保護政策」及中華民國相關法令辦理。使用本網站即表示您已了解並同意本網站依相關政策及法令處理必要之個人資料。`,
+      `11.【服務條款之修改】\n本公司得因法令變更、服務內容調整、網站功能更新或營運需要，適時修改本服務條款。修改後之內容將公告於本網站，並自公告之日起生效。建議您定期查看本服務條款，以了解最新內容。`,
+      `12.【準據法與管轄法院】\n本服務條款之解釋與適用，均依中華民國法律辦理。如因本網站服務或本條款產生爭議，雙方應本於誠信原則協商處理；如仍無法解決，除法律另有強制規定外，同意以臺灣臺南地方法院為第一審管轄法院。`,
+      `13.【客服聯絡方式】\n如您對本服務條款、訂單、付款、取貨、配送或其他網站服務有任何疑問，請聯繫本公司客服。\n\n米立微 MilkZeroWaste\n米立微有限公司\n統一編號：93545674\n客服電話：0911-899-752\n客服 Email：milkzerowaste@gmail.com\n營業地址：台南市永康區永大路二段386-6號`
+    ]
+  }
+};
 
 // 自動補 0 與分機拆解輔助函數 (相容 09 手機、02-08 市話與 # 分機)
 const formatTaiwanPhone = (phone) => {
@@ -258,6 +358,14 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   const [showAreaModal, setShowAreaModal] = useState(false);
   const [activeCampaign, setActiveCampaign] = useState(null);
   const [nextOpenTime, setNextOpenTime] = useState(null);
+
+  // 📱 Mobile Footer & 政策彈窗控制狀態
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
+  const [activePolicyKey, setActivePolicyKey] = useState(null);
+
+  // 🛒 購物車彈出時動態捲軸防遮擋追蹤 Ref
+  const prevTotalQtyRef = useRef(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1507,6 +1615,28 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   };
 
   const totalQty = Object.values(cart).reduce((s, q) => s + q, 0);
+
+  // 🛒 當購物車從 0 件變為 >0 件時，若使用者停留在最底部，自動平滑調校捲軸，讓頁尾順暢上推浮於購物車條上方
+  useEffect(() => {
+    const prev = prevTotalQtyRef.current;
+    if (prev === 0 && totalQty > 0) {
+      if (listRef.current) {
+        const el = listRef.current;
+        const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        if (distanceToBottom < 200) {
+          setTimeout(() => {
+            if (listRef.current) {
+              listRef.current.scrollTo({
+                top: listRef.current.scrollHeight,
+                behavior: "smooth"
+              });
+            }
+          }, 80);
+        }
+      }
+    }
+    prevTotalQtyRef.current = totalQty;
+  }, [totalQty]);
 
   const { cartItems, cartTotal, discountDetails, availableGiftCredits, memberGiftCredits } = useMemo(() => {
     let tempItems = Object.entries(cart).map(([pid, qty]) => {
@@ -4490,6 +4620,7 @@ ${freeNote(newFee, newMin)}
               </p>
             </div>
           )}
+
           <button
             onClick={() => {
               if (canProceed && !isSubmitting) {
@@ -4866,12 +4997,296 @@ ${freeNote(newFee, newMin)}
                 </div>
               ))
             )}
+            {renderMobileFooter()}
           </div>
         </div>
         {renderBottomNav()}
       </div>
     );
   }
+
+  // ── 📱 Mobile Footer & 政策彈窗 Render Helpers (兩行嚴格零換行 + 長版權底座) ──
+  const renderMobileFooter = () => (
+    <footer className="w-full mt-1.5 mb-0 px-1 pt-2 pb-0 border-t border-[var(--border-primary)]/30 text-center select-none animate-in fade-in duration-300">
+      <div className="flex items-start justify-between text-xs px-0.5 gap-1">
+        {/* 左側：品牌招牌以下方公司與統編為底座居中 (不換行) */}
+        <div className="flex flex-col items-center text-center gap-0.5 shrink-0">
+          <div className="flex items-center gap-1 font-bold text-slate-700 text-xs whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 shrink-0" />
+            <span>米立微 MilkZeroWaste</span>
+          </div>
+          <div className="text-[9.5px] sm:text-[10px] text-slate-500 font-medium whitespace-nowrap">
+            米立微有限公司 <span className="text-slate-300 mx-0.5">|</span> 統編 93545674
+          </div>
+        </div>
+
+        {/* 右側：客服與政策入口以下方完整版權為底座居中 (不換行) */}
+        <div className="flex flex-col items-center text-center gap-0.5 shrink-0">
+          <div className="flex items-center justify-center gap-1.5 sm:gap-2 font-medium text-blue-500 text-xs whitespace-nowrap">
+            <button 
+              type="button" 
+              onClick={() => setShowServiceModal(true)} 
+              className="hover:underline flex items-center gap-0.5 cursor-pointer"
+            >
+              <Headphones size={12} className="text-emerald-500" />
+              <span>客服中心</span>
+            </button>
+            <span className="text-slate-300 font-normal">|</span>
+            <button 
+              type="button" 
+              onClick={() => setShowPolicyModal(true)} 
+              className="hover:underline flex items-center gap-0.5 cursor-pointer"
+            >
+              <ShieldCheck size={12} className="text-emerald-500" />
+              <span>網站政策</span>
+            </button>
+          </div>
+          <div className="text-[9px] text-slate-400 font-mono tracking-wider whitespace-nowrap">
+            © 2026 MilkZeroWaste Ltd.
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+
+  const renderServiceModal = () => {
+    if (!showServiceModal) return null;
+    return (
+      <div className="fixed inset-0 z-[9995] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200 select-none">
+        <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in slide-in-from-bottom duration-200 max-h-[85vh] overflow-y-auto">
+          {/* Header */}
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3.5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-xs">
+                <Headphones size={20} />
+              </div>
+              <div className="flex flex-col text-left">
+                <h3 className="text-base font-extrabold text-slate-800 tracking-tight">客服中心</h3>
+                <p className="text-[10px] text-slate-400 font-medium">如有任何疑問，歡迎隨時聯繫專人為您服務</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowServiceModal(false)}
+              className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* 聯絡資訊方塊 */}
+          <div className="bg-gradient-to-br from-slate-50 via-slate-50 to-emerald-50/40 border border-slate-200/70 rounded-2xl p-4 space-y-2 shadow-xs">
+            <div className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>聯絡專線與資訊</span>
+            </div>
+
+            <a href="tel:0911899752" className="group flex items-center justify-between p-2.5 rounded-xl hover:bg-white transition-all border border-transparent hover:border-slate-200/60 shadow-xs hover:shadow-sm">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <Phone size={15} />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-[10px] text-slate-400 font-medium">專線電話</span>
+                  <span className="text-xs font-extrabold text-blue-600 group-hover:text-blue-700">0911-899-752</span>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">撥打專線</span>
+            </a>
+
+            <a href="mailto:milkzerowaste@gmail.com" className="group flex items-center justify-between p-2.5 rounded-xl hover:bg-white transition-all border border-transparent hover:border-slate-200/60 shadow-xs hover:shadow-sm">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                  <Mail size={15} />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-[10px] text-slate-400 font-medium">客服信箱</span>
+                  <span className="text-xs font-bold text-slate-700 group-hover:text-sky-600">milkzerowaste@gmail.com</span>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold text-sky-600 bg-sky-50 px-2.5 py-1 rounded-lg group-hover:bg-sky-600 group-hover:text-white transition-colors">發送信件</span>
+            </a>
+
+            <div className="flex items-center gap-2.5 p-2.5 text-xs font-medium text-slate-600">
+              <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
+                <MapPin size={15} />
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="text-[10px] text-slate-400 font-medium">門市門牌地址</span>
+                <span className="text-xs font-semibold text-slate-700">台南市永康區永大路二段386-6號</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 購物條款與選單 */}
+          <div className="space-y-2 py-1">
+            <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-1 mb-1">
+              購物說明與條款
+            </div>
+            {[
+              { key: 'shopping_notice', label: '購物須知', IconComp: Package, desc: '服務範疇、取貨與退款須知' },
+              { key: 'refund_policy', label: '退換貨／退款政策', IconComp: RefreshCw, desc: '消保法規範與退款處置說明' },
+              { key: 'shipping_policy', label: '配送／取貨說明', IconComp: MapPin, desc: '店面取貨、指定地點與大樓配送' },
+              { key: 'payment_policy', label: '付款方式說明', IconComp: CreditCard, desc: '銀行轉帳、LINE Pay、奶包金與現金' },
+            ].map(item => (
+              <button
+                type="button"
+                key={item.key}
+                onClick={() => {
+                  setShowServiceModal(false);
+                  setActivePolicyKey(item.key);
+                }}
+                className="group w-full flex justify-between items-center p-3.5 rounded-2xl bg-gradient-to-r from-slate-50 to-slate-50/50 hover:from-emerald-50/70 hover:to-teal-50/40 text-xs font-bold text-slate-800 transition-all border border-slate-200/70 hover:border-emerald-300 hover:shadow-md cursor-pointer active:scale-[0.99]"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-xs group-hover:bg-emerald-500 group-hover:text-white transition-all shrink-0">
+                    <item.IconComp size={18} />
+                  </span>
+                  <span className="flex flex-col text-left">
+                    <span className="font-extrabold text-slate-800 group-hover:text-emerald-950 text-xs">{item.label}</span>
+                    <span className="text-[10px] text-slate-400 font-medium group-hover:text-emerald-700/80">{item.desc}</span>
+                  </span>
+                </span>
+                <ChevronRight size={18} className="text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all" />
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowServiceModal(false)}
+            className="w-full py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-xs font-extrabold transition-all shadow-xs border border-slate-200/60 cursor-pointer"
+          >
+            關閉
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPolicyModal = () => {
+    if (!showPolicyModal) return null;
+    return (
+      <div className="fixed inset-0 z-[9995] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200 select-none">
+        <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col gap-4.5 animate-in slide-in-from-bottom duration-200 max-h-[85vh] overflow-y-auto">
+          {/* Header */}
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3.5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-xs">
+                <ShieldCheck size={20} />
+              </div>
+              <div className="flex flex-col text-left">
+                <h3 className="text-base font-extrabold text-slate-800 tracking-tight">網站政策條款</h3>
+                <p className="text-[10px] text-slate-400 font-medium">米立微官方個資防護與服務規範</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowPolicyModal(false)}
+              className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* 政策選單 */}
+          <div className="space-y-2.5 py-1">
+            {[
+              { key: 'privacy_policy', label: '隱私權保護政策', IconComp: ShieldCheck, desc: '個資安全、利用目的與法規保障' },
+              { key: 'terms_of_service', label: '網站服務條款', IconComp: FileText, desc: '使用者規範與臺南地方法院管轄' },
+            ].map(item => (
+              <button
+                type="button"
+                key={item.key}
+                onClick={() => {
+                  setShowPolicyModal(false);
+                  setActivePolicyKey(item.key);
+                }}
+                className="group w-full flex justify-between items-center p-4 rounded-2xl bg-gradient-to-r from-slate-50 to-slate-50/50 hover:from-emerald-50/70 hover:to-teal-50/40 text-xs font-bold text-slate-800 transition-all border border-slate-200/70 hover:border-emerald-300 hover:shadow-md cursor-pointer active:scale-[0.99]"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-xs group-hover:bg-emerald-500 group-hover:text-white transition-all shrink-0">
+                    <item.IconComp size={20} />
+                  </span>
+                  <span className="flex flex-col text-left">
+                    <span className="font-extrabold text-slate-800 group-hover:text-emerald-950 text-sm">{item.label}</span>
+                    <span className="text-[11px] text-slate-500 font-medium group-hover:text-emerald-700/90">{item.desc}</span>
+                  </span>
+                </span>
+                <ChevronRight size={18} className="text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all" />
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowPolicyModal(false)}
+            className="w-full py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-xs font-extrabold transition-all shadow-xs border border-slate-200/60 cursor-pointer"
+          >
+            關閉
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPolicyViewerModal = () => {
+    if (!activePolicyKey) return null;
+    const policyData = POLICY_CONTENT_MAP[activePolicyKey];
+    if (!policyData) return null;
+
+    const IconComp = activePolicyKey === 'privacy_policy' ? ShieldCheck :
+                     activePolicyKey === 'terms_of_service' ? FileText :
+                     activePolicyKey === 'shopping_notice' ? Package :
+                     activePolicyKey === 'refund_policy' ? RefreshCw :
+                     activePolicyKey === 'shipping_policy' ? MapPin : CreditCard;
+
+    return (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200 select-none">
+        <div className="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-200 max-h-[85vh]">
+          {/* Header */}
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3.5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-xs">
+                <IconComp size={20} />
+              </div>
+              <div className="flex flex-col text-left">
+                <h3 className="text-base font-extrabold text-slate-800 tracking-tight">
+                  {policyData.title}
+                </h3>
+                <p className="text-[10px] text-slate-400 font-medium">米立微官方權益規範條文</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActivePolicyKey(null)}
+              className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* 政策內文 */}
+          <div className="overflow-y-auto pr-1 text-xs text-slate-700 leading-relaxed space-y-3 font-medium">
+            {policyData.content.map((paragraph, idx) => (
+              <div key={idx} className="whitespace-pre-line bg-slate-50/70 p-4 rounded-2xl border border-slate-200/60 text-slate-700 shadow-xs hover:border-slate-300/80 transition-colors">
+                {paragraph}
+              </div>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setActivePolicyKey(null)}
+            className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs font-extrabold transition-all shadow-md shadow-emerald-600/20 cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            <CheckCircle size={16} />
+            <span>我已瞭解</span>
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   if (step === "member") {
     return (
@@ -4953,6 +5368,7 @@ ${freeNote(newFee, newMin)}
               </button>
             </div>
           </div>
+          {renderMobileFooter()}
         </div>
         {renderBottomNav()}
       </div>
@@ -5278,7 +5694,7 @@ ${freeNote(newFee, newMin)}
           <div
             ref={listRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-y-auto pb-28 relative overscroll-contain"
+            className={`flex-1 overflow-y-auto ${totalQty > 0 ? (isGeneralUser && selectedCommunityId ? 'pb-[116px]' : 'pb-[80px]') : 'pb-3'} relative overscroll-contain`}
           >
             {products.length === 0 ? (
               <div className="text-center py-16 text-[var(--text-secondary)]">
@@ -5557,7 +5973,7 @@ ${freeNote(newFee, newMin)}
                 </div>
               ))
             )}
-            <div className="h-4" />
+            {renderMobileFooter()}
           </div>
 
           {/* 浮動購物車 */}
@@ -5702,6 +6118,11 @@ ${freeNote(newFee, newMin)}
       {/* 多規格口味選擇彈窗 */}
       {renderFlavorModal()}
       {renderBottomNav()}
+
+      {/* 📱 Mobile 客服中心與網站政策彈窗 */}
+      {renderServiceModal()}
+      {renderPolicyModal()}
+      {renderPolicyViewerModal()}
       
       {/* 自訂美化彈窗提示 */}
       {alertModal.show && (
