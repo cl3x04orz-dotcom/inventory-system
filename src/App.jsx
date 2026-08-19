@@ -459,6 +459,11 @@ function AppContent() {
         // BOSS and SUPER_ADMIN have god mode
         if (user.role === 'BOSS' || user.role === 'SUPER_ADMIN') return true;
 
+        // VIEWER (唯讀檢視者) 具備除了系統權限管理之外的所有頁面檢視權限
+        if (user.role === 'VIEWER') {
+            return targetPage !== 'superAdmin' && targetPage !== 'permissionControl';
+        }
+
         // Ensure permissions is an array, handle undefined/string cases
         let perms = user.permissions;
         if (typeof perms === 'undefined' || perms === null) {

@@ -18,6 +18,25 @@ import { WebPushService } from '../services/webpush.service.js';
 import { callGASFromNode } from '../utils/gasClient.js';
 
 export async function apiRouter(action: string, payload: any, user: any): Promise<any> {
+  // VIEWER 唯讀權限強效攔截器 (禁止任何寫入/修改/刪除操作)
+  const isViewer = user && (String(user.role).toUpperCase() === 'VIEWER');
+  if (isViewer) {
+    const readOnlyActions = new Set([
+      'login', 'renewToken', 'getStoreSetting', 'getUsers', 'getProducts',
+      'getSalesByDateRange', 'getSmartPickSuggestion', 'getVendors',
+      'getPurchaseSuggestions', 'getPurchaseHistory', 'getInventory',
+      'getInventoryAdjustmentHistory', 'getStocktakeHistory', 'getValuationReport',
+      'getExpenditures', 'getReceivables', 'getPayables', 'getIncomeStatement',
+      'getSalesRanking', 'getCustomerRanking', 'getCustomerAnalytics',
+      'getProfitAnalysis', 'getTurnoverRate', 'getActivityLog', 'getPayrollData',
+      'getEmployeeProfile', 'getGroupBuySettings', 'v1_getMember', 'v1_getOrders',
+      'getWebPushPublicKey', 'getRecentNotifications', 'generatePdf'
+    ]);
+    if (!readOnlyActions.has(action)) {
+      throw new Error('⚠️ 權限不足：VIEWER (唯讀檢視者) 帳號僅具備檢視權限，無法執行新增、修改或刪除操作。');
+    }
+  }
+
   switch (action) {
     case 'getWebPushPublicKey':
       return { success: true, publicKey: await WebPushService.getPublicKey() };
