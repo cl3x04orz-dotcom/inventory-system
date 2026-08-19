@@ -677,12 +677,12 @@ function AppContent() {
                                     {/* 團購管理 Group */}
                                     {(user.role === 'BOSS' || checkPermission('pendingOrders') || checkPermission('products')) && (
                                         <MobileNavGroup label="團購" icon={Users}>
-                                            <NavItem label="商城預覽" icon={ShoppingCart} onClick={() => handlePageChange('liffOrder')} active={page === 'liffOrder'} />
                                             {checkPermission('pendingOrders') && <NavItem label="訂單審核" icon={ClipboardList} onClick={() => handlePageChange('pendingOrders')} active={page === 'pendingOrders'} />}
                                             {checkPermission('pendingOrders') && <NavItem label="定期配管理" icon={Calendar} onClick={() => handlePageChange('subscriptionManagement')} active={page === 'subscriptionManagement'} />}
                                             {checkPermission('groupBuySettings') && <NavItem label="開團管理" icon={Link} onClick={() => handlePageChange('groupBuySettings')} active={page === 'groupBuySettings'} />}
                                             {checkPermission('products') && <NavItem label="商品屬性" icon={Edit2} onClick={() => handlePageChange('products')} active={page === 'products'} />}
                                             {checkPermission('memberManagement') && <NavItem label="會員管理" icon={Wallet} onClick={() => handlePageChange('memberManagement')} active={page === 'memberManagement'} />}
+                                            <NavItem label="商城預覽" icon={ShoppingCart} onClick={() => handlePageChange('liffOrder')} active={page === 'liffOrder'} />
                                         </MobileNavGroup>
                                     )}
                                     {(user.role === 'BOSS' || checkPermission('purchase') || checkPermission('purchaseHistory')) && (
@@ -768,12 +768,12 @@ function AppContent() {
                                      setOpenDropdown={setOpenDropdown}
                                      active={['pendingOrders', 'groupBuySettings', 'products', 'memberManagement', 'subscriptionManagement', 'liffOrder'].includes(page)}
                                  >
-                                     <NavItem label="商城預覽" icon={ShoppingCart} onClick={() => handlePageChange('liffOrder')} active={page === 'liffOrder'} />
                                      {checkPermission('pendingOrders') && <NavItem label="訂單審核" icon={ClipboardList} onClick={() => handlePageChange('pendingOrders')} active={page === 'pendingOrders'} />}
                                      {checkPermission('pendingOrders') && <NavItem label="定期配管理" icon={Calendar} onClick={() => handlePageChange('subscriptionManagement')} active={page === 'subscriptionManagement'} />}
                                      {checkPermission('groupBuySettings') && <NavItem label="開團管理" icon={Link} onClick={() => handlePageChange('groupBuySettings')} active={page === 'groupBuySettings'} />}
                                      {checkPermission('products') && <NavItem label="商品屬性" icon={Edit2} onClick={() => handlePageChange('products')} active={page === 'products'} />}
                                      {checkPermission('memberManagement') && <NavItem label="會員管理" icon={Wallet} onClick={() => handlePageChange('memberManagement')} active={page === 'memberManagement'} />}
+                                     <NavItem label="商城預覽" icon={ShoppingCart} onClick={() => handlePageChange('liffOrder')} active={page === 'liffOrder'} />
                                  </NavDropdown>
                             )}
                         </div>
