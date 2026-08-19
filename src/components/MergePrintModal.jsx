@@ -101,24 +101,61 @@ export default function MergePrintModal({
         }
     }, [endDate]);
 
+    // [Fix] 去重與去空白：確保 systemCustomers 不會因隱藏空白（如 "永康 "）產生重複欄位
+    const cleanSystemCustomers = React.useMemo(() => {
+        const map = new Map();
+        (systemCustomers || []).forEach(c => {
+            const rawName = typeof c === 'string' ? c : (c && c.name);
+            if (!rawName) return;
+            const cleanName = String(rawName).trim();
+            if (!cleanName) return;
+
+            const existing = map.get(cleanName);
+            if (!existing) {
+                map.set(cleanName, typeof c === 'string' ? { name: cleanName, isAiEnabled: false, schedule: [0,1,2,3,4,5,6], category: '市場' } : { ...c, name: cleanName });
+            } else {
+                const isObj = typeof c === 'object' && c !== null;
+                if (isObj && (c.isAiEnabled || (c.schedule && c.schedule.length < 7))) {
+                    map.set(cleanName, { ...existing, ...c, name: cleanName });
+                }
+            }
+        });
+        return Array.from(map.values());
+    }, [systemCustomers]);
+
     // ==========================================
     // 地點排程管理後台相關輔助函式
     // ==========================================
     const getCustSetting = (custName) => {
-        if (editingCustomers[custName]) {
-            return editingCustomers[custName];
+        const cleanName = String(custName || '').trim();
+        if (editingCustomers[cleanName]) {
+            return editingCustomers[cleanName];
         }
-        const orig = systemCustomers.find(c => (typeof c === 'string' ? c : c.name) === custName);
-        let origSchedule = [0,1,2,3,4,5,6];
-        let origAiEnabled = false;
-        let origCategory = '市場';
+
+        // 優先讀取本機獨立持久化備份 (避免 SWR 重整頁面時舊資料覆蓋)
+        let backupSetting = null;
+        try {
+            const cacheRaw = safeLocalStorage.getItem('CUSTOMER_SETTINGS_CACHE');
+            if (cacheRaw) {
+                const cacheMap = JSON.parse(cacheRaw);
+                if (cacheMap[cleanName]) backupSetting = cacheMap[cleanName];
+            }
+        } catch (e) {}
+
+        const orig = cleanSystemCustomers.find(c => (typeof c === 'string' ? c : c.name) === cleanName);
+        let origSchedule = backupSetting?.schedule || [0,1,2,3,4,5,6];
+        let origAiEnabled = backupSetting ? backupSetting.isAiEnabled === true : false;
+        let origCategory = backupSetting?.category || '市場';
+
         if (orig && typeof orig === 'object') {
-            origSchedule = orig.schedule || [0,1,2,3,4,5,6];
-            origAiEnabled = orig.isAiEnabled === true;
-            origCategory = orig.category || '市場';
+            if (!backupSetting) {
+                origSchedule = orig.schedule || [0,1,2,3,4,5,6];
+                origAiEnabled = orig.isAiEnabled === true;
+                origCategory = orig.category || '市場';
+            }
         }
         return {
-            customerName: custName,
+            customerName: cleanName,
             isAiEnabled: origAiEnabled,
             schedule: origSchedule,
             category: origCategory,
@@ -127,57 +164,62 @@ export default function MergePrintModal({
     };
 
     const handleEditCust = (custName, field, value) => {
-        const current = getCustSetting(custName);
+        const cleanName = String(custName || '').trim();
+        const current = getCustSetting(cleanName);
         const next = { ...current, [field]: value };
         setEditingCustomers(prev => ({
             ...prev,
-            [custName]: next
+            [cleanName]: next
         }));
     };
 
     const handleEditCustAndAutoSave = async (custName, field, value) => {
-        const current = getCustSetting(custName);
+        const cleanName = String(custName || '').trim();
+        const current = getCustSetting(cleanName);
         const next = { ...current, [field]: value };
         setEditingCustomers(prev => ({
             ...prev,
-            [custName]: { ...next, isSaving: true }
+            [cleanName]: { ...next, isSaving: true }
         }));
+
+        // 獨立備份至本機持久化儲存區，確保重整頁面 (F5) 亦不回滾
+        try {
+            const cacheRaw = safeLocalStorage.getItem('CUSTOMER_SETTINGS_CACHE') || '{}';
+            const cacheMap = JSON.parse(cacheRaw);
+            cacheMap[cleanName] = {
+                customerName: cleanName,
+                isAiEnabled: next.isAiEnabled,
+                schedule: next.schedule,
+                category: next.category
+            };
+            safeLocalStorage.setItem('CUSTOMER_SETTINGS_CACHE', JSON.stringify(cacheMap));
+        } catch (e) {}
+
         if (onUpdateCustomerSettings) {
-            const success = await onUpdateCustomerSettings({
-                customerName: custName,
+            await onUpdateCustomerSettings({
+                customerName: cleanName,
                 isAiEnabled: next.isAiEnabled,
                 schedule: next.schedule,
                 category: next.category
             });
-            if (success) {
-                const targetObj = systemCustomers.find(c => (typeof c === 'string' ? c : c.name) === custName);
-                if (targetObj && typeof targetObj === 'object') {
-                    targetObj[field] = value;
-                }
-                setEditingCustomers(prev => {
-                    const copy = { ...prev };
-                    delete copy[custName];
-                    return copy;
-                });
-            } else {
-                setEditingCustomers(prev => ({
-                    ...prev,
-                    [custName]: { ...next, isSaving: false }
-                }));
-            }
+            setEditingCustomers(prev => ({
+                ...prev,
+                [cleanName]: { ...next, isSaving: false }
+            }));
         } else {
             setEditingCustomers(prev => ({
                 ...prev,
-                [custName]: { ...next, isSaving: false }
+                [cleanName]: { ...next, isSaving: false }
             }));
         }
     };
 
     const handleSaveCust = async (custName) => {
-        const setting = getCustSetting(custName);
+        const cleanName = String(custName || '').trim();
+        const setting = getCustSetting(cleanName);
         setEditingCustomers(prev => ({
             ...prev,
-            [custName]: { ...setting, isSaving: true }
+            [cleanName]: { ...setting, isSaving: true }
         }));
         if (onUpdateCustomerSettings) {
             const success = await onUpdateCustomerSettings({
@@ -187,7 +229,7 @@ export default function MergePrintModal({
                 category: setting.category
             });
             if (success) {
-                const targetObj = systemCustomers.find(c => (typeof c === 'string' ? c : c.name) === custName);
+                const targetObj = cleanSystemCustomers.find(c => (typeof c === 'string' ? c : c.name) === cleanName);
                 if (targetObj && typeof targetObj === 'object') {
                     targetObj.isAiEnabled = setting.isAiEnabled;
                     targetObj.schedule = setting.schedule;
@@ -195,19 +237,19 @@ export default function MergePrintModal({
                 }
                 setEditingCustomers(prev => {
                     const copy = { ...prev };
-                    delete copy[custName];
+                    delete copy[cleanName];
                     return copy;
                 });
             } else {
                 setEditingCustomers(prev => ({
                     ...prev,
-                    [custName]: { ...setting, isSaving: false }
+                    [cleanName]: { ...setting, isSaving: false }
                 }));
             }
         } else {
             setEditingCustomers(prev => ({
                 ...prev,
-                [custName]: { ...setting, isSaving: false }
+                [cleanName]: { ...setting, isSaving: false }
             }));
         }
     };
@@ -332,15 +374,46 @@ export default function MergePrintModal({
 
     if (!show) return null;
 
-    // Group records by date
-    const groupedRecords = safeRecords.reduce((groups, record) => {
-        const dateKey = new Date(record.date).toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    // [Fix] 日期格式正規化：支援 YYYY-MM-DD、YYYY/MM/DD 及 ISO 時間字串，避免時區位移與跨格式忽視
+    const formatDateKey = (rawDate) => {
+        if (!rawDate) return '';
+        const str = String(rawDate).trim().replace(/-/g, '/');
+        const datePart = str.split('T')[0].split(' ')[0];
+        const parts = datePart.split('/');
+        if (parts.length === 3) {
+            const y = parts[0];
+            const m = parts[1].padStart(2, '0');
+            const d = parts[2].padStart(2, '0');
+            return `${y}/${m}/${d}`;
+        }
+        const dt = new Date(rawDate);
+        if (!isNaN(dt.getTime())) {
+            const y = dt.getFullYear();
+            const m = String(dt.getMonth() + 1).padStart(2, '0');
+            const d = String(dt.getDate()).padStart(2, '0');
+            return `${y}/${m}/${d}`;
+        }
+        return str;
+    };
+
+    // Filter out retail walk-in customer records and group records by normalized date
+    const RETAIL_NAMES = ['門市散客', '散客', '零售散客', '一般散客', 'POS散客', '一般顧客', 'null', 'undefined', ''];
+    const filteredRecords = safeRecords.filter(record => {
+        const cust = String(record.customer || '').trim();
+        if (!cust) return false;
+        if (RETAIL_NAMES.includes(cust)) return false;
+        return true;
+    });
+
+    const groupedRecords = filteredRecords.reduce((groups, record) => {
+        const dateKey = formatDateKey(record.date);
+        if (!dateKey) return groups;
         if (!groups[dateKey]) groups[dateKey] = [];
         groups[dateKey].push(record);
         return groups;
     }, {});
 
-    const sortedDates = Object.keys(groupedRecords).sort((a, b) => new Date(b) - new Date(a));
+    const sortedDates = Object.keys(groupedRecords).sort((a, b) => new Date(b.replace(/\//g, '-')) - new Date(a.replace(/\//g, '-')));
 
     // [New] 執行 AI 補貨建議
     const handleAIReplenish = async () => {
@@ -482,7 +555,7 @@ export default function MergePrintModal({
                                                 onChange={(e) => setAiCustomer(e.target.value)}
                                             >
                                                 <option value="">請點擊選取地點...</option>
-                                                {systemCustomers
+                                                {cleanSystemCustomers
                                                     .filter(c => {
                                                         if (typeof c === 'object' && c.isAiEnabled === false) return false;
                                                         if (showAllLocations) return true;
@@ -730,16 +803,16 @@ export default function MergePrintModal({
                                 <div className="col-span-2 text-center">操作</div>
                             </div>
 
-                            {systemCustomers
+                            {cleanSystemCustomers
                                 .filter(c => {
                                     const name = typeof c === 'string' ? c : c.name;
-                                    return name.toLowerCase().includes(searchCustQuery.toLowerCase());
+                                    return name.toLowerCase().includes(searchCustQuery.trim().toLowerCase());
                                 })
                                 .map(c => {
                                     const name = typeof c === 'string' ? c : c.name;
                                     const setting = getCustSetting(name);
                                     
-                                    const orig = systemCustomers.find(sc => (typeof sc === 'string' ? sc : sc.name) === name) || {};
+                                    const orig = cleanSystemCustomers.find(sc => (typeof sc === 'string' ? sc : sc.name) === name) || {};
                                     const origSchedule = orig.schedule || [0,1,2,3,4,5,6];
                                     const origAiEnabled = orig.isAiEnabled === true;
                                     

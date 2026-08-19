@@ -519,17 +519,20 @@ export const SalesService = {
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
 
+    const targetStoreCode = storeCode || 'MILI001';
     const disabledCustomers = await prisma.customer.findMany({
-      where: { isAiEnabled: false, storeCode },
+      where: { isAiEnabled: false, storeCode: targetStoreCode },
       select: { customerName: true }
     });
-    const disabledNames = disabledCustomers.map(c => c.customerName || '');
+    const disabledNames = disabledCustomers.map(c => String(c.customerName || '').trim());
+    const retailNames = ['門市散客', '散客', '零售散客', '一般散客', 'POS散客', '一般顧客', 'null', 'undefined', ''];
+    const excludedCustomers = Array.from(new Set([...disabledNames, ...retailNames]));
 
     const sales = await prisma.sales.findMany({
       where: {
         status: { not: 'VOID' },
-        customer: { notIn: disabledNames },
-        storeCode,
+        customer: { notIn: excludedCustomers },
+        storeCode: targetStoreCode,
         date: {
           gte: start,
           lte: end
@@ -779,32 +782,34 @@ export const SalesService = {
 
   // 更新客戶 AI 送貨排程與設定 (地點排程後台)
   async updateCustomerSettings(payload: any) {
-    const { customerName, isAiEnabled, schedule, category, storeCode } = payload;
+    const { customerName, isAiEnabled, schedule, category } = payload;
+    const targetStoreCode = payload.storeCode || 'MILI001';
     if (!customerName) throw new Error('缺少客戶/地點名稱');
 
+    const cleanName = String(customerName).trim();
     const existing = await prisma.customer.findFirst({
-      where: { customerName: String(customerName).trim(), storeCode }
+      where: { customerName: cleanName }
     });
 
     let updated;
     if (existing) {
-      await prisma.customer.updateMany({
-        where: { customerName: String(customerName).trim(), storeCode },
+      updated = await prisma.customer.update({
+        where: { customerName: cleanName },
         data: {
           isAiEnabled: isAiEnabled !== undefined ? Boolean(isAiEnabled) : undefined,
           schedule: schedule !== undefined ? schedule : undefined,
-          category: category !== undefined ? String(category) : undefined
+          category: category !== undefined ? String(category) : undefined,
+          storeCode: targetStoreCode
         }
       });
-      updated = await prisma.customer.findFirst({ where: { customerName: String(customerName).trim(), storeCode } });
     } else {
       updated = await prisma.customer.create({
         data: {
-          customerName: String(customerName).trim(),
+          customerName: cleanName,
           isAiEnabled: isAiEnabled !== undefined ? Boolean(isAiEnabled) : false,
           schedule: schedule !== undefined ? schedule : [],
           category: category !== undefined ? String(category) : '市場',
-          storeCode
+          storeCode: targetStoreCode
         }
       });
     }

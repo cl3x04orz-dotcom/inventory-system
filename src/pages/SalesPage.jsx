@@ -1079,9 +1079,14 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
     const loadMergeRecords = async (start = mergeStartDate, end = mergeEndDate) => {
         setIsMergeSearchLoading(true);
         try {
+            // [Fix] 擴充結束日期時間戳至當天 23:59:59，確保今日白天發生的銷售與退貨單據不被凌晨 00:00:00 邊界攔截
+            let cleanEnd = end ? String(end).trim() : '';
+            if (cleanEnd && !cleanEnd.includes(' ')) {
+                cleanEnd = `${cleanEnd} 23:59:59`;
+            }
             const records = await callGAS(apiUrl, 'getSalesByDateRange', {
                 startDate: start,
-                endDate: end
+                endDate: cleanEnd
             }, user.token);
             setMergeRecords(records);
         } catch (error) {
@@ -1805,37 +1810,37 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 systemCustomers={systemCustomers}
                 onUpdateCustomerSettings={async (payload) => {
                     try {
-                        const res = await callGAS(apiUrl, 'updateCustomerSettings', payload, user?.token);
+                        const cleanName = String(payload.customerName || '').trim();
+                        const cleanPayload = { ...payload, customerName: cleanName };
+                        const res = await callGAS(apiUrl, 'updateCustomerSettings', cleanPayload, user?.token);
                         if (res && res.success) {
                             setSystemCustomers(prev => {
-                                if (!Array.isArray(prev)) return prev;
-                                const copy = [...prev];
-                                const idx = copy.findIndex(c => (typeof c === 'string' ? c : c.name) === payload.customerName);
-                                if (idx >= 0) {
-                                    if (typeof copy[idx] === 'string') {
-                                        copy[idx] = {
-                                            name: payload.customerName,
-                                            isAiEnabled: payload.isAiEnabled,
-                                            schedule: payload.schedule,
-                                            category: payload.category || '市場'
-                                        };
-                                    } else {
-                                        copy[idx] = {
-                                            ...copy[idx],
-                                            isAiEnabled: payload.isAiEnabled,
-                                            schedule: payload.schedule,
-                                            category: payload.category || copy[idx].category || '市場'
-                                        };
+                                const list = Array.isArray(prev) ? prev : [];
+                                // 徹底過濾掉所有名稱匹配 cleanName 的新舊殘留條目 (包含字串與物件)
+                                const filtered = list.filter(c => {
+                                    const nameStr = typeof c === 'string' ? c : (c && c.name);
+                                    return String(nameStr || '').trim() !== cleanName;
+                                });
+                                const updatedList = [...filtered, {
+                                    name: cleanName,
+                                    isAiEnabled: payload.isAiEnabled === true,
+                                    schedule: Array.isArray(payload.schedule) ? payload.schedule : [0,1,2,3,4,5,6],
+                                    category: payload.category || '市場'
+                                }];
+
+                                // [Fix] 同步更新 SWR 本地快取，避免重新整理頁面 (F5) 時舊快取蓋掉最新設定！
+                                try {
+                                    const cachedRaw = safeLocalStorage.getItem('SALES_PAGE_CACHE');
+                                    if (cachedRaw) {
+                                        const cachedData = JSON.parse(cachedRaw);
+                                        cachedData.systemCustomers = updatedList;
+                                        safeLocalStorage.setItem('SALES_PAGE_CACHE', JSON.stringify(cachedData));
                                     }
-                                } else {
-                                    copy.push({
-                                        name: payload.customerName,
-                                        isAiEnabled: payload.isAiEnabled,
-                                        schedule: payload.schedule,
-                                        category: payload.category || '市場'
-                                    });
+                                } catch (e) {
+                                    console.error('更新本地快取失敗', e);
                                 }
-                                return copy;
+
+                                return updatedList;
                             });
                             return true;
                         }
