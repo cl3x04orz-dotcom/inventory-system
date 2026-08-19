@@ -1,8 +1,8 @@
 import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 /**
- * Unified API Caller for Google Apps Script (GAS)
+ * Unified Backend API Client
  */
-export const callGAS = async (apiUrl, action, payload, token = null, customTimeoutMs = null) => {
+export const callApi = async (apiUrl, action, payload, token = null, customTimeoutMs = null) => {
     try {
         let targetUrl = apiUrl || (typeof window !== 'undefined' && window.GAS_API_URL) || import.meta.env.VITE_GAS_API_URL;
         if (!targetUrl || targetUrl.includes('github.io')) {
@@ -95,8 +95,11 @@ export const callGAS = async (apiUrl, action, payload, token = null, customTimeo
 
 // 米立微會員中心 V1 - API Helpers
 export const memberApi = {
-    getMember: (apiUrl, payload) => callGAS(apiUrl, 'v1_getMember', payload),
-    saveMember: (apiUrl, payload) => callGAS(apiUrl, 'v1_saveMember', payload),
-    getOrders: (apiUrl, payload) => callGAS(apiUrl, 'v1_getOrders', payload),
-    reorder: (apiUrl, payload) => callGAS(apiUrl, 'v1_reorder', payload),
+    getMember: (apiUrl, payload) => callApi(apiUrl, 'v1_getMember', payload),
+    saveMember: (apiUrl, payload) => callApi(apiUrl, 'v1_saveMember', payload),
+    getOrders: (apiUrl, payload) => callApi(apiUrl, 'v1_getOrders', payload),
+    reorder: (apiUrl, payload) => callApi(apiUrl, 'v1_reorder', payload),
 };
+
+// 相容性別名層 (100% 保障舊程式碼呼叫)
+export const callGAS = callApi;
