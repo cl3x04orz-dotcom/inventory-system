@@ -2552,6 +2552,295 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     return `https://line.me/R/oaMessage/@839rpabi/?text=${encodeURIComponent(text)}`;
   };
 
+  function renderMobileFooter() {
+    return (
+      <footer className="w-full mt-3 mb-0 px-3.5 sm:px-4 pb-2 select-none animate-in fade-in duration-300">
+        <div className="pt-3 border-t border-[var(--border-primary)]/40 flex items-start justify-between text-xs gap-1">
+          {/* 左側：品牌招牌以下方公司與統編為底座居中 (不換行) */}
+          <div className="flex flex-col items-center text-center gap-0.5 shrink-0">
+            <div className="flex items-center gap-1 font-bold text-slate-700 text-xs whitespace-nowrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 shrink-0" />
+              <span>米立微 MilkZeroWaste</span>
+            </div>
+            <div className="text-[9.5px] sm:text-[10px] text-slate-500 font-medium whitespace-nowrap">
+              米立微有限公司 <span className="text-slate-300 mx-0.5">|</span> 統編 93545674
+            </div>
+          </div>
+
+          {/* 右側：客服與政策入口以下方完整版權為底座居中 (不換行) */}
+          <div className="flex flex-col items-center text-center gap-0.5 shrink-0">
+            <div className="flex items-center justify-center gap-1.5 sm:gap-2 font-medium text-blue-500 text-xs whitespace-nowrap">
+              <button 
+                type="button" 
+                onClick={() => setShowServiceModal(true)} 
+                className="hover:underline flex items-center gap-0.5 cursor-pointer"
+              >
+                <Headphones size={12} className="text-emerald-500" />
+                <span>客服中心</span>
+              </button>
+              <span className="text-slate-300 font-normal">|</span>
+              <button 
+                type="button" 
+                onClick={() => setShowPolicyModal(true)} 
+                className="hover:underline flex items-center gap-0.5 cursor-pointer"
+              >
+                <ShieldCheck size={12} className="text-emerald-500" />
+                <span>網站政策</span>
+              </button>
+            </div>
+            <div className="text-[9px] text-slate-400 font-mono tracking-wider whitespace-nowrap">
+              © 2026 MilkZeroWaste Ltd.
+            </div>
+          </div>
+        </div>
+      </footer>
+    );
+  }
+
+  function renderServiceModal() {
+    if (!showServiceModal) return null;
+    return (
+      <div className="fixed inset-0 z-[9995] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200 select-none">
+        <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in slide-in-from-bottom duration-200 max-h-[85vh] overflow-y-auto">
+          {/* Header */}
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3.5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-xs">
+                <Headphones size={20} />
+              </div>
+              <div className="flex flex-col text-left">
+                <h3 className="text-base font-extrabold text-slate-800 tracking-tight">客服中心</h3>
+                <p className="text-[10px] text-slate-400 font-medium">如有任何疑問，歡迎隨時聯繫專人為您服務</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowServiceModal(false)}
+              className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* 聯絡資訊方塊 */}
+          <div className="bg-gradient-to-br from-slate-50 via-slate-50 to-emerald-50/40 border border-slate-200/70 rounded-2xl p-4 space-y-2 shadow-xs">
+            <div className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>聯絡專線與資訊</span>
+            </div>
+
+            <a href="tel:0911899752" className="group flex items-center justify-between p-2.5 rounded-xl hover:bg-white transition-all border border-transparent hover:border-slate-200/60 shadow-xs hover:shadow-sm">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <Phone size={15} />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-[10px] text-slate-400 font-medium">專線電話</span>
+                  <span className="text-xs font-extrabold text-blue-600 group-hover:text-blue-700">0911-899-752</span>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">撥打專線</span>
+            </a>
+
+            <a 
+              href="https://lin.ee/6N0AET0" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="group flex items-center justify-between p-2.5 rounded-xl hover:bg-white transition-all border border-transparent hover:border-slate-200/60 shadow-xs hover:shadow-sm"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 font-extrabold text-[10px]">
+                  LINE
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-[10px] text-slate-400 font-medium">官方 LINE 客服</span>
+                  <span className="text-xs font-extrabold text-emerald-600 group-hover:text-emerald-700">@milkzerowaste</span>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors">加入好友</span>
+            </a>
+
+            <div className="flex items-center gap-2.5 p-2.5 text-xs font-medium text-slate-600">
+              <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
+                <MapPin size={15} />
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="text-[10px] text-slate-400 font-medium">門市門牌地址</span>
+                <span className="text-xs font-semibold text-slate-700">台南市永康區永大路二段386-6號</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 購物條款與選單 */}
+          <div className="space-y-2 py-1">
+            <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-1 mb-1">
+              購物說明與條款
+            </div>
+            {[
+              { key: 'shopping_notice', label: '購物須知', IconComp: Package, desc: '服務範疇、取貨與退款須知' },
+              { key: 'refund_policy', label: '退換貨／退款政策', IconComp: RefreshCw, desc: '消保法規範與退款處置說明' },
+              { key: 'shipping_policy', label: '配送／取貨說明', IconComp: MapPin, desc: '店面取貨、指定地點與大樓配送' },
+              { key: 'payment_policy', label: '付款方式說明', IconComp: CreditCard, desc: '銀行轉帳、LINE Pay、奶包金與現金' },
+            ].map(item => (
+              <button
+                type="button"
+                key={item.key}
+                onClick={() => {
+                  setShowServiceModal(false);
+                  setActivePolicyKey(item.key);
+                }}
+                className="group w-full flex justify-between items-center p-3.5 rounded-2xl bg-gradient-to-r from-slate-50 to-slate-50/50 hover:from-emerald-50/70 hover:to-teal-50/40 text-xs font-bold text-slate-800 transition-all border border-slate-200/70 hover:border-emerald-300 hover:shadow-md cursor-pointer active:scale-[0.99]"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-xs group-hover:bg-emerald-500 group-hover:text-white transition-all shrink-0">
+                    <item.IconComp size={18} />
+                  </span>
+                  <span className="flex flex-col text-left">
+                    <span className="font-extrabold text-slate-800 group-hover:text-emerald-950 text-xs">{item.label}</span>
+                    <span className="text-[10px] text-slate-400 font-medium group-hover:text-emerald-700/80">{item.desc}</span>
+                  </span>
+                </span>
+                <ChevronRight size={18} className="text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all" />
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowServiceModal(false)}
+            className="w-full py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-xs font-extrabold transition-all shadow-xs border border-slate-200/60 cursor-pointer"
+          >
+            關閉
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  function renderPolicyModal() {
+    if (!showPolicyModal) return null;
+    return (
+      <div className="fixed inset-0 z-[9995] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200 select-none">
+        <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col gap-4.5 animate-in slide-in-from-bottom duration-200 max-h-[85vh] overflow-y-auto">
+          {/* Header */}
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3.5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-xs">
+                <ShieldCheck size={20} />
+              </div>
+              <div className="flex flex-col text-left">
+                <h3 className="text-base font-extrabold text-slate-800 tracking-tight">網站政策條款</h3>
+                <p className="text-[10px] text-slate-400 font-medium">米立微官方個資防護與服務規範</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowPolicyModal(false)}
+              className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* 政策選單 */}
+          <div className="space-y-2.5 py-1">
+            {[
+              { key: 'privacy_policy', label: '隱私權保護政策', IconComp: ShieldCheck, desc: '個資安全、利用目的與法規保障' },
+              { key: 'terms_of_service', label: '網站服務條款', IconComp: FileText, desc: '使用者規範與臺南地方法院管轄' },
+            ].map(item => (
+              <button
+                type="button"
+                key={item.key}
+                onClick={() => {
+                  setShowPolicyModal(false);
+                  setActivePolicyKey(item.key);
+                }}
+                className="group w-full flex justify-between items-center p-4 rounded-2xl bg-gradient-to-r from-slate-50 to-slate-50/50 hover:from-emerald-50/70 hover:to-teal-50/40 text-xs font-bold text-slate-800 transition-all border border-slate-200/70 hover:border-emerald-300 hover:shadow-md cursor-pointer active:scale-[0.99]"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-xs group-hover:bg-emerald-500 group-hover:text-white transition-all shrink-0">
+                    <item.IconComp size={20} />
+                  </span>
+                  <span className="flex flex-col text-left">
+                    <span className="font-extrabold text-slate-800 group-hover:text-emerald-950 text-sm">{item.label}</span>
+                    <span className="text-[11px] text-slate-500 font-medium group-hover:text-emerald-700/90">{item.desc}</span>
+                  </span>
+                </span>
+                <ChevronRight size={18} className="text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all" />
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowPolicyModal(false)}
+            className="w-full py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-xs font-extrabold transition-all shadow-xs border border-slate-200/60 cursor-pointer"
+          >
+            關閉
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  function renderPolicyViewerModal() {
+    if (!activePolicyKey) return null;
+    const policyData = POLICY_CONTENT_MAP[activePolicyKey];
+    if (!policyData) return null;
+
+    const IconComp = activePolicyKey === 'privacy_policy' ? ShieldCheck :
+                     activePolicyKey === 'terms_of_service' ? FileText :
+                     activePolicyKey === 'shopping_notice' ? Package :
+                     activePolicyKey === 'refund_policy' ? RefreshCw :
+                     activePolicyKey === 'shipping_policy' ? MapPin : CreditCard;
+
+    return (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200 select-none">
+        <div className="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-200 max-h-[85vh]">
+          {/* Header */}
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3.5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-xs">
+                <IconComp size={20} />
+              </div>
+              <div className="flex flex-col text-left">
+                <h3 className="text-base font-extrabold text-slate-800 tracking-tight">
+                  {policyData.title}
+                </h3>
+                <p className="text-[10px] text-slate-400 font-medium">米立微官方權益規範條文</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActivePolicyKey(null)}
+              className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* 政策內文 */}
+          <div className="overflow-y-auto pr-1 text-xs text-slate-700 leading-relaxed space-y-3 font-medium">
+            {policyData.content.map((paragraph, idx) => (
+              <div key={idx} className="whitespace-pre-line bg-slate-50/70 p-4 rounded-2xl border border-slate-200/60 text-slate-700 shadow-xs hover:border-slate-300/80 transition-colors">
+                {paragraph}
+              </div>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setActivePolicyKey(null)}
+            className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs font-extrabold transition-all shadow-md shadow-emerald-600/20 cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            <CheckCircle size={16} />
+            <span>我已瞭解</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // ════════════════════════════════════════════════════════════
   // 感謝頁
   // ════════════════════════════════════════════════════════════
@@ -5004,292 +5293,7 @@ ${freeNote(newFee, newMin)}
     );
   }
 
-  const renderMobileFooter = () => (
-    <footer className="w-full mt-3 mb-0 px-3.5 sm:px-4 pb-2 select-none animate-in fade-in duration-300">
-      <div className="pt-3 border-t border-[var(--border-primary)]/40 flex items-start justify-between text-xs gap-1">
-        {/* 左側：品牌招牌以下方公司與統編為底座居中 (不換行) */}
-        <div className="flex flex-col items-center text-center gap-0.5 shrink-0">
-          <div className="flex items-center gap-1 font-bold text-slate-700 text-xs whitespace-nowrap">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 shrink-0" />
-            <span>米立微 MilkZeroWaste</span>
-          </div>
-          <div className="text-[9.5px] sm:text-[10px] text-slate-500 font-medium whitespace-nowrap">
-            米立微有限公司 <span className="text-slate-300 mx-0.5">|</span> 統編 93545674
-          </div>
-        </div>
 
-        {/* 右側：客服與政策入口以下方完整版權為底座居中 (不換行) */}
-        <div className="flex flex-col items-center text-center gap-0.5 shrink-0">
-          <div className="flex items-center justify-center gap-1.5 sm:gap-2 font-medium text-blue-500 text-xs whitespace-nowrap">
-            <button 
-              type="button" 
-              onClick={() => setShowServiceModal(true)} 
-              className="hover:underline flex items-center gap-0.5 cursor-pointer"
-            >
-              <Headphones size={12} className="text-emerald-500" />
-              <span>客服中心</span>
-            </button>
-            <span className="text-slate-300 font-normal">|</span>
-            <button 
-              type="button" 
-              onClick={() => setShowPolicyModal(true)} 
-              className="hover:underline flex items-center gap-0.5 cursor-pointer"
-            >
-              <ShieldCheck size={12} className="text-emerald-500" />
-              <span>網站政策</span>
-            </button>
-          </div>
-          <div className="text-[9px] text-slate-400 font-mono tracking-wider whitespace-nowrap">
-            © 2026 MilkZeroWaste Ltd.
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-
-  const renderServiceModal = () => {
-    if (!showServiceModal) return null;
-    return (
-      <div className="fixed inset-0 z-[9995] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200 select-none">
-        <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in slide-in-from-bottom duration-200 max-h-[85vh] overflow-y-auto">
-          {/* Header */}
-          <div className="flex justify-between items-center border-b border-slate-100 pb-3.5">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-xs">
-                <Headphones size={20} />
-              </div>
-              <div className="flex flex-col text-left">
-                <h3 className="text-base font-extrabold text-slate-800 tracking-tight">客服中心</h3>
-                <p className="text-[10px] text-slate-400 font-medium">如有任何疑問，歡迎隨時聯繫專人為您服務</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowServiceModal(false)}
-              className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
-            >
-              <X size={18} />
-            </button>
-          </div>
-
-          {/* 聯絡資訊方塊 */}
-          <div className="bg-gradient-to-br from-slate-50 via-slate-50 to-emerald-50/40 border border-slate-200/70 rounded-2xl p-4 space-y-2 shadow-xs">
-            <div className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>聯絡專線與資訊</span>
-            </div>
-
-            <a href="tel:0911899752" className="group flex items-center justify-between p-2.5 rounded-xl hover:bg-white transition-all border border-transparent hover:border-slate-200/60 shadow-xs hover:shadow-sm">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                  <Phone size={15} />
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-[10px] text-slate-400 font-medium">專線電話</span>
-                  <span className="text-xs font-extrabold text-blue-600 group-hover:text-blue-700">0911-899-752</span>
-                </div>
-              </div>
-              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">撥打專線</span>
-            </a>
-
-            <a 
-              href="https://lin.ee/6N0AET0" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="group flex items-center justify-between p-2.5 rounded-xl hover:bg-white transition-all border border-transparent hover:border-slate-200/60 shadow-xs hover:shadow-sm"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 font-extrabold text-[10px]">
-                  LINE
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-[10px] text-slate-400 font-medium">官方 LINE 客服</span>
-                  <span className="text-xs font-extrabold text-emerald-600 group-hover:text-emerald-700">@milkzerowaste</span>
-                </div>
-              </div>
-              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors">加入好友</span>
-            </a>
-
-            <div className="flex items-center gap-2.5 p-2.5 text-xs font-medium text-slate-600">
-              <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
-                <MapPin size={15} />
-              </div>
-              <div className="flex flex-col text-left">
-                <span className="text-[10px] text-slate-400 font-medium">門市門牌地址</span>
-                <span className="text-xs font-semibold text-slate-700">台南市永康區永大路二段386-6號</span>
-              </div>
-            </div>
-          </div>
-
-          {/* 購物條款與選單 */}
-          <div className="space-y-2 py-1">
-            <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-1 mb-1">
-              購物說明與條款
-            </div>
-            {[
-              { key: 'shopping_notice', label: '購物須知', IconComp: Package, desc: '服務範疇、取貨與退款須知' },
-              { key: 'refund_policy', label: '退換貨／退款政策', IconComp: RefreshCw, desc: '消保法規範與退款處置說明' },
-              { key: 'shipping_policy', label: '配送／取貨說明', IconComp: MapPin, desc: '店面取貨、指定地點與大樓配送' },
-              { key: 'payment_policy', label: '付款方式說明', IconComp: CreditCard, desc: '銀行轉帳、LINE Pay、奶包金與現金' },
-            ].map(item => (
-              <button
-                type="button"
-                key={item.key}
-                onClick={() => {
-                  setShowServiceModal(false);
-                  setActivePolicyKey(item.key);
-                }}
-                className="group w-full flex justify-between items-center p-3.5 rounded-2xl bg-gradient-to-r from-slate-50 to-slate-50/50 hover:from-emerald-50/70 hover:to-teal-50/40 text-xs font-bold text-slate-800 transition-all border border-slate-200/70 hover:border-emerald-300 hover:shadow-md cursor-pointer active:scale-[0.99]"
-              >
-                <span className="flex items-center gap-3">
-                  <span className="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-xs group-hover:bg-emerald-500 group-hover:text-white transition-all shrink-0">
-                    <item.IconComp size={18} />
-                  </span>
-                  <span className="flex flex-col text-left">
-                    <span className="font-extrabold text-slate-800 group-hover:text-emerald-950 text-xs">{item.label}</span>
-                    <span className="text-[10px] text-slate-400 font-medium group-hover:text-emerald-700/80">{item.desc}</span>
-                  </span>
-                </span>
-                <ChevronRight size={18} className="text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all" />
-              </button>
-            ))}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowServiceModal(false)}
-            className="w-full py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-xs font-extrabold transition-all shadow-xs border border-slate-200/60 cursor-pointer"
-          >
-            關閉
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  const renderPolicyModal = () => {
-    if (!showPolicyModal) return null;
-    return (
-      <div className="fixed inset-0 z-[9995] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200 select-none">
-        <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col gap-4.5 animate-in slide-in-from-bottom duration-200 max-h-[85vh] overflow-y-auto">
-          {/* Header */}
-          <div className="flex justify-between items-center border-b border-slate-100 pb-3.5">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-xs">
-                <ShieldCheck size={20} />
-              </div>
-              <div className="flex flex-col text-left">
-                <h3 className="text-base font-extrabold text-slate-800 tracking-tight">網站政策條款</h3>
-                <p className="text-[10px] text-slate-400 font-medium">米立微官方個資防護與服務規範</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowPolicyModal(false)}
-              className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
-            >
-              <X size={18} />
-            </button>
-          </div>
-
-          {/* 政策選單 */}
-          <div className="space-y-2.5 py-1">
-            {[
-              { key: 'privacy_policy', label: '隱私權保護政策', IconComp: ShieldCheck, desc: '個資安全、利用目的與法規保障' },
-              { key: 'terms_of_service', label: '網站服務條款', IconComp: FileText, desc: '使用者規範與臺南地方法院管轄' },
-            ].map(item => (
-              <button
-                type="button"
-                key={item.key}
-                onClick={() => {
-                  setShowPolicyModal(false);
-                  setActivePolicyKey(item.key);
-                }}
-                className="group w-full flex justify-between items-center p-4 rounded-2xl bg-gradient-to-r from-slate-50 to-slate-50/50 hover:from-emerald-50/70 hover:to-teal-50/40 text-xs font-bold text-slate-800 transition-all border border-slate-200/70 hover:border-emerald-300 hover:shadow-md cursor-pointer active:scale-[0.99]"
-              >
-                <span className="flex items-center gap-3">
-                  <span className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-xs group-hover:bg-emerald-500 group-hover:text-white transition-all shrink-0">
-                    <item.IconComp size={20} />
-                  </span>
-                  <span className="flex flex-col text-left">
-                    <span className="font-extrabold text-slate-800 group-hover:text-emerald-950 text-sm">{item.label}</span>
-                    <span className="text-[11px] text-slate-500 font-medium group-hover:text-emerald-700/90">{item.desc}</span>
-                  </span>
-                </span>
-                <ChevronRight size={18} className="text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all" />
-              </button>
-            ))}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowPolicyModal(false)}
-            className="w-full py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-xs font-extrabold transition-all shadow-xs border border-slate-200/60 cursor-pointer"
-          >
-            關閉
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  const renderPolicyViewerModal = () => {
-    if (!activePolicyKey) return null;
-    const policyData = POLICY_CONTENT_MAP[activePolicyKey];
-    if (!policyData) return null;
-
-    const IconComp = activePolicyKey === 'privacy_policy' ? ShieldCheck :
-                     activePolicyKey === 'terms_of_service' ? FileText :
-                     activePolicyKey === 'shopping_notice' ? Package :
-                     activePolicyKey === 'refund_policy' ? RefreshCw :
-                     activePolicyKey === 'shipping_policy' ? MapPin : CreditCard;
-
-    return (
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200 select-none">
-        <div className="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-200 max-h-[85vh]">
-          {/* Header */}
-          <div className="flex justify-between items-center border-b border-slate-100 pb-3.5">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-xs">
-                <IconComp size={20} />
-              </div>
-              <div className="flex flex-col text-left">
-                <h3 className="text-base font-extrabold text-slate-800 tracking-tight">
-                  {policyData.title}
-                </h3>
-                <p className="text-[10px] text-slate-400 font-medium">米立微官方權益規範條文</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setActivePolicyKey(null)}
-              className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
-            >
-              <X size={18} />
-            </button>
-          </div>
-
-          {/* 政策內文 */}
-          <div className="overflow-y-auto pr-1 text-xs text-slate-700 leading-relaxed space-y-3 font-medium">
-            {policyData.content.map((paragraph, idx) => (
-              <div key={idx} className="whitespace-pre-line bg-slate-50/70 p-4 rounded-2xl border border-slate-200/60 text-slate-700 shadow-xs hover:border-slate-300/80 transition-colors">
-                {paragraph}
-              </div>
-            ))}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setActivePolicyKey(null)}
-            className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs font-extrabold transition-all shadow-md shadow-emerald-600/20 cursor-pointer flex items-center justify-center gap-1.5"
-          >
-            <CheckCircle size={16} />
-            <span>我已瞭解</span>
-          </button>
-        </div>
-      </div>
-    );
-  };
 
   if (step === "member") {
     return (
