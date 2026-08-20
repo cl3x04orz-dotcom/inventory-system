@@ -20,7 +20,11 @@ export const callApi = async (apiUrl, action, payload, token = null, customTimeo
         const response = await fetch(targetUrl, {
             method: 'POST',
             redirect: 'follow', // GAS requirement
-            headers: { 'Content-Type': 'text/plain' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json, text/plain, */*',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
             body: JSON.stringify({
                 action,
                 payload,
