@@ -127,38 +127,56 @@ export default function MergePrintModal({
     // 地點排程管理後台相關輔助函式
     // ==========================================
     const getCustSetting = (custName) => {
-        const cleanName = String(custName || '').trim();
-        if (editingCustomers[cleanName]) {
-            return editingCustomers[cleanName];
+        const rawName = String(custName || '').trim();
+        // 清除尾端點號與省略符號 (例如: "임순정 kobayashi ..." -> "임순정 kobayashi")
+        const cleanName = rawName.replace(/[\.\s…]+$/g, '').toLowerCase();
+
+        // 1. 檢查編輯中的設定
+        for (const [key, val] of Object.entries(editingCustomers)) {
+            const k = key.trim().replace(/[\.\s…]+$/g, '').toLowerCase();
+            if (k === cleanName || (cleanName.length > 2 && (k.startsWith(cleanName) || cleanName.startsWith(k)))) {
+                return val;
+            }
         }
 
-        // 優先讀取本機獨立持久化備份 (避免 SWR 重整頁面時舊資料覆蓋)
+        // 2. 優先讀取本機獨立持久化備份 (避免 SWR 重整頁面時舊資料覆蓋)
         let backupSetting = null;
         try {
             const cacheRaw = safeLocalStorage.getItem('CUSTOMER_SETTINGS_CACHE');
             if (cacheRaw) {
                 const cacheMap = JSON.parse(cacheRaw);
-                if (cacheMap[cleanName]) backupSetting = cacheMap[cleanName];
+                for (const [key, val] of Object.entries(cacheMap)) {
+                    const k = key.trim().replace(/[\.\s…]+$/g, '').toLowerCase();
+                    if (k === cleanName || (cleanName.length > 2 && (k.startsWith(cleanName) || cleanName.startsWith(k)))) {
+                        backupSetting = val;
+                        break;
+                    }
+                }
             }
         } catch (e) {}
 
-        const orig = cleanSystemCustomers.find(c => (typeof c === 'string' ? c : c.name) === cleanName);
-        let origSchedule = backupSetting?.schedule || [0,1,2,3,4,5,6];
-        let origAiEnabled = backupSetting ? backupSetting.isAiEnabled === true : false;
-        let origCategory = backupSetting?.category || '市場';
+        // 3. 從 cleanSystemCustomers 對照匹配
+        const orig = cleanSystemCustomers.find(c => {
+            const nameStr = (typeof c === 'string' ? c : c?.name || '').trim().replace(/[\.\s…]+$/g, '').toLowerCase();
+            if (!nameStr) return false;
+            return nameStr === cleanName || (cleanName.length > 2 && (nameStr.startsWith(cleanName) || cleanName.startsWith(nameStr)));
+        });
+
+        let origSchedule = backupSetting?.schedule;
+        let origAiEnabled = backupSetting ? backupSetting.isAiEnabled === true : undefined;
+        let origCategory = backupSetting?.category;
 
         if (orig && typeof orig === 'object') {
-            if (!backupSetting) {
-                origSchedule = orig.schedule || [0,1,2,3,4,5,6];
-                origAiEnabled = orig.isAiEnabled === true;
-                origCategory = orig.category || '市場';
-            }
+            if (origSchedule === undefined) origSchedule = orig.schedule;
+            if (origAiEnabled === undefined) origAiEnabled = orig.isAiEnabled === true;
+            if (origCategory === undefined) origCategory = orig.category;
         }
+
         return {
-            customerName: cleanName,
-            isAiEnabled: origAiEnabled,
-            schedule: origSchedule,
-            category: origCategory,
+            customerName: (orig && typeof orig === 'object' && orig.name) ? orig.name : rawName,
+            isAiEnabled: origAiEnabled !== undefined ? origAiEnabled : false,
+            schedule: origSchedule || [0,1,2,3,4,5,6],
+            category: origCategory || '市場',
             isSaving: false
         };
     };
@@ -396,12 +414,19 @@ export default function MergePrintModal({
         return str;
     };
 
-    // Filter out retail walk-in customer records and group records by normalized date
+    // Filter out retail walk-in customer records AND filter out OFF state customers (isAiEnabled === false)
     const RETAIL_NAMES = ['門市散客', '散客', '零售散客', '一般散客', 'POS散客', '一般顧客', 'null', 'undefined', ''];
     const filteredRecords = safeRecords.filter(record => {
         const cust = String(record.customer || '').trim();
         if (!cust) return false;
         if (RETAIL_NAMES.includes(cust)) return false;
+
+        // [Fix] 若該地點在「地點送貨排程管理」被設為 OFF 關閉 (isAiEnabled !== true)，100% 自動過濾隱藏
+        const setting = getCustSetting(cust);
+        if (setting && setting.isAiEnabled !== true) {
+            return false;
+        }
+
         return true;
     });
 
