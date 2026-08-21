@@ -1354,7 +1354,37 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         return Array.from(set).filter(Boolean);
     }, [orders]);
 
+    const handleTabChange = (newTab) => {
+        if (newTab === activeTab) return;
+        setOrders([]); // 0 秒清空舊頁籤資料，絕不殘留閃爍
+        setLoading(true); // 0 秒切換載入轉圈
+        setSelectedOrderIds([]);
+
+        if (newTab === 'CONFIRMED') {
+            const today = new Date().toISOString().split('T')[0];
+            setStartDate(today);
+            setEndDate(today);
+        } else {
+            setStartDate('');
+            setEndDate('');
+        }
+
+        setActiveTab(newTab);
+    };
+
     const filteredOrders = orders.filter(order => {
+        // [防護 1] 嚴格頁籤狀態二次防範過濾 (避免切換頁籤時舊資料閃爍或洩漏)
+        const orderStatus = String(order.status || 'PENDING').trim().toUpperCase();
+        if (activeTab === 'PENDING') {
+            if (orderStatus === 'CONFIRMED' || orderStatus === 'SHIPPED' || orderStatus === 'CANCELLED') {
+                return false;
+            }
+        } else if (activeTab === 'CONFIRMED') {
+            if (orderStatus === 'PENDING' || orderStatus === 'CANCELLED') {
+                return false;
+            }
+        }
+
         // 未付款分頁雙重防護過濾
         if (activeTab === 'UNPAID') {
             const ps = String(order.paymentStatus || '').trim();
@@ -2345,7 +2375,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-[var(--border-primary)] pb-1.5 gap-2 w-full max-w-full">
                 <div className="grid grid-cols-3 w-full sm:flex sm:w-auto items-center gap-1 sm:gap-2">
                     <button
-                        onClick={() => { setActiveTab('PENDING'); setSelectedOrderIds([]); setStartDate(''); setEndDate(''); }}
+                        onClick={() => handleTabChange('PENDING')}
                         className={`px-1 sm:px-4 py-2 font-bold text-xs sm:text-sm text-center transition-colors border-b-2 whitespace-nowrap ${activeTab === 'PENDING'
                                 ? 'border-blue-500 text-blue-600'
                                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -2354,13 +2384,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         <span>待確認訂單</span><span className="hidden md:inline text-[11px] opacity-80"> (PENDING)</span>
                     </button>
                     <button
-                        onClick={() => { 
-                            setActiveTab('CONFIRMED'); 
-                            setSelectedOrderIds([]); 
-                            const today = new Date().toISOString().split('T')[0];
-                            setStartDate(today);
-                            setEndDate(today);
-                        }}
+                        onClick={() => handleTabChange('CONFIRMED')}
                         className={`px-1 sm:px-4 py-2 font-bold text-xs sm:text-sm text-center transition-colors border-b-2 whitespace-nowrap ${activeTab === 'CONFIRMED'
                                 ? 'border-blue-500 text-blue-600'
                                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -2369,7 +2393,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         <span>已出貨/確認</span><span className="hidden md:inline text-[11px] opacity-80"> (CONFIRMED)</span>
                     </button>
                     <button
-                        onClick={() => { setActiveTab('UNPAID'); setSelectedOrderIds([]); setStartDate(''); setEndDate(''); }}
+                        onClick={() => handleTabChange('UNPAID')}
                         className={`px-1 sm:px-4 py-2 font-bold text-xs sm:text-sm text-center transition-colors border-b-2 whitespace-nowrap ${activeTab === 'UNPAID'
                                 ? 'border-amber-500 text-amber-600'
                                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
