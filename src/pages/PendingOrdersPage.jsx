@@ -227,6 +227,49 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     const [dateModalValue, setDateModalValue] = useState('');
     const [isSavingDate, setIsSavingDate] = useState(false);
 
+    // 快捷修改付款方式 Modal (已出貨專用)
+    const [quickPayOrder, setQuickPayOrder] = useState(null);
+    const [quickPayMethod, setQuickPayMethod] = useState('');
+    const [quickPayLastFive, setQuickPayLastFive] = useState('');
+    const [isSavingQuickPay, setIsSavingQuickPay] = useState(false);
+
+    const handleOpenQuickPayModal = (order) => {
+        setQuickPayOrder(order);
+        setQuickPayMethod(order.paymentMethod || '現金');
+        setQuickPayLastFive(order.transferLastFive || '');
+    };
+
+    const handleSaveQuickPayMethod = async () => {
+        if (!quickPayOrder) return;
+        setIsSavingQuickPay(true);
+        try {
+            const res = await callGAS(apiUrl, 'updatePendingOrder', {
+                orderId: quickPayOrder.orderId,
+                paymentMethod: quickPayMethod,
+                transferLastFive: quickPayMethod === '轉帳' ? quickPayLastFive : ''
+            }, user?.token);
+
+            if (res && res.error) {
+                alert('更新失敗: ' + res.error);
+                return;
+            }
+
+            // 0 秒同步前端狀態
+            setOrders(prev => prev.map(o => o.orderId === quickPayOrder.orderId ? {
+                ...o,
+                paymentMethod: quickPayMethod,
+                transferLastFive: quickPayMethod === '轉帳' ? quickPayLastFive : ''
+            } : o));
+
+            setQuickPayOrder(null);
+        } catch (e) {
+            console.error('Quick pay update error:', e);
+            alert('更新失敗: ' + e.message);
+        } finally {
+            setIsSavingQuickPay(false);
+        }
+    };
+
     // 取得相對天數的 YYYY-MM-DD 日期字串 (用於日期搜尋快捷按鍵)
     const getRelativeDateStr = useCallback((offsetDays) => {
         const d = new Date();
@@ -2537,15 +2580,36 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                             })()}
 
                                             {order.paymentMethod && (
-                                                <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold border ${
-                                                    order.paymentMethod === '滿額消費折抵' || order.paymentMethod === '滿額折抵'
-                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                                        : order.paymentMethod === '奶包金扣抵'
-                                                        ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)]'
-                                                }`}>
-                                                    {order.paymentMethod === '滿額消費折抵' || order.paymentMethod === '滿額折抵' ? '🎁 滿額消費折抵' : order.paymentMethod === '奶包金扣抵' ? '💳 奶包金扣抵' : `💳 ${order.paymentMethod}`}
-                                                </span>
+                                                activeTab === 'CONFIRMED' ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleOpenQuickPayModal(order);
+                                                        }}
+                                                        className={`inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold border transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-2xs ${
+                                                            order.paymentMethod === '滿額消費折抵' || order.paymentMethod === '滿額折抵'
+                                                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300'
+                                                                : order.paymentMethod === '奶包金扣抵'
+                                                                ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-300'
+                                                                : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300'
+                                                        }`}
+                                                        title="點擊快捷變更付款方式"
+                                                    >
+                                                        {order.paymentMethod === '滿額消費折抵' || order.paymentMethod === '滿額折抵' ? '🎁 滿額消費折抵' : order.paymentMethod === '奶包金扣抵' ? '💳 奶包金扣抵' : `💳 ${order.paymentMethod}`}
+                                                        <Edit size={11} className="ml-0.5 opacity-60" />
+                                                    </button>
+                                                ) : (
+                                                    <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold border ${
+                                                        order.paymentMethod === '滿額消費折抵' || order.paymentMethod === '滿額折抵'
+                                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                            : order.paymentMethod === '奶包金扣抵'
+                                                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)]'
+                                                    }`}>
+                                                        {order.paymentMethod === '滿額消費折抵' || order.paymentMethod === '滿額折抵' ? '🎁 滿額消費折抵' : order.paymentMethod === '奶包金扣抵' ? '💳 奶包金扣抵' : `💳 ${order.paymentMethod}`}
+                                                    </span>
+                                                )
                                             )}
 
                                             {/* 付款狀態 */}
@@ -3465,6 +3529,120 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                             >
                                 <Save size={14} />
                                 確認儲存口味配置
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 快捷變更付款方式 Modal (已出貨專用) */}
+            {quickPayOrder && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[130] p-4">
+                    <div className="bg-white border border-slate-200/90 shadow-2xl rounded-2xl p-6 w-full max-w-md space-y-5 animate-in fade-in zoom-in-95 duration-200">
+                        {/* Header */}
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                <CreditCard className="text-blue-600" size={20} />
+                                快捷變更付款方式
+                            </h3>
+                            <button
+                                onClick={() => setQuickPayOrder(null)}
+                                className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-full hover:bg-slate-100 cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Order Info Summary */}
+                        <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1">
+                            <div className="flex justify-between items-center text-xs">
+                                <span className="text-slate-500 font-semibold">訂單編號:</span>
+                                <span className="font-mono font-bold text-slate-700">{quickPayOrder.orderId}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-xs">
+                                <span className="text-slate-500 font-semibold">客戶姓名:</span>
+                                <span className="font-bold text-slate-800">{quickPayOrder.customerName}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200/60">
+                                <span className="text-slate-500 font-semibold">當前付款方式:</span>
+                                <span className="font-bold text-blue-600">{quickPayOrder.paymentMethod || '未指定'}</span>
+                            </div>
+                        </div>
+
+                        {/* Payment Options Grid */}
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold text-slate-500 block">請選擇新的付款方式</label>
+                            <div className="grid grid-cols-2 gap-2.5">
+                                {[
+                                    { label: '現金', icon: '💰', value: '現金' },
+                                    { label: '轉帳', icon: '🏦', value: '轉帳' },
+                                    { label: 'LINE Pay', icon: '📱', value: 'LINE Pay' },
+                                    { label: '奶包金扣抵', icon: '💳', value: '奶包金扣抵' },
+                                    { label: '賒銷/賒帳', icon: '📝', value: '賒銷' },
+                                    { label: '滿額消費折抵', icon: '🎁', value: '滿額消費折抵' }
+                                ].map(option => {
+                                    const isSelected = quickPayMethod === option.value;
+                                    return (
+                                        <button
+                                            key={option.value}
+                                            type="button"
+                                            onClick={() => setQuickPayMethod(option.value)}
+                                            className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all active:scale-95 cursor-pointer ${
+                                                isSelected
+                                                    ? 'bg-blue-50 border-blue-500 text-blue-700 ring-2 ring-blue-500/20 font-bold shadow-sm'
+                                                    : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            <span className="text-lg">{option.icon}</span>
+                                            <span className="text-xs font-bold">{option.label}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* 轉帳對帳後五碼 */}
+                        {quickPayMethod === '轉帳' && (
+                            <div className="space-y-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                                <label className="text-xs font-semibold text-slate-500 block">轉帳對帳後五碼 (選填)</label>
+                                <input
+                                    type="text"
+                                    maxLength="5"
+                                    value={quickPayLastFive}
+                                    onChange={(e) => setQuickPayLastFive(e.target.value)}
+                                    placeholder="輸入後五碼..."
+                                    className="input-field w-full text-xs font-mono font-bold bg-white text-slate-800 border-slate-300"
+                                />
+                            </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={handleSaveQuickPayMethod}
+                                disabled={isSavingQuickPay}
+                                className="btn-primary flex-1 py-2.5 text-sm font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                                {isSavingQuickPay ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        <span>儲存中...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Check size={16} />
+                                        <span>確認變更</span>
+                                    </>
+                                )}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setQuickPayOrder(null)}
+                                disabled={isSavingQuickPay}
+                                className="btn-secondary flex-1 py-2.5 text-sm cursor-pointer"
+                            >
+                                取消
                             </button>
                         </div>
                     </div>

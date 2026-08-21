@@ -338,6 +338,26 @@ export const GroupBuyService = {
           }
         }
       }
+
+      // 4. 若該訂單已存在連動銷售單據 (prisma.sales)，同步更新 sales.paymentMethod 與 sales.totalCash 現金金額
+      if (paymentMethod !== undefined) {
+        const salesPm = paymentMethod === '轉帳' ? 'TRANSFER' :
+                        paymentMethod === 'LINE Pay' ? 'LINEPAY' :
+                        (paymentMethod === '奶包金扣抵' || paymentMethod === '奶包金') ? 'WALLET' :
+                        (paymentMethod === '賒銷' || paymentMethod === '滿額消費折抵' || paymentMethod === '滿額折抵') ? 'CREDIT' : 'CASH';
+
+        const finalAmount = updateData.totalAmount || (productTotal + finalShippingFee);
+        const totalCashVal = (salesPm === 'CASH') ? finalAmount : 0;
+
+        await tx.sales.updateMany({
+          where: { saleId: orderId },
+          data: {
+            paymentMethod: salesPm,
+            totalCash: totalCashVal,
+            finalTotal: finalAmount
+          }
+        });
+      }
     });
 
     return { success: true };
