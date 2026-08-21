@@ -137,7 +137,7 @@ export const InventoryService = {
 
   // 4. 庫存調整
   async adjustInventory(payload: any, user: any) {
-    let { productId, productName, batchId, type, quantity, afterQty, beforeQty, note, storeCode = 'MILI001' } = payload;
+    let { productId, productName, batchId, inventoryCategory, type, quantity, afterQty, beforeQty, note, storeCode = 'MILI001' } = payload;
     const operator = user?.username || user?.userId || 'system';
 
     // 1. 若傳入 batchId 補全商品資訊及查詢當前批次
@@ -171,43 +171,56 @@ export const InventoryService = {
     const finalProductId = productId || batchId || 'UNKNOWN';
     const finalProductName = productName || '未指定商品';
 
+    // 分清類別：「現貨進貨 (STOCK)」或「原貨/退貨 (ORIGINAL)」
+    const targetCategory = inventoryCategory || (targetBatch && targetBatch.type !== 'STOCK' && targetBatch.type !== 'VOID_REFUND' ? 'ORIGINAL' : 'STOCK');
+
     // 4. 計算變更數量 changeQty (正數增加，負數減少)
     let changeQty = 0;
     let recordQty = 0;
 
     if (afterQty !== undefined && afterQty !== null && afterQty !== '') {
       const after = Number(afterQty);
-      const current = targetBatch ? targetBatch.quantity : (Number(beforeQty) || 0);
+      const current = (beforeQty !== undefined && beforeQty !== null && beforeQty !== '')
+        ? Number(beforeQty)
+        : (targetBatch ? targetBatch.quantity : 0);
       changeQty = after - current;
       recordQty = Math.abs(changeQty);
       if (!type) {
-        type = changeQty >= 0 ? 'ADD' : 'ADJUST_REDUCE';
+        type = changeQty >= 0 ? 'ADD' : 'SCRAP';
       }
     } else {
       const qty = Math.abs(Number(quantity) || 0);
       recordQty = qty;
-      const isAdd = (type || '').toUpperCase() === 'ADD';
-      changeQty = isAdd ? qty : -qty;
+      const isAddType = ['ADD', 'OTHER_ADD', 'INFLOW'].includes((type || '').toUpperCase());
+      changeQty = isAddType ? qty : -qty;
     }
 
     // 5. 確實更新資料庫中的批次庫存 (prisma.inventory)
-    if (targetBatch) {
-      let newBatchQty = targetBatch.quantity + changeQty;
-      if (newBatchQty < 0) newBatchQty = 0;
-      await prisma.inventory.updateMany({
-        where: { batchId: targetBatch.batchId, storeCode },
-        data: { quantity: newBatchQty }
-      });
-    } else if (finalProductId !== 'UNKNOWN') {
-      if (changeQty < 0) {
-        await deductInventory(finalProductId, Math.abs(changeQty), 'STOCK', storeCode);
-      } else if (changeQty > 0) {
+    if (changeQty < 0) {
+      // 扣減情況：分類別跨批次智能扣除 (FIFO, 不跨類別扣除)
+      if (finalProductId !== 'UNKNOWN') {
+        await deductInventory(finalProductId, Math.abs(changeQty), targetCategory, storeCode);
+      } else if (targetBatch) {
+        let newBatchQty = Math.max(0, targetBatch.quantity + changeQty);
+        await prisma.inventory.updateMany({
+          where: { batchId: targetBatch.batchId, storeCode },
+          data: { quantity: newBatchQty }
+        });
+      }
+    } else if (changeQty > 0) {
+      // 增加情況：更新該批次或建立新批次
+      if (targetBatch) {
+        await prisma.inventory.updateMany({
+          where: { batchId: targetBatch.batchId, storeCode },
+          data: { quantity: targetBatch.quantity + changeQty }
+        });
+      } else if (finalProductId !== 'UNKNOWN') {
         await prisma.inventory.create({
           data: {
             productId: finalProductId,
             productName: finalProductName,
             quantity: changeQty,
-            type: 'STOCK',
+            type: targetCategory === 'STOCK' ? 'STOCK' : 'ORIGINAL',
             storeCode
           }
         });

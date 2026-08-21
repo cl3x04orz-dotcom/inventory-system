@@ -101,12 +101,21 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
             return;
         }
 
+        const isStockSec = selectedItem?.type === 'STOCK' || selectedItem?.type === 'VOID_REFUND';
+        const currentSectionTotal = isStockSec
+            ? (stockTotals[selectedItem?.productName] || 0)
+            : (originalTotals[selectedItem?.productName] || 0);
+
         setIsAdjusting(true);
         try {
             await callGAS(apiUrl, 'adjustInventory', {
                 batchId: selectedItem.batchId,
+                productId: selectedItem.productId,
+                productName: selectedItem.productName,
+                inventoryCategory: isStockSec ? 'STOCK' : 'ORIGINAL',
                 type: adjustmentType,
                 quantity: Number(adjustmentQty),
+                beforeQty: currentSectionTotal,
                 note: adjustmentNote
             }, user.token);
 
@@ -221,11 +230,19 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
     const stockItems = filteredInventory.filter(item => item.type === 'STOCK' || item.type === 'VOID_REFUND');
     const originalItems = filteredInventory.filter(item => item.type !== 'STOCK' && item.type !== 'VOID_REFUND');
 
-    // Calculate total quantity per product for safety check
+    // 分開計算「現貨進貨總庫存」與「原貨/退貨總庫存」 (不互相加總與扣除)
+    const stockTotals = {};
+    const originalTotals = {};
     const productTotals = {};
+
     inventory.forEach(item => {
-        if (!productTotals[item.productName]) productTotals[item.productName] = 0;
-        productTotals[item.productName] += Number(item.quantity);
+        const isStock = item.type === 'STOCK' || item.type === 'VOID_REFUND';
+        if (isStock) {
+            stockTotals[item.productName] = (stockTotals[item.productName] || 0) + Number(item.quantity);
+        } else {
+            originalTotals[item.productName] = (originalTotals[item.productName] || 0) + Number(item.quantity);
+        }
+        productTotals[item.productName] = (productTotals[item.productName] || 0) + Number(item.quantity);
     });
 
     // [New] Grouping Logic
@@ -579,86 +596,144 @@ export default function InventoryPage({ user, apiUrl, logActivity }) {
             </div>
 
             {showAdjustModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     {isAdjusting && (
                         <div className="loading-overlay">
                             <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                             <p className="text-lg font-bold text-slate-800">異動處理中，請稍後...</p>
                         </div>
                     )}
-                    <div className="glass-panel p-6 w-96 max-w-[90vw]">
-                        <h3 className="text-xl font-bold mb-4">庫存異動</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-sm text-[var(--text-secondary)] block mb-1">產品資訊</label>
-                                <div className="flex justify-between items-center p-2 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-primary)]">
-                                    <div className="text-[var(--text-primary)] font-bold">{selectedItem?.productName}</div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs text-slate-400">當前庫存:</span>
-                                        <span className="text-emerald-600 font-mono font-bold text-lg">{selectedItem?.quantity}</span>
+                    <div className="bg-white border border-slate-200/90 shadow-2xl rounded-2xl p-6 w-full max-w-md space-y-5 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                <Package className="text-blue-600" size={22} />
+                                庫存異動作業
+                            </h3>
+                            <button onClick={() => setShowAdjustModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                                ✕
+                            </button>
+                        </div>
+
+                        {(() => {
+                            const isStockSec = selectedItem?.type === 'STOCK' || selectedItem?.type === 'VOID_REFUND';
+                            const currentSecTotal = isStockSec
+                                ? (stockTotals[selectedItem?.productName] || 0)
+                                : (originalTotals[selectedItem?.productName] || 0);
+                            const secBadge = isStockSec ? '現貨總庫存' : '原貨/退貨總庫存';
+                            const isAdd = ['ADD', 'OTHER_ADD'].includes(adjustmentType);
+                            const changeVal = isAdd ? (Number(adjustmentQty) || 0) : -(Number(adjustmentQty) || 0);
+                            const previewResult = currentSecTotal + changeVal;
+
+                            return (
+                                <div className="space-y-4">
+                                    {/* 產品資訊 */}
+                                    <div>
+                                        <label className="text-xs font-semibold text-slate-500 block mb-1">產品項目 ({secBadge})</label>
+                                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center">
+                                            <span className="font-bold text-slate-800 text-base">{selectedItem?.productName}</span>
+                                            <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md font-mono font-bold border border-blue-100">
+                                                {secBadge}: {currentSecTotal}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* 異動類型 */}
+                                    <div>
+                                        <label className="text-xs font-semibold text-slate-500 block mb-1">異動類型</label>
+                                        <select
+                                            className="input-field w-full text-sm font-semibold bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+                                            value={adjustmentType}
+                                            onChange={(e) => setAdjustmentType(e.target.value)}
+                                        >
+                                            <optgroup label="🔴 扣減類 ((-) 庫存減少)">
+                                                <option value="SCRAP">🔴 報廢損耗 (-)</option>
+                                                <option value="RETURN">🔴 退貨退款 (-)</option>
+                                                <option value="LOSS">🔴 盤虧扣減 (-)</option>
+                                                <option value="OTHER_REDUCE">🔴 其他減少 (-)</option>
+                                            </optgroup>
+                                            <optgroup label="🟢 增加類 ((+) 庫存增加)">
+                                                <option value="ADD">🟢 盤盈增加 (+)</option>
+                                                <option value="OTHER_ADD">🟢 補貨/其他增加 (+)</option>
+                                            </optgroup>
+                                        </select>
+                                    </div>
+
+                                    {/* 異動數量 */}
+                                    <div>
+                                        <label className="text-xs font-semibold text-slate-500 block mb-1">異動數量</label>
+                                        <input
+                                            id="adjustment-qty-input"
+                                            type="number"
+                                            min="1"
+                                            className="input-field w-full text-base font-mono font-bold"
+                                            value={adjustmentQty}
+                                            onChange={(e) => setAdjustmentQty(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === 'ArrowDown') {
+                                                    e.preventDefault();
+                                                    document.getElementById('adjustment-note-input')?.focus();
+                                                }
+                                            }}
+                                            placeholder="請輸入數量"
+                                            autoFocus
+                                        />
+                                    </div>
+
+                                    {/* 高級即時預覽方塊 (Light Mode) */}
+                                    <div className="bg-gradient-to-br from-slate-50 to-indigo-50/30 border border-slate-200/80 rounded-xl p-3.5 shadow-sm space-y-2">
+                                        <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
+                                            <span>庫存異動即時預覽</span>
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${changeVal < 0 ? 'bg-rose-100 text-rose-700 border border-rose-200' : changeVal > 0 ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600'}`}>
+                                                {changeVal > 0 ? `+${changeVal}` : changeVal < 0 ? `${changeVal}` : '無變更'}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between pt-1">
+                                            <div className="flex flex-col">
+                                                <span className="text-[11px] text-slate-400">當前總庫存</span>
+                                                <span className="text-base font-mono font-bold text-slate-700">{currentSecTotal}</span>
+                                            </div>
+                                            <div className="text-slate-300 font-bold text-lg">➔</div>
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-[11px] text-slate-400">異動後預覽</span>
+                                                <span className={`text-xl font-mono font-black ${previewResult < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                    {previewResult}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 備註 */}
+                                    <div>
+                                        <label className="text-xs font-semibold text-slate-500 block mb-1">
+                                            備註原因 <span className="text-rose-500">*</span>
+                                        </label>
+                                        <textarea
+                                            id="adjustment-note-input"
+                                            className="input-field w-full text-sm"
+                                            rows="2"
+                                            value={adjustmentNote}
+                                            onChange={(e) => setAdjustmentNote(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                    e.preventDefault();
+                                                    submitAdjustment();
+                                                }
+                                            }}
+                                            placeholder="輸入備註原因（必填）..."
+                                        />
+                                    </div>
+
+                                    <div className="flex gap-3 pt-2">
+                                        <button onClick={submitAdjustment} className="btn-primary flex-1 py-2.5 text-sm font-bold shadow-md shadow-blue-500/20">
+                                            確認異動
+                                        </button>
+                                        <button onClick={() => setShowAdjustModal(false)} className="btn-secondary flex-1 py-2.5 text-sm">
+                                            取消
+                                        </button>
                                     </div>
                                 </div>
-                            </div>
-                            <div>
-                                <label className="text-sm text-slate-400 block mb-1">異動類型</label>
-                                <select
-                                    className="input-field w-full"
-                                    value={adjustmentType}
-                                    onChange={(e) => setAdjustmentType(e.target.value)}
-                                >
-                                    <option value="SCRAP">報廢</option>
-                                    <option value="RETURN">退貨</option>
-                                    <option value="LOSS">損耗</option>
-                                    <option value="OTHER">其他</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-sm text-slate-400 block mb-1">異動數量</label>
-                                <input
-                                    id="adjustment-qty-input"
-                                    type="number"
-                                    className="input-field w-full"
-                                    value={adjustmentQty}
-                                    onChange={(e) => setAdjustmentQty(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === 'ArrowDown') {
-                                            e.preventDefault();
-                                            document.getElementById('adjustment-note-input')?.focus();
-                                        }
-                                    }}
-                                    placeholder="輸入數量"
-                                    autoFocus
-                                />
-                            </div>
-                            <div>
-                                <label className="text-sm text-slate-400 block mb-1">備註 <span className="text-red-400">*</span></label>
-                                <textarea
-                                    id="adjustment-note-input"
-                                    className="input-field w-full"
-                                    rows="3"
-                                    value={adjustmentNote}
-                                    onChange={(e) => setAdjustmentNote(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            submitAdjustment();
-                                        } else if (e.key === 'ArrowUp') {
-                                            e.preventDefault();
-                                            document.getElementById('adjustment-qty-input')?.focus();
-                                        }
-                                    }}
-                                    placeholder="輸入備註原因（必填）..."
-                                />
-                            </div>
-                            <div className="flex gap-2">
-                                <button onClick={submitAdjustment} className="btn-primary flex-1">
-                                    確認異動
-                                </button>
-                                <button onClick={() => setShowAdjustModal(false)} className="btn-secondary flex-1">
-                                    取消
-                                </button>
-                            </div>
-                        </div>
+                            );
+                        })()}
                     </div>
                 </div>
             )}
