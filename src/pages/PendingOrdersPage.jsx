@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Package, ClipboardList, Eye, Edit, Trash2, CheckCircle, RefreshCw, X, User, Users, Phone, MapPin, FileText, Plus, Minus, Save, Calendar, Clock, Check, Search, Copy, PackageSearch, ChevronDown, ChevronUp, Building2, CreditCard } from 'lucide-react';
 import { callGAS } from '../utils/api';
 import { copyToClipboard } from '../utils/clipboard';
+import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 
 // --- 🎨 口味備註解析與格式化輔助函數 ---
 const parseRemarkToFlavorMap = (remarkStr, flavorChoices = [], currentTotalQty = 0) => {
@@ -194,7 +195,7 @@ const formatDetailItemLine = (item, prod) => {
     return `   - ${formatted.cleanBaseName} x ${item.qty} ${unitStr}${formatted.flavorBracket}`;
 };
 
-export default function PendingOrdersPage({ user, apiUrl }) {
+export default function PendingOrdersPage({ user, apiUrl, setPage }) {
     const [orders, setOrders] = useState([]);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -437,7 +438,9 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         try {
             const data = await callGAS(apiUrl, 'getPendingOrders', { status: activeTab }, user.token);
             if (Array.isArray(data)) {
-                setOrders(data.map(order => normalizeOrder(order)));
+                const normalized = data.map(order => normalizeOrder(order));
+                setOrders(normalized);
+                safeLocalStorage.setItem('pending_orders', JSON.stringify(normalized));
             }
         } catch (error) {
             console.error('Failed to fetch orders:', error);
@@ -2517,6 +2520,18 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         title={selectedOrderIds.length > 0 ? `複製選取的 ${selectedOrderIds.length} 筆客戶分貨明細` : "複製目前篩選的所有客戶分貨明細"}
                     >
                         <span>{clientDetailCopied ? '✅ 已複製分貨明細(客戶)！' : selectedOrderIds.length > 0 ? `📋 複製分貨明細(客戶) (${selectedOrderIds.length})` : '📋 複製分貨明細(客戶)'}</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (setPage) setPage('driver');
+                            else window.location.href = '?page=driver';
+                        }}
+                        className="py-1.5 px-2.5 sm:px-3 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-200 border whitespace-nowrap cursor-pointer shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white border-transparent"
+                        title="切換至司機專用外送與撿貨包貨 PWA 介面"
+                    >
+                        <span>🚚 司機外送 PWA</span>
                     </button>
                 </div>
             </div>

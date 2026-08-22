@@ -33,6 +33,8 @@ import StoreSettingsPage from './pages/StoreSettingsPage';
 import MemberManagementPage from './pages/MemberManagementPage';
 import SubscriptionManagementPage from './pages/SubscriptionManagementPage';
 import SuperAdminPage from './pages/SuperAdminPage';
+import DriverDeliveryPage from './pages/DriverDeliveryPage';
+import DeliveryBoardPage from './pages/DeliveryBoardPage';
 import NotificationCenter from './components/NotificationCenter';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -349,7 +351,22 @@ function AppContent() {
             const isLiffCallback = params.has('code') && params.has('state');
             const isLiff = hasLiffParams || isLiffCallback || safeSessionStorage.getItem('is_liff_context') === 'true';
 
-            if (isLiff) {
+            const isDriverPage = params.get('page') === 'driver' || window.location.pathname.includes('/driver');
+            const isDeliveryBoardPage = params.get('page') === 'deliveryBoard' || params.get('page') === 'delivery' || window.location.pathname.includes('/delivery-board');
+
+            if (isDriverPage) {
+                if (!currentUser) {
+                    const guestUser = { success: true, token: 'driver_guest', username: '司機', role: 'EMPLOYEE', permissions: ['driver'] };
+                    handleLogin(guestUser);
+                }
+                setPage('driver');
+            } else if (isDeliveryBoardPage) {
+                if (!currentUser) {
+                    const guestUser = { success: true, token: 'board_guest', username: '顧客', role: 'EMPLOYEE', permissions: ['deliveryBoard'] };
+                    handleLogin(guestUser);
+                }
+                setPage('deliveryBoard');
+            } else if (isLiff) {
                 safeSessionStorage.setItem('is_liff_context', 'true');
                 if (!currentUser) {
                     if (window.GAS_GUEST_TOKEN) {
@@ -984,7 +1001,9 @@ function AppContent() {
                         {page === 'payroll' && <PayrollPage user={user} apiUrl={GAS_API_URL} logActivity={logActivity} />}
                         {page === 'activityLog' && <ActivityLogPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'liffOrder' && <LiffOrderPage user={user} apiUrl={GAS_API_URL} setting={setting} />}
-                        {page === 'pendingOrders' && <PendingOrdersPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'pendingOrders' && <PendingOrdersPage user={user} apiUrl={GAS_API_URL} setPage={handlePageChange} />}
+                        {page === 'driver' && <DriverDeliveryPage apiUrl={GAS_API_URL} onBack={() => handlePageChange('pendingOrders')} />}
+                        {page === 'deliveryBoard' && <DeliveryBoardPage apiUrl={GAS_API_URL} />}
                         {page === 'groupBuySettings' && <GroupBuySettingsPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'products' && <ProductManagementPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'memberManagement' && <MemberManagementPage user={user} apiUrl={GAS_API_URL} />}
