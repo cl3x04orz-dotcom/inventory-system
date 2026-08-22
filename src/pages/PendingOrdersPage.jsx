@@ -65,8 +65,8 @@ const SearchableProductSelect = ({ products = [], onSelect, placeholder = "-- �
     const filteredProducts = React.useMemo(() => {
         if (!search.trim()) return products;
         const q = search.toLowerCase().trim();
-        return products.filter(p => 
-            (p.name && p.name.toLowerCase().includes(q)) || 
+        return products.filter(p =>
+            (p.name && p.name.toLowerCase().includes(q)) ||
             (p.id && p.id.toLowerCase().includes(q))
         );
     }, [products, search]);
@@ -85,9 +85,9 @@ const SearchableProductSelect = ({ products = [], onSelect, placeholder = "-- �
 
             {isOpen && (
                 <>
-                    <div 
-                        className="fixed inset-0 z-[110]" 
-                        onClick={() => { setIsOpen(false); setSearch(''); }} 
+                    <div
+                        className="fixed inset-0 z-[110]"
+                        onClick={() => { setIsOpen(false); setSearch(''); }}
                     />
                     <div className="absolute right-0 top-full mt-1.5 w-64 md:w-72 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl shadow-2xl z-[120] p-2 animate-in fade-in slide-in-from-top-2 duration-150">
                         <div className="relative mb-2">
@@ -310,7 +310,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         if (prod.has_volume_pricing && prod.volume_pricing_settings) {
             let settings = prod.volume_pricing_settings;
             if (typeof settings === 'string') {
-                try { settings = JSON.parse(settings); } catch (e) {}
+                try { settings = JSON.parse(settings); } catch (e) { }
             }
             let tiers = [];
             if (settings && Array.isArray(settings.tiers) && settings.tiers.length > 0) {
@@ -342,7 +342,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     const normalizeOrder = useCallback((order) => {
         if (!order || !order.items) return order;
         const hasRecipients = order.recipients && Array.isArray(order.recipients) && order.recipients.length > 0;
-        
+
         const normalizedRecipients = hasRecipients ? order.recipients.map(r => ({
             ...r,
             items: (r.items || []).map(ri => {
@@ -482,15 +482,15 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             console.error('Failed to fetch buildings settings:', error);
         }
     }, [apiUrl, user.token]);
- 
-     useEffect(() => {
-         if (user?.token) {
-             fetchOrders();
-             fetchProducts();
-             fetchGroupBindings();
-             fetchBuildings();
-         }
-     }, [user.token, activeTab, fetchOrders, fetchProducts, fetchGroupBindings, fetchBuildings]);
+
+    useEffect(() => {
+        if (user?.token) {
+            fetchOrders();
+            fetchProducts();
+            fetchGroupBindings();
+            fetchBuildings();
+        }
+    }, [user.token, activeTab, fetchOrders, fetchProducts, fetchGroupBindings, fetchBuildings]);
 
     // 進到訂單審核或切換大樓時，自動在背景掃描並導入全站全大樓本週定期配，實現「100% 全自動無感零點擊體驗」
     useEffect(() => {
@@ -501,7 +501,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         building: selectedBuilding || '全部',
                         importWeek: true
                     }, user.token);
-                    
+
                     if (res && res.success && res.count > 0) {
                         fetchOrders();
                     }
@@ -560,11 +560,11 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 building: selectedBuilding,
                 importWeek: true
             }, user.token);
-            
+
             if (res && res.error) {
                 throw new Error(res.error);
             }
-            
+
             alert(res.message || `定期配本週自動導入完成！共處理新增 ${res.count} 筆訂單。`);
             fetchOrders();
         } catch (error) {
@@ -604,7 +604,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                 const newGroup = value || '';
                 const currentAddr = prev.deliveryAddress || '';
                 const origGroup = prev.initialSourceGroup || prev.sourceGroup || '';
-                
+
                 if (newGroup) {
                     let matchPrefix = '';
                     if (origGroup && currentAddr.startsWith(origGroup)) {
@@ -653,7 +653,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
     // 💡 團員分配雙軌狀態同步邏輯
     const syncRecipientsToItems = (newRecipients) => {
         const productTotals = {};
-        
+
         newRecipients.forEach(r => {
             if (r.items) {
                 r.items.forEach(ri => {
@@ -694,7 +694,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             const subtotal = calculateItemSubtotal(item.productId, item.qty);
             const prod = products.find(p => p.id === item.productId);
             const displayPrice = prod ? (Number(prod.single_price) || Number(prod.price)) : item.unitPrice;
-            
+
             let finalRemark = item.remark || "";
             if (item.flavorMap && Object.keys(item.flavorMap).length > 0) {
                 const fParts = Object.entries(item.flavorMap).map(([k, v]) => `${k}x${v}`);
@@ -1321,9 +1321,9 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         const matchesAllKeywords = keywords.every(kw => {
             if (isExact) {
                 return isExactProductSeriesMatch(nameStr, kw) ||
-                       isExactProductSeriesMatch(baseNameStr, kw) ||
-                       idStr === kw ||
-                       remarkStr.includes(kw);
+                    isExactProductSeriesMatch(baseNameStr, kw) ||
+                    idStr === kw ||
+                    remarkStr.includes(kw);
             }
             return nameStr.includes(kw) || idStr.includes(kw) || remarkStr.includes(kw);
         });
@@ -1752,10 +1752,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         setIsBatchProcessing(true);
         setLoading(true);
         setBatchMessage(`正在更新 ${selectedOrderIds.length} 筆訂單的付款狀態...`);
-        
+
         try {
-            const res = await callGAS(apiUrl, 'batchConfirmPayments', { 
-                orderIds: selectedOrderIds 
+            const res = await callGAS(apiUrl, 'batchConfirmPayments', {
+                orderIds: selectedOrderIds
             }, user.token);
             if (res && res.error) {
                 throw new Error(res.error);
@@ -1781,10 +1781,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         setIsBatchProcessing(true);
         setLoading(true);
         setBatchMessage(`正在出貨 ${selectedOrderIds.length} 筆訂單...`);
-        
+
         try {
-            const res = await callGAS(apiUrl, 'batchConfirmPendingOrders', { 
-                orderIds: selectedOrderIds 
+            const res = await callGAS(apiUrl, 'batchConfirmPendingOrders', {
+                orderIds: selectedOrderIds
             }, user.token);
             if (res && res.error) {
                 throw new Error(res.error);
@@ -1812,8 +1812,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
         setBatchMessage(`正在刪除 ${selectedOrderIds.length} 筆訂單...`);
 
         try {
-            const res = await callGAS(apiUrl, 'batchDeletePendingOrders', { 
-                orderIds: selectedOrderIds 
+            const res = await callGAS(apiUrl, 'batchDeletePendingOrders', {
+                orderIds: selectedOrderIds
             }, user.token);
             if (res && res.error) {
                 throw new Error(res.error);
@@ -1941,7 +1941,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             if (order.deliveryAddress) {
                 lines.push(`   地址/自取：${order.deliveryAddress}`);
             }
-            
+
             lines.push('   訂購品項：');
             order.items.forEach(item => {
                 const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
@@ -2011,14 +2011,36 @@ export default function PendingOrdersPage({ user, apiUrl }) {
             if (order.deliveryAddress) {
                 lines.push(`   地址/自取：${order.deliveryAddress}`);
             }
-            
+
             lines.push('   訂購品項：');
             order.items.forEach(item => {
                 const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
                 lines.push(formatDetailItemLine(item, prod));
             });
 
+            // 團員代訂分配明細
+            if (order.recipients && order.recipients.length > 0) {
+                lines.push('   👥 團員分配：');
+                order.recipients.forEach(r => {
+                    const rTotal = r.items.reduce((sum, ri) => sum + (ri.subtotal != null && ri.subtotal !== undefined ? Number(ri.subtotal) : 0), 0);
+                    lines.push(`      👤 ${r.recipientName}（$${rTotal}）`);
+                    r.items.forEach(ri => {
+                        const formatted = formatCleanProductNameAndFlavor(ri.productName, ri.remark, null);
+                        const prod = products.find(p => p.id === ri.productId || p.name === formatted.cleanBaseName);
+                        const isBundle = prod ? prod.isBundle : false;
+                        const bundleSize = prod ? prod.bundleSize : 1;
+                        const unitStr = isBundle ? `組 (共 ${ri.qty * bundleSize} 瓶)` : '瓶';
+
+                        const sub = ri.subtotal != null && ri.subtotal !== undefined ? Number(ri.subtotal) : 0;
+                        lines.push(`         - ${formatted.pNameDisplay} x${ri.qty} ${unitStr} = $${sub}`);
+                    });
+                });
+            }
+
             lines.push(`   合計金額：$${order.totalAmount}`);
+            if (order.note) {
+                lines.push(`   訂單備註：${order.note}`);
+            }
             lines.push('----------------------------------------');
         });
 
@@ -2088,8 +2110,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     </h2>
 
                     {/* 右上角刷新按鈕 */}
-                    <button 
-                        onClick={fetchOrders} 
+                    <button
+                        onClick={fetchOrders}
                         className="p-2 text-slate-500 hover:text-blue-600 hover:bg-[var(--bg-hover)] rounded-xl border border-[var(--border-primary)] transition-all shadow-2xs flex items-center gap-1 text-xs font-bold"
                         title="重新整理"
                     >
@@ -2177,11 +2199,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                         <button
                             type="button"
                             onClick={() => setIsExactProductMatch(!isExactProductMatch)}
-                            className={`px-3 rounded-xl text-xs font-bold shrink-0 transition-all flex items-center gap-1 border h-[40px] active:scale-95 ${
-                                isExactProductMatch
+                            className={`px-3 rounded-xl text-xs font-bold shrink-0 transition-all flex items-center gap-1 border h-[40px] active:scale-95 ${isExactProductMatch
                                     ? "bg-emerald-600 text-white border-emerald-500 shadow-sm"
                                     : "bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-slate-400"
-                            }`}
+                                }`}
                             title={isExactProductMatch ? "目前為【精確 OFF】模式，點擊切換為模糊包含搜尋" : "目前為【模糊包含】模式，點擊開啟【精確 ON】隔離搜尋"}
                         >
                             <span>{isExactProductMatch ? "精確 ON" : "精確 OFF"}</span>
@@ -2278,11 +2299,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                     setEndDate(targetDate);
                                                 }
                                             }}
-                                            className={`w-full py-1 text-xs font-bold rounded-lg transition-all cursor-pointer border text-center truncate ${
-                                                isActive
+                                            className={`w-full py-1 text-xs font-bold rounded-lg transition-all cursor-pointer border text-center truncate ${isActive
                                                     ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs font-black'
                                                     : 'bg-[var(--bg-primary)] border-[var(--border-primary)] text-[var(--text-primary)] hover:bg-slate-200 dark:hover:bg-slate-700'
-                                            }`}
+                                                }`}
                                         >
                                             {item.label}
                                         </button>
@@ -2420,8 +2440,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     <button
                         onClick={() => handleTabChange('PENDING')}
                         className={`px-1 sm:px-4 py-2 font-bold text-xs sm:text-sm text-center transition-colors border-b-2 whitespace-nowrap ${activeTab === 'PENDING'
-                                ? 'border-blue-500 text-blue-600'
-                                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                             }`}
                     >
                         <span>待確認訂單</span><span className="hidden md:inline text-[11px] opacity-80"> (PENDING)</span>
@@ -2429,8 +2449,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     <button
                         onClick={() => handleTabChange('CONFIRMED')}
                         className={`px-1 sm:px-4 py-2 font-bold text-xs sm:text-sm text-center transition-colors border-b-2 whitespace-nowrap ${activeTab === 'CONFIRMED'
-                                ? 'border-blue-500 text-blue-600'
-                                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                             }`}
                     >
                         <span>已出貨/確認</span><span className="hidden md:inline text-[11px] opacity-80"> (CONFIRMED)</span>
@@ -2438,8 +2458,8 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     <button
                         onClick={() => handleTabChange('UNPAID')}
                         className={`px-1 sm:px-4 py-2 font-bold text-xs sm:text-sm text-center transition-colors border-b-2 whitespace-nowrap ${activeTab === 'UNPAID'
-                                ? 'border-amber-500 text-amber-600'
-                                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                            ? 'border-amber-500 text-amber-600'
+                            : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                             }`}
                     >
                         <span>未付款訂單</span><span className="hidden md:inline text-[11px] opacity-80"> (UNPAID)</span>
@@ -2466,10 +2486,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     <button
                         type="button"
                         onClick={handleCopyShipmentSummary}
-                        className={`py-1.5 px-2.5 sm:px-3 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-200 border whitespace-nowrap cursor-pointer shrink-0 ${copied 
-                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent' 
+                        className={`py-1.5 px-2.5 sm:px-3 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-200 border whitespace-nowrap cursor-pointer shrink-0 ${copied
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent'
                             : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)]'
-                        }`}
+                            }`}
                         title={selectedOrderIds.length > 0 ? `複製選取的 ${selectedOrderIds.length} 筆訂單點貨總量` : "複製目前篩選的所有訂單點貨總量"}
                     >
                         <span>{copied ? '✅ 已複製點貨總量！' : selectedOrderIds.length > 0 ? `📦 複製點貨總量 (${selectedOrderIds.length})` : '📦 複製點貨總量'}</span>
@@ -2478,10 +2498,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     <button
                         type="button"
                         onClick={handleCopyDetailSummary}
-                        className={`py-1.5 px-2.5 sm:px-3 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-200 border whitespace-nowrap cursor-pointer shrink-0 ${detailCopied 
-                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent' 
+                        className={`py-1.5 px-2.5 sm:px-3 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-200 border whitespace-nowrap cursor-pointer shrink-0 ${detailCopied
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent'
                             : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)]'
-                        }`}
+                            }`}
                         title={selectedOrderIds.length > 0 ? `複製選取的 ${selectedOrderIds.length} 筆業務分貨明細` : "複製目前篩選的所有業務分貨明細"}
                     >
                         <span>{detailCopied ? '✅ 已複製分貨明細(業務)！' : selectedOrderIds.length > 0 ? `📋 複製分貨明細(業務) (${selectedOrderIds.length})` : '📋 複製分貨明細(業務)'}</span>
@@ -2490,10 +2510,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                     <button
                         type="button"
                         onClick={handleCopyClientDetailSummary}
-                        className={`py-1.5 px-2.5 sm:px-3 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-200 border whitespace-nowrap cursor-pointer shrink-0 ${clientDetailCopied 
-                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent' 
+                        className={`py-1.5 px-2.5 sm:px-3 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-200 border whitespace-nowrap cursor-pointer shrink-0 ${clientDetailCopied
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent'
                             : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border-[var(--border-primary)] text-[var(--text-primary)]'
-                        }`}
+                            }`}
                         title={selectedOrderIds.length > 0 ? `複製選取的 ${selectedOrderIds.length} 筆客戶分貨明細` : "複製目前篩選的所有客戶分貨明細"}
                     >
                         <span>{clientDetailCopied ? '✅ 已複製分貨明細(客戶)！' : selectedOrderIds.length > 0 ? `📋 複製分貨明細(客戶) (${selectedOrderIds.length})` : '📋 複製分貨明細(客戶)'}</span>
@@ -2520,7 +2540,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                 <div key={order.orderId} className="relative bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] shadow-sm hover:border-blue-500/40 hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col">
                                     {/* 右上角紅底邊角標籤：極速辨識團員代訂單 */}
                                     {order.recipients && order.recipients.length > 0 && (
-                                        <div 
+                                        <div
                                             className="absolute top-0 right-0 z-10 bg-rose-600 text-white font-black text-[10px] sm:text-xs px-2.5 py-0.5 rounded-bl-lg rounded-tr-xl shadow-sm tracking-wider flex items-center gap-1 pointer-events-none"
                                             title={`含 ${order.recipients.length} 位團員代訂明細`}
                                         >
@@ -2529,7 +2549,7 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                     )}
 
                                     {/* 頂部 Header & 完整訂單摘要 (收合狀態 = 100% 完整訂單摘要卡片，零視覺雜訊) */}
-                                    <div 
+                                    <div
                                         onClick={() => toggleExpandOrder(order.orderId)}
                                         className="p-4 sm:p-5 flex flex-col justify-between gap-2.5 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors select-none"
                                     >
@@ -2587,26 +2607,24 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                             e.stopPropagation();
                                                             handleOpenQuickPayModal(order);
                                                         }}
-                                                        className={`inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold border transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-2xs ${
-                                                            order.paymentMethod === '滿額消費折抵' || order.paymentMethod === '滿額折抵'
+                                                        className={`inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold border transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-2xs ${order.paymentMethod === '滿額消費折抵' || order.paymentMethod === '滿額折抵'
                                                                 ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300'
                                                                 : order.paymentMethod === '奶包金扣抵'
-                                                                ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-300'
-                                                                : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300'
-                                                        }`}
+                                                                    ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-300'
+                                                                    : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300'
+                                                            }`}
                                                         title="點擊快捷變更付款方式"
                                                     >
                                                         {order.paymentMethod === '滿額消費折抵' || order.paymentMethod === '滿額折抵' ? '🎁 滿額消費折抵' : order.paymentMethod === '奶包金扣抵' ? '💳 奶包金扣抵' : `💳 ${order.paymentMethod}`}
                                                         <Edit size={11} className="ml-0.5 opacity-60" />
                                                     </button>
                                                 ) : (
-                                                    <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold border ${
-                                                        order.paymentMethod === '滿額消費折抵' || order.paymentMethod === '滿額折抵'
+                                                    <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded font-bold border ${order.paymentMethod === '滿額消費折抵' || order.paymentMethod === '滿額折抵'
                                                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                                             : order.paymentMethod === '奶包金扣抵'
-                                                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)]'
-                                                    }`}>
+                                                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                                                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)]'
+                                                        }`}>
                                                         {order.paymentMethod === '滿額消費折抵' || order.paymentMethod === '滿額折抵' ? '🎁 滿額消費折抵' : order.paymentMethod === '奶包金扣抵' ? '💳 奶包金扣抵' : `💳 ${order.paymentMethod}`}
                                                     </span>
                                                 )
@@ -2725,92 +2743,92 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                 )}
 
                                                 {/* 商品明細卡片 */}
-                                            <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)] shadow-sm">
-                                                <div className="flex items-center justify-between mb-3 pb-2 border-b border-[var(--border-primary)]">
-                                                    <span className="text-xs font-extrabold uppercase text-[var(--text-tertiary)] tracking-wider flex items-center gap-1.5">
-                                                        <Package size={15} className="text-blue-500" />
-                                                        訂單商品明細 (共 {order.items?.reduce((sum, it) => sum + (Number(it.qty) || 0), 0) || 0} 件)
-                                                    </span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => handleOpenDateModal(order, e)}
-                                                        className="text-xs px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-2xs transition-all flex items-center gap-1"
-                                                    >
-                                                        <Calendar size={12} />
-                                                        修改配送日
-                                                    </button>
-                                                </div>
+                                                <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)] shadow-sm">
+                                                    <div className="flex items-center justify-between mb-3 pb-2 border-b border-[var(--border-primary)]">
+                                                        <span className="text-xs font-extrabold uppercase text-[var(--text-tertiary)] tracking-wider flex items-center gap-1.5">
+                                                            <Package size={15} className="text-blue-500" />
+                                                            訂單商品明細 (共 {order.items?.reduce((sum, it) => sum + (Number(it.qty) || 0), 0) || 0} 件)
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => handleOpenDateModal(order, e)}
+                                                            className="text-xs px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-2xs transition-all flex items-center gap-1"
+                                                        >
+                                                            <Calendar size={12} />
+                                                            修改配送日
+                                                        </button>
+                                                    </div>
 
-                                                <div className="divide-y divide-[var(--border-primary)] divide-dashed space-y-3">
-                                                    {order.items.map((item, idx) => {
-                                                        const matchedQty = productSearchTerm.trim()
-                                                            ? extractMatchedQtyFromItem(item, productSearchTerm, isExactProductMatch)
-                                                            : 0;
-                                                        const isHighlighted = matchedQty > 0;
+                                                    <div className="divide-y divide-[var(--border-primary)] divide-dashed space-y-3">
+                                                        {order.items.map((item, idx) => {
+                                                            const matchedQty = productSearchTerm.trim()
+                                                                ? extractMatchedQtyFromItem(item, productSearchTerm, isExactProductMatch)
+                                                                : 0;
+                                                            const isHighlighted = matchedQty > 0;
 
-                                                        return (
-                                                        <div key={idx} className={`flex flex-col transition-all rounded-xl ${isHighlighted ? "bg-amber-500/15 border-l-4 border-l-amber-500 p-3 my-1.5" : "pt-2.5 first:pt-0"}`}>
-                                                            {(() => {
-                                                                const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
-                                                                const isBundle = prod ? prod.isBundle : false;
-                                                                const bundleSize = prod ? prod.bundleSize : 1;
-                                                                const freeQty = prod ? calculateFreeQtyFromTotal(prod.id, item.qty) : 0;
-                                                                const paidQty = item.qty - freeQty;
+                                                            return (
+                                                                <div key={idx} className={`flex flex-col transition-all rounded-xl ${isHighlighted ? "bg-amber-500/15 border-l-4 border-l-amber-500 p-3 my-1.5" : "pt-2.5 first:pt-0"}`}>
+                                                                    {(() => {
+                                                                        const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
+                                                                        const isBundle = prod ? prod.isBundle : false;
+                                                                        const bundleSize = prod ? prod.bundleSize : 1;
+                                                                        const freeQty = prod ? calculateFreeQtyFromTotal(prod.id, item.qty) : 0;
+                                                                        const paidQty = item.qty - freeQty;
 
-                                                                const cleanName = String(item.productName || '')
-                                                                     .replace(/\s*\(\s*【?口味備註：.*$/gi, '')
-                                                                     .replace(/\s*【口味備註：.*$/gi, '')
-                                                                     .replace(/\s*\([^)]*口味備註.*$/gi, '')
-                                                                     .replace(/[)】\s]+$/g, '')
-                                                                     .trim();
+                                                                        const cleanName = String(item.productName || '')
+                                                                            .replace(/\s*\(\s*【?口味備註：.*$/gi, '')
+                                                                            .replace(/\s*【口味備註：.*$/gi, '')
+                                                                            .replace(/\s*\([^)]*口味備註.*$/gi, '')
+                                                                            .replace(/[)】\s]+$/g, '')
+                                                                            .trim();
 
-                                                                return (
-                                                                    <div className="flex justify-between items-start text-sm md:text-base">
-                                                                        <div className="flex flex-col gap-1">
-                                                                            <div className="flex items-center gap-2 flex-wrap">
-                                                                                <span className="font-black text-[var(--text-primary)]">
-                                                                                    {cleanName}
-                                                                                    {isBundle && <span className="text-[10px] font-extrabold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md ml-1.5">捆裝 {bundleSize}入</span>}
-                                                                                </span>
-                                                                                <span className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-extrabold">
-                                                                                    x {item.qty} {isBundle ? '組' : '瓶'}
-                                                                                </span>
+                                                                        return (
+                                                                            <div className="flex justify-between items-start text-sm md:text-base">
+                                                                                <div className="flex flex-col gap-1">
+                                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                                        <span className="font-black text-[var(--text-primary)]">
+                                                                                            {cleanName}
+                                                                                            {isBundle && <span className="text-[10px] font-extrabold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md ml-1.5">捆裝 {bundleSize}入</span>}
+                                                                                        </span>
+                                                                                        <span className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-extrabold">
+                                                                                            x {item.qty} {isBundle ? '組' : '瓶'}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    {freeQty > 0 && (
+                                                                                        <span className="text-xs font-bold text-emerald-600">
+                                                                                            (付費: {paidQty}, 贈送: {freeQty})
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                                <span className="font-mono font-bold text-[var(--text-secondary)] mt-0.5">${item.subtotal}</span>
                                                                             </div>
-                                                                            {freeQty > 0 && (
-                                                                                <span className="text-xs font-bold text-emerald-600">
-                                                                                    (付費: {paidQty}, 贈送: {freeQty})
-                                                                                </span>
-                                                                            )}
+                                                                        );
+                                                                    })()}
+                                                                    {item.remark && (() => {
+                                                                        const rawTag = String(item.remark || '')
+                                                                            .replace(/【?口味備註：?/g, '')
+                                                                            .replace(/】/g, '')
+                                                                            .trim();
+                                                                        const flavorTag = stripTrailingQty(rawTag);
+                                                                        if (!flavorTag) return null;
+                                                                        return (
+                                                                            <div className="text-xs text-blue-600 dark:text-blue-400 font-bold mt-1 ml-1">
+                                                                                【{flavorTag}】
+                                                                            </div>
+                                                                        );
+                                                                    })()}
+                                                                    {/* 🎯 移動至右下角獨立列，避免擠壓手機版檔頭畫面 */}
+                                                                    {isHighlighted && (
+                                                                        <div className="flex justify-end mt-2 pt-1 border-t border-amber-500/20">
+                                                                            <span className="px-2 py-0.5 bg-amber-500 text-white rounded-md text-[10px] sm:text-xs font-black shadow-2xs flex items-center gap-1">
+                                                                                🎯 搜尋目標 (符合 {matchedQty} 罐)
+                                                                            </span>
                                                                         </div>
-                                                                        <span className="font-mono font-bold text-[var(--text-secondary)] mt-0.5">${item.subtotal}</span>
-                                                                    </div>
-                                                                );
-                                                            })()}
-                                                            {item.remark && (() => {
-                                                                const rawTag = String(item.remark || '')
-                                                                    .replace(/【?口味備註：?/g, '')
-                                                                    .replace(/】/g, '')
-                                                                    .trim();
-                                                                const flavorTag = stripTrailingQty(rawTag);
-                                                                if (!flavorTag) return null;
-                                                                return (
-                                                                    <div className="text-xs text-blue-600 dark:text-blue-400 font-bold mt-1 ml-1">
-                                                                        【{flavorTag}】
-                                                                    </div>
-                                                                );
-                                                            })()}
-                                                            {/* 🎯 移動至右下角獨立列，避免擠壓手機版檔頭畫面 */}
-                                                            {isHighlighted && (
-                                                                <div className="flex justify-end mt-2 pt-1 border-t border-amber-500/20">
-                                                                    <span className="px-2 py-0.5 bg-amber-500 text-white rounded-md text-[10px] sm:text-xs font-black shadow-2xs flex items-center gap-1">
-                                                                        🎯 搜尋目標 (符合 {matchedQty} 罐)
-                                                                    </span>
+                                                                    )}
                                                                 </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
                                                     {(() => {
                                                         const totals = computeOrderTotals(order, buildingSettingsList, groupBindings);
                                                         return (
@@ -3243,12 +3261,12 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                                             className="input-field text-xs p-1 w-full mt-1.5 border-dashed"
                                                             value={item.remark || ''}
                                                             onChange={(e) => {
-                                                                    const val = e.target.value;
-                                                                    setEditingOrder(prev => ({
-                                                                        ...prev,
-                                                                        items: prev.items.map((it, i) => i === idx ? { ...it, remark: val } : it)
-                                                                    }));
-                                                                }}
+                                                                const val = e.target.value;
+                                                                setEditingOrder(prev => ({
+                                                                    ...prev,
+                                                                    items: prev.items.map((it, i) => i === idx ? { ...it, remark: val } : it)
+                                                                }));
+                                                            }}
                                                         />
                                                     </div>
 
@@ -3392,11 +3410,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                             key={btn.label}
                                             type="button"
                                             onClick={() => setDateModalValue(btn.date)}
-                                            className={`text-[10px] sm:text-xs px-1 sm:px-3 py-1.5 rounded-lg font-bold border transition-colors text-center truncate ${
-                                                dateModalValue === btn.date
+                                            className={`text-[10px] sm:text-xs px-1 sm:px-3 py-1.5 rounded-lg font-bold border transition-colors text-center truncate ${dateModalValue === btn.date
                                                     ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
                                                     : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)]'
-                                            }`}
+                                                }`}
                                         >
                                             {btn.label}
                                         </button>
@@ -3459,11 +3476,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                     return (
                                         <div
                                             key={flavor}
-                                            className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                                                count > 0
+                                            className={`flex items-center justify-between p-3 rounded-xl border transition-all ${count > 0
                                                     ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-300 dark:border-amber-700/60 shadow-xs'
                                                     : 'bg-[var(--bg-secondary)] border-[var(--border-primary)] opacity-85 hover:opacity-100'
-                                            }`}
+                                                }`}
                                         >
                                             <span className={`text-sm font-bold ${count > 0 ? 'text-amber-900 dark:text-amber-200' : 'text-[var(--text-primary)]'}`}>
                                                 {flavor}
@@ -3587,11 +3603,10 @@ export default function PendingOrdersPage({ user, apiUrl }) {
                                             key={option.value}
                                             type="button"
                                             onClick={() => setQuickPayMethod(option.value)}
-                                            className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all active:scale-95 cursor-pointer ${
-                                                isSelected
+                                            className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all active:scale-95 cursor-pointer ${isSelected
                                                     ? 'bg-blue-50 border-blue-500 text-blue-700 ring-2 ring-blue-500/20 font-bold shadow-sm'
                                                     : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-                                            }`}
+                                                }`}
                                         >
                                             <span className="text-lg">{option.icon}</span>
                                             <span className="text-xs font-bold">{option.label}</span>
