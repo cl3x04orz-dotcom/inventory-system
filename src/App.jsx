@@ -34,7 +34,6 @@ import MemberManagementPage from './pages/MemberManagementPage';
 import SubscriptionManagementPage from './pages/SubscriptionManagementPage';
 import SuperAdminPage from './pages/SuperAdminPage';
 import DriverDeliveryPage from './pages/DriverDeliveryPage';
-import DeliveryBoardPage from './pages/DeliveryBoardPage';
 import NotificationCenter from './components/NotificationCenter';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -352,7 +351,6 @@ function AppContent() {
             const isLiff = hasLiffParams || isLiffCallback || safeSessionStorage.getItem('is_liff_context') === 'true';
 
             const isDriverPage = params.get('page') === 'driver' || window.location.pathname.includes('/driver');
-            const isDeliveryBoardPage = params.get('page') === 'deliveryBoard' || params.get('page') === 'delivery' || window.location.pathname.includes('/delivery-board');
 
             if (isDriverPage) {
                 if (!currentUser) {
@@ -360,12 +358,6 @@ function AppContent() {
                     handleLogin(guestUser);
                 }
                 setPage('driver');
-            } else if (isDeliveryBoardPage) {
-                if (!currentUser) {
-                    const guestUser = { success: true, token: 'board_guest', username: '顧客', role: 'EMPLOYEE', permissions: ['deliveryBoard'] };
-                    handleLogin(guestUser);
-                }
-                setPage('deliveryBoard');
             } else if (isLiff) {
                 safeSessionStorage.setItem('is_liff_context', 'true');
                 if (!currentUser) {
@@ -1003,7 +995,6 @@ function AppContent() {
                         {page === 'liffOrder' && <LiffOrderPage user={user} apiUrl={GAS_API_URL} setting={setting} />}
                         {page === 'pendingOrders' && <PendingOrdersPage user={user} apiUrl={GAS_API_URL} setPage={handlePageChange} />}
                         {page === 'driver' && <DriverDeliveryPage apiUrl={GAS_API_URL} onBack={() => handlePageChange('pendingOrders')} />}
-                        {page === 'deliveryBoard' && <DeliveryBoardPage apiUrl={GAS_API_URL} />}
                         {page === 'groupBuySettings' && <GroupBuySettingsPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'products' && <ProductManagementPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'memberManagement' && <MemberManagementPage user={user} apiUrl={GAS_API_URL} />}

@@ -371,9 +371,6 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
     case 'submitDriverDelivery':
       console.log('[Driver] Received delivery submission for building:', payload?.buildingName);
       return { success: true, message: '外送照片與狀態已成功通報至官方系統！' };
-    case 'getDeliveryBoardData':
-      console.log('[DeliveryBoard] Querying board data for building:', payload?.buildingName);
-      return { success: true, building: null };
 
     default:
       console.warn(`[Controller] 未移植或不支援的 Action: ${action}`);
