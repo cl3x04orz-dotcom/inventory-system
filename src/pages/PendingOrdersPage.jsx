@@ -516,6 +516,14 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
         }
     }, [selectedBuilding, activeTab, user.token, apiUrl, fetchOrders]);
 
+    useEffect(() => {
+        const handleOrdersUpdated = () => {
+            fetchOrders();
+        };
+        window.addEventListener('orders_updated', handleOrdersUpdated);
+        return () => window.removeEventListener('orders_updated', handleOrdersUpdated);
+    }, [fetchOrders]);
+
     const handleConfirmOrder = async (orderId) => {
         if (!window.confirm(`確定要將訂單 ${orderId} 確認出貨嗎？\n此動作會正式扣減商品庫存，並寫入銷售紀錄！`)) {
             return;
@@ -523,7 +531,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
 
         setLoading(true);
         try {
-            const res = await callGAS(apiUrl, 'confirmPendingOrder', { orderId }, user.token);
+            const res = await callGAS(apiUrl, 'confirmPendingOrder', { orderId, confirmedBy: user?.username || '黃世成' }, user.token);
             if (res && res.error) {
                 throw new Error(res.error);
             }

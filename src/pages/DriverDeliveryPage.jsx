@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Truck, PackageCheck, MapPin, Phone, Camera, CheckCircle2, ChevronRight,
-    AlertCircle, RefreshCw, Layers, ShieldCheck, ArrowLeft, Clock, Info, Calendar, Filter
+    AlertCircle, RefreshCw, Layers, ShieldCheck, ArrowLeft, Clock, Info, Calendar, Filter, AlertTriangle, Package
 } from 'lucide-react';
 import { callApi } from '../utils/api';
 import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
@@ -30,6 +30,10 @@ export default function DriverDeliveryPage({ apiUrl, onBack }) {
     const [deliveryPhotos, setDeliveryPhotos] = useState({}); // { buildingName: base64 }
     const [completedBuildings, setCompletedBuildings] = useState({}); // { buildingName: boolean }
     const [submittingBuilding, setSubmittingBuilding] = useState(null);
+
+    // 出貨與扣庫存 Modal 狀態
+    const [shipModalData, setShipModalData] = useState(null); // { buildingName, targetOrders: [], taskOrders: [] }
+    const [isShipping, setIsShipping] = useState(false);
 
     // 載入當日訂單與配送資料
     const fetchDeliveryTasks = async () => {
@@ -84,12 +88,16 @@ export default function DriverDeliveryPage({ apiUrl, onBack }) {
         if (!orders || orders.length === 0) return [];
         const groupsMap = {};
 
-        // 進行當日配送日期審查篩選
+        // 進行配送日期 100% 嚴格審查與過濾
         const filteredOrders = orders.filter(order => {
-            if (!filterByDateStrict) return true;
             const expDate = String(order.expectedDeliveryDate || order.deliveryDate || '').trim().replace(/\//g, '-');
-            if (!expDate) return true; // 無預設配送日則允許顯示於當日外送
-            return expDate.includes(selectedDate);
+            // 未設定預計配送日期的訂單 -> 100% 嚴格過濾排除，不顯示於司機端
+            if (!expDate) return false;
+            
+            if (filterByDateStrict) {
+                return expDate.includes(selectedDate);
+            }
+            return true;
         });
 
         filteredOrders.forEach(order => {
@@ -143,38 +151,141 @@ export default function DriverDeliveryPage({ apiUrl, onBack }) {
         return Object.values(summary);
     }, [buildingTasks]);
 
-    const isOrderPacked = (orderKey, bName) => {
-        return !!packedState[orderKey] || !!packedState[bName];
+    const getOrderPackedKey = (order, bName) => {
+        const id = order?.orderId || order?.id || order?.['訂單編號'] || `ord_${bName}_${order?.customerName}`;
+        return `${id}_${selectedDate}`;
     };
 
-    const toggleOrderPacked = (orderKey, bName, taskOrders = []) => {
-        const current = !!packedState[orderKey];
-        const next = { ...packedState, [orderKey]: !current };
-        
-        // 檢查該大樓的所有訂單是否全數打包完成
-        if (taskOrders.length > 0) {
-            const allDone = taskOrders.every(o => {
-                const k = o.orderId || `ord_${bName}_${o.customerName}`;
-                return !!next[k];
-            });
-            next[bName] = allDone;
-        }
-
-        setPackedState(next);
-        safeLocalStorage.setItem('driver_packed_buildings', JSON.stringify(next));
+    const isOrderPacked = (order, bName) => {
+        if (!order) return false;
+        if (order.status === 'CONFIRMED') return true;
+        const key = getOrderPackedKey(order, bName);
+        return !!packedState[key];
     };
 
-    const togglePacked = (bName, taskOrders = []) => {
-        const nextStatus = !packedState[bName];
-        const next = { ...packedState, [bName]: nextStatus };
-        if (taskOrders.length > 0) {
-            taskOrders.forEach(o => {
-                const k = o.orderId || `ord_${bName}_${o.customerName}`;
-                next[k] = nextStatus;
-            });
+    const isTaskBuildingPacked = (task) => {
+        if (!task || !task.orders || task.orders.length === 0) return false;
+        return task.orders.every(o => isOrderPacked(o, task.buildingName));
+    };
+
+    // 開啟出貨與扣庫存 Modal (單筆訂單)
+    const handleOpenShipModalForOrder = (order, bName, taskOrders) => {
+        const oKey = getOrderPackedKey(order, bName);
+        if (isOrderPacked(order, bName)) {
+            // 已出貨/已打包，取消本機劃記
+            const next = { ...packedState, [oKey]: false };
+            setPackedState(next);
+            safeLocalStorage.setItem('driver_packed_buildings', JSON.stringify(next));
+            return;
         }
-        setPackedState(next);
-        safeLocalStorage.setItem('driver_packed_buildings', JSON.stringify(next));
+        setShipModalData({
+            buildingName: bName,
+            targetOrders: [order],
+            taskOrders: taskOrders
+        });
+    };
+
+    // 開啟出貨與扣庫存 Modal (整棟大樓)
+    const handleOpenShipModalForBuilding = (task) => {
+        const allPacked = isTaskBuildingPacked(task);
+        if (allPacked) {
+            const next = { ...packedState };
+            task.orders.forEach(o => {
+                const k = getOrderPackedKey(o, task.buildingName);
+                next[k] = false;
+            });
+            setPackedState(next);
+            safeLocalStorage.setItem('driver_packed_buildings', JSON.stringify(next));
+            return;
+        }
+        setShipModalData({
+            buildingName: task.buildingName,
+            targetOrders: task.orders,
+            taskOrders: task.orders
+        });
+    };
+
+    const getActivePackerName = () => {
+        try {
+            const u = safeSessionStorage.getItem('inventory_user');
+            if (u) {
+                const parsed = JSON.parse(u);
+                if (parsed.username && !['driver_guest', 'board_guest'].includes(parsed.username)) {
+                    return parsed.username;
+                }
+                if (parsed.name) return parsed.name;
+            }
+        } catch (e) {}
+        return '黃世成';
+    };
+
+    // 執行正式出貨與庫存扣減
+    const handleExecuteShipmentAndDeductStock = async () => {
+        if (!shipModalData) return;
+        setIsShipping(true);
+        try {
+            const apiTarget = apiUrl || (typeof window !== 'undefined' && window.GAS_API_URL) || '/api';
+            const orderIds = shipModalData.targetOrders.map(o => o.orderId || o.id || o['訂單編號']).filter(Boolean);
+            const currentPacker = getActivePackerName();
+
+            if (orderIds.length === 1) {
+                await callApi(apiTarget, 'confirmPendingOrder', { orderId: orderIds[0], confirmedBy: currentPacker }).catch(async () => {
+                    if (typeof window !== 'undefined' && window.callGAS) {
+                        await window.callGAS(apiTarget, 'confirmPendingOrder', { orderId: orderIds[0], confirmedBy: currentPacker });
+                    }
+                });
+            } else if (orderIds.length > 1) {
+                await callApi(apiTarget, 'batchConfirmPendingOrders', { orderIds, confirmedBy: currentPacker }).catch(async () => {
+                    if (typeof window !== 'undefined' && window.callGAS) {
+                        await window.callGAS(apiTarget, 'batchConfirmPendingOrders', { orderIds, confirmedBy: currentPacker });
+                    }
+                });
+            }
+
+            // 更新打包劃記狀態
+            const nextPacked = { ...packedState };
+            shipModalData.targetOrders.forEach(o => {
+                const k = getOrderPackedKey(o, shipModalData.buildingName);
+                nextPacked[k] = true;
+            });
+
+            setPackedState(nextPacked);
+            safeLocalStorage.setItem('driver_packed_buildings', JSON.stringify(nextPacked));
+
+            // 同步更新本機 pending_orders 快取中的訂單狀態為 CONFIRMED (連動圖一「訂單審核」分頁)
+            const cachedOrders = safeLocalStorage.getItem('pending_orders');
+            if (cachedOrders) {
+                try {
+                    let allPending = JSON.parse(cachedOrders);
+                    const nowIso = new Date().toISOString();
+                    allPending = allPending.map(o => {
+                        if (orderIds.includes(o.orderId)) {
+                            return {
+                                ...o,
+                                status: 'CONFIRMED',
+                                confirmedAt: nowIso,
+                                confirmedBy: currentPacker
+                            };
+                        }
+                        return o;
+                    });
+                    safeLocalStorage.setItem('pending_orders', JSON.stringify(allPending));
+                    if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('orders_updated', { detail: { orderIds } }));
+                    }
+                } catch (e) {
+                    console.error('[Driver] Sync local pending orders error:', e);
+                }
+            }
+
+            alert('✅ 訂單確認出貨成功，商品庫存已扣減！已連動後台【訂單審核】轉為已出貨！');
+            setShipModalData(null);
+        } catch (err) {
+            console.error('[Driver] Confirm shipment error:', err);
+            alert('確認出貨失敗: ' + (err.message || '連線錯誤'));
+        } finally {
+            setIsShipping(false);
+        }
     };
 
     const handlePhotoCapture = (bName, event) => {
@@ -342,7 +453,7 @@ export default function DriverDeliveryPage({ apiUrl, onBack }) {
                     }`}
                 >
                     <PackageCheck size={18} />
-                    📦 撿貨與打包 ({buildingTasks.filter(t => packedState[t.buildingName]).length}/{buildingTasks.length})
+                    📦 撿貨與打包 ({buildingTasks.filter(t => isTaskBuildingPacked(t)).length}/{buildingTasks.length})
                 </button>
                 <button
                     onClick={() => setActiveTab('deliver')}
@@ -408,7 +519,7 @@ export default function DriverDeliveryPage({ apiUrl, onBack }) {
                                         大樓分箱打包確認
                                     </h3>
                                     {buildingTasks.map((task, idx) => {
-                                        const isPacked = !!packedState[task.buildingName];
+                                        const isPacked = isTaskBuildingPacked(task);
                                         return (
                                             <div
                                                 key={idx}
@@ -430,19 +541,20 @@ export default function DriverDeliveryPage({ apiUrl, onBack }) {
                                                             <MapPin size={13} className="text-slate-400" /> {task.address}
                                                         </p>
                                                     </div>
-                                                    {/* 多筆訂單時頂部顯示進度徽章，單筆訂單時顯示打包按鈕 */}
+
+                                                    {/* 多筆訂單時頂部顯示進度徽章，單筆訂單時顯示打包與扣庫存按鈕 */}
                                                     {task.orders.length > 1 ? (
                                                         <span className={`py-1.5 px-3 rounded-xl font-black text-xs flex items-center gap-1 border ${
-                                                            task.orders.every(o => isOrderPacked(o.orderId || `ord_${task.buildingName}_${o.customerName}`, task.buildingName))
+                                                            task.orders.every(o => isOrderPacked(o, task.buildingName))
                                                                 ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                                                                 : 'bg-blue-50 text-blue-800 border-blue-200'
                                                         }`}>
                                                             <PackageCheck size={16} />
-                                                            打包進度 ({task.orders.filter(o => isOrderPacked(o.orderId || `ord_${task.buildingName}_${o.customerName}`, task.buildingName)).length}/{task.orders.length} 筆)
+                                                            打包進度 ({task.orders.filter(o => isOrderPacked(o, task.buildingName)).length}/{task.orders.length} 筆)
                                                         </span>
                                                     ) : (
                                                         <button
-                                                            onClick={() => togglePacked(task.buildingName, task.orders)}
+                                                            onClick={() => handleOpenShipModalForBuilding(task)}
                                                             className={`py-2 px-3.5 rounded-xl font-black text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-xs ${
                                                                 isPacked
                                                                     ? 'bg-emerald-600 text-white shadow-emerald-600/30'
@@ -478,8 +590,7 @@ export default function DriverDeliveryPage({ apiUrl, onBack }) {
                                                                 <span>📋 本站點共 {task.orders.length} 筆主訂單：</span>
                                                             </div>
                                                             {task.orders.map((order, oIdx) => {
-                                                                const oKey = order.orderId || `ord_${task.buildingName}_${order.customerName}`;
-                                                                const orderPacked = isOrderPacked(oKey, task.buildingName);
+                                                                const orderPacked = isOrderPacked(order, task.buildingName);
                                                                 return (
                                                                     <div key={oIdx} className="bg-white p-3.5 rounded-xl border border-slate-300 space-y-2.5 shadow-2xs">
                                                                         <div className="font-black text-slate-900 flex justify-between items-center border-b border-slate-100 pb-2">
@@ -495,7 +606,7 @@ export default function DriverDeliveryPage({ apiUrl, onBack }) {
                                                                                 <span className="text-emerald-700 font-mono font-black text-sm">${order.totalAmount}</span>
                                                                                 {task.orders.length > 1 && (
                                                                                     <button
-                                                                                        onClick={() => toggleOrderPacked(oKey, task.buildingName, task.orders)}
+                                                                                        onClick={() => handleOpenShipModalForOrder(order, task.buildingName, task.orders)}
                                                                                         className={`py-1.5 px-3 rounded-lg font-black text-xs flex items-center gap-1 transition-all active:scale-95 shadow-2xs ${
                                                                                             orderPacked
                                                                                                 ? 'bg-emerald-600 text-white shadow-emerald-600/30'
@@ -509,47 +620,48 @@ export default function DriverDeliveryPage({ apiUrl, onBack }) {
                                                                             </div>
                                                                         </div>
 
-                                                                {/* 主訂單訂購商品 */}
-                                                                {order.items && order.items.length > 0 && (
-                                                                    <div className="space-y-1">
-                                                                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">主訂單品項：</div>
-                                                                        {order.items.map((item, iIdx) => (
-                                                                            <div key={iIdx} className="flex justify-between items-center text-sm text-slate-900 font-bold">
-                                                                                <span>{item.productName}</span>
-                                                                                <span className="font-mono font-black text-slate-900 text-base">x{item.qty}</span>
+                                                                        {/* 主訂單訂購商品 */}
+                                                                        {order.items && order.items.length > 0 && (
+                                                                            <div className="space-y-1">
+                                                                                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">主訂單品項：</div>
+                                                                                {order.items.map((item, iIdx) => (
+                                                                                    <div key={iIdx} className="flex justify-between items-center text-sm text-slate-900 font-bold">
+                                                                                        <span>{item.productName}</span>
+                                                                                        <span className="font-mono font-black text-slate-900 text-base">x{item.qty}</span>
+                                                                                    </div>
+                                                                                ))}
                                                                             </div>
-                                                                        ))}
-                                                                    </div>
-                                                                )}
+                                                                        )}
 
-                                                                {/* 團員代訂分貨明細 */}
-                                                                {order.recipients && order.recipients.length > 0 && (
-                                                                    <div className="pt-2 border-t border-slate-100 space-y-2">
-                                                                        <div className="text-xs font-black text-blue-800">👥 團員分貨小袋明細：</div>
-                                                                        {order.recipients.map((r, rIdx) => {
-                                                                            const rTotal = (r.items || []).reduce((sum, ri) => sum + (Number(ri.subtotal) || 0), 0);
-                                                                            return (
-                                                                                <div key={rIdx} className="bg-blue-50/70 p-2.5 rounded-lg border border-blue-200 space-y-1">
-                                                                                    <div className="font-black text-slate-900 flex justify-between text-sm">
-                                                                                        <span>👤 {r.recipientName}</span>
-                                                                                        <span className="text-emerald-700 font-mono font-bold text-xs">（小計 ${rTotal}）</span>
-                                                                                    </div>
-                                                                                    <div className="space-y-1 pt-0.5">
-                                                                                        {(r.items || []).map((ri, riIdx) => (
-                                                                                            <div key={riIdx} className="flex justify-between items-center text-xs text-slate-800 font-bold">
-                                                                                                <span>{ri.productName}</span>
-                                                                                                <span className="font-mono font-black text-slate-900 text-sm">x{ri.qty}</span>
+                                                                        {/* 團員代訂分貨明細 */}
+                                                                        {order.recipients && order.recipients.length > 0 && (
+                                                                            <div className="pt-2 border-t border-slate-100 space-y-2">
+                                                                                <div className="text-xs font-black text-blue-800">👥 團員分貨小袋明細：</div>
+                                                                                {order.recipients.map((r, rIdx) => {
+                                                                                    const rTotal = (r.items || []).reduce((sum, ri) => sum + (Number(ri.subtotal) || 0), 0);
+                                                                                    return (
+                                                                                        <div key={rIdx} className="bg-blue-50/70 p-2.5 rounded-lg border border-blue-200 space-y-1">
+                                                                                            <div className="font-black text-slate-900 flex justify-between text-sm">
+                                                                                                <span>👤 {r.recipientName}</span>
+                                                                                                <span className="text-emerald-700 font-mono font-bold text-xs">（小計 ${rTotal}）</span>
                                                                                             </div>
-                                                                                        ))}
-                                                                                    </div>
-                                                                                </div>
-                                                                            );
-                                                                        })}
+                                                                                            <div className="space-y-1 pt-0.5">
+                                                                                                {(r.items || []).map((ri, riIdx) => (
+                                                                                                    <div key={riIdx} className="flex justify-between items-center text-xs text-slate-800 font-bold">
+                                                                                                        <span>{ri.productName}</span>
+                                                                                                        <span className="font-mono font-black text-slate-900 text-sm">x{ri.qty}</span>
+                                                                                                    </div>
+                                                                                                ))}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        )}
                                                                     </div>
-                                                                )}
-                                                            </div>
-                                                        ); })}
-                                                     </div>
+                                                                );
+                                                            })}
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>
@@ -692,6 +804,83 @@ export default function DriverDeliveryPage({ apiUrl, onBack }) {
                     </>
                 )}
             </div>
+
+            {/* Modal: 訂單確認出貨與庫存扣減 (與訂單審核相同功能) */}
+            {shipModalData && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl border border-slate-200">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                                <PackageCheck className="text-emerald-600" size={22} />
+                                📦 訂單確認出貨與庫存扣減
+                            </h3>
+                            <button
+                                onClick={() => setShipModalData(null)}
+                                disabled={isShipping}
+                                className="text-slate-400 hover:text-slate-600 text-lg font-bold"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-1">
+                                <div className="flex justify-between font-bold text-slate-800">
+                                    <span>📍 外送站點：{shipModalData.buildingName}</span>
+                                    <span className="text-emerald-700 font-mono font-black text-sm">
+                                        共 {shipModalData.targetOrders.length} 筆訂單
+                                    </span>
+                                </div>
+                                <div className="text-slate-600 font-medium">
+                                    主訂人：{shipModalData.targetOrders.map(o => o.customerName || '顧客').join('、')}
+                                </div>
+                            </div>
+
+                            {/* 待扣減庫存商品清單 */}
+                            <div className="space-y-1.5">
+                                <div className="text-xs font-bold text-slate-600 flex items-center justify-between">
+                                    <span>📦 本次出貨預計扣減庫存商品：</span>
+                                </div>
+                                <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 space-y-1.5">
+                                    {shipModalData.targetOrders.flatMap(o => o.items || []).map((item, idx) => (
+                                        <div key={idx} className="flex justify-between items-center text-xs font-bold text-slate-800">
+                                            <span>{item.productName}</span>
+                                            <span className="text-emerald-800 font-mono font-black">
+                                                扣減 -{item.qty} 瓶
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* 警示提醒 */}
+                            <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs text-amber-800 font-bold flex items-start gap-2">
+                                <AlertTriangle size={18} className="shrink-0 text-amber-600 mt-0.5" />
+                                <span>確定要將此訂單【確認出貨】嗎？此動作會正式扣減商品庫存，並寫入銷售紀錄！</span>
+                            </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-100">
+                            <button
+                                onClick={() => setShipModalData(null)}
+                                disabled={isShipping}
+                                className="px-4 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all active:scale-95"
+                            >
+                                取消
+                            </button>
+                            <button
+                                onClick={handleExecuteShipmentAndDeductStock}
+                                disabled={isShipping}
+                                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 shadow-md shadow-emerald-600/30 transition-all active:scale-95 disabled:opacity-50"
+                            >
+                                {isShipping ? <RefreshCw size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                                {isShipping ? '出貨扣庫存處理中...' : '確定出貨並扣減庫存'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Bottom Footer Notice */}
             <div className="text-center py-4 text-xs text-slate-500 space-y-1 font-medium">

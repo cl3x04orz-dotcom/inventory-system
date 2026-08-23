@@ -365,7 +365,8 @@ export const GroupBuyService = {
 
   // 4. 確認出貨：PENDING → CONFIRMED，並寫入正式銷售單
   async confirmPendingOrder(payload: any, user: any) {
-    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
+    const actualPackerName = payload?.confirmedBy || (user && user.username && !['board_guest', 'driver_guest'].includes(user.username) ? user.username : '黃世成');
+    const salesRepName = '張庭瑜'; // 銷售業績 100% 固定歸屬張庭瑜
     const { orderId } = payload;
     if (!orderId) throw new Error('缺少 orderId');
 
@@ -385,40 +386,44 @@ export const GroupBuyService = {
     });
     const orderProdMap = new Map(orderProds.map(p => [p.productId, p]));
 
-    // 寫入正式銷售單
-    await prisma.sales.create({
-      data: {
-        saleId: orderId,
-        date: now,
-        salesRep: user.username,
-        operator: user.username,
-        customer: (order.customerName || '') + (order.deliveryAddress ? ' ' + order.deliveryAddress : ''),
-        paymentMethod: order.paymentMethod === '轉帳' ? 'TRANSFER' : 
-                       order.paymentMethod === 'LINE Pay' ? 'LINEPAY' :
-                       (order.paymentMethod === '奶包金扣抵' || order.paymentMethod === '奶包金') ? 'WALLET' : 'CASH',
-        status: 'PAID',
-        totalCash: (order.paymentMethod === '現金' || !order.paymentMethod) ? order.totalAmount : 0,
-        finalTotal: order.totalAmount,
-        details: {
-          create: (order.details as any[]).map((d: any) => {
-            const prod = orderProdMap.get(d.productId);
-            const multiplier = (prod && prod.isBundle) ? Number(prod.bundleSize || 1) : 1;
-            const finalSold = Number(d.qty) * multiplier;
+    // 寫入正式銷售單 (業績 100% 歸屬張庭瑜)
+    try {
+      await prisma.sales.create({
+        data: {
+          saleId: orderId,
+          date: now,
+          salesRep: salesRepName,
+          operator: salesRepName,
+          customer: (order.customerName || '') + (order.deliveryAddress ? ' ' + order.deliveryAddress : ''),
+          paymentMethod: order.paymentMethod === '轉帳' ? 'TRANSFER' : 
+                         order.paymentMethod === 'LINE Pay' ? 'LINEPAY' :
+                         (order.paymentMethod === '奶包金扣抵' || order.paymentMethod === '奶包金') ? 'WALLET' : 'CASH',
+          status: 'PAID',
+          totalCash: (order.paymentMethod === '現金' || !order.paymentMethod) ? order.totalAmount : 0,
+          finalTotal: order.totalAmount,
+          details: {
+            create: (order.details as any[]).map((d: any) => {
+              const prod = orderProdMap.get(d.productId);
+              const multiplier = (prod && prod.isBundle) ? Number(prod.bundleSize || 1) : 1;
+              const finalSold = Number(d.qty) * multiplier;
 
-            const effectiveUnitPrice = finalSold > 0 ? Number((Number(d.subtotal) / finalSold).toFixed(4)) : Number(d.unitPrice);
+              const effectiveUnitPrice = finalSold > 0 ? Number((Number(d.subtotal) / finalSold).toFixed(4)) : Number(d.unitPrice);
 
-            return {
-              productId: d.productId || 'UNKNOWN',
-              sold: finalSold,
-              picked: finalSold,
-              original: 0,
-              subtotal: Number(d.subtotal),
-              unitPrice: effectiveUnitPrice
-            };
-          })
+              return {
+                productId: d.productId || 'UNKNOWN',
+                sold: finalSold,
+                picked: finalSold,
+                original: 0,
+                subtotal: Number(d.subtotal),
+                unitPrice: effectiveUnitPrice
+              };
+            })
+          }
         }
-      }
-    });
+      });
+    } catch (salesErr: any) {
+      console.warn('[ConfirmPendingOrder] 寫入 sales 銷售單略過或警告:', salesErr?.message);
+    }
 
     // 扣除庫存 (FIFO)
     for (const d of order.details as any[]) {
@@ -428,20 +433,22 @@ export const GroupBuyService = {
         const multiplier = (prod && prod.isBundle) ? Number(prod.bundleSize || 1) : 1;
         const totalDeduct = qty * multiplier;
 
-        await deductInventory(d.productId, totalDeduct, 'STOCK');
+        await deductInventory(d.productId, totalDeduct, 'STOCK').catch(err => {
+          console.warn('[ConfirmPendingOrder] 扣減庫存失敗備退:', err?.message);
+        });
       }
     }
 
-    // 更新訂單狀態
+    // 更新訂單狀態 (出貨標籤動態顯示實際點擊包貨/出貨人員名稱 XXX)
     await prisma.groupBuyOrder.update({
       where: { orderId },
-      data: { status: 'CONFIRMED', confirmedAt: now, confirmedBy: user.username }
+      data: { status: 'CONFIRMED', confirmedAt: now, confirmedBy: actualPackerName }
     });
 
     return { success: true, orderId };
   },
 
-  // 5. 刪除 PENDING 訂單
+  // 5. 刪除訂單 (允許任意狀態刪除)
   async deletePendingOrder(payload: any, user: any) {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { orderId } = payload;
@@ -449,16 +456,14 @@ export const GroupBuyService = {
 
     const order = await prisma.groupBuyOrder.findUnique({ where: { orderId } });
     if (!order) throw new Error('找不到訂單：' + orderId);
-    if (order.status !== 'PENDING') throw new Error('此訂單已非 PENDING 狀態，無法刪除');
 
-    // Cascade 會自動刪明細
+    // Cascade 會自動刪除明細
     await prisma.groupBuyOrder.delete({ where: { orderId } });
     return { success: true, orderId };
   },
 
   // 5a. 批次確認出貨
   async batchConfirmPendingOrders(payload: any, user: any) {
-    if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { orderIds } = payload;
     if (!orderIds || !Array.isArray(orderIds)) throw new Error('缺少 orderIds');
 
@@ -486,23 +491,13 @@ export const GroupBuyService = {
     });
   },
 
-  // 5c. 批次刪除 pending 訂單
+  // 5c. 批次刪除訂單 (允許任意狀態刪除)
   async batchDeletePendingOrders(payload: any, user: any) {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
     const { orderIds } = payload;
     if (!orderIds || !Array.isArray(orderIds)) throw new Error('缺少 orderIds');
 
     return runInTransaction(async () => {
-      // 先確認都是 PENDING
-      const orders = await prisma.groupBuyOrder.findMany({
-        where: { orderId: { in: orderIds } }
-      });
-      for (const order of orders) {
-        if (order.status !== 'PENDING') {
-          throw new Error(`訂單 ${order.orderId} 不是 PENDING 狀態，無法刪除`);
-        }
-      }
-
       await prisma.groupBuyOrder.deleteMany({
         where: { orderId: { in: orderIds } }
       });
