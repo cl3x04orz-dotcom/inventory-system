@@ -6,7 +6,7 @@ export const renderFormattedContent = (text) => {
   if (!text) return null;
 
   // Step 1: 將 Markdown 粗體 **文字** 轉為 <b>文字</b>
-  const html = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+  const html = text.replace(/\*\*([\s\S]*?)\*\*/g, '<b>$1</b>');
 
   // Step 2: 使用瀏覽器原生 DOMParser 進行 100% 精準的 HTML 標籤層驗證與 nested 解析
   try {
