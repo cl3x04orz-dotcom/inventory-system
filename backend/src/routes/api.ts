@@ -11,7 +11,7 @@ const publicActions = ['getStoreSetting', 'login', 'register', 'checkInit', 'log
 const actionPermissions: Record<string, string> = {
   saveStoreSetting: 'system_config',
   saveRewardConfig: 'system_config',
-  saveLiffAnnouncement: 'system_config',
+  saveLiffAnnouncement: 'sales_pending',
   admin_adjustMemberSpend: 'sales_pending',
   saveSales: 'sales_entry',
   createRetailSale: 'sales_entry',

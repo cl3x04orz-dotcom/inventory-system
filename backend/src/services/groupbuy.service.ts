@@ -31,7 +31,7 @@ export const GroupBuyService = {
   },
 
   async saveLiffAnnouncement(payload: any, user: any) {
-    const { storeCode = 'MILI001', enabled, title, content, themeColor, fontSize, customColors } = payload;
+    const { storeCode = 'MILI001', enabled, title, content, themeColor, fontSize, customColors, buttonTextColor, titleTextColor } = payload;
     const valueStr = JSON.stringify({
       enabled: !!enabled,
       title: title || '',
@@ -39,6 +39,8 @@ export const GroupBuyService = {
       themeColor: themeColor || 'purple',
       fontSize: fontSize || 'medium',
       customColors: customColors || { start: '#6366f1', end: '#a855f7', button: '#6366f1' },
+      buttonTextColor: buttonTextColor || 'white',
+      titleTextColor: titleTextColor || 'white',
       updatedAt: new Date().toISOString(),
       updatedBy: user?.username || user?.name || 'System'
     });

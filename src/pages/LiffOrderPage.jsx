@@ -196,16 +196,17 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   const alert = (message, callback = null) => {
     setAlertModal({ show: true, message, callback });
   };
-  const [confirmModal, setConfirmModal] = useState({ 
-    show: false, 
-    message: '', 
-    onConfirm: null, 
+  const [confirmModal, setConfirmModal] = useState({
+    show: false,
+    message: '',
+    onConfirm: null,
     onCancel: null,
     confirmText: '確定',
     cancelText: '取消'
   });
 
   // ── 首頁公告狀態 ──────────────────────────────────────────────
+  const [dontShowToday, setDontShowToday] = useState(false);
   const [announcementData, setAnnouncementData] = useState(null);
   const [announcementModal, setAnnouncementModal] = useState({
     show: false,
@@ -275,7 +276,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
       if (stepParam === "member" || liffState.includes("step=member") || window.location.hash.includes("member") || params.has("member")) {
         return "member";
       }
-    } catch (_) {}
+    } catch (_) { }
     return "shop";
   });
 
@@ -313,7 +314,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         const savedObj = JSON.parse(savedStr);
         if (savedObj.building) return savedObj.building;
       }
-    } catch (_) {}
+    } catch (_) { }
     return "一般用戶";
   });
   const [otherBuildingText, setOtherBuildingText] = useState("");
@@ -412,7 +413,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         } else if (stepParam === "member" || liffState.includes("step=member") || window.location.hash.includes("member") || params.has("member")) {
           setStep("member");
         }
-      } catch (_) {}
+      } catch (_) { }
     };
     handleUrlCheck();
     window.addEventListener("hashchange", handleUrlCheck);
@@ -439,11 +440,11 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
           <span className="text-[10px] mt-1 font-bold">首頁</span>
         </button>
         <button onClick={() => {
-            if (Object.keys(cart).length === 0) {
-                alert('購物車是空的');
-                return;
-            }
-            setStep("confirm");
+          if (Object.keys(cart).length === 0) {
+            alert('購物車是空的');
+            return;
+          }
+          setStep("confirm");
         }} className={`flex flex-col items-center justify-center flex-1 h-full relative ${step === 'form' || step === 'confirm' ? 'text-blue-600' : 'text-[var(--text-tertiary)]'}`}>
           <div className="relative">
             <ShoppingCart size={22} />
@@ -456,14 +457,14 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
           <span className="text-[10px] mt-1 font-bold">購物車</span>
         </button>
         <button onClick={() => {
-            if (lineUserId) {
-                setIsMemberLoading(true);
-                memberApi.getOrders(apiUrl, { userId: lineUserId }).then(res => {
-                    if (res && res.success) setOrders(res.orders || []);
-                    setIsMemberLoading(false);
-                }).catch(err => setIsMemberLoading(false));
-            }
-            setStep("orders");
+          if (lineUserId) {
+            setIsMemberLoading(true);
+            memberApi.getOrders(apiUrl, { userId: lineUserId }).then(res => {
+              if (res && res.success) setOrders(res.orders || []);
+              setIsMemberLoading(false);
+            }).catch(err => setIsMemberLoading(false));
+          }
+          setStep("orders");
         }} className={`flex flex-col items-center justify-center flex-1 h-full ${step === 'orders' ? 'text-blue-600' : 'text-[var(--text-tertiary)]'}`}>
           <FileText size={22} />
           <span className="text-[10px] mt-1 font-bold">訂單</span>
@@ -489,7 +490,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         try {
           const stateStr = liffState.startsWith('?') ? liffState.slice(1) : liffState;
           liffStateParams = new URLSearchParams(stateStr);
-        } catch (e) {}
+        } catch (e) { }
       }
       const getP = (key) => liffStateParams?.get(key) || params.get(key) || '';
 
@@ -503,7 +504,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
             const savedObj = JSON.parse(savedStr);
             if (savedObj.building) buildingParam = savedObj.building;
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       // 載入滿額折抵設定
@@ -521,17 +522,26 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         const annRes = await callGAS(apiUrl, "getLiffAnnouncement", {});
         if (annRes && annRes.enabled) {
           const currentHash = `${annRes.updatedAt}_${annRes.title}`;
+          const todayStr = new Date().toISOString().split('T')[0];
+          const suppressedDate = localStorage.getItem("mlw_announcement_suppressed_date");
+          const lastReadHash = localStorage.getItem("mlw_announcement_read_hash");
+
           const annData = {
             title: annRes.title,
             content: annRes.content,
             themeColor: annRes.themeColor || 'purple',
             fontSize: annRes.fontSize || 'medium',
             customColors: annRes.customColors,
+            buttonTextColor: annRes.buttonTextColor || 'white',
+            titleTextColor: annRes.titleTextColor || 'white',
             hash: currentHash
           };
           setAnnouncementData(annData);
-          const lastReadHash = localStorage.getItem("mlw_announcement_read_hash");
-          if (lastReadHash !== currentHash) {
+
+          const isNewVersion = lastReadHash !== currentHash;
+          const isSuppressedToday = suppressedDate === todayStr;
+
+          if (isNewVersion || !isSuppressedToday) {
             setAnnouncementModal({
               show: true,
               ...annData
@@ -555,7 +565,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
       if (initData) {
         // V2 回傳包裝在 data 屬性內
         const resData = initData.data || initData;
-        
+
         // A. 處理商品
         if (Array.isArray(resData.products)) {
           const activeProds = resData.products.filter((p) => p.isActive);
@@ -575,7 +585,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         if (resData.community) {
           setCurrentCommunity(resData.community);
           setSelectedBuilding(resData.community.CommunityName);
-          
+
           const isVirtual = ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(resData.community.CommunityName);
           if (isVirtual) {
             // 嘗試從 localStorage 帶入上次記錄的區域
@@ -691,19 +701,19 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     // 3. 彙整狀態輸出
     if (isAutoOpen) {
       const autoEndStr = `${dayNames[auto_close_day]} ${auto_close_time}`;
-      
+
       // 計算倒數時間
       const [closeH, closeM] = auto_close_time.split(':').map(Number);
       const targetDate = new Date(now.getTime());
       targetDate.setHours(closeH, closeM, 0, 0);
-      
+
       const currentDay = targetDate.getDay();
       let dayDiff = Number(auto_close_day) - currentDay;
       if (dayDiff < 0 || (dayDiff === 0 && now.getTime() > targetDate.getTime())) {
         dayDiff += 7;
       }
       targetDate.setDate(targetDate.getDate() + dayDiff);
-      
+
       const diffMs = targetDate.getTime() - now.getTime();
       let countdownStr = '';
       if (diffMs > 0) {
@@ -820,7 +830,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
       if (profile?.userId) {
         setLineUserId(profile.userId);
         if (profile.pictureUrl) setLinePictureUrl(profile.pictureUrl);
-        
+
         // 呼叫後端 API 取得會員資料
         try {
           const mRes = await memberApi.getMember(apiUrl, {
@@ -833,7 +843,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
             // 雲端資料與本地 LocalStorage 進行合併
             const savedStr = localStorage.getItem(LS_KEY);
             let savedObj = savedStr ? JSON.parse(savedStr) : {};
-            
+
             // 後端若有存檔，以後端為主
             if (mRes.member.ReceiverName) {
               setCustomerName(mRes.member.ReceiverName);
@@ -844,7 +854,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
             } else if (savedObj.name) {
               setCustomerName(savedObj.name);
             }
-            
+
             if (mRes.member.Phone) {
               const { phone: pVal, ext: eVal } = formatTaiwanPhone(mRes.member.Phone);
               setCustomerPhone(pVal);
@@ -855,7 +865,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
               setCustomerPhone(pVal);
               if (eVal) setPhoneExt(eVal);
             }
-            
+
             if (lockedBuilding) {
               setSelectedBuilding(lockedBuilding);
               savedObj.building = lockedBuilding;
@@ -865,12 +875,12 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
             } else if (savedObj.building) {
               setSelectedBuilding(savedObj.building);
             }
-            
+
             if (mRes.member.FloorRoom) {
               setDetailAddress(mRes.member.FloorRoom);
               savedObj.detailAddress = mRes.member.FloorRoom;
             } else if (savedObj.detailAddress) setDetailAddress(savedObj.detailAddress);
-            
+
             localStorage.setItem(LS_KEY, JSON.stringify(savedObj));
           }
         } catch (mErr) {
@@ -1030,7 +1040,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
           return b;
         }
       }
-    } catch (_) {}
+    } catch (_) { }
     return "";
   }, [urlBuilding, sourceGroup, groupBindings]);
 
@@ -1080,11 +1090,11 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     return sourceGroup;
   }, [sourceGroup, groupBindings, selectedBuilding, currentCommunity]);
 
-  const isGeneralUser = 
-    selectedBuilding === "一般用戶" || 
-    selectedBuilding === "一般散客" || 
-    selectedBuilding === "上線下單" || 
-    selectedBuilding === "線上下單" || 
+  const isGeneralUser =
+    selectedBuilding === "一般用戶" ||
+    selectedBuilding === "一般散客" ||
+    selectedBuilding === "上線下單" ||
+    selectedBuilding === "線上下單" ||
     selectedBuilding === "一般常態" ||
     selectedBuilding === "常態零售";
 
@@ -1098,7 +1108,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         try {
           const parsed = JSON.parse(str);
           if (Array.isArray(parsed)) return parsed.map(String).map(s => s.trim());
-        } catch (e) {}
+        } catch (e) { }
       }
       if (str.includes(',')) {
         return str.split(',').map(s => s.trim()).filter(Boolean);
@@ -1144,7 +1154,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
           const match = Array.isArray(allCommunities) ? allCommunities.find(c => (c.CommunityId || c.communityId) === id) : null;
           const cName = match ? (match.CommunityName || match.communityName) : id;
           return ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(cName) ||
-                 ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(id);
+            ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(id);
         });
 
         const isGenericOnlineCustomer = activeList.some(identifier => {
@@ -1528,7 +1538,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     if (product.has_volume_pricing && product.volume_pricing_settings) {
       let settings = product.volume_pricing_settings;
       if (typeof settings === 'string') {
-        try { settings = JSON.parse(settings); } catch (e) {}
+        try { settings = JSON.parse(settings); } catch (e) { }
       }
       let tiers = [];
       if (settings && Array.isArray(settings.tiers) && settings.tiers.length > 0) {
@@ -1749,269 +1759,269 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         let totalQtyInGroup = group.items.reduce((sum, item) => sum + item.qty, 0);
 
         if (mode === 'AUTO_LOWEST_PRICE') {
-           let totalFreeAllowed = 0;
-           let totalSavedAmount = 0;
+          let totalFreeAllowed = 0;
+          let totalSavedAmount = 0;
 
-           if (isGroupOrder && groupCart && typeof groupCart === 'object') {
-             for (const [memberName, memberItems] of Object.entries(groupCart)) {
-               if (!memberItems || typeof memberItems !== 'object') continue;
-               let memberExpandedUnits = [];
-               for (const item of group.items) {
-                 const mQty = Number(memberItems[item.id] || 0);
-                 for (let i = 0; i < mQty; i++) {
-                   memberExpandedUnits.push({ ...item, unitPrice: item.price });
-                 }
-               }
-               let remainingQty = memberExpandedUnits.length;
-               let memberFree = 0;
-               for (const tier of sortedTiers) {
-                 const groupSize = tier.buyQty + tier.freeQty;
-                 if (groupSize > 0 && remainingQty >= groupSize) {
-                   const sets = Math.floor(remainingQty / groupSize);
-                   memberFree += sets * tier.freeQty;
-                   remainingQty -= sets * groupSize;
-                 }
-               }
-               memberExpandedUnits.sort((a, b) => a.unitPrice - b.unitPrice);
-               for (let i = 0; i < memberFree; i++) {
-                 if (memberExpandedUnits[i]) {
-                   totalSavedAmount += memberExpandedUnits[i].unitPrice;
-                 }
-               }
-               totalFreeAllowed += memberFree;
-             }
-             for (const item of group.items) {
-               finalCartItems.push({ ...item, qty: item.qty, subtotal: item.qty * item.price, isGift: false });
-               totalAmount += item.qty * item.price;
-             }
-           } else {
-             let remainingQty = totalQtyInGroup;
-             for (const tier of sortedTiers) {
-               const groupSize = tier.buyQty + tier.freeQty;
-               if (groupSize > 0 && remainingQty >= groupSize) {
-                 const sets = Math.floor(remainingQty / groupSize);
-                 totalFreeAllowed += sets * tier.freeQty;
-                 remainingQty -= sets * groupSize;
-               }
-             }
-             let expandedUnits = [];
-             for (const item of group.items) {
-               for (let i = 0; i < item.qty; i++) {
-                 expandedUnits.push({ ...item, unitPrice: item.price });
-               }
-             }
-             expandedUnits.sort((a, b) => a.unitPrice - b.unitPrice);
-             for (let i = 0; i < expandedUnits.length; i++) {
-                expandedUnits[i].isFree = i < totalFreeAllowed;
-             }
-             for (const item of group.items) {
-                const unitsOfThisItem = expandedUnits.filter(u => u.id === item.id);
-                const freeCount = unitsOfThisItem.filter(u => u.isFree).length;
-                const paidCount = unitsOfThisItem.filter(u => !u.isFree).length;
-                if (paidCount > 0) {
-                    finalCartItems.push({ ...item, qty: paidCount, subtotal: paidCount * item.price, isGift: false });
-                    totalAmount += paidCount * item.price;
+          if (isGroupOrder && groupCart && typeof groupCart === 'object') {
+            for (const [memberName, memberItems] of Object.entries(groupCart)) {
+              if (!memberItems || typeof memberItems !== 'object') continue;
+              let memberExpandedUnits = [];
+              for (const item of group.items) {
+                const mQty = Number(memberItems[item.id] || 0);
+                for (let i = 0; i < mQty; i++) {
+                  memberExpandedUnits.push({ ...item, unitPrice: item.price });
                 }
-                if (freeCount > 0) {
-                    finalCartItems.push({ ...item, qty: freeCount, subtotal: 0, price: 0, isGift: true, remark: item.remark ? `${item.remark} (贈品)` : "贈品" });
+              }
+              let remainingQty = memberExpandedUnits.length;
+              let memberFree = 0;
+              for (const tier of sortedTiers) {
+                const groupSize = tier.buyQty + tier.freeQty;
+                if (groupSize > 0 && remainingQty >= groupSize) {
+                  const sets = Math.floor(remainingQty / groupSize);
+                  memberFree += sets * tier.freeQty;
+                  remainingQty -= sets * groupSize;
                 }
-             }
-             totalSavedAmount = expandedUnits.filter(u => u.isFree).reduce((sum, u) => sum + u.unitPrice, 0);
-           }
-           
-           if (totalFreeAllowed > 0) {
-              discounts.push(`✨ [${promo.name}] 已自動折抵 ${totalFreeAllowed} 件免費商品 (省 $${totalSavedAmount})`);
-           }
+              }
+              memberExpandedUnits.sort((a, b) => a.unitPrice - b.unitPrice);
+              for (let i = 0; i < memberFree; i++) {
+                if (memberExpandedUnits[i]) {
+                  totalSavedAmount += memberExpandedUnits[i].unitPrice;
+                }
+              }
+              totalFreeAllowed += memberFree;
+            }
+            for (const item of group.items) {
+              finalCartItems.push({ ...item, qty: item.qty, subtotal: item.qty * item.price, isGift: false });
+              totalAmount += item.qty * item.price;
+            }
+          } else {
+            let remainingQty = totalQtyInGroup;
+            for (const tier of sortedTiers) {
+              const groupSize = tier.buyQty + tier.freeQty;
+              if (groupSize > 0 && remainingQty >= groupSize) {
+                const sets = Math.floor(remainingQty / groupSize);
+                totalFreeAllowed += sets * tier.freeQty;
+                remainingQty -= sets * groupSize;
+              }
+            }
+            let expandedUnits = [];
+            for (const item of group.items) {
+              for (let i = 0; i < item.qty; i++) {
+                expandedUnits.push({ ...item, unitPrice: item.price });
+              }
+            }
+            expandedUnits.sort((a, b) => a.unitPrice - b.unitPrice);
+            for (let i = 0; i < expandedUnits.length; i++) {
+              expandedUnits[i].isFree = i < totalFreeAllowed;
+            }
+            for (const item of group.items) {
+              const unitsOfThisItem = expandedUnits.filter(u => u.id === item.id);
+              const freeCount = unitsOfThisItem.filter(u => u.isFree).length;
+              const paidCount = unitsOfThisItem.filter(u => !u.isFree).length;
+              if (paidCount > 0) {
+                finalCartItems.push({ ...item, qty: paidCount, subtotal: paidCount * item.price, isGift: false });
+                totalAmount += paidCount * item.price;
+              }
+              if (freeCount > 0) {
+                finalCartItems.push({ ...item, qty: freeCount, subtotal: 0, price: 0, isGift: true, remark: item.remark ? `${item.remark} (贈品)` : "贈品" });
+              }
+            }
+            totalSavedAmount = expandedUnits.filter(u => u.isFree).reduce((sum, u) => sum + u.unitPrice, 0);
+          }
+
+          if (totalFreeAllowed > 0) {
+            discounts.push(`✨ [${promo.name}] 已自動折抵 ${totalFreeAllowed} 件免費商品 (省 $${totalSavedAmount})`);
+          }
 
         } else if (mode === 'CUSTOMER_SELECT') {
-           let earnedGifts = 0;
-           if (isGroupOrder && groupCart && typeof groupCart === 'object') {
-             for (const [memberName, memberItems] of Object.entries(groupCart)) {
-               if (!memberItems || typeof memberItems !== 'object') continue;
-               let memberGroupQty = 0;
-               for (const item of group.items) {
-                 memberGroupQty += Number(memberItems[item.id] || 0);
-               }
-               let remaining = memberGroupQty;
-               let mEarned = 0;
-               for (const tier of sortedTiers) {
-                 if (tier.buyQty > 0 && remaining >= tier.buyQty) {
-                   const sets = Math.floor(remaining / tier.buyQty);
-                   mEarned += sets * tier.freeQty;
-                   remaining -= sets * tier.buyQty;
-                 }
-               }
-               earnedGifts += mEarned;
+          let earnedGifts = 0;
+          if (isGroupOrder && groupCart && typeof groupCart === 'object') {
+            for (const [memberName, memberItems] of Object.entries(groupCart)) {
+              if (!memberItems || typeof memberItems !== 'object') continue;
+              let memberGroupQty = 0;
+              for (const item of group.items) {
+                memberGroupQty += Number(memberItems[item.id] || 0);
+              }
+              let remaining = memberGroupQty;
+              let mEarned = 0;
+              for (const tier of sortedTiers) {
+                if (tier.buyQty > 0 && remaining >= tier.buyQty) {
+                  const sets = Math.floor(remaining / tier.buyQty);
+                  mEarned += sets * tier.freeQty;
+                  remaining -= sets * tier.buyQty;
+                }
+              }
+              earnedGifts += mEarned;
 
-               // 計算該成員已選取贈品
-               const mSelections = groupGiftSelections[memberName]?.[pId] || {};
-               const mSelectedCount = Object.values(mSelections).reduce((a, b) => a + Number(b), 0);
-               if (!memberGiftCredits[memberName]) memberGiftCredits[memberName] = {};
-               memberGiftCredits[memberName][pId] = { earned: mEarned, selected: mSelectedCount, promoName: promo.name };
-             }
-           } else {
-             let remaining = totalQtyInGroup;
-             for (const tier of sortedTiers) {
-               if (tier.buyQty > 0 && remaining >= tier.buyQty) {
-                 const sets = Math.floor(remaining / tier.buyQty);
-                 earnedGifts += sets * tier.freeQty;
-                 remaining -= sets * tier.buyQty;
-               }
-             }
-           }
-           
-           for (const item of group.items) {
-               finalCartItems.push({ ...item, qty: item.qty, subtotal: item.qty * item.price, isGift: false });
-               totalAmount += item.qty * item.price;
-           }
-           
-           let selectedGiftsCount = 0;
-           if (isGroupOrder && groupCart && typeof groupCart === 'object') {
-             const aggregatedGifts = {}; // { [gPid]: totalQty }
-             Object.entries(groupGiftSelections || {}).forEach(([memberName, mGifts]) => {
-               const selections = mGifts?.[pId] || {};
-               Object.entries(selections).forEach(([gPid, gQty]) => {
-                 if (gQty > 0) {
-                   selectedGiftsCount += gQty;
-                   aggregatedGifts[gPid] = (aggregatedGifts[gPid] || 0) + gQty;
-                 }
-               });
-             });
+              // 計算該成員已選取贈品
+              const mSelections = groupGiftSelections[memberName]?.[pId] || {};
+              const mSelectedCount = Object.values(mSelections).reduce((a, b) => a + Number(b), 0);
+              if (!memberGiftCredits[memberName]) memberGiftCredits[memberName] = {};
+              memberGiftCredits[memberName][pId] = { earned: mEarned, selected: mSelectedCount, promoName: promo.name };
+            }
+          } else {
+            let remaining = totalQtyInGroup;
+            for (const tier of sortedTiers) {
+              if (tier.buyQty > 0 && remaining >= tier.buyQty) {
+                const sets = Math.floor(remaining / tier.buyQty);
+                earnedGifts += sets * tier.freeQty;
+                remaining -= sets * tier.buyQty;
+              }
+            }
+          }
 
-             Object.entries(aggregatedGifts).forEach(([gPid, totalGQty]) => {
-               const gProd = products.find(p => p.id === gPid);
-               if (gProd) {
-                 finalCartItems.push({
-                   id: gPid,
-                   name: gProd.name,
-                   price: 0,
-                   qty: totalGQty,
-                   freeQty: 0,
-                   subtotal: 0,
-                   product: gProd,
-                   remark: "免費贈品",
-                   imageUrl: gProd.imageUrl || "",
-                   isGift: true
-                 });
-               }
-             });
-           } else {
-             const selections = giftSelections[pId] || {};
-             for (const [gPid, gQty] of Object.entries(selections)) {
-                 if (gQty > 0) {
-                     selectedGiftsCount += gQty;
-                     const gProd = products.find(p => p.id === gPid);
-                     if (gProd) {
-                         finalCartItems.push({
-                             id: gPid,
-                             name: gProd.name,
-                             price: 0,
-                             qty: gQty,
-                             freeQty: 0,
-                             subtotal: 0,
-                             product: gProd,
-                             remark: "贈品",
-                             imageUrl: gProd.imageUrl || "",
-                             isGift: true
-                         });
-                     }
-                 }
-             }
-           }
-           
-           availableGiftCredits[pId] = { earned: earnedGifts, selected: selectedGiftsCount, promoName: promo.name };
-           if (earnedGifts > 0) {
-               discounts.push(`✨ [${promo.name}] 獲得 ${earnedGifts} 件贈品額度 (已選 ${selectedGiftsCount} 件)`);
-           }
+          for (const item of group.items) {
+            finalCartItems.push({ ...item, qty: item.qty, subtotal: item.qty * item.price, isGift: false });
+            totalAmount += item.qty * item.price;
+          }
+
+          let selectedGiftsCount = 0;
+          if (isGroupOrder && groupCart && typeof groupCart === 'object') {
+            const aggregatedGifts = {}; // { [gPid]: totalQty }
+            Object.entries(groupGiftSelections || {}).forEach(([memberName, mGifts]) => {
+              const selections = mGifts?.[pId] || {};
+              Object.entries(selections).forEach(([gPid, gQty]) => {
+                if (gQty > 0) {
+                  selectedGiftsCount += gQty;
+                  aggregatedGifts[gPid] = (aggregatedGifts[gPid] || 0) + gQty;
+                }
+              });
+            });
+
+            Object.entries(aggregatedGifts).forEach(([gPid, totalGQty]) => {
+              const gProd = products.find(p => p.id === gPid);
+              if (gProd) {
+                finalCartItems.push({
+                  id: gPid,
+                  name: gProd.name,
+                  price: 0,
+                  qty: totalGQty,
+                  freeQty: 0,
+                  subtotal: 0,
+                  product: gProd,
+                  remark: "免費贈品",
+                  imageUrl: gProd.imageUrl || "",
+                  isGift: true
+                });
+              }
+            });
+          } else {
+            const selections = giftSelections[pId] || {};
+            for (const [gPid, gQty] of Object.entries(selections)) {
+              if (gQty > 0) {
+                selectedGiftsCount += gQty;
+                const gProd = products.find(p => p.id === gPid);
+                if (gProd) {
+                  finalCartItems.push({
+                    id: gPid,
+                    name: gProd.name,
+                    price: 0,
+                    qty: gQty,
+                    freeQty: 0,
+                    subtotal: 0,
+                    product: gProd,
+                    remark: "贈品",
+                    imageUrl: gProd.imageUrl || "",
+                    isGift: true
+                  });
+                }
+              }
+            }
+          }
+
+          availableGiftCredits[pId] = { earned: earnedGifts, selected: selectedGiftsCount, promoName: promo.name };
+          if (earnedGifts > 0) {
+            discounts.push(`✨ [${promo.name}] 獲得 ${earnedGifts} 件贈品額度 (已選 ${selectedGiftsCount} 件)`);
+          }
 
         } else if (mode === 'SAME_PRODUCT') {
-           for (const item of group.items) {
-               let totalItemFree = 0;
-               if (isGroupOrder && groupCart && typeof groupCart === 'object') {
-                 for (const [memberName, memberItems] of Object.entries(groupCart)) {
-                   if (!memberItems || typeof memberItems !== 'object') continue;
-                   let memberItemQty = Number(memberItems[item.id] || 0);
-                   let remaining = memberItemQty;
-                   for (const tier of sortedTiers) {
-                     if (tier.buyQty > 0 && remaining >= tier.buyQty) {
-                       const sets = Math.floor(remaining / tier.buyQty);
-                       totalItemFree += sets * tier.freeQty;
-                       remaining -= sets * tier.buyQty;
-                     }
-                   }
-                 }
-               } else {
-                 let remaining = item.qty;
-                 for (const tier of sortedTiers) {
-                   if (tier.buyQty > 0 && remaining >= tier.buyQty) {
-                     const sets = Math.floor(remaining / tier.buyQty);
-                     totalItemFree += sets * tier.freeQty;
-                     remaining -= sets * tier.buyQty;
-                   }
-                 }
-               }
-               
-               finalCartItems.push({ ...item, qty: item.qty, subtotal: item.qty * item.price, isGift: false });
-               totalAmount += item.qty * item.price;
-               
-               if (totalItemFree > 0) {
-                   finalCartItems.push({ ...item, qty: totalItemFree, subtotal: 0, price: 0, isGift: true, remark: item.remark ? `${item.remark} (贈品)` : "贈品" });
-                   discounts.push(`✨ [${promo.name}] ${item.name} 滿贈獲得 ${totalItemFree} 件贈品`);
-               }
-           }
+          for (const item of group.items) {
+            let totalItemFree = 0;
+            if (isGroupOrder && groupCart && typeof groupCart === 'object') {
+              for (const [memberName, memberItems] of Object.entries(groupCart)) {
+                if (!memberItems || typeof memberItems !== 'object') continue;
+                let memberItemQty = Number(memberItems[item.id] || 0);
+                let remaining = memberItemQty;
+                for (const tier of sortedTiers) {
+                  if (tier.buyQty > 0 && remaining >= tier.buyQty) {
+                    const sets = Math.floor(remaining / tier.buyQty);
+                    totalItemFree += sets * tier.freeQty;
+                    remaining -= sets * tier.buyQty;
+                  }
+                }
+              }
+            } else {
+              let remaining = item.qty;
+              for (const tier of sortedTiers) {
+                if (tier.buyQty > 0 && remaining >= tier.buyQty) {
+                  const sets = Math.floor(remaining / tier.buyQty);
+                  totalItemFree += sets * tier.freeQty;
+                  remaining -= sets * tier.buyQty;
+                }
+              }
+            }
+
+            finalCartItems.push({ ...item, qty: item.qty, subtotal: item.qty * item.price, isGift: false });
+            totalAmount += item.qty * item.price;
+
+            if (totalItemFree > 0) {
+              finalCartItems.push({ ...item, qty: totalItemFree, subtotal: 0, price: 0, isGift: true, remark: item.remark ? `${item.remark} (贈品)` : "贈品" });
+              discounts.push(`✨ [${promo.name}] ${item.name} 滿贈獲得 ${totalItemFree} 件贈品`);
+            }
+          }
         }
 
       } else if (promo.promoType === 'BUNDLE_PRICE') {
-         const targetQty = Number(promo.buyQty);
-         const packagePrice = Number(promo.bundlePrice);
-         
-         const totalQtyInGroup = group.items.reduce((sum, item) => sum + item.qty, 0);
-         const sets = Math.floor(totalQtyInGroup / targetQty);
-         
-         let expandedUnits = [];
-         for (const item of group.items) {
-           for (let i = 0; i < item.qty; i++) {
-             expandedUnits.push({ ...item, unitPrice: item.price });
-           }
-         }
-         expandedUnits.sort((a, b) => b.unitPrice - a.unitPrice);
-         
-         for (let i = 0; i < expandedUnits.length; i++) {
-            expandedUnits[i].isPartOfBundle = i < sets * targetQty;
-         }
-         
-         const groupSubtotal = sets * packagePrice;
-         
-         for (const item of group.items) {
-           const unitsOfThisItem = expandedUnits.filter(u => u.id === item.id);
-           const bundleCount = unitsOfThisItem.filter(u => u.isPartOfBundle).length;
-           const remainCount = unitsOfThisItem.filter(u => !u.isPartOfBundle).length;
-           
-           let itemSub = remainCount * item.price;
-           if (bundleCount > 0 && sets * targetQty > 0) {
-             itemSub += (bundleCount / (sets * targetQty)) * groupSubtotal;
-           }
-           item.subtotal = Math.round(itemSub);
-         }
-         
-         let sumOfItemSubtotals = group.items.reduce((sum, item) => sum + item.subtotal, 0);
-         const expectedTotal = groupSubtotal + expandedUnits.filter(u => !u.isPartOfBundle).reduce((sum, u) => sum + u.unitPrice, 0);
-         
-         if (sumOfItemSubtotals !== expectedTotal && group.items.length > 0) {
-            group.items[0].subtotal += (expectedTotal - sumOfItemSubtotals);
-         }
-         
-         totalAmount += expectedTotal;
-         
-         for (const item of group.items) {
-             finalCartItems.push({ ...item, isGift: false });
-         }
+        const targetQty = Number(promo.buyQty);
+        const packagePrice = Number(promo.bundlePrice);
 
-         if (sets > 0) {
-            const originalPriceForBundled = expandedUnits.filter(u => u.isPartOfBundle).reduce((sum, u) => sum + u.unitPrice, 0);
-            const savedAmount = originalPriceForBundled - groupSubtotal;
-            discounts.push(`✨ [${promo.name}] 組合優惠 (省 $${savedAmount})`);
-         }
+        const totalQtyInGroup = group.items.reduce((sum, item) => sum + item.qty, 0);
+        const sets = Math.floor(totalQtyInGroup / targetQty);
+
+        let expandedUnits = [];
+        for (const item of group.items) {
+          for (let i = 0; i < item.qty; i++) {
+            expandedUnits.push({ ...item, unitPrice: item.price });
+          }
+        }
+        expandedUnits.sort((a, b) => b.unitPrice - a.unitPrice);
+
+        for (let i = 0; i < expandedUnits.length; i++) {
+          expandedUnits[i].isPartOfBundle = i < sets * targetQty;
+        }
+
+        const groupSubtotal = sets * packagePrice;
+
+        for (const item of group.items) {
+          const unitsOfThisItem = expandedUnits.filter(u => u.id === item.id);
+          const bundleCount = unitsOfThisItem.filter(u => u.isPartOfBundle).length;
+          const remainCount = unitsOfThisItem.filter(u => !u.isPartOfBundle).length;
+
+          let itemSub = remainCount * item.price;
+          if (bundleCount > 0 && sets * targetQty > 0) {
+            itemSub += (bundleCount / (sets * targetQty)) * groupSubtotal;
+          }
+          item.subtotal = Math.round(itemSub);
+        }
+
+        let sumOfItemSubtotals = group.items.reduce((sum, item) => sum + item.subtotal, 0);
+        const expectedTotal = groupSubtotal + expandedUnits.filter(u => !u.isPartOfBundle).reduce((sum, u) => sum + u.unitPrice, 0);
+
+        if (sumOfItemSubtotals !== expectedTotal && group.items.length > 0) {
+          group.items[0].subtotal += (expectedTotal - sumOfItemSubtotals);
+        }
+
+        totalAmount += expectedTotal;
+
+        for (const item of group.items) {
+          finalCartItems.push({ ...item, isGift: false });
+        }
+
+        if (sets > 0) {
+          const originalPriceForBundled = expandedUnits.filter(u => u.isPartOfBundle).reduce((sum, u) => sum + u.unitPrice, 0);
+          const savedAmount = originalPriceForBundled - groupSubtotal;
+          discounts.push(`✨ [${promo.name}] 組合優惠 (省 $${savedAmount})`);
+        }
       }
     }
 
@@ -2019,7 +2029,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     for (const item of standaloneItems) {
       const p = item.product;
       const singlePrice = item.price;
-      
+
       let legacyFreeQty = 0;
       if (Array.isArray(p.promotions) && p.promotions.length > 0) {
         let bestFree = 0;
@@ -2033,23 +2043,23 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         }
         legacyFreeQty = bestFree;
         item.freeQty = legacyFreeQty;
-        item.subtotal = singlePrice * (item.qty - legacyFreeQty); 
+        item.subtotal = singlePrice * (item.qty - legacyFreeQty);
       } else if (p.has_volume_pricing && p.volume_pricing_settings) {
         item.subtotal = calculateProductSubtotal(p, item.qty);
       } else {
         item.subtotal = singlePrice * item.qty;
       }
       totalAmount += item.subtotal;
-      
+
       if (legacyFreeQty > 0) {
-          // split legacy free items as well
-          const paidQty = item.qty - legacyFreeQty;
-          if (paidQty > 0) {
-              finalCartItems.push({ ...item, qty: paidQty, isGift: false });
-          }
-          finalCartItems.push({ ...item, qty: legacyFreeQty, subtotal: 0, price: 0, isGift: true, remark: item.remark ? `${item.remark} (贈品)` : "贈品" });
+        // split legacy free items as well
+        const paidQty = item.qty - legacyFreeQty;
+        if (paidQty > 0) {
+          finalCartItems.push({ ...item, qty: paidQty, isGift: false });
+        }
+        finalCartItems.push({ ...item, qty: legacyFreeQty, subtotal: 0, price: 0, isGift: true, remark: item.remark ? `${item.remark} (贈品)` : "贈品" });
       } else {
-          finalCartItems.push({ ...item, isGift: false });
+        finalCartItems.push({ ...item, isGift: false });
       }
     }
 
@@ -2144,12 +2154,12 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   const getFullAddress = () => {
     const bName =
       selectedBuilding === "其它" ? otherBuildingText.trim() : selectedBuilding;
-    
-    const isGeneral = 
-      bName === "一般用戶" || 
-      bName === "一般散客" || 
-      bName === "上線下單" || 
-      bName === "線上下單" || 
+
+    const isGeneral =
+      bName === "一般用戶" ||
+      bName === "一般散客" ||
+      bName === "上線下單" ||
+      bName === "線上下單" ||
       bName === "一般常態" ||
       bName === "常態零售";
 
@@ -2193,7 +2203,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
           }
           if (credit.selected > credit.earned) {
             setShowGiftModal(pId);
-            alert(credit.earned === 0 
+            alert(credit.earned === 0
               ? `⚠️ 團員【${memberName}】因付費商品已刪除/減購，不符合贈品資格，請重新調整贈品！`
               : `⚠️ 團員【${memberName}】的贈品已超出額度！可得 ${credit.earned} 件，目前已選 ${credit.selected} 件，請點擊調整！`
             );
@@ -2210,7 +2220,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         }
         if (credit.selected > credit.earned) {
           setShowGiftModal(pId);
-          alert(credit.earned === 0 
+          alert(credit.earned === 0
             ? `⚠️ 因付費商品已刪除/減購，您已無【${credit.promoName || '贈品'}】獲得額度，請重新調整/清空贈品！`
             : `⚠️ 贈品數量已超出可獲得額度！可得 ${credit.earned} 件，目前已選 ${credit.selected} 件，請重新調整贈品。`
           );
@@ -2374,7 +2384,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
           if (credit.selected > credit.earned) {
             setIsSubmitting(false);
             setShowGiftModal(pId);
-            alert(credit.earned === 0 
+            alert(credit.earned === 0
               ? `⚠️ 團員【${memberName}】因付費商品已刪除/減購，不符合贈品資格，請重新調整贈品！`
               : `⚠️ 團員【${memberName}】的贈品已超出額度！可得 ${credit.earned} 件，目前已選 ${credit.selected} 件，請點擊調整！`
             );
@@ -2393,7 +2403,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         if (credit.selected > credit.earned) {
           setIsSubmitting(false);
           setShowGiftModal(pId);
-          alert(credit.earned === 0 
+          alert(credit.earned === 0
             ? `⚠️ 因付費商品已刪除/減購，您已無【${credit.promoName || '贈品'}】獲得額度，請重新調整/清空贈品！`
             : `⚠️ 贈品數量已超出可獲得額度！可得 ${credit.earned} 件，目前已選 ${credit.selected} 件，請重新調整贈品。`
           );
@@ -2543,8 +2553,8 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         setMemberProfile(prev => prev ? {
           ...prev,
           WalletBalance: useWallet ? Math.max(0, Number(prev.WalletBalance) - maxDeduction) : Number(prev.WalletBalance),
-          RedeemableSpendBalance: selectedRewardRule 
-            ? Math.max(0, Number(prev.RedeemableSpendBalance || 0) - selectedRewardRule.spendMin + netCartTotal) 
+          RedeemableSpendBalance: selectedRewardRule
+            ? Math.max(0, Number(prev.RedeemableSpendBalance || 0) - selectedRewardRule.spendMin + netCartTotal)
             : Number(prev.RedeemableSpendBalance || 0) + netCartTotal,
           TotalLifetimeSpend: Number(prev.TotalLifetimeSpend || 0) + netCartTotal
         } : null);
@@ -2552,7 +2562,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
       setOrderId(res.orderId || "");
       setOrderTime(new Date().toLocaleString("zh-TW", { hour12: false }));
-      
+
       const finalTotal = useWallet ? Math.max(0, orderTotal - maxDeduction) : orderTotal;
       setSuccessOrderTotal(finalTotal);
 
@@ -2627,18 +2637,18 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
           {/* 右側：客服與政策入口以下方完整版權為底座居中 (不換行) */}
           <div className="flex flex-col items-center text-center gap-0.5 shrink-0">
             <div className="flex items-center justify-center gap-1.5 sm:gap-2 font-medium text-blue-500 text-xs whitespace-nowrap">
-              <button 
-                type="button" 
-                onClick={() => setShowServiceModal(true)} 
+              <button
+                type="button"
+                onClick={() => setShowServiceModal(true)}
                 className="hover:underline flex items-center gap-0.5 cursor-pointer"
               >
                 <Headphones size={12} className="text-emerald-500" />
                 <span>客服中心</span>
               </button>
               <span className="text-slate-300 font-normal">|</span>
-              <button 
-                type="button" 
-                onClick={() => setShowPolicyModal(true)} 
+              <button
+                type="button"
+                onClick={() => setShowPolicyModal(true)}
                 className="hover:underline flex items-center gap-0.5 cursor-pointer"
               >
                 <ShieldCheck size={12} className="text-emerald-500" />
@@ -2699,10 +2709,10 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
               <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">撥打專線</span>
             </a>
 
-            <a 
-              href="https://lin.ee/6N0AET0" 
-              target="_blank" 
-              rel="noopener noreferrer" 
+            <a
+              href="https://lin.ee/6N0AET0"
+              target="_blank"
+              rel="noopener noreferrer"
               className="group flex items-center justify-between p-2.5 rounded-xl hover:bg-white transition-all border border-transparent hover:border-slate-200/60 shadow-xs hover:shadow-sm"
             >
               <div className="flex items-center gap-2.5">
@@ -2854,10 +2864,10 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     if (!policyData) return null;
 
     const IconComp = activePolicyKey === 'privacy_policy' ? ShieldCheck :
-                     activePolicyKey === 'terms_of_service' ? FileText :
-                     activePolicyKey === 'shopping_notice' ? Package :
-                     activePolicyKey === 'refund_policy' ? RefreshCw :
-                     activePolicyKey === 'shipping_policy' ? MapPin : CreditCard;
+      activePolicyKey === 'terms_of_service' ? FileText :
+        activePolicyKey === 'shopping_notice' ? Package :
+          activePolicyKey === 'refund_policy' ? RefreshCw :
+            activePolicyKey === 'shipping_policy' ? MapPin : CreditCard;
 
     return (
       <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200 select-none">
@@ -3096,16 +3106,16 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
           {/* 🛒 商品明細 Card */}
           {successOrderItems.length > 0 && (
             <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl shadow-sm text-sm">
-              <div 
+              <div
                 onClick={() => setIsDetailExpanded(!isDetailExpanded)}
                 className="px-5 py-4 flex justify-between items-center cursor-pointer hover:bg-[var(--bg-hover)] transition-colors select-none rounded-t-2xl"
               >
                 <span className="font-bold text-[var(--text-primary)] flex items-center gap-1.5">
                   🛒 商品明細 (共 {successOrderItems.reduce((sum, item) => sum + item.qty, 0)} 件)
                 </span>
-                <ChevronDown 
-                  size={18} 
-                  className={`text-[var(--text-secondary)] transition-transform duration-300 ${isDetailExpanded ? 'rotate-180' : ''}`} 
+                <ChevronDown
+                  size={18}
+                  className={`text-[var(--text-secondary)] transition-transform duration-300 ${isDetailExpanded ? 'rotate-180' : ''}`}
                 />
               </div>
               {isDetailExpanded && (
@@ -3453,7 +3463,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                 flavorModalProduct.volume_pricing_settings && (() => {
                   let s = flavorModalProduct.volume_pricing_settings;
                   if (typeof s === 'string') {
-                    try { s = JSON.parse(s); } catch (e) {}
+                    try { s = JSON.parse(s); } catch (e) { }
                   }
                   if (!s) return null;
                   const tiers = Array.isArray(s.tiers) && s.tiers.length > 0
@@ -3536,7 +3546,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
       return (
         <div className="fixed inset-0 z-[9999] flex flex-col justify-end p-3 pb-[75px]">
           {/* 遮罩背景 */}
-          <div 
+          <div
             className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-fadeIn"
             onClick={() => setShowGiftModal(null)}
           />
@@ -3575,15 +3585,14 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                   <button
                     key={name}
                     onClick={() => setActiveGroupMember(name)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all flex items-center gap-1 ${
-                      isActive
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : isOver
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all flex items-center gap-1 ${isActive
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : isOver
                         ? 'bg-red-500/10 text-red-600 border border-red-300 dark:border-red-700 animate-pulse'
                         : isDone
-                        ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-300 dark:border-emerald-700'
-                        : 'bg-amber-500/10 text-amber-600 border border-amber-300 dark:border-amber-700 animate-pulse'
-                    }`}
+                          ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-300 dark:border-emerald-700'
+                          : 'bg-amber-500/10 text-amber-600 border border-amber-300 dark:border-amber-700 animate-pulse'
+                      }`}
                   >
                     <span>👤 {name}</span>
                     <span>{isOver ? `⚠️ (${mc.selected}/${mc.earned})` : (isDone ? `✅ (${mc.selected}/${mc.earned})` : `(${mc.selected}/${mc.earned})`)}</span>
@@ -3635,11 +3644,10 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                     setShowGiftModal(null);
                   }
                 }}
-                className={`w-full py-3.5 rounded-xl font-extrabold text-sm transition-all shadow-md active:scale-95 flex items-center justify-center gap-1 text-white ${
-                  mRemaining === 0 && nextIncomplete
-                    ? 'bg-amber-500 hover:bg-amber-600 animate-pulse'
-                    : 'bg-blue-600 hover:bg-blue-700'
-                }`}
+                className={`w-full py-3.5 rounded-xl font-extrabold text-sm transition-all shadow-md active:scale-95 flex items-center justify-center gap-1 text-white ${mRemaining === 0 && nextIncomplete
+                  ? 'bg-amber-500 hover:bg-amber-600 animate-pulse'
+                  : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
               >
                 {mRemaining > 0 ? (
                   `確認 👤【${currMember}】的選取 (尚有 ${mRemaining} 件未選)`
@@ -3660,24 +3668,24 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     const remaining = credits.earned - credits.selected;
 
     const handleSetGift = (prodId, num) => {
-       const current = selections[prodId] || 0;
-       const diff = num - current;
-       if (num < 0) return;
-       if (diff > 0 && remaining < diff) return;
-       
-       setGiftSelections(prev => ({
-           ...prev,
-           [pId]: {
-               ...(prev[pId] || {}),
-               [prodId]: num
-           }
-       }));
+      const current = selections[prodId] || 0;
+      const diff = num - current;
+      if (num < 0) return;
+      if (diff > 0 && remaining < diff) return;
+
+      setGiftSelections(prev => ({
+        ...prev,
+        [pId]: {
+          ...(prev[pId] || {}),
+          [prodId]: num
+        }
+      }));
     };
 
     return (
       <div className="fixed inset-0 z-[9999] flex flex-col justify-end p-3 pb-[75px]">
         {/* 遮罩背景 */}
-        <div 
+        <div
           className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-fadeIn"
           onClick={() => setShowGiftModal(null)}
         />
@@ -3763,7 +3771,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
     return (
       <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
-        <div 
+        <div
           className="p-4 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] flex items-center gap-3 flex-shrink-0"
           style={{ touchAction: "none" }}
         >
@@ -3827,7 +3835,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                       if (item.isGift) {
                         return (
                           <span className="w-8 text-center font-extrabold font-mono text-sm text-[var(--text-primary)] mr-2">
-                             x{item.qty}
+                            x{item.qty}
                           </span>
                         );
                       }
@@ -3946,7 +3954,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                 </div>
               </div>
             ))}
-            
+
             {/* 贈品挑選區塊 */}
             {Object.entries(availableGiftCredits || {}).map(([pId, credits]) => {
               if (credits.earned > 0 || credits.selected > 0) {
@@ -3962,7 +3970,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                           {isOver ? `⚠️ 贈品超出額度 (已獲得 ${credits.earned} 件，目前已選 ${credits.selected} 件)` : (remaining > 0 ? `已獲得 ${credits.earned} 件，尚未挑選 ${remaining} 件` : `✅ 已完成挑選 (${credits.selected}/${credits.earned} 件)`)}
                         </span>
                       </div>
-                      <button 
+                      <button
                         onClick={() => setShowGiftModal(pId)}
                         className={`px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm transition-all ${isOver ? 'bg-amber-600 text-white hover:bg-amber-700 animate-pulse' : (remaining > 0 ? 'bg-blue-600 text-white hover:bg-blue-700 animate-pulse' : 'bg-blue-200 text-blue-700')}`}
                       >
@@ -4007,15 +4015,15 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                       {/* 軌道與小車車 */}
                       <div className="relative w-full h-1.5 bg-slate-100 rounded-full border border-slate-200/60 overflow-visible">
                         {/* 進度填充 */}
-                        <div 
+                        <div
                           className={`h-full rounded-full transition-all duration-300 ${isFree ? 'bg-emerald-500' : 'bg-gradient-to-r from-orange-400 to-amber-500'}`}
                           style={{ width: `${progress}%` }}
                         />
                         {/* 小車車圖示 */}
-                        <span 
+                        <span
                           className="absolute -top-[7px] text-base transition-all duration-300 pointer-events-none select-none"
-                          style={{ 
-                            left: `calc(${progress}% - 9px)`, 
+                          style={{
+                            left: `calc(${progress}% - 9px)`,
                             transform: 'scaleX(-1)' // 將車車開的方向轉為朝右
                           }}
                         >
@@ -4072,7 +4080,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                         {validItems.map(([productId, qty]) => {
                           const product = products.find((p) => p.id === productId);
                           const singlePrice = product ? (Number(product.single_price) || Number(product.price)) : 0;
-                          
+
                           let subtotal = 0;
                           if (product && product.has_volume_pricing && product.volume_pricing_settings) {
                             subtotal = calculateProductSubtotal(product, qty);
@@ -4128,7 +4136,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
         </div>
 
-        <div 
+        <div
           className="p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] grid grid-cols-2 gap-3 flex-shrink-0"
           style={{ touchAction: "none" }}
         >
@@ -4173,7 +4181,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         selectedBuilding &&
         (selectedBuilding !== "其它" || safeOther.trim())
       );
-    
+
     // 找出目前選中的行政區前綴
     let communityPrefix = "";
     if (selectedCommunityId && allCommunities.length > 0) {
@@ -4203,34 +4211,34 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
     const paymentOptions = isFullyCovered
       ? [
-          {
-            value: "奶包金扣抵",
-            Icon: Wallet,
-            label: "奶包金全額扣抵",
-          }
-        ]
+        {
+          value: "奶包金扣抵",
+          Icon: Wallet,
+          label: "奶包金全額扣抵",
+        }
+      ]
       : [
-          {
-            value: "現金",
-            Icon: Banknote,
-            label: "現金",
-          },
-          {
-            value: "轉帳",
-            Icon: CreditCard,
-            label: "銀行轉帳",
-          },
-          {
-            value: "LINE Pay",
-            Icon: Smartphone,
-            label: "LINE Pay",
-          },
-        ];
+        {
+          value: "現金",
+          Icon: Banknote,
+          label: "現金",
+        },
+        {
+          value: "轉帳",
+          Icon: CreditCard,
+          label: "銀行轉帳",
+        },
+        {
+          value: "LINE Pay",
+          Icon: Smartphone,
+          label: "LINE Pay",
+        },
+      ];
 
     return (
       <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
         {/* Header */}
-        <div 
+        <div
           className="p-4 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] flex items-center gap-3 flex-shrink-0"
           style={{ touchAction: "none" }}
         >
@@ -4398,7 +4406,7 @@ ${freeNote(newFee, newMin)}
 
                       // 首次選或相同區域直接套用
                       setSelectedCommunityId(commId);
-                      
+
                       // 智慧前綴帶入/替換邏輯
                       if (commId) {
                         const target = allCommunities.find(c => c.CommunityId === commId);
@@ -4439,10 +4447,10 @@ ${freeNote(newFee, newMin)}
                         let shortName = c.CommunityName.replace("台南市", "").replace("高雄市", "");
                         const fee = Number(c.ShippingFee) || 0;
                         const min = Number(c.FreeShippingMin) || 0;
-                        
+
                         // 縮短運費文字描述
                         const ruleText = fee > 0 ? `$${fee}/滿$${min}免運` : '免運';
-                        
+
                         return (
                           <option key={c.CommunityId} value={c.CommunityId}>
                             {shortName} ({ruleText})
@@ -4451,7 +4459,7 @@ ${freeNote(newFee, newMin)}
                       })}
                   </select>
                 </div>
-                 <div className="space-y-1">
+                <div className="space-y-1">
                   <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
                     公司 / 機關單位 / 大樓名稱 <span className="text-[var(--text-secondary)] text-[10px] font-normal">(選填)</span>
                   </label>
@@ -4632,24 +4640,22 @@ ${freeNote(newFee, newMin)}
                     return (
                       <div
                         key={rule.id || rIdx}
-                        className={`flex flex-col rounded-xl border transition-all relative overflow-hidden ${
-                          !isUnlocked
-                            ? "opacity-80 bg-slate-50/80 border-slate-200"
-                            : isSelected
+                        className={`flex flex-col rounded-xl border transition-all relative overflow-hidden ${!isUnlocked
+                          ? "opacity-80 bg-slate-50/80 border-slate-200"
+                          : isSelected
                             ? "bg-white border-2 border-emerald-500 shadow-md ring-4 ring-emerald-500/10 cursor-pointer"
                             : "bg-white border-slate-200 hover:border-emerald-300 shadow-sm cursor-pointer"
-                        }`}
+                          }`}
                       >
-                        <div 
+                        <div
                           className="flex items-center gap-3 p-3 relative"
                           onClick={() => {
                             if (isUnlocked) setSelectedRewardRule(rule);
                           }}
                         >
                           {/* Radio Icon */}
-                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                            !isUnlocked ? "border-slate-300 bg-slate-100" : isSelected ? "border-emerald-600 bg-emerald-600" : "border-slate-300 bg-white"
-                          }`}>
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${!isUnlocked ? "border-slate-300 bg-slate-100" : isSelected ? "border-emerald-600 bg-emerald-600" : "border-slate-300 bg-white"
+                            }`}>
                             {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
                           </div>
 
@@ -4673,7 +4679,7 @@ ${freeNote(newFee, newMin)}
                                 </span>
                               )}
                             </div>
-                            
+
                             <div className="flex items-center justify-between mt-0.5">
                               <span className="text-[10px] tracking-widest text-slate-400">
                                 {stars}
@@ -4693,7 +4699,7 @@ ${freeNote(newFee, newMin)}
                         </div>
 
                         {/* 可能獲得預覽按鈕 */}
-                        <div 
+                        <div
                           className="bg-slate-50 px-3 py-1.5 flex justify-end border-t border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -4701,7 +4707,7 @@ ${freeNote(newFee, newMin)}
                           }}
                         >
                           <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
-                            可能獲得獎品 
+                            可能獲得獎品
                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>
@@ -4736,18 +4742,17 @@ ${freeNote(newFee, newMin)}
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col items-center text-center space-y-2">
                     <div className="text-sm font-black text-slate-800">🐄 不急著開？</div>
                     <div className="text-xs text-slate-500 font-bold leading-relaxed">
-                      累積更多消費，<br/>可直接解鎖更高級奶箱。
+                      累積更多消費，<br />可直接解鎖更高級奶箱。
                     </div>
                     <button
                       onClick={() => {
                         setSelectedRewardRule(null);
                         setExpandedBoxIdx(null);
                       }}
-                      className={`mt-2 w-full py-2 rounded-lg text-xs font-black transition-all ${
-                        selectedRewardRule === null 
-                          ? "bg-slate-800 text-white shadow-md border-b-4 border-slate-900" 
-                          : "bg-white border-2 border-slate-300 text-slate-600 hover:bg-slate-100 hover:border-slate-400"
-                      }`}
+                      className={`mt-2 w-full py-2 rounded-lg text-xs font-black transition-all ${selectedRewardRule === null
+                        ? "bg-slate-800 text-white shadow-md border-b-4 border-slate-900"
+                        : "bg-white border-2 border-slate-300 text-slate-600 hover:bg-slate-100 hover:border-slate-400"
+                        }`}
                     >
                       {selectedRewardRule === null ? "✔ 目前已存著" : "暫不開啟，先存著"}
                     </button>
@@ -4757,13 +4762,13 @@ ${freeNote(newFee, newMin)}
                 {/* Bottom Sheet for Prize Preview */}
                 {previewBox && (
                   <div className="fixed inset-0 z-[100] flex flex-col justify-end">
-                    <div 
-                      className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" 
+                    <div
+                      className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
                       onClick={() => setPreviewBox(null)}
                     />
                     <div className="relative bg-white rounded-t-3xl shadow-2xl p-6 pb-10 animate-slide-up space-y-4">
                       <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4" />
-                      
+
                       <div className="flex items-center gap-4">
                         <img src={previewBox.image || milkBoxMini} alt={previewBox.name} className="w-16 h-16 object-contain drop-shadow-md scale-110" />
                         <div>
@@ -4812,7 +4817,7 @@ ${freeNote(newFee, newMin)}
                   </div>
                   <div>
                     <div className="text-sm font-bold text-amber-800 flex items-center gap-1.5">
-                      錢包折抵 
+                      錢包折抵
                       <span className="text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded-full">
                         餘額 ${Number(memberProfile.WalletBalance)}
                       </span>
@@ -4885,8 +4890,8 @@ ${freeNote(newFee, newMin)}
                   <div
                     key={value}
                     className={`flex flex-col rounded-xl border transition-all overflow-hidden ${active
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-[var(--border-primary)] bg-[var(--bg-secondary)] hover:border-blue-300"
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-[var(--border-primary)] bg-[var(--bg-secondary)] hover:border-blue-300"
                       }`}
                   >
                     <label className="flex items-center gap-3 p-3.5 cursor-pointer">
@@ -4959,7 +4964,7 @@ ${freeNote(newFee, newMin)}
         </div>
 
         {/* 下一步 */}
-        <div 
+        <div
           className="p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] flex-shrink-0"
           style={{ touchAction: "none" }}
         >
@@ -4982,11 +4987,10 @@ ${freeNote(newFee, newMin)}
               }
             }}
             disabled={!canProceed || isSubmitting}
-            className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
-              canProceed && !isSubmitting
-                ? "btn-primary shadow-md shadow-blue-500/20 active:scale-98"
-                : "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed"
-            }`}
+            className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${canProceed && !isSubmitting
+              ? "btn-primary shadow-md shadow-blue-500/20 active:scale-98"
+              : "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed"
+              }`}
           >
             {isSubmitting ? (
               <>
@@ -5082,18 +5086,18 @@ ${freeNote(newFee, newMin)}
             <div className="flex gap-3 mt-1">
               <div className="flex-1 bg-amber-50/80 border border-amber-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
                 <div className="text-xs text-amber-800 font-bold flex items-center justify-between mb-1">
-                  <span className="flex items-center gap-1"><Banknote size={14}/> 奶包金餘額</span>
+                  <span className="flex items-center gap-1"><Banknote size={14} /> 奶包金餘額</span>
                   <span className="text-[9px] bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-bold scale-90">開發中</span>
                 </div>
                 <div className="text-2xl font-black text-amber-700 font-mono">${memberProfile?.WalletBalance || 0}</div>
               </div>
               <div className="flex-1 bg-slate-50/80 border border-slate-200 rounded-xl p-4 flex flex-col justify-between shadow-sm">
-                <div className="text-xs text-slate-700 font-bold flex items-center gap-1"><CheckCircle size={14}/> 會員等級</div>
+                <div className="text-xs text-slate-700 font-bold flex items-center gap-1"><CheckCircle size={14} /> 會員等級</div>
                 <div className="text-base font-black text-slate-800 mt-1">{
-                  !memberProfile?.MemberLevel || memberProfile.MemberLevel.trim().toUpperCase() === 'GENERAL' ? '一般會員' : 
-                  memberProfile.MemberLevel.trim().toUpperCase() === 'VIP' ? 'VIP 會員' : 
-                  memberProfile.MemberLevel.trim().toUpperCase() === 'VVIP' ? 'VVIP 會員' : 
-                  memberProfile.MemberLevel
+                  !memberProfile?.MemberLevel || memberProfile.MemberLevel.trim().toUpperCase() === 'GENERAL' ? '一般會員' :
+                    memberProfile.MemberLevel.trim().toUpperCase() === 'VIP' ? 'VIP 會員' :
+                      memberProfile.MemberLevel.trim().toUpperCase() === 'VVIP' ? 'VVIP 會員' :
+                        memberProfile.MemberLevel
                 }</div>
               </div>
             </div>
@@ -5101,29 +5105,29 @@ ${freeNote(newFee, newMin)}
             {/* 快捷操作按鈕 */}
             <div className="flex gap-3 mt-1">
               <button onClick={() => {
-                  if (lineUserId) {
-                      setIsMemberLoading(true);
-                      memberApi.getOrders(apiUrl, { userId: lineUserId }).then(res => {
-                          if (res && res.success) setOrders(res.orders || []);
-                          setIsMemberLoading(false);
-                      }).catch(err => setIsMemberLoading(false));
-                  }
-                  setStep("orders");
-                }} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
-                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center"><RotateCcw size={20}/></div>
+                if (lineUserId) {
+                  setIsMemberLoading(true);
+                  memberApi.getOrders(apiUrl, { userId: lineUserId }).then(res => {
+                    if (res && res.success) setOrders(res.orders || []);
+                    setIsMemberLoading(false);
+                  }).catch(err => setIsMemberLoading(false));
+                }
+                setStep("orders");
+              }} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center"><RotateCcw size={20} /></div>
                 <span className="text-xs font-bold text-[var(--text-primary)]">再訂一次</span>
               </button>
               <button onClick={() => {
-                  if (lineUserId) {
-                      setIsMemberLoading(true);
-                      memberApi.getOrders(apiUrl, { userId: lineUserId }).then(res => {
-                          if (res && res.success) setOrders(res.orders || []);
-                          setIsMemberLoading(false);
-                      }).catch(err => setIsMemberLoading(false));
-                  }
-                  setStep("orders");
-                }} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
-                <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center"><History size={20}/></div>
+                if (lineUserId) {
+                  setIsMemberLoading(true);
+                  memberApi.getOrders(apiUrl, { userId: lineUserId }).then(res => {
+                    if (res && res.success) setOrders(res.orders || []);
+                    setIsMemberLoading(false);
+                  }).catch(err => setIsMemberLoading(false));
+                }
+                setStep("orders");
+              }} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center"><History size={20} /></div>
                 <span className="text-xs font-bold text-[var(--text-primary)]">查看訂單</span>
               </button>
               <button className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors relative overflow-hidden">
@@ -5131,7 +5135,7 @@ ${freeNote(newFee, newMin)}
                 <div className="absolute top-0 right-0 bg-rose-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-bl">
                   開發中
                 </div>
-                <div className="w-10 h-10 rounded-full bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center"><Package size={20}/></div>
+                <div className="w-10 h-10 rounded-full bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center"><Package size={20} /></div>
                 <span className="text-xs font-bold text-[var(--text-primary)]">最新優惠</span>
               </button>
             </div>
@@ -5165,22 +5169,21 @@ ${freeNote(newFee, newMin)}
                 <div key={o.OrderId} className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl overflow-hidden shadow-sm">
                   <div className="px-4 py-3 border-b border-[var(--border-primary)] flex justify-between items-center bg-[var(--bg-tertiary)]">
                     <span className="text-sm font-medium text-[var(--text-secondary)]">{o.OrderId}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                      o.Status === 'CONFIRMED' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
-                    }`}>{o.Status}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${o.Status === 'CONFIRMED' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                      }`}>{o.Status}</span>
                   </div>
                   <div className="p-4 flex flex-col gap-2 text-sm text-[var(--text-secondary)]">
-                    <div className="flex gap-2"><Clock size={16} className="mt-0.5 opacity-70 flex-shrink-0"/> <span>{new Date(o.CreatedAt).toLocaleString()}</span></div>
+                    <div className="flex gap-2"><Clock size={16} className="mt-0.5 opacity-70 flex-shrink-0" /> <span>{new Date(o.CreatedAt).toLocaleString()}</span></div>
                     {o.ExpectedDeliveryDate && (
                       <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/60">
-                        <Calendar size={16} className="flex-shrink-0"/>
+                        <Calendar size={16} className="flex-shrink-0" />
                         <span>預計出貨/配送日：{o.ExpectedDeliveryDate}</span>
                       </div>
                     )}
-                    <div className="flex gap-2"><MapPin size={16} className="mt-0.5 opacity-70 flex-shrink-0"/> <span className="line-clamp-2">{o.DeliveryAddress}</span></div>
-                    <div className="flex gap-2"><CreditCard size={16} className="mt-0.5 opacity-70 flex-shrink-0"/> <span>{o.PaymentMethod} ({o.PaymentStatus || '未付款'})</span></div>
-                    {o.Note && <div className="flex gap-2"><FileText size={16} className="mt-0.5 opacity-70 flex-shrink-0"/> <span>{o.Note}</span></div>}
-                    
+                    <div className="flex gap-2"><MapPin size={16} className="mt-0.5 opacity-70 flex-shrink-0" /> <span className="line-clamp-2">{o.DeliveryAddress}</span></div>
+                    <div className="flex gap-2"><CreditCard size={16} className="mt-0.5 opacity-70 flex-shrink-0" /> <span>{o.PaymentMethod} ({o.PaymentStatus || '未付款'})</span></div>
+                    {o.Note && <div className="flex gap-2"><FileText size={16} className="mt-0.5 opacity-70 flex-shrink-0" /> <span>{o.Note}</span></div>}
+
                     <div className="mt-2 pt-2 border-t border-[var(--border-primary)]">
                       <div className="font-bold text-[var(--text-primary)] mb-2 flex justify-between">
                         <span>{o.recipients && o.recipients.length > 0 ? "訂單總明細" : "訂單內容"}</span>
@@ -5236,7 +5239,7 @@ ${freeNote(newFee, newMin)}
                     )}
                   </div>
                   <div className="p-3 border-t border-[var(--border-primary)] bg-[var(--bg-tertiary)]">
-                    <button 
+                    <button
                       onClick={async () => {
                         setIsMemberLoading(true);
                         try {
@@ -5244,23 +5247,23 @@ ${freeNote(newFee, newMin)}
                           if (res && res.success) {
                             const newCart = {};
                             const newFlavorSelections = {};
-                            
+
                             // 雙重保險：優先使用 res.items 重組購物車與口味選擇，防止後端 cart 缺漏或大小寫對不上
                             if (Array.isArray(res.items) && res.items.length > 0) {
                               res.items.forEach(item => {
                                 const pid = item.ProductId || item.productId;
                                 if (!pid) return;
-                                
+
                                 const qty = Number(item.Qty || item.qty || 1);
                                 newCart[pid] = (newCart[pid] || 0) + qty;
-                                
+
                                 // 解析 Remark 內的口味備註，例如 "【口味備註：原味x2, 巧克力x1】"
                                 const remarkStr = item.Remark || item.remark || '';
                                 if (remarkStr) {
                                   const cleanRemark = remarkStr.replace(/【口味備註：(.*?)】/, '$1');
                                   const parts = cleanRemark.split(/[,，\s+]/);
                                   const flavorMap = {};
-                                  
+
                                   parts.forEach(part => {
                                     // 匹配 "規格x數量" (如 "原味x2", "(巧克力)x1")
                                     const match = part.trim().match(/^\(?([^\s*x:：)]+)\)?\s*[*xX:：]\s*(\d+)$/);
@@ -5272,7 +5275,7 @@ ${freeNote(newFee, newMin)}
                                       }
                                     }
                                   });
-                                  
+
                                   if (Object.keys(flavorMap).length > 0) {
                                     newFlavorSelections[pid] = {
                                       ...(newFlavorSelections[pid] || {}),
@@ -5282,11 +5285,11 @@ ${freeNote(newFee, newMin)}
                                 }
                               });
                             }
-                            
+
                             const finalCart = Object.keys(newCart).length > 0 ? newCart : (res.cart || {});
                             setCart(finalCart);
                             setFlavorSelections(newFlavorSelections);
-                            
+
                             if (o.recipients && o.recipients.length > 0) {
                               const nextGroupCart = {};
                               const nextGroupFlavors = {};
@@ -5330,7 +5333,7 @@ ${freeNote(newFee, newMin)}
                             }
                             if (res.payment) setPaymentMethod(res.payment.method || "");
                             if (res.remark) setNote(res.remark.note || "");
-                            
+
                             setIsReorder(true);
                             setStep("confirm");
                           } else {
@@ -5404,18 +5407,18 @@ ${freeNote(newFee, newMin)}
             <div className="flex gap-3 mt-1">
               <div className="flex-1 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 rounded-xl p-4 relative overflow-hidden">
                 <div className="text-xs text-amber-700 font-bold flex items-center justify-between mb-1">
-                  <span className="flex items-center gap-1"><Banknote size={14}/> 奶包金餘額</span>
+                  <span className="flex items-center gap-1"><Banknote size={14} /> 奶包金餘額</span>
                   <span className="text-[9px] bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-bold scale-90">開發中</span>
                 </div>
                 <div className="text-2xl font-black text-amber-600">${memberProfile?.WalletBalance || 0}</div>
               </div>
               <div className="flex-1 bg-gradient-to-br from-gray-50 to-slate-50 border border-gray-200 rounded-xl p-4 flex flex-col justify-between">
-                <div className="text-xs text-gray-500 font-bold flex items-center gap-1"><CheckCircle size={14}/> 會員等級</div>
+                <div className="text-xs text-gray-500 font-bold flex items-center gap-1"><CheckCircle size={14} /> 會員等級</div>
                 <div className="text-base font-bold text-[var(--text-primary)] mt-1">{
-                  !memberProfile?.MemberLevel || memberProfile.MemberLevel.trim().toUpperCase() === 'GENERAL' ? '一般會員' : 
-                  memberProfile.MemberLevel.trim().toUpperCase() === 'VIP' ? 'VIP 會員' : 
-                  memberProfile.MemberLevel.trim().toUpperCase() === 'VVIP' ? 'VVIP 會員' : 
-                  memberProfile.MemberLevel
+                  !memberProfile?.MemberLevel || memberProfile.MemberLevel.trim().toUpperCase() === 'GENERAL' ? '一般會員' :
+                    memberProfile.MemberLevel.trim().toUpperCase() === 'VIP' ? 'VIP 會員' :
+                      memberProfile.MemberLevel.trim().toUpperCase() === 'VVIP' ? 'VVIP 會員' :
+                        memberProfile.MemberLevel
                 }</div>
               </div>
             </div>
@@ -5423,11 +5426,11 @@ ${freeNote(newFee, newMin)}
             {/* 快捷操作按鈕 */}
             <div className="flex gap-3 mt-1">
               <button onClick={() => setStep("shop")} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
-                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600"><RotateCcw size={20}/></div>
+                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600"><RotateCcw size={20} /></div>
                 <span className="text-xs font-bold text-[var(--text-primary)]">再訂一次</span>
               </button>
               <button onClick={() => setStep("orders")} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
-                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600"><History size={20}/></div>
+                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600"><History size={20} /></div>
                 <span className="text-xs font-bold text-[var(--text-primary)]">查看訂單</span>
               </button>
               <button className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors relative overflow-hidden">
@@ -5435,7 +5438,7 @@ ${freeNote(newFee, newMin)}
                 <div className="absolute top-0 right-0 bg-rose-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-bl">
                   開發中
                 </div>
-                <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-600"><Package size={20}/></div>
+                <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-600"><Package size={20} /></div>
                 <span className="text-xs font-bold text-[var(--text-primary)]">最新優惠</span>
               </button>
             </div>
@@ -5451,7 +5454,7 @@ ${freeNote(newFee, newMin)}
     <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
       {/* 頂部固定導覽列 */}
 
-      <div 
+      <div
         className="flex-shrink-0 flex flex-col z-10 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] shadow-sm"
         style={{ touchAction: "pan-x" }}
       >
@@ -5462,11 +5465,10 @@ ${freeNote(newFee, newMin)}
             {isGeneralUser ? (
               <button
                 onClick={() => setShowAreaModal(true)}
-                className={`text-xs font-bold px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all active:scale-95 duration-100 ${
-                  selectedCommunityId
-                    ? "bg-emerald-50 text-emerald-600 border-emerald-200"
-                    : "bg-blue-600 text-white border-blue-700 animate-pulse shadow shadow-blue-500/20"
-                }`}
+                className={`text-xs font-bold px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all active:scale-95 duration-100 ${selectedCommunityId
+                  ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+                  : "bg-blue-600 text-white border-blue-700 animate-pulse shadow shadow-blue-500/20"
+                  }`}
               >
                 <span>📍</span>
                 <span>
@@ -5498,11 +5500,10 @@ ${freeNote(newFee, newMin)}
                   setSearchQuery("");
                 }
               }}
-              className={`p-1.5 rounded-lg transition-colors duration-100 ${
-                isSearchExpanded
-                  ? "bg-blue-50 text-blue-600 dark:bg-blue-950/40"
-                  : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              }`}
+              className={`p-1.5 rounded-lg transition-colors duration-100 ${isSearchExpanded
+                ? "bg-blue-50 text-blue-600 dark:bg-blue-950/40"
+                : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                }`}
             >
               <svg
                 width="16"
@@ -5539,12 +5540,11 @@ ${freeNote(newFee, newMin)}
 
         {/* 團購限時防呆 Banner 提示 */}
         {gbStatus.message && (
-          <div className={`px-4 py-2 text-xs font-bold flex flex-col items-center justify-center border-t border-[var(--border-primary)] ${
-              gbStatus.status === 'upcoming'
-                ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                : gbStatus.status === 'ended'
-                  ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
-                  : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+          <div className={`px-4 py-2 text-xs font-bold flex flex-col items-center justify-center border-t border-[var(--border-primary)] ${gbStatus.status === 'upcoming'
+            ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+            : gbStatus.status === 'ended'
+              ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+              : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
             }`}>
             {gbStatus.message.includes(' (') ? (
               <>
@@ -5575,11 +5575,10 @@ ${freeNote(newFee, newMin)}
                   setActiveRecipient(commonRecipients[0]);
                 }
               }}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all border ${
-                isGroupOrder
-                  ? "bg-blue-600 text-white border-transparent"
-                  : "bg-transparent border-[var(--border-primary)] text-[var(--text-secondary)]"
-              }`}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all border ${isGroupOrder
+                ? "bg-blue-600 text-white border-transparent"
+                : "bg-transparent border-[var(--border-primary)] text-[var(--text-secondary)]"
+                }`}
             >
               {isGroupOrder ? "已啟用" : "啟用代訂"}
             </button>
@@ -5625,11 +5624,10 @@ ${freeNote(newFee, newMin)}
                     return (
                       <div
                         key={name}
-                        className={`flex items-center gap-1 flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
-                          isActive
-                            ? "bg-blue-50 text-blue-600 border-blue-300"
-                            : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)]"
-                        }`}
+                        className={`flex items-center gap-1 flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${isActive
+                          ? "bg-blue-50 text-blue-600 border-blue-300"
+                          : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)]"
+                          }`}
                       >
                         <button
                           onClick={() => setActiveRecipient(name)}
@@ -5650,7 +5648,7 @@ ${freeNote(newFee, newMin)}
                                 const updated = commonRecipients.filter(x => x !== name);
                                 setCommonRecipients(updated);
                                 localStorage.setItem("mlw_common_recipients", JSON.stringify(updated));
-                                
+
                                 setGroupCart(prev => {
                                   const next = { ...prev };
                                   delete next[name];
@@ -5679,12 +5677,11 @@ ${freeNote(newFee, newMin)}
         </div>
 
         {/* 展開式搜尋欄位 */}
-        <div 
-          className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            isSearchExpanded 
-              ? "max-h-[60px] opacity-100 py-2 border-t border-[var(--border-primary)]" 
-              : "max-h-0 opacity-0 py-0 border-t-0"
-          } px-4 bg-[var(--bg-secondary)]`}
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-in-out ${isSearchExpanded
+            ? "max-h-[60px] opacity-100 py-2 border-t border-[var(--border-primary)]"
+            : "max-h-0 opacity-0 py-0 border-t-0"
+            } px-4 bg-[var(--bg-secondary)]`}
         >
           <div className="relative flex items-center">
             <input
@@ -5751,8 +5748,8 @@ ${freeNote(newFee, newMin)}
                   data-cat={cat}
                   onClick={() => handleCategoryChange(cat)}
                   className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 whitespace-nowrap border ${activeCategory === cat
-                      ? "bg-[var(--text-primary)] text-[var(--bg-primary)] border-transparent shadow-sm"
-                      : "bg-transparent border-[var(--border-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    ? "bg-[var(--text-primary)] text-[var(--bg-primary)] border-transparent shadow-sm"
+                    : "bg-transparent border-[var(--border-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                     }`}
                 >
                   {cat}
@@ -5927,13 +5924,12 @@ ${freeNote(newFee, newMin)}
                                 const remaining = qInfo.remaining;
                                 const isComm = qInfo.isCommunityQuota;
                                 return (
-                                  <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded mt-1 font-bold ${
-                                    remaining === 0
-                                      ? 'text-red-600 bg-red-50 border border-red-200'
-                                      : 'text-purple-600 dark:text-purple-300 bg-purple-500/10 border border-purple-200/50'
-                                  }`}>
-                                    {remaining === 0 
-                                      ? (isComm ? '🚫 本社區專屬額度已售完' : '🚫 已售完') 
+                                  <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded mt-1 font-bold ${remaining === 0
+                                    ? 'text-red-600 bg-red-50 border border-red-200'
+                                    : 'text-purple-600 dark:text-purple-300 bg-purple-500/10 border border-purple-200/50'
+                                    }`}>
+                                    {remaining === 0
+                                      ? (isComm ? '🚫 本社區專屬額度已售完' : '🚫 已售完')
                                       : (isComm ? `⚡️ 本社區獨家專屬 剩 ${remaining} 罐` : `⚡️ 活動限量 剩 ${remaining} 罐`)}
                                   </span>
                                 );
@@ -6016,13 +6012,12 @@ ${freeNote(newFee, newMin)}
                                       <button
                                         onClick={() => !isSoldOut && handleProductAction(product, true)}
                                         disabled={isSoldOut}
-                                        className={`w-7 h-7 flex items-center justify-center rounded-lg shadow-sm transition-all duration-100 ${
-                                          isSoldOut
-                                            ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
-                                            : qty > 0
+                                        className={`w-7 h-7 flex items-center justify-center rounded-lg shadow-sm transition-all duration-100 ${isSoldOut
+                                          ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
+                                          : qty > 0
                                             ? 'bg-slate-700 text-white hover:bg-slate-800 active:scale-90'
                                             : 'bg-blue-500 text-white hover:bg-blue-600 active:scale-90'
-                                        }`}
+                                          }`}
                                       >
                                         <Plus size={13} />
                                       </button>
@@ -6075,7 +6070,7 @@ ${freeNote(newFee, newMin)}
 
                     if (!activeComm) {
                       return (
-                        <div 
+                        <div
                           onClick={() => setShowAreaModal(true)}
                           className="flex justify-between items-center text-xs font-semibold text-blue-600 cursor-pointer hover:underline py-0.5 animate-pulse"
                         >
@@ -6090,7 +6085,7 @@ ${freeNote(newFee, newMin)}
 
                     const freeMin = Number(activeComm.FreeShippingMin) || 0;
                     const fee = Number(activeComm.ShippingFee) || 0;
-                    
+
                     // 如果運費是 0 或者沒有免運門檻 (預設免運)
                     if (fee === 0 || activeComm.DefaultFreeShipping) {
                       return (
@@ -6120,15 +6115,15 @@ ${freeNote(newFee, newMin)}
                         {/* 軌道與小車車 */}
                         <div className="relative w-full h-1.5 bg-slate-100 rounded-full border border-slate-200/60 overflow-visible">
                           {/* 進度填充 */}
-                          <div 
+                          <div
                             className={`h-full rounded-full transition-all duration-300 ${isFree ? 'bg-emerald-500' : 'bg-gradient-to-r from-orange-400 to-amber-500'}`}
                             style={{ width: `${progress}%` }}
                           />
                           {/* 小車車圖示 */}
-                          <span 
+                          <span
                             className="absolute -top-[7px] text-base transition-all duration-300 pointer-events-none select-none"
-                            style={{ 
-                              left: `calc(${progress}% - 9px)`, 
+                            style={{
+                              left: `calc(${progress}% - 9px)`,
                               transform: 'scaleX(-1)' // 將車車開的方向轉為朝右
                             }}
                           >
@@ -6163,7 +6158,7 @@ ${freeNote(newFee, newMin)}
 
               {/* 購物車核心按鈕列 */}
               <div className="px-4 py-3 flex justify-between items-center">
-                <div 
+                <div
                   onClick={() => setStep("confirm")}
                   className="flex items-center gap-3 cursor-pointer select-none group"
                 >
@@ -6205,7 +6200,7 @@ ${freeNote(newFee, newMin)}
       {renderServiceModal()}
       {renderPolicyModal()}
       {renderPolicyViewerModal()}
-      
+
       {/* 自訂美化彈窗提示 */}
       {alertModal.show && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -6358,7 +6353,7 @@ ${freeNote(newFee, newMin)}
                   onChange={(e) => {
                     const commId = e.target.value;
                     setSelectedCommunityId(commId);
-                    
+
                     // 智慧前綴地址預填
                     if (commId) {
                       const target = allCommunities.find(c => c.CommunityId === commId);
@@ -6471,63 +6466,85 @@ ${freeNote(newFee, newMin)}
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setAnnouncementModal(prev => ({ ...prev, show: false }))}></div>
           <div className="relative w-full max-w-[330px] sm:max-w-[360px] animate-[bounceIn_0.4s_ease-out] my-auto">
             <div
-              className={`backdrop-blur-2xl bg-gradient-to-br border shadow-2xl rounded-3xl p-4.5 sm:p-5 relative overflow-hidden flex flex-col max-h-[78vh] ${
-                announcementModal.themeColor === 'blue' ? 'from-blue-600/30 via-sky-600/20 to-cyan-700/30 border-blue-400/40 text-blue-50' :
+              className={`backdrop-blur-2xl bg-gradient-to-br border shadow-2xl rounded-3xl p-4.5 sm:p-5 relative overflow-hidden flex flex-col max-h-[78vh] ${announcementModal.themeColor === 'blue' ? 'from-blue-600/30 via-sky-600/20 to-cyan-700/30 border-blue-400/40 text-blue-50' :
                 announcementModal.themeColor === 'dark' ? 'from-gray-900/90 via-slate-900/90 to-black/95 border-gray-700/60 text-gray-100' :
-                announcementModal.themeColor === 'emerald' ? 'from-emerald-700/30 via-teal-600/20 to-green-700/30 border-emerald-400/40 text-emerald-50' :
-                announcementModal.themeColor === 'amber' ? 'from-amber-600/30 via-orange-600/20 to-yellow-600/30 border-amber-400/40 text-amber-50' :
-                announcementModal.themeColor === 'rose' ? 'from-rose-600/30 via-pink-600/20 to-red-600/30 border-rose-400/40 text-rose-50' :
-                announcementModal.themeColor === 'indigo' ? 'from-indigo-700/30 via-blue-600/20 to-purple-800/30 border-indigo-400/40 text-indigo-50' :
-                announcementModal.themeColor === 'custom' ? 'border-white/30 text-white' :
-                'from-purple-700/30 via-fuchsia-600/20 to-pink-700/30 border-purple-400/40 text-purple-50'
-              }`}
+                  announcementModal.themeColor === 'emerald' ? 'from-emerald-700/30 via-teal-600/20 to-green-700/30 border-emerald-400/40 text-emerald-50' :
+                    announcementModal.themeColor === 'amber' ? 'from-amber-600/30 via-orange-600/20 to-yellow-600/30 border-amber-400/40 text-amber-50' :
+                      announcementModal.themeColor === 'rose' ? 'from-rose-600/30 via-pink-600/20 to-red-600/30 border-rose-400/40 text-rose-50' :
+                        announcementModal.themeColor === 'indigo' ? 'from-indigo-700/30 via-blue-600/20 to-purple-800/30 border-indigo-400/40 text-indigo-50' :
+                          announcementModal.themeColor === 'custom' ? 'border-white/30 text-white' :
+                            'from-purple-700/30 via-fuchsia-600/20 to-pink-700/30 border-purple-400/40 text-purple-50'
+                }`}
               style={announcementModal.themeColor === 'custom' && announcementModal.customColors ? {
                 background: `linear-gradient(135deg, ${announcementModal.customColors.start}, ${announcementModal.customColors.end})`
               } : {}}
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
-              
+
               <div className="relative z-10 text-center flex flex-col h-full space-y-3">
                 <div className="w-11 h-11 rounded-2xl bg-white/15 mx-auto flex items-center justify-center shrink-0 shadow-inner border border-white/20">
                   <Megaphone className="w-5.5 h-5.5 text-white drop-shadow-sm" />
                 </div>
-                
-                <h3 className="text-lg sm:text-xl font-extrabold tracking-tight text-white drop-shadow-sm shrink-0 px-1">
+
+                <h3 className={`text-lg sm:text-xl font-extrabold tracking-tight drop-shadow-sm shrink-0 px-1 ${
+                  announcementModal.titleTextColor === 'black' ? 'text-slate-950 font-black' : 'text-white'
+                }`}>
                   {announcementModal.title}
                 </h3>
-                
+
                 <div className="w-10 h-0.5 bg-white/30 mx-auto rounded-full shrink-0"></div>
-                
-                <div className={`leading-relaxed text-white/95 font-medium whitespace-pre-wrap text-left bg-black/25 p-3.5 rounded-2xl border border-white/10 overflow-y-auto max-h-[42vh] shadow-inner my-1 ${
-                  announcementModal.fontSize === 'small' ? 'text-xs' :
+
+                <div className={`leading-relaxed text-white/95 font-medium whitespace-pre-wrap text-left bg-black/25 p-3.5 rounded-2xl border border-white/10 overflow-y-auto max-h-[42vh] shadow-inner my-1 ${announcementModal.fontSize === 'small' ? 'text-xs' :
                   announcementModal.fontSize === 'large' ? 'text-base' :
-                  announcementModal.fontSize === 'xlarge' ? 'text-lg' :
-                  'text-[13.5px] sm:text-sm'
-                }`}>
+                    announcementModal.fontSize === 'xlarge' ? 'text-lg' :
+                      'text-[13.5px] sm:text-sm'
+                  }`}>
                   {renderFormattedContent(announcementModal.content)}
                 </div>
 
-                <button 
-                  onClick={() => {
-                    localStorage.setItem("mlw_announcement_read_hash", announcementModal.hash);
-                    setAnnouncementModal(prev => ({ ...prev, show: false }));
-                  }}
-                  className={`w-full py-3 rounded-xl font-extrabold tracking-wide shadow-lg transition-all active:scale-95 text-sm sm:text-base shrink-0 mt-1 cursor-pointer ${
-                    announcementModal.themeColor === 'blue' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white border border-blue-300/30 shadow-blue-500/20' :
-                    announcementModal.themeColor === 'dark' ? 'bg-white hover:bg-gray-100 text-slate-900 border border-gray-200 shadow-white/10' :
-                    announcementModal.themeColor === 'emerald' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white border border-emerald-300/30 shadow-emerald-500/20' :
-                    announcementModal.themeColor === 'amber' ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border border-amber-300/30 shadow-amber-500/20' :
-                    announcementModal.themeColor === 'rose' ? 'bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white border border-rose-300/30 shadow-rose-500/20' :
-                    announcementModal.themeColor === 'indigo' ? 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border border-indigo-300/30 shadow-indigo-500/20' :
-                    announcementModal.themeColor === 'custom' ? 'text-white border border-white/20 shadow-md' :
-                    'bg-gradient-to-r from-purple-500 to-fuchsia-500 hover:from-purple-600 hover:to-fuchsia-600 text-white border border-purple-300/30 shadow-purple-500/20'
-                  }`}
-                  style={announcementModal.themeColor === 'custom' && announcementModal.customColors ? {
-                    backgroundColor: announcementModal.customColors.button
-                  } : {}}
-                >
-                  我知道了
-                </button>
+                {/* 底部按鈕與今日不再提示選項 (按鈕在上、勾選在下) */}
+                <div className="flex flex-col items-center space-y-2 pt-1">
+                  <button 
+                    onClick={() => {
+                      const todayStr = new Date().toISOString().split('T')[0];
+                      localStorage.setItem("mlw_announcement_read_hash", announcementModal.hash);
+                      if (dontShowToday) {
+                        localStorage.setItem("mlw_announcement_suppressed_date", todayStr);
+                      } else {
+                        localStorage.removeItem("mlw_announcement_suppressed_date");
+                      }
+                      setAnnouncementModal(prev => ({ ...prev, show: false }));
+                    }}
+                    className={`w-full py-3 rounded-xl font-extrabold tracking-wide shadow-lg transition-all active:scale-95 text-sm sm:text-base shrink-0 cursor-pointer ${
+                      announcementModal.buttonTextColor === 'black' ? 'text-slate-950 font-black' : 'text-white font-extrabold'
+                    } ${
+                      announcementModal.themeColor === 'blue' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 border border-blue-300/30 shadow-blue-500/20' :
+                      announcementModal.themeColor === 'dark' ? 'bg-white hover:bg-gray-100 border border-gray-200 shadow-white/10' :
+                      announcementModal.themeColor === 'emerald' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 border border-emerald-300/30 shadow-emerald-500/20' :
+                      announcementModal.themeColor === 'amber' ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border border-amber-300/30 shadow-amber-500/20' :
+                      announcementModal.themeColor === 'rose' ? 'bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 border border-rose-300/30 shadow-rose-500/20' :
+                      announcementModal.themeColor === 'indigo' ? 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 border border-indigo-300/30 shadow-indigo-500/20' :
+                      announcementModal.themeColor === 'custom' ? 'border border-white/20 shadow-md' :
+                      'bg-gradient-to-r from-purple-500 to-fuchsia-500 hover:from-purple-600 hover:to-fuchsia-600 border border-purple-300/30 shadow-purple-500/20'
+                    }`}
+                    style={announcementModal.themeColor === 'custom' && announcementModal.customColors ? {
+                      backgroundColor: announcementModal.customColors.button,
+                      color: announcementModal.buttonTextColor === 'black' ? '#0f172a' : '#ffffff'
+                    } : {}}
+                  >
+                    我知道了
+                  </button>
+
+                  <label className="inline-flex items-center justify-center gap-1.5 cursor-pointer text-[11.5px] font-medium text-white/80 hover:text-white transition-colors select-none pt-0.5 pb-0.5">
+                    <input
+                      type="checkbox"
+                      checked={dontShowToday}
+                      onChange={e => setDontShowToday(e.target.checked)}
+                      className="w-3.5 h-3.5 rounded border-white/30 bg-black/20 text-purple-500 accent-purple-500 cursor-pointer"
+                    />
+                    <span>今日不再提示</span>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
