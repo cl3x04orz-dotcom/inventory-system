@@ -930,10 +930,11 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                                             onChange={(e) => {
                                                                                                 const next = new Set(ids);
                                                                                                 if (e.target.checked) {
-                                                                                                    next.add(cid);
+                                                                                                    if (cid) next.add(cid);
+                                                                                                    if (cname) next.add(cname);
                                                                                                 } else {
-                                                                                                    next.delete(cid);
-                                                                                                    next.delete(cname);
+                                                                                                    if (cid) next.delete(cid);
+                                                                                                    if (cname) next.delete(cname);
                                                                                                 }
                                                                                                 const newIds = [...next];
                                                                                                 handleFieldChange(product.id, 'allowedCommunityIds', newIds);

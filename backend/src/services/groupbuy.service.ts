@@ -115,7 +115,9 @@ export const GroupBuyService = {
 
     await prisma.$transaction(async (tx) => {
       // 社區白名單寫入防護：防止未授權社區繞過 LIFF UI 直接 API 下單
-      const communityId: string = payload?.communityId || payload?.sourceGroup || '';
+      const allComms = await tx.community.findMany({ select: { communityId: true, communityName: true } });
+      const commMap = new Map(allComms.map((c: any) => [c.communityId, c.communityName]));
+
       if (communityId) {
         for (const item of items) {
           if (!item?.productId) continue;
@@ -124,15 +126,17 @@ export const GroupBuyService = {
             select: { productName: true, maxTotalQty: true, allowedCommunityIds: true }
           });
           const allowedList = prod?.allowedCommunityIds || [];
-          const hasGlobalOnline = allowedList.some((id: string) => 
-            ['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售'].includes(id)
-          );
+          const hasGlobalOnline = allowedList.some((id: string) => {
+            const cName = commMap.get(id) || id;
+            return ['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售'].includes(cName) ||
+                   ['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售'].includes(id);
+          });
           if (
             prod &&
-            prod.maxTotalQty !== null &&
             allowedList.length > 0 &&
             !hasGlobalOnline &&
-            !allowedList.includes(communityId)
+            !allowedList.includes(communityId) &&
+            !(commMap.get(communityId) && allowedList.includes(commMap.get(communityId)!))
           ) {
             throw new Error(`商品【${prod.productName}】未開放您所在的社區購買`);
           }
@@ -1170,6 +1174,9 @@ export const GroupBuyService = {
 
     await prisma.$transaction(async (tx) => {
       // 社區白名單寫入防護：防止未授權社區繞過 LIFF UI 直接 API 下單
+      const allComms = await tx.community.findMany({ select: { communityId: true, communityName: true } });
+      const commMap = new Map(allComms.map((c: any) => [c.communityId, c.communityName]));
+
       if (CommunityId) {
         for (const item of items) {
           if (!item?.productId) continue;
@@ -1178,15 +1185,17 @@ export const GroupBuyService = {
             select: { productName: true, maxTotalQty: true, allowedCommunityIds: true }
           });
           const allowedList = prod?.allowedCommunityIds || [];
-          const hasGlobalOnline = allowedList.some((id: string) => 
-            ['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售'].includes(id)
-          );
+          const hasGlobalOnline = allowedList.some((id: string) => {
+            const cName = commMap.get(id) || id;
+            return ['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售'].includes(cName) ||
+                   ['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售'].includes(id);
+          });
           if (
             prod &&
-            prod.maxTotalQty !== null &&
             allowedList.length > 0 &&
             !hasGlobalOnline &&
-            !allowedList.includes(CommunityId)
+            !allowedList.includes(CommunityId) &&
+            !(commMap.get(CommunityId) && allowedList.includes(commMap.get(CommunityId)!))
           ) {
             throw new Error(`商品【${prod.productName}】未開放您所在的社區購買`);
           }
