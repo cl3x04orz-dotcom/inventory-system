@@ -131,7 +131,7 @@ export const GroupBuyService = {
   // 2. 客戶送出訂單 (PENDING)
   async savePendingOrder(payload: any, user: any) {
     const { customerName, customerPhone, deliveryAddress, sourceGroup, note, items,
-            paymentMethod, transferLastFive, lineDisplayName, lineUserId, source } = payload;
+            paymentMethod, transferLastFive, lineDisplayName, lineUserId, source, communityId } = payload;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       throw new Error('訂單明細不得為空');
@@ -153,7 +153,7 @@ export const GroupBuyService = {
 
     await prisma.$transaction(async (tx) => {
       // 社區白名單寫入防護：防止未授權社區繞過 LIFF UI 直接 API 下單
-      const allComms = await tx.community.findMany({ select: { communityId: true, communityName: true } });
+      const allComms = await tx.groupBuyCommunity.findMany({ select: { communityId: true, communityName: true } });
       const commMap = new Map(allComms.map((c: any) => [c.communityId, c.communityName]));
 
       if (communityId) {
@@ -1223,7 +1223,7 @@ export const GroupBuyService = {
 
     await prisma.$transaction(async (tx) => {
       // 社區白名單寫入防護：防止未授權社區繞過 LIFF UI 直接 API 下單
-      const allComms = await tx.community.findMany({ select: { communityId: true, communityName: true } });
+      const allComms = await tx.groupBuyCommunity.findMany({ select: { communityId: true, communityName: true } });
       const commMap = new Map(allComms.map((c: any) => [c.communityId, c.communityName]));
 
       if (CommunityId) {
