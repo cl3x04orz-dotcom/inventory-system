@@ -39,7 +39,7 @@ export const renderFormattedContent = (text) => {
         }
         if (tagName === 'u') {
           return (
-            <u key={index} className="underline underline-offset-4 decoration-2 decoration-amber-300">
+            <u key={index} className="underline underline-offset-4 decoration-2 decoration-amber-300" style={{ fontWeight: 'inherit' }}>
               {children}
             </u>
           );
