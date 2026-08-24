@@ -123,12 +123,16 @@ export const GroupBuyService = {
             where: { productId: String(item.productId).trim() },
             select: { productName: true, maxTotalQty: true, allowedCommunityIds: true }
           });
+          const allowedList = prod?.allowedCommunityIds || [];
+          const hasGlobalOnline = allowedList.some((id: string) => 
+            ['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售'].includes(id)
+          );
           if (
             prod &&
             prod.maxTotalQty !== null &&
-            prod.allowedCommunityIds &&
-            prod.allowedCommunityIds.length > 0 &&
-            !prod.allowedCommunityIds.includes(communityId)
+            allowedList.length > 0 &&
+            !hasGlobalOnline &&
+            !allowedList.includes(communityId)
           ) {
             throw new Error(`商品【${prod.productName}】未開放您所在的社區購買`);
           }
@@ -1173,12 +1177,16 @@ export const GroupBuyService = {
             where: { productId: String(item.productId).trim() },
             select: { productName: true, maxTotalQty: true, allowedCommunityIds: true }
           });
+          const allowedList = prod?.allowedCommunityIds || [];
+          const hasGlobalOnline = allowedList.some((id: string) => 
+            ['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售'].includes(id)
+          );
           if (
             prod &&
             prod.maxTotalQty !== null &&
-            prod.allowedCommunityIds &&
-            prod.allowedCommunityIds.length > 0 &&
-            !prod.allowedCommunityIds.includes(CommunityId)
+            allowedList.length > 0 &&
+            !hasGlobalOnline &&
+            !allowedList.includes(CommunityId)
           ) {
             throw new Error(`商品【${prod.productName}】未開放您所在的社區購買`);
           }

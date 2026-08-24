@@ -1102,7 +1102,13 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
       const allowedRaw = p.allowedCommunityIds || p.allowed_community_ids;
       const allowed = parseAllowedCommunities(allowedRaw);
       if (allowed.length > 0) {
-        // 當商品設有白名單時：顧客社區識別標籤必須至少有一個匹配白名單
+        // 關鍵通配邏輯：當白名單包含「線上下單」或「一般散客」時，代表對所有行政區與散客全面開放！
+        const hasGlobalOnlineOption = allowed.some(id => 
+          ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(id)
+        );
+        if (hasGlobalOnlineOption) return true;
+
+        // 否則進行特定社區 ID / 大樓名稱匹配
         return activeList.some(id => allowed.includes(id));
       }
       return true; // 未設定白名單 (空陣列/null) ➔ 全社區開放

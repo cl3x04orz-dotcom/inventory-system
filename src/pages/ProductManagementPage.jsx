@@ -878,9 +878,17 @@ export default function ProductManagementPage({ user, apiUrl }) {
 
                                                             const visibleCommunities = communities.filter(c => {
                                                                 const cid = c.communityId || c.CommunityId;
-                                                                const cname = c.communityName || c.CommunityName;
+                                                                const cname = String(c.communityName || c.CommunityName || '').trim();
                                                                 if (c.status && c.status !== 'ACTIVE') return false;
                                                                 if (hiddenBuildings.includes(cname) || hiddenBuildings.includes(cid)) return false;
+
+                                                                // 順便把開放社區裡的純行政區隱藏起來 (如台南市仁德區、台南安定區)，僅保留實體社區大樓與「線上下單」
+                                                                if (!['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售'].includes(cname)) {
+                                                                    const cleanName = cname.replace(/^(台南市|高雄市|台灣|臺灣)/, '').trim();
+                                                                    if (cleanName.endsWith('區') && !cleanName.includes('大樓') && !cleanName.includes('社區') && !cleanName.includes('華廈') && !cleanName.includes('莊園') && !cleanName.includes('山莊') && !cleanName.includes('大廈')) {
+                                                                        return false;
+                                                                    }
+                                                                }
                                                                 return true;
                                                             });
 
@@ -893,7 +901,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                     {/* 開放社區白名單 */}
                                                                     <div className="flex flex-col gap-2 bg-[var(--bg-tertiary)]/30 p-3.5 rounded-xl border border-purple-400/30">
                                                                         <div className="flex justify-between items-center">
-                                                                            <span className="text-[10px] uppercase font-extrabold text-purple-500 tracking-wider">🏠 開放社區（未選擇代表全區開放）</span>
+                                                                            <span className="text-[10px] uppercase font-extrabold text-purple-500 tracking-wider">🏠 開放社區（未選擇代表全區開放，勾選「線上下單」代表開放所有行政區與散客）</span>
                                                                             {(product.allowedCommunityIds || []).length > 0 && (
                                                                                 <button
                                                                                     className="text-[10px] text-red-400 hover:text-red-600 font-bold cursor-pointer"
@@ -906,14 +914,15 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                                 </button>
                                                                             )}
                                                                         </div>
-                                                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-40 overflow-y-auto pr-1">
+                                                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1">
                                                                             {visibleCommunities.map(c => {
                                                                                 const ids = product.allowedCommunityIds || [];
                                                                                 const cid = c.communityId || c.CommunityId;
                                                                                 const cname = c.communityName || c.CommunityName;
                                                                                 const checked = ids.includes(cid) || ids.includes(cname);
+                                                                                const isOnlineAll = cname === '線上下單';
                                                                                 return (
-                                                                                    <label key={cid || cname} className="flex items-center gap-2 cursor-pointer group p-1 rounded hover:bg-[var(--bg-tertiary)]">
+                                                                                    <label key={cid || cname} className={`flex items-center gap-2 cursor-pointer group p-1.5 rounded transition-all ${isOnlineAll ? 'bg-purple-500/10 border border-purple-500/30 col-span-full' : 'hover:bg-[var(--bg-tertiary)]'}`}>
                                                                                         <input
                                                                                             type="checkbox"
                                                                                             checked={checked}
@@ -931,7 +940,9 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                                                 handleSaveProduct(product.id, { allowedCommunityIds: newIds });
                                                                                             }}
                                                                                         />
-                                                                                        <span className="text-xs text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors truncate">{cname}</span>
+                                                                                        <span className={`text-xs font-bold ${isOnlineAll ? 'text-purple-600 dark:text-purple-400 font-extrabold' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'} truncate`}>
+                                                                                            {isOnlineAll ? '🛒 線上下單 (自動包含所有行政區與散客)' : cname}
+                                                                                        </span>
                                                                                     </label>
                                                                                 );
                                                                             })}
