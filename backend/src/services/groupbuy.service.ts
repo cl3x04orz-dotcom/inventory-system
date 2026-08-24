@@ -131,10 +131,21 @@ export const GroupBuyService = {
             return ['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售'].includes(cName) ||
                    ['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售'].includes(id);
           });
+          
+          let isGenericOnlineCustomer = false;
+          const customerName = commMap.get(communityId) || communityId;
+          const cleanName = customerName.replace(/^(台南市|高雄市|台灣|臺灣)/, '').trim();
+          if (
+            ['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售', '其它'].includes(customerName) ||
+            (cleanName.endsWith('區') && !cleanName.includes('大樓') && !cleanName.includes('社區') && !cleanName.includes('華廈') && !cleanName.includes('莊園') && !cleanName.includes('山莊') && !cleanName.includes('大廈'))
+          ) {
+            isGenericOnlineCustomer = true;
+          }
+
           if (
             prod &&
             allowedList.length > 0 &&
-            !hasGlobalOnline &&
+            !(hasGlobalOnline && isGenericOnlineCustomer) &&
             !allowedList.includes(communityId) &&
             !(commMap.get(communityId) && allowedList.includes(commMap.get(communityId)!))
           ) {
@@ -1190,10 +1201,21 @@ export const GroupBuyService = {
             return ['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售'].includes(cName) ||
                    ['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售'].includes(id);
           });
+
+          let isGenericOnlineCustomer = false;
+          const customerName = commMap.get(CommunityId) || CommunityId;
+          const cleanName = customerName.replace(/^(台南市|高雄市|台灣|臺灣)/, '').trim();
+          if (
+            ['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售', '其它'].includes(customerName) ||
+            (cleanName.endsWith('區') && !cleanName.includes('大樓') && !cleanName.includes('社區') && !cleanName.includes('華廈') && !cleanName.includes('莊園') && !cleanName.includes('山莊') && !cleanName.includes('大廈'))
+          ) {
+            isGenericOnlineCustomer = true;
+          }
+
           if (
             prod &&
             allowedList.length > 0 &&
-            !hasGlobalOnline &&
+            !(hasGlobalOnline && isGenericOnlineCustomer) &&
             !allowedList.includes(CommunityId) &&
             !(commMap.get(CommunityId) && allowedList.includes(commMap.get(CommunityId)!))
           ) {

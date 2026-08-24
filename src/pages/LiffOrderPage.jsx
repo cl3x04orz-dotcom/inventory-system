@@ -1109,7 +1109,18 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
           return ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(cName) ||
                  ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(id);
         });
-        if (hasGlobalOnlineOption) return true;
+
+        const isGenericOnlineCustomer = activeList.some(identifier => {
+          const name = String(identifier).trim();
+          if (["一般用戶", "一般散客", "上線下單", "線上下單", "一般常態", "常態零售", "其它"].includes(name)) return true;
+          const cleanName = name.replace(/^(台南市|高雄市|台灣|臺灣)/, '').trim();
+          if (cleanName.endsWith('區') && !cleanName.includes('大樓') && !cleanName.includes('社區') && !cleanName.includes('華廈') && !cleanName.includes('莊園') && !cleanName.includes('山莊') && !cleanName.includes('大廈')) {
+            return true;
+          }
+          return false;
+        });
+
+        if (hasGlobalOnlineOption && isGenericOnlineCustomer) return true;
 
         // 否則進行特定社區 ID / 大樓名稱匹配
         return activeList.some(id => allowed.includes(id));
