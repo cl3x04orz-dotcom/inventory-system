@@ -5,8 +5,10 @@ import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 export const callApi = async (apiUrl, action, payload, token = null, customTimeoutMs = null) => {
     try {
         let targetUrl = apiUrl || (typeof window !== 'undefined' && window.GAS_API_URL) || import.meta.env.VITE_GAS_API_URL;
-        if (!targetUrl || targetUrl.includes('github.io')) {
-            targetUrl = 'https://inventory-system-j6rs.onrender.com/api';
+        if (!targetUrl || targetUrl.includes('github.io') || targetUrl.includes('script.google.com')) {
+            targetUrl = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.startsWith('192.168.')))
+                ? '/api'
+                : 'https://inventory-system-j6rs.onrender.com/api';
         } else if (targetUrl === 'api' || targetUrl === '/api') {
             targetUrl = '/api';
         }

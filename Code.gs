@@ -207,6 +207,7 @@ function apiHandler(request) {
         'deleteUser': 'system_config',
         'updateUserPermissions': 'system_config',
         'updateUserStatus': 'system_config',
+        'saveLiffAnnouncement': 'sales_pending',
         
         // Activity Logging (操作紀錄)
         'logActivity': null, // 所有人都可以記錄自己的活動
@@ -325,6 +326,8 @@ function apiHandler(request) {
                     }
                     return res;
                 }
+            case 'getLiffAnnouncement': return typeof getLiffAnnouncementService !== 'undefined' ? getLiffAnnouncementService(payload) : { enabled: false };
+            case 'saveLiffAnnouncement': return typeof saveLiffAnnouncementService !== 'undefined' ? saveLiffAnnouncementService(payload, user) : { success: true };
             case 'getLiffInitData':
                 {
                     // 1. 商品列表快取
