@@ -29,9 +29,11 @@ import {
   ShieldCheck,
   Mail,
   X,
+  Megaphone,
 } from "lucide-react";
 import { callGAS, memberApi } from "../utils/api";
 import { copyToClipboard } from '../utils/clipboard';
+import { renderFormattedContent } from './LiffAnnouncementPage';
 import logoImg from "../assets/logo.png";
 import logoLiff from "../assets/logo_liff.jpg";
 import milkBoxMini from "../assets/milk_box_mini.png";
@@ -201,6 +203,15 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     onCancel: null,
     confirmText: '確定',
     cancelText: '取消'
+  });
+
+  // ── 首頁公告狀態 ──────────────────────────────────────────────
+  const [announcementData, setAnnouncementData] = useState(null);
+  const [announcementModal, setAnnouncementModal] = useState({
+    show: false,
+    title: '',
+    content: '',
+    themeColor: 'purple'
   });
 
   // ── 商品 state ───────────────────────────────────────────────
@@ -503,6 +514,32 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         }
       } catch (rErr) {
         console.warn("Failed to load reward config:", rErr);
+      }
+
+      // 載入商城首頁公告
+      try {
+        const annRes = await callGAS(apiUrl, "getLiffAnnouncement", {});
+        if (annRes && annRes.enabled) {
+          const currentHash = `${annRes.updatedAt}_${annRes.title}`;
+          const annData = {
+            title: annRes.title,
+            content: annRes.content,
+            themeColor: annRes.themeColor || 'purple',
+            fontSize: annRes.fontSize || 'medium',
+            customColors: annRes.customColors,
+            hash: currentHash
+          };
+          setAnnouncementData(annData);
+          const lastReadHash = localStorage.getItem("mlw_announcement_read_hash");
+          if (lastReadHash !== currentHash) {
+            setAnnouncementModal({
+              show: true,
+              ...annData
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to load announcement:", err);
       }
 
       const initData = await callGAS(
@@ -5481,6 +5518,16 @@ ${freeNote(newFee, newMin)}
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
             </button>
+            {announcementData && (
+              <button
+                onClick={() => setAnnouncementModal({ show: true, ...announcementData })}
+                className="p-1.5 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 transition-colors relative cursor-pointer"
+                title="查看商城公告"
+              >
+                <Megaphone size={16} />
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-purple-500 rounded-full animate-ping" />
+              </button>
+            )}
             <button
               onClick={() => loadAllData()}
               className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -6417,6 +6464,83 @@ ${freeNote(newFee, newMin)}
           </div>
         </div>
       )}
+
+      {/* ── 首頁彈出式公告 Modal ── */}
+      {announcementModal.show && (
+        <div className="fixed inset-0 z-[100] flex flex-col justify-center items-center p-3.5 sm:p-4 select-none">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setAnnouncementModal(prev => ({ ...prev, show: false }))}></div>
+          <div className="relative w-full max-w-[330px] sm:max-w-[360px] animate-[bounceIn_0.4s_ease-out] my-auto">
+            <div
+              className={`backdrop-blur-2xl bg-gradient-to-br border shadow-2xl rounded-3xl p-4.5 sm:p-5 relative overflow-hidden flex flex-col max-h-[78vh] ${
+                announcementModal.themeColor === 'blue' ? 'from-blue-600/30 via-sky-600/20 to-cyan-700/30 border-blue-400/40 text-blue-50' :
+                announcementModal.themeColor === 'dark' ? 'from-gray-900/90 via-slate-900/90 to-black/95 border-gray-700/60 text-gray-100' :
+                announcementModal.themeColor === 'emerald' ? 'from-emerald-700/30 via-teal-600/20 to-green-700/30 border-emerald-400/40 text-emerald-50' :
+                announcementModal.themeColor === 'amber' ? 'from-amber-600/30 via-orange-600/20 to-yellow-600/30 border-amber-400/40 text-amber-50' :
+                announcementModal.themeColor === 'rose' ? 'from-rose-600/30 via-pink-600/20 to-red-600/30 border-rose-400/40 text-rose-50' :
+                announcementModal.themeColor === 'indigo' ? 'from-indigo-700/30 via-blue-600/20 to-purple-800/30 border-indigo-400/40 text-indigo-50' :
+                announcementModal.themeColor === 'custom' ? 'border-white/30 text-white' :
+                'from-purple-700/30 via-fuchsia-600/20 to-pink-700/30 border-purple-400/40 text-purple-50'
+              }`}
+              style={announcementModal.themeColor === 'custom' && announcementModal.customColors ? {
+                background: `linear-gradient(135deg, ${announcementModal.customColors.start}, ${announcementModal.customColors.end})`
+              } : {}}
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
+              
+              <div className="relative z-10 text-center flex flex-col h-full space-y-3">
+                <div className="w-11 h-11 rounded-2xl bg-white/15 mx-auto flex items-center justify-center shrink-0 shadow-inner border border-white/20">
+                  <Megaphone className="w-5.5 h-5.5 text-white drop-shadow-sm" />
+                </div>
+                
+                <h3 className="text-lg sm:text-xl font-extrabold tracking-tight text-white drop-shadow-sm shrink-0 px-1">
+                  {announcementModal.title}
+                </h3>
+                
+                <div className="w-10 h-0.5 bg-white/30 mx-auto rounded-full shrink-0"></div>
+                
+                <div className={`leading-relaxed text-white/95 font-medium whitespace-pre-wrap text-left bg-black/25 p-3.5 rounded-2xl border border-white/10 overflow-y-auto max-h-[42vh] shadow-inner my-1 ${
+                  announcementModal.fontSize === 'small' ? 'text-xs' :
+                  announcementModal.fontSize === 'large' ? 'text-base' :
+                  announcementModal.fontSize === 'xlarge' ? 'text-lg' :
+                  'text-[13.5px] sm:text-sm'
+                }`}>
+                  {renderFormattedContent(announcementModal.content)}
+                </div>
+
+                <button 
+                  onClick={() => {
+                    localStorage.setItem("mlw_announcement_read_hash", announcementModal.hash);
+                    setAnnouncementModal(prev => ({ ...prev, show: false }));
+                  }}
+                  className={`w-full py-3 rounded-xl font-extrabold tracking-wide shadow-lg transition-all active:scale-95 text-sm sm:text-base shrink-0 mt-1 cursor-pointer ${
+                    announcementModal.themeColor === 'blue' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white border border-blue-300/30 shadow-blue-500/20' :
+                    announcementModal.themeColor === 'dark' ? 'bg-white hover:bg-gray-100 text-slate-900 border border-gray-200 shadow-white/10' :
+                    announcementModal.themeColor === 'emerald' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white border border-emerald-300/30 shadow-emerald-500/20' :
+                    announcementModal.themeColor === 'amber' ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border border-amber-300/30 shadow-amber-500/20' :
+                    announcementModal.themeColor === 'rose' ? 'bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white border border-rose-300/30 shadow-rose-500/20' :
+                    announcementModal.themeColor === 'indigo' ? 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border border-indigo-300/30 shadow-indigo-500/20' :
+                    announcementModal.themeColor === 'custom' ? 'text-white border border-white/20 shadow-md' :
+                    'bg-gradient-to-r from-purple-500 to-fuchsia-500 hover:from-purple-600 hover:to-fuchsia-600 text-white border border-purple-300/30 shadow-purple-500/20'
+                  }`}
+                  style={announcementModal.themeColor === 'custom' && announcementModal.customColors ? {
+                    backgroundColor: announcementModal.customColors.button
+                  } : {}}
+                >
+                  我知道了
+                </button>
+              </div>
+            </div>
+          </div>
+          <style>{`
+            @keyframes bounceIn {
+              0% { transform: scale(0.8); opacity: 0; }
+              60% { transform: scale(1.05); opacity: 1; }
+              100% { transform: scale(1); opacity: 1; }
+            }
+          `}</style>
+        </div>
+      )}
+
     </div>
   );
 }

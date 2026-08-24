@@ -87,7 +87,7 @@ function apiHandler(request) {
     if (action === 'loginAdminByPassword') return typeof loginAdminByPassword !== 'undefined' ? loginAdminByPassword(payload) : { error: '後端服務缺失: loginAdminByPassword' };
 
     // 身份驗證失敗攔截 (LIFF 公開路徑可豁免驗證)
-    const publicLiffActions = ['v1_getMember', 'v1_saveMember', 'v1_getOrders', 'v1_reorder', 'getLiffInitData', 'savePendingOrder', 'v2_getLiffInitData', 'v2_createOrder', 'v2_getCommunities', 'v2_getCampaigns'];
+    const publicLiffActions = ['v1_getMember', 'v1_saveMember', 'v1_getOrders', 'v1_reorder', 'getLiffInitData', 'savePendingOrder', 'v2_getLiffInitData', 'v2_createOrder', 'v2_getCommunities', 'v2_getCampaigns', 'getLiffAnnouncement'];
     
     if (!publicLiffActions.includes(action)) {
         if (!user) {
@@ -170,6 +170,8 @@ function apiHandler(request) {
         'getLiffInitData': null,
         'v2_getLiffInitData': null,
         'v2_createOrder': null,
+        'getLiffAnnouncement': null,
+        'saveLiffAnnouncement': 'system_config',
         
         // Finance (財務管理)
         'getExpenditures': null, // [Modification] Anyone can call, filtering happens in service
@@ -253,6 +255,8 @@ function apiHandler(request) {
             case 'v1_saveMember': return typeof v1_saveMemberService !== 'undefined' ? v1_saveMemberService(payload) : {error: 'Service missing'};
             case 'v1_getOrders': return typeof v1_getOrdersService !== 'undefined' ? v1_getOrdersService(payload) : {error: 'Service missing'};
             case 'v1_reorder': return typeof v1_reorderService !== 'undefined' ? v1_reorderService(payload) : {error: 'Service missing'};
+            case 'getLiffAnnouncement': return typeof getLiffAnnouncementService !== 'undefined' ? getLiffAnnouncementService(payload) : { enabled: false, title: '', content: '', themeColor: 'purple' };
+            case 'saveLiffAnnouncement': return typeof saveLiffAnnouncementService !== 'undefined' ? saveLiffAnnouncementService(payload, user) : { error: 'Service missing' };
             
             // 銷售頁面整合 API (解決卡頓)
             case 'initSalesPageData': return typeof initSalesPageDataService !== 'undefined' ? initSalesPageDataService(payload, user) : {error: 'Service missing'};

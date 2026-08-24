@@ -235,3 +235,32 @@ function v2_saveCampaignService(payload, user) {
     
     return ApiResponse.success({ CampaignId: rowData[headers.indexOf('CampaignId')] });
 }
+
+// ── 商城首頁公告 (GAS 版本相容服務) ──────────────────────────────────────────
+function getLiffAnnouncementService(payload) {
+  const props = PropertiesService.getScriptProperties();
+  const val = props.getProperty('LIFF_ANNOUNCEMENT');
+  if (!val) {
+    return { enabled: false, title: '', content: '', themeColor: 'purple' };
+  }
+  try {
+    return JSON.parse(val);
+  } catch (e) {
+    return { enabled: false, title: '', content: '', themeColor: 'purple' };
+  }
+}
+
+function saveLiffAnnouncementService(payload, user) {
+  const props = PropertiesService.getScriptProperties();
+  const data = {
+    enabled: !!payload.enabled,
+    title: payload.title || '',
+    content: payload.content || '',
+    themeColor: payload.themeColor || 'purple',
+    updatedAt: new Date().toISOString(),
+    updatedBy: user?.username || user?.name || 'System'
+  };
+  props.setProperty('LIFF_ANNOUNCEMENT', JSON.stringify(data));
+  return { success: true };
+}
+

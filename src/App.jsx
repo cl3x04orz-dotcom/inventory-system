@@ -34,6 +34,7 @@ import MemberManagementPage from './pages/MemberManagementPage';
 import SubscriptionManagementPage from './pages/SubscriptionManagementPage';
 import SuperAdminPage from './pages/SuperAdminPage';
 import DriverDeliveryPage from './pages/DriverDeliveryPage';
+import LiffAnnouncementPage from './pages/LiffAnnouncementPage';
 import NotificationCenter from './components/NotificationCenter';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -47,7 +48,7 @@ import {
     LayoutDashboard, ShoppingCart, Archive, LogOut, PackagePlus,
     FileText, ClipboardList, DollarSign, CheckSquare, Wallet, ChevronDown, ChevronUp,
     TrendingUp, BarChart2, Users, Activity, PieChart, Shield, WifiOff, Menu,
-    Edit2, Link, Calendar, Store, Building2
+    Edit2, Link, Calendar, Store, Building2, Megaphone
 } from 'lucide-react';
 
 // Google Apps Script (GAS) API Endpoint
@@ -499,6 +500,8 @@ function AppContent() {
                 return perms.includes('sales_pending') || user.role === 'BOSS';
             case 'groupBuySettings':
                 return perms.includes('sales_pending') || user.role === 'BOSS';
+            case 'liffAnnouncement':
+                return perms.includes('sales_pending') || perms.includes('system_config') || user.role === 'BOSS' || user.role === 'ADMIN';
             case 'memberManagement':
                 return perms.includes('sales_pending') || user.role === 'BOSS';
             case 'subscriptionManagement':
@@ -694,6 +697,7 @@ function AppContent() {
                                             {checkPermission('pendingOrders') && <NavItem label="訂單審核" icon={ClipboardList} onClick={() => handlePageChange('pendingOrders')} active={page === 'pendingOrders'} />}
                                             {checkPermission('pendingOrders') && <NavItem label="定期配管理" icon={Calendar} onClick={() => handlePageChange('subscriptionManagement')} active={page === 'subscriptionManagement'} />}
                                             {checkPermission('groupBuySettings') && <NavItem label="開團管理" icon={Link} onClick={() => handlePageChange('groupBuySettings')} active={page === 'groupBuySettings'} />}
+                                            {checkPermission('liffAnnouncement') && <NavItem label="首頁公告設定" icon={Megaphone} onClick={() => handlePageChange('liffAnnouncement')} active={page === 'liffAnnouncement'} />}
                                             {checkPermission('products') && <NavItem label="商品屬性" icon={Edit2} onClick={() => handlePageChange('products')} active={page === 'products'} />}
                                             {checkPermission('memberManagement') && <NavItem label="會員管理" icon={Wallet} onClick={() => handlePageChange('memberManagement')} active={page === 'memberManagement'} />}
                                             <NavItem label="商城預覽" icon={ShoppingCart} onClick={() => handlePageChange('liffOrder')} active={page === 'liffOrder'} />
@@ -780,11 +784,12 @@ function AppContent() {
                                      icon={Users}
                                      openDropdown={openDropdown}
                                      setOpenDropdown={setOpenDropdown}
-                                     active={['pendingOrders', 'groupBuySettings', 'products', 'memberManagement', 'subscriptionManagement', 'liffOrder'].includes(page)}
+                                     active={['pendingOrders', 'groupBuySettings', 'liffAnnouncement', 'products', 'memberManagement', 'subscriptionManagement', 'liffOrder'].includes(page)}
                                  >
                                      {checkPermission('pendingOrders') && <NavItem label="訂單審核" icon={ClipboardList} onClick={() => handlePageChange('pendingOrders')} active={page === 'pendingOrders'} />}
                                      {checkPermission('pendingOrders') && <NavItem label="定期配管理" icon={Calendar} onClick={() => handlePageChange('subscriptionManagement')} active={page === 'subscriptionManagement'} />}
                                      {checkPermission('groupBuySettings') && <NavItem label="開團管理" icon={Link} onClick={() => handlePageChange('groupBuySettings')} active={page === 'groupBuySettings'} />}
+                                     {checkPermission('liffAnnouncement') && <NavItem label="首頁公告設定" icon={Megaphone} onClick={() => handlePageChange('liffAnnouncement')} active={page === 'liffAnnouncement'} />}
                                      {checkPermission('products') && <NavItem label="商品屬性" icon={Edit2} onClick={() => handlePageChange('products')} active={page === 'products'} />}
                                      {checkPermission('memberManagement') && <NavItem label="會員管理" icon={Wallet} onClick={() => handlePageChange('memberManagement')} active={page === 'memberManagement'} />}
                                      <NavItem label="商城預覽" icon={ShoppingCart} onClick={() => handlePageChange('liffOrder')} active={page === 'liffOrder'} />
@@ -996,6 +1001,7 @@ function AppContent() {
                         {page === 'pendingOrders' && <PendingOrdersPage user={user} apiUrl={GAS_API_URL} setPage={handlePageChange} />}
                         {page === 'driver' && <DriverDeliveryPage apiUrl={GAS_API_URL} onBack={() => handlePageChange('pendingOrders')} />}
                         {page === 'groupBuySettings' && <GroupBuySettingsPage user={user} apiUrl={GAS_API_URL} />}
+                        {page === 'liffAnnouncement' && <LiffAnnouncementPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'products' && <ProductManagementPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'memberManagement' && <MemberManagementPage user={user} apiUrl={GAS_API_URL} />}
                         {page === 'subscriptionManagement' && <SubscriptionManagementPage user={user} apiUrl={GAS_API_URL} />}

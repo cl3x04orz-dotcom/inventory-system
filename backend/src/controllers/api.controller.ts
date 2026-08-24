@@ -101,6 +101,10 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
         ...payload,
         cashierId: user?.username || user?.userId || 'admin'
       });
+    case 'getLiffAnnouncement':
+      return GroupBuyService.getLiffAnnouncement(payload);
+    case 'saveLiffAnnouncement':
+      return GroupBuyService.saveLiffAnnouncement(payload, user);
     case 'getSaleToClone':
       return SalesService.getSaleToClone(payload);
     case 'voidAndFetchSale':

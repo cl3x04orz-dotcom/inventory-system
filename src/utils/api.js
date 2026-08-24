@@ -107,3 +107,4 @@ export const memberApi = {
 
 // 相容性別名層 (100% 保障舊程式碼呼叫)
 export const callGAS = callApi;
+export const apiCall = (action, payload, token, customTimeoutMs) => callApi(null, action, payload, token, customTimeoutMs);

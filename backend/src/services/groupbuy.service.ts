@@ -14,6 +14,42 @@ function generateOrderId(): string {
 
 export const GroupBuyService = {
 
+  // ==========================================
+  // 商城首頁公告 (LIFF Announcement)
+  // ==========================================
+  async getLiffAnnouncement(payload: any) {
+    const { storeCode = 'MILI001' } = payload || {};
+    const setting = await prisma.groupBuySystemSetting.findUnique({
+      where: { settingKey: 'LIFF_ANNOUNCEMENT' } // Ideally we should include storeCode in composite key, but settingKey is @id
+    });
+    if (!setting) return null;
+    try {
+      return JSON.parse(setting.settingValue);
+    } catch (e) {
+      return null;
+    }
+  },
+
+  async saveLiffAnnouncement(payload: any, user: any) {
+    const { storeCode = 'MILI001', enabled, title, content, themeColor, fontSize, customColors } = payload;
+    const valueStr = JSON.stringify({
+      enabled: !!enabled,
+      title: title || '',
+      content: content || '',
+      themeColor: themeColor || 'purple',
+      fontSize: fontSize || 'medium',
+      customColors: customColors || { start: '#6366f1', end: '#a855f7', button: '#6366f1' },
+      updatedAt: new Date().toISOString(),
+      updatedBy: user?.username || user?.name || 'System'
+    });
+
+    await prisma.groupBuySystemSetting.upsert({
+      where: { settingKey: 'LIFF_ANNOUNCEMENT' },
+      update: { settingValue: valueStr, storeCode },
+      create: { settingKey: 'LIFF_ANNOUNCEMENT', settingValue: valueStr, storeCode }
+    });
+    return { success: true };
+  },
   // 1. 取得訂單列表（按狀態篩選）
   async getPendingOrders(payload: any, user: any) {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') throw new Error('權限不足');
