@@ -1103,9 +1103,12 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
       const allowed = parseAllowedCommunities(allowedRaw);
       if (allowed.length > 0) {
         // 關鍵通配邏輯：當白名單包含「線上下單」或「一般散客」時，代表對所有行政區與散客全面開放！
-        const hasGlobalOnlineOption = allowed.some(id => 
-          ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(id)
-        );
+        const hasGlobalOnlineOption = allowed.some(id => {
+          const match = Array.isArray(allCommunities) ? allCommunities.find(c => (c.CommunityId || c.communityId) === id) : null;
+          const cName = match ? (match.CommunityName || match.communityName) : id;
+          return ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(cName) ||
+                 ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(id);
+        });
         if (hasGlobalOnlineOption) return true;
 
         // 否則進行特定社區 ID / 大樓名稱匹配
