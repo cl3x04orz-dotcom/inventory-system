@@ -2153,5 +2153,245 @@ export const GroupBuyService = {
       redeemableSpendBalance: Number(updated.redeemableSpendBalance),
       totalLifetimeSpend: Number(updated.totalLifetimeSpend)
     };
+  },
+
+  // 12. 訂單合併 (Merge Orders)
+  async mergeOrders(payload: any, user: any) {
+    const { orderIds } = payload;
+    if (!orderIds || !Array.isArray(orderIds) || orderIds.length < 2) {
+      throw new Error('至少需要選擇兩筆訂單才能合併');
+    }
+
+    return await prisma.$transaction(async (tx) => {
+      // 1. 取得所有要合併的訂單，並按照時間排序（最舊的當主訂單）
+      const orders = await tx.groupBuyOrder.findMany({
+        where: { orderId: { in: orderIds } },
+        include: { details: true },
+        orderBy: { createdAt: 'asc' }
+      });
+
+      if (orders.length !== orderIds.length) {
+        throw new Error('部分訂單不存在，合併失敗');
+      }
+
+      // 2. 嚴格驗證：只允許相同姓名或電話合併
+      const firstOrder = orders[0];
+      const primaryName = (firstOrder.customerName || '').trim().toLowerCase();
+      const primaryPhone = (firstOrder.customerPhone || '').trim();
+
+      for (let i = 1; i < orders.length; i++) {
+        const order = orders[i];
+        const name = (order.customerName || '').trim().toLowerCase();
+        const phone = (order.customerPhone || '').trim();
+        
+        let isValid = false;
+        if (primaryName && name && primaryName === name) isValid = true;
+        if (primaryPhone && phone && primaryPhone === phone) isValid = true;
+
+        if (!isValid) {
+          throw new Error(`訂單 ${order.orderId} 的客戶資料（${order.customerName}/${order.customerPhone}）與主訂單（${firstOrder.customerName}/${firstOrder.customerPhone}）不符，無法合併。`);
+        }
+      }
+
+      const primaryOrder = orders[0];
+      const secondaryOrders = orders.slice(1);
+
+      let additionalTotalAmount = 0;
+      const mergedOrderIds = secondaryOrders.map(o => o.orderId);
+      
+      // 3. 建立主訂單現有商品 Map (優先以 productId 為 Key，若無則以 productName 為 Key)
+      const primaryItemsMap = new Map();
+      primaryOrder.details.forEach(item => {
+        const key = item.productId || item.productName;
+        if (key) {
+          primaryItemsMap.set(key, item);
+        }
+      });
+
+      const newDetailsToCreate = [];
+      let maxShippingFee = Number(primaryOrder.shippingFee || 0);
+
+      // 4. 將副訂單明細轉移至主訂單，或建立新的明細
+      for (const sOrder of secondaryOrders) {
+        if (Number(sOrder.shippingFee || 0) > maxShippingFee) {
+           maxShippingFee = Number(sOrder.shippingFee || 0);
+        }
+
+        for (const sItem of sOrder.details) {
+          const key = sItem.productId || sItem.productName;
+          if (key && primaryItemsMap.has(key)) {
+            // 已有該商品，數量相加
+            const pItem = primaryItemsMap.get(key);
+            pItem.qty += sItem.qty;
+            pItem.remark = pItem.remark ? `${pItem.remark}, ${sItem.remark || ''}`.replace(/,\s*$/, '') : (sItem.remark || null);
+          } else {
+            // 沒有該商品，準備新增
+            const newDetail = {
+              id: undefined, // undefined 方便之後判定
+              orderId: primaryOrder.orderId,
+              productId: sItem.productId || '',
+              productName: sItem.productName,
+              unitPrice: Number(sItem.unitPrice),
+              qty: sItem.qty,
+              subtotal: 0,
+              remark: sItem.remark,
+              storeCode: primaryOrder.storeCode
+            };
+            newDetailsToCreate.push(newDetail);
+            if (key) {
+              primaryItemsMap.set(key, newDetail);
+            }
+          }
+        }
+
+        // 將副訂單標記為作廢
+        await tx.groupBuyOrder.update({
+          where: { orderId: sOrder.orderId },
+          data: { 
+            status: 'MERGED_CANCELLED',
+            note: ((sOrder.note || '') + `\n(此訂單已合併至 ${primaryOrder.orderId})`).trim(),
+            totalAmount: 0 // 作廢訂單金額歸零避免報表重複計算
+          }
+        });
+      }
+
+      // 5. 重新計算所有商品的最新小計 (套用多件優惠)
+      let newProductTotal = 0;
+      const productIdsToFetch = Array.from(primaryItemsMap.values()).map(item => item.productId).filter(id => id);
+      const dbProducts = await tx.product.findMany({
+        where: { productId: { in: productIdsToFetch } }
+      });
+      const dbProductMap = new Map(dbProducts.map(p => [p.productId, p]));
+
+      // 更新主訂單既有的 detail
+      for (const pItem of primaryOrder.details) {
+        const key = pItem.productId || pItem.productName;
+        const currentItem = primaryItemsMap.get(key);
+        
+        let finalSubtotal = Number(currentItem.unitPrice) * currentItem.qty;
+        
+        if (currentItem.productId && dbProductMap.has(currentItem.productId)) {
+          const dbProd = dbProductMap.get(currentItem.productId)!;
+          let settings: any = null;
+          if (dbProd.volumePricingSettings) {
+            settings = typeof dbProd.volumePricingSettings === 'string'
+              ? JSON.parse(dbProd.volumePricingSettings as string)
+              : dbProd.volumePricingSettings;
+          }
+          if (dbProd.hasVolumePricing && settings) {
+             const calcSub = calculateItemSubtotal({
+               productId: dbProd.productId,
+               productName: dbProd.productName,
+               unitPrice: Number(dbProd.singlePrice || dbProd.defaultPrice || currentItem.unitPrice || 0),
+               qty: currentItem.qty,
+               has_volume_pricing: true,
+               volume_pricing_settings: settings
+             });
+             if (calcSub > 0) {
+               finalSubtotal = calcSub;
+             }
+          }
+        }
+
+        currentItem.subtotal = finalSubtotal;
+        newProductTotal += finalSubtotal;
+
+        await tx.groupBuyOrderDetail.update({
+          where: { id: pItem.id },
+          data: {
+            qty: currentItem.qty,
+            subtotal: finalSubtotal,
+            remark: currentItem.remark
+          }
+        });
+      }
+
+      // 處理建立 newDetailsToCreate
+      const finalDetailsToCreate = [];
+      for (const nItem of newDetailsToCreate) {
+        let finalSubtotal = Number(nItem.unitPrice) * nItem.qty;
+        
+        if (nItem.productId && dbProductMap.has(nItem.productId)) {
+          const dbProd = dbProductMap.get(nItem.productId)!;
+          let settings: any = null;
+          if (dbProd.volumePricingSettings) {
+            settings = typeof dbProd.volumePricingSettings === 'string'
+              ? JSON.parse(dbProd.volumePricingSettings as string)
+              : dbProd.volumePricingSettings;
+          }
+          if (dbProd.hasVolumePricing && settings) {
+             const calcSub = calculateItemSubtotal({
+               productId: dbProd.productId,
+               productName: dbProd.productName,
+               unitPrice: Number(dbProd.singlePrice || dbProd.defaultPrice || nItem.unitPrice || 0),
+               qty: nItem.qty,
+               has_volume_pricing: true,
+               volume_pricing_settings: settings
+             });
+             if (calcSub > 0) {
+               finalSubtotal = calcSub;
+             }
+          }
+        }
+        
+        newProductTotal += finalSubtotal;
+        finalDetailsToCreate.push({
+          orderId: nItem.orderId,
+          productId: nItem.productId,
+          productName: nItem.productName,
+          unitPrice: nItem.unitPrice,
+          qty: nItem.qty,
+          subtotal: finalSubtotal,
+          remark: nItem.remark,
+          storeCode: nItem.storeCode
+        });
+      }
+
+      if (finalDetailsToCreate.length > 0) {
+        await tx.groupBuyOrderDetail.createMany({
+          data: finalDetailsToCreate
+        });
+      }
+
+      // 6. 計算免運門檻與最終運費
+      let finalShippingFee = maxShippingFee;
+      if (primaryOrder.sourceGroup) {
+         const comm = await tx.groupBuyCommunity.findFirst({
+           where: { communityName: primaryOrder.sourceGroup }
+         });
+         if (comm && comm.defaultFreeShipping) {
+           const freeShippingMin = Number(comm.freeShippingMin || 0);
+           if (freeShippingMin > 0 && newProductTotal >= freeShippingMin) {
+             finalShippingFee = 0; // 達到免運門檻
+           }
+         }
+      }
+
+      // 7. 更新主訂單金額與備註
+      const newTotalAmount = newProductTotal + finalShippingFee;
+      const newNote = ((primaryOrder.note || '') + `\n(此訂單合併了以下訂單: ${mergedOrderIds.join(', ')})`).trim();
+
+      await tx.groupBuyOrder.update({
+        where: { orderId: primaryOrder.orderId },
+        data: {
+          totalAmount: newTotalAmount,
+          shippingFee: finalShippingFee,
+          note: newNote
+        }
+      });
+
+      await tx.groupBuyAuditLog.create({
+         data: {
+           module: 'ORDERS',
+           action: 'MERGE_ORDERS',
+           targetId: primaryOrder.orderId,
+           oldValue: mergedOrderIds.join(', '),
+           newValue: 'MERGED',
+           operator: user.username || user.userId || 'SYSTEM'
+         }
+      });
+
+      return { success: true, primaryOrderId: primaryOrder.orderId, mergedOrderIds };
+    });
   }
 };

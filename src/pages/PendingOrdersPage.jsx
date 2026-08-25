@@ -1811,6 +1811,57 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
         }
     };
 
+    // 訂單合併邏輯
+    const handleMergeOrders = async () => {
+        if (selectedOrderIds.length < 2) {
+            alert('請至少選擇兩筆訂單才能進行合併');
+            return;
+        }
+
+        const selectedOrders = orders.filter(o => selectedOrderIds.includes(o.orderId));
+        // 找到建立時間最早的當作主訂單
+        const firstOrder = selectedOrders.reduce((oldest, current) => 
+            new Date(current.createdAt) < new Date(oldest.createdAt) ? current : oldest
+        );
+        const primaryName = (firstOrder.customerName || '').trim().toLowerCase();
+        const primaryPhone = (firstOrder.customerPhone || '').trim();
+
+        for (const o of selectedOrders) {
+            if (o.orderId === firstOrder.orderId) continue;
+            const name = (o.customerName || '').trim().toLowerCase();
+            const phone = (o.customerPhone || '').trim();
+            let isValid = false;
+            if (primaryName && name && primaryName === name) isValid = true;
+            if (primaryPhone && phone && primaryPhone === phone) isValid = true;
+            
+            if (!isValid) {
+                alert(`⚠️ 無法合併！\n訂單 ${o.orderId} 的客戶（${o.customerName || '未填'}/${o.customerPhone || '未填'}）\n與主訂單（${firstOrder.customerName || '未填'}/${firstOrder.customerPhone || '未填'}）不符。\n\n系統嚴格限制僅能合併相同姓名或電話的訂單。`);
+                return;
+            }
+        }
+
+        if (!window.confirm(`確定要將這 ${selectedOrderIds.length} 筆訂單合併嗎？\n合併後，除主訂單外，其餘訂單將會作廢隱藏（不會實體刪除），此動作無法復原！`)) {
+            return;
+        }
+
+        try {
+            setIsBatchProcessing(true);
+            const res = await callGAS(apiUrl, 'mergeOrders', { orderIds: selectedOrderIds }, user.token);
+            if (res.success) {
+                alert(`合併成功！\n已將 ${selectedOrderIds.length} 筆訂單整併至主訂單：${res.primaryOrderId}`);
+                setSelectedOrderIds([]);
+                await fetchOrders();
+            } else {
+                throw new Error(res.error || '合併失敗');
+            }
+        } catch (err) {
+            console.error('Merge Error:', err);
+            alert(`合併失敗: ${err.message}`);
+        } finally {
+            setIsBatchProcessing(false);
+        }
+    };
+
     // 批次刪除邏輯
     const handleBatchDelete = async () => {
         if (selectedOrderIds.length === 0) return;
@@ -2418,6 +2469,15 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                             >
                                 <Trash2 size={14} /> 批次刪除 ({selectedOrderIds.length})
                             </button>
+                            {selectedOrderIds.length >= 2 && (
+                                <button
+                                    type="button"
+                                    onClick={handleMergeOrders}
+                                    className="py-1.5 px-3 text-xs font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-transform text-white shadow-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                                >
+                                    🔗 合併訂單 ({selectedOrderIds.length})
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 onClick={handleBatchSetDeliveryDate}

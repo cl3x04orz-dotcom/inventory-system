@@ -234,6 +234,8 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       return GroupBuyService.batchConfirmPendingOrders(payload, user);
     case 'batchConfirmPayments':
       return GroupBuyService.batchConfirmPayments(payload, user);
+    case 'mergeOrders':
+      return GroupBuyService.mergeOrders(payload, user);
     case 'batchDeletePendingOrders':
       return GroupBuyService.batchDeletePendingOrders(payload, user);
     case 'batchSetDeliveryDates':
