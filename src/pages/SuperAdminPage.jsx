@@ -216,15 +216,17 @@ export default function SuperAdminPage({ user, apiUrl }) {
                         >
                           <Edit2 size={12} />編輯
                         </button>
-                        {/* 刪除 */}
-                        <button
-                          onClick={() => setDeleteTarget(tenant)}
-                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all hover:bg-red-50"
-                          style={{ color: '#ef4444', borderColor: '#fecaca' }}
-                          title="刪除店鋪"
-                        >
-                          <Trash2 size={12} />
-                        </button>
+                        {/* 刪除 (主店鋪 MILI001 不可刪除) */}
+                        {tenant.storeCode !== 'MILI001' && (
+                          <button
+                            onClick={() => setDeleteTarget(tenant)}
+                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all hover:bg-red-50"
+                            style={{ color: '#ef4444', borderColor: '#fecaca' }}
+                            title="刪除店鋪"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
