@@ -59,6 +59,9 @@ export const GroupBuyService = {
 
     const where: any = { storeCode };
     if (status === 'UNPAID') {
+      where.status = {
+        notIn: ['MERGED_CANCELLED', 'CANCELLED', 'VOID']
+      };
       where.OR = [
         { paymentStatus: null },
         { paymentStatus: '' },

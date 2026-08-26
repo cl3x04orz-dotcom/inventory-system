@@ -226,6 +226,7 @@ function getPendingOrdersService(payload, user) {
         const rowStatus = statusIdx >= 0 ? String(row[statusIdx] || '').trim() : '';
         if (!orderId) continue;
         if (status === 'UNPAID') {
+            if (['MERGED_CANCELLED', 'CANCELLED', 'VOID'].includes(rowStatus)) continue;
             const rowPs = psIdx >= 0 ? String(row[psIdx] || '').trim() : '';
             if (rowPs === '已付款' || rowPs === '已入帳' || rowPs.includes('已付款') || rowPs.includes('已入帳')) continue;
         } else if (status && rowStatus !== status) {
