@@ -1780,20 +1780,26 @@ export const GroupBuyService = {
 
       if (filteredSubs.length === 0) continue;
 
-      // 按大樓與客戶分組
+      // 按客戶姓名分組（同一客戶當天所有定期配商品統一合併至單一張訂單）
       const customerGroups: Record<string, any> = {};
       filteredSubs.forEach((sub: any) => {
-        const subBuilding = sub.building || building || '';
-        const key = `${subBuilding}_${sub.customerName}_${sub.phone || ''}`;
+        const subBuilding = (sub.building || building || '').trim();
+        const cName = (sub.customerName || '').trim();
+        const key = cName.toLowerCase();
+
         if (!customerGroups[key]) {
           customerGroups[key] = {
             building: subBuilding,
-            customerName: sub.customerName,
-            phone: sub.phone || '',
+            customerName: cName,
+            phone: (sub.phone || '').trim(),
             paymentMethod: sub.paymentMethod || '奶包金',
             note: sub.note || '',
             items: []
           };
+        } else {
+          if (!customerGroups[key].phone && sub.phone) {
+            customerGroups[key].phone = sub.phone.trim();
+          }
         }
         const price = prodPriceMap[sub.productId] || 0;
         customerGroups[key].items.push({
@@ -1805,27 +1811,38 @@ export const GroupBuyService = {
         });
       });
 
-      // 防重複檢查
+      // 防重複檢查：搜尋該配送日 (expectedDeliveryDate === targetDateStr) 所有未取消訂單
       const flagNote = `定期配(${targetDateStr})`;
       const existingOrders = await prisma.groupBuyOrder.findMany({
         where: {
-          note: { contains: flagNote }
+          expectedDeliveryDate: targetDateStr,
+          status: { not: 'CANCELLED' }
         }
       });
 
-      const alreadyImportedKeys = new Set(
-        existingOrders.map((o: any) => {
-          // extract building from address or deliveryAddress if needed
-          const addr = o.deliveryAddress || '';
-          return `${o.customerName}_${o.customerPhone || ''}`;
-        })
+      const alreadyImportedNames = new Set(
+        existingOrders
+          .map((o: any) => (o.customerName || '').trim().toLowerCase())
+          .filter(Boolean)
+      );
+
+      const alreadyImportedPhones = new Set(
+        existingOrders
+          .map((o: any) => (o.customerPhone || '').trim())
+          .filter((p: string) => p && p !== '0000000000000')
       );
 
       // 寫入訂單
       for (const key in customerGroups) {
         const group = customerGroups[key];
-        const dedupeKey = `${group.customerName}_${group.phone || ''}`;
-        if (alreadyImportedKeys.has(dedupeKey)) continue;
+        const normName = (group.customerName || '').trim().toLowerCase();
+        const normPhone = (group.phone || '').trim();
+
+        const isNameExists = normName && alreadyImportedNames.has(normName);
+        const isPhoneExists = normPhone && normPhone !== '0000000000000' && alreadyImportedPhones.has(normPhone);
+
+        // 只要當天同姓名或電話已存在有效訂單，即視為已發單，絕不重複建立
+        if (isNameExists || isPhoneExists) continue;
 
         const orderId = `GB${targetDateStr.replace(/-/g, '')}${now.getHours()}${now.getMinutes()}${now.getSeconds()}_${Math.floor(Math.random() * 100)}`;
         const totalAmount = group.items.reduce((sum: number, item: any) => sum + (item.unitPrice * item.qty), 0);
@@ -1865,6 +1882,10 @@ export const GroupBuyService = {
             });
           }
         });
+
+        // 訂單成功建立後，立即將姓名與電話加入防重 Set，確保同一次執行中絕不重複建單
+        if (normName) alreadyImportedNames.add(normName);
+        if (normPhone && normPhone !== '0000000000000') alreadyImportedPhones.add(normPhone);
 
         totalImportCount++;
       }
