@@ -3264,7 +3264,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
               )}
               <div className="flex items-start gap-2">
                 <span className="text-amber-500 mt-0.5">✓</span>
-                <span>配送前一天將透過 LINE 訊息與您聯絡通知。</span>
+                <span>配送日將由官方LINE與您聯繫告知。</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-amber-500 mt-0.5">✓</span>
@@ -4482,7 +4482,7 @@ ${freeNote(newFee, newMin)}
                         const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
                         if (match) {
                           return (
-                            <span className="bg-slate-100 dark:bg-slate-800 text-[var(--text-primary)] font-extrabold text-sm px-3.5 py-2.5 border-r border-[var(--border-primary)] select-none shrink-0">
+                            <span className="bg-slate-100 text-slate-800 font-extrabold text-sm px-3.5 py-2.5 border-r border-slate-200 select-none shrink-0">
                               {match.CommunityName}
                             </span>
                           );
