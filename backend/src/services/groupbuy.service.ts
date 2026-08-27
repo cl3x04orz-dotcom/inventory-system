@@ -12,6 +12,8 @@ function generateOrderId(): string {
   return `GB${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 }
 
+const importLocks: Record<string, boolean> = {};
+
 export const GroupBuyService = {
 
   // ==========================================
@@ -1709,9 +1711,16 @@ export const GroupBuyService = {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
 
     const { building, date, importWeek, mode } = payload;
-    const isAllBuildings = !building || building === '全部' || building === 'ALL';
+    const lockKey = `${payload.storeCode || 'DEF'}_${building || 'ALL'}_${date || 'TODAY'}_${importWeek || mode || 'DAY'}`;
+    if (importLocks[lockKey]) {
+      return { success: true, count: 0, message: '匯入處理中，請稍後再試' };
+    }
+    importLocks[lockKey] = true;
 
-    // 計算欲處理的日期陣列（若為整週模式，則推算本週一至本週日共 7 天）
+    try {
+      const isAllBuildings = !building || building === '全部' || building === 'ALL';
+
+      // 計算欲處理的日期陣列（若為整週模式，則推算本週一至本週日共 7 天）
     const getWeekDates = (refDateStr?: string): string[] => {
       let refDate = new Date();
       if (refDateStr) {
@@ -1848,6 +1857,19 @@ export const GroupBuyService = {
         const totalAmount = group.items.reduce((sum: number, item: any) => sum + (item.unitPrice * item.qty), 0);
 
         await prisma.$transaction(async (tx) => {
+          // Double check inside transaction
+          const doubleCheckExisting = await tx.groupBuyOrder.findMany({
+             where: { expectedDeliveryDate: targetDateStr, status: { not: 'CANCELLED' } }
+          });
+          const isNameExistsTx = normName && doubleCheckExisting.some((o: any) => (o.customerName || '').trim().toLowerCase() === normName);
+          const isPhoneExistsTx = normPhone && normPhone !== '0000000000000' && doubleCheckExisting.some((o: any) => (o.customerPhone || '').trim() === normPhone);
+          
+          if (isNameExistsTx || isPhoneExistsTx) {
+              if (normName) alreadyImportedNames.add(normName);
+              if (normPhone && normPhone !== '0000000000000') alreadyImportedPhones.add(normPhone);
+              return;
+          }
+
           await tx.groupBuyOrder.create({
             data: {
               orderId,
@@ -1891,11 +1913,14 @@ export const GroupBuyService = {
       }
     }
 
-    return { 
-      success: true, 
-      count: totalImportCount, 
-      message: `成功處理 ${datesToProcess.length} 天的定期配，共有 ${totalImportCount} 筆新訂單` 
-    };
+      return { 
+        success: true, 
+        count: totalImportCount, 
+        message: `成功處理 ${datesToProcess.length} 天的定期配，共有 ${totalImportCount} 筆新訂單` 
+      };
+    } finally {
+      delete importLocks[lockKey];
+    }
   },
 
   // 17. 取得所有社區列表 (用於後台社區/外送區域管理)
