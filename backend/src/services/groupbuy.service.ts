@@ -89,8 +89,8 @@ export const GroupBuyService = {
       where.createdAt = { gte: thirtyDaysAgo };
     }
 
-    const take = pageSize ? parseInt(pageSize, 10) : 100;
-    const skip = page && pageSize ? (parseInt(page, 10) - 1) * take : 0;
+    const take = pageSize ? parseInt(pageSize, 10) : undefined;
+    const skip = page && pageSize && take ? (parseInt(page, 10) - 1) * take : undefined;
 
     const orders = await prisma.groupBuyOrder.findMany({
       where,
@@ -1402,8 +1402,8 @@ export const GroupBuyService = {
       where.createdAt = { gte: ninetyDaysAgo };
     }
 
-    const take = pageSize ? parseInt(pageSize, 10) : 50;
-    const skip = page && pageSize ? (parseInt(page, 10) - 1) * take : 0;
+    const take = pageSize ? parseInt(pageSize, 10) : undefined;
+    const skip = page && pageSize && take ? (parseInt(page, 10) - 1) * take : undefined;
 
     // 2. 獲取自己建立的訂單，或是自己是團員（收件人）被代訂的訂單
     const dbOrders = await prisma.groupBuyOrder.findMany({

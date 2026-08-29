@@ -304,8 +304,8 @@ export const PurchaseService = {
       where.date = { gte: thirtyDaysAgo };
     }
 
-    const take = pageSize ? parseInt(pageSize, 10) : 100;
-    const skip = page && pageSize ? (parseInt(page, 10) - 1) * take : 0;
+    const take = pageSize ? parseInt(pageSize, 10) : undefined;
+    const skip = page && pageSize && take ? (parseInt(page, 10) - 1) * take : undefined;
 
     const purchases = await prisma.purchase.findMany({
       where,

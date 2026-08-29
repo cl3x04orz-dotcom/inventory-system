@@ -269,8 +269,8 @@ export const InventoryService = {
       where.date = { gte: thirtyDaysAgo };
     }
 
-    const take = pageSize ? parseInt(pageSize, 10) : 100;
-    const skip = page && pageSize ? (parseInt(page, 10) - 1) * take : 0;
+    const take = pageSize ? parseInt(pageSize, 10) : undefined;
+    const skip = page && pageSize && take ? (parseInt(page, 10) - 1) * take : undefined;
 
     return await prisma.inventoryAdjustment.findMany({
       where,
@@ -357,8 +357,8 @@ export const InventoryService = {
       where.diff = { not: 0 };
     }
 
-    const take = pageSize ? parseInt(pageSize, 10) : 100;
-    const skip = page && pageSize ? (parseInt(page, 10) - 1) * take : 0;
+    const take = pageSize ? parseInt(pageSize, 10) : undefined;
+    const skip = page && pageSize && take ? (parseInt(page, 10) - 1) * take : undefined;
 
     return await prisma.stocktake.findMany({
       where,
