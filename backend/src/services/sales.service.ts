@@ -434,11 +434,19 @@ export const SalesService = {
     let start: Date | null = null;
     let end: Date | null = null;
 
-    if (startDate) {
-      start = new Date(startDate + 'T00:00:00.000+08:00');
-    }
-    if (endDate) {
-      end = new Date(endDate + 'T23:59:59.999+08:00');
+    if (!startDate && !endDate) {
+      start = new Date();
+      start.setDate(start.getDate() - 30);
+      start.setHours(0, 0, 0, 0);
+      end = new Date();
+      end.setHours(23, 59, 59, 999);
+    } else {
+      if (startDate) {
+        start = new Date(startDate + 'T00:00:00.000+08:00');
+      }
+      if (endDate) {
+        end = new Date(endDate + 'T23:59:59.999+08:00');
+      }
     }
 
     if (start && end) {
@@ -466,6 +474,15 @@ export const SalesService = {
     }
 
     query += ` ORDER BY s.date DESC`;
+
+    const page = parseInt(payload.page, 10);
+    const pageSize = parseInt(payload.pageSize, 10);
+    if (!isNaN(page) && !isNaN(pageSize) && page > 0 && pageSize > 0) {
+      const offset = (page - 1) * pageSize;
+      query += ` LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
+      params.push(pageSize, offset);
+      paramIdx += 2;
+    }
 
     const list: any[] = await prisma.$queryRawUnsafe(query, ...params);
 

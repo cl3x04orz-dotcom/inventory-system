@@ -57,7 +57,7 @@ export const GroupBuyService = {
   // 1. 取得訂單列表（按狀態篩選）
   async getPendingOrders(payload: any, user: any) {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') throw new Error('權限不足');
-    const { status, storeCode } = payload || {};
+    const { status, storeCode, startDate, endDate, page, pageSize } = payload || {};
 
     const where: any = { storeCode };
     if (status === 'UNPAID') {
@@ -78,8 +78,24 @@ export const GroupBuyService = {
       where.status = status;
     }
 
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate + 'T00:00:00.000+08:00');
+      if (endDate) where.createdAt.lte = new Date(endDate + 'T23:59:59.999+08:00');
+    } else {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      thirtyDaysAgo.setHours(0, 0, 0, 0);
+      where.createdAt = { gte: thirtyDaysAgo };
+    }
+
+    const take = pageSize ? parseInt(pageSize, 10) : 100;
+    const skip = page && pageSize ? (parseInt(page, 10) - 1) * take : 0;
+
     const orders = await prisma.groupBuyOrder.findMany({
       where,
+      take,
+      skip,
       include: {
         details: true,
         recipients: {
@@ -1349,7 +1365,7 @@ export const GroupBuyService = {
 
   // 13. LIFF V1 取得個人訂單列表
   async v1_getOrders(payload: any, user: any) {
-    const { userId, storeCode } = payload;
+    const { userId, storeCode, startDate, endDate, page, pageSize } = payload;
     if (!userId) throw new Error('缺少 userId');
 
     // 1. 查找該 LINE 使用者在 Member 資料庫中的資料
@@ -1374,11 +1390,26 @@ export const GroupBuyService = {
       }
     }
 
+    const where: any = { OR: conditions };
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate + 'T00:00:00.000+08:00');
+      if (endDate) where.createdAt.lte = new Date(endDate + 'T23:59:59.999+08:00');
+    } else {
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      ninetyDaysAgo.setHours(0, 0, 0, 0);
+      where.createdAt = { gte: ninetyDaysAgo };
+    }
+
+    const take = pageSize ? parseInt(pageSize, 10) : 50;
+    const skip = page && pageSize ? (parseInt(page, 10) - 1) * take : 0;
+
     // 2. 獲取自己建立的訂單，或是自己是團員（收件人）被代訂的訂單
     const dbOrders = await prisma.groupBuyOrder.findMany({
-      where: {
-        OR: conditions
-      },
+      where,
+      take,
+      skip,
       include: {
         details: true,
         recipients: {

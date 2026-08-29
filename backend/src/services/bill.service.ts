@@ -13,7 +13,7 @@ const formatLocalYMD = (date: Date) => {
 export const BillService = {
   // 1. 查詢應收帳款
   async getReceivables(payload: any) {
-    const { startDate, endDate, status, storeCode } = payload;
+    const { startDate, endDate, status, storeCode, page, pageSize } = payload;
     const where: any = {
       paymentMethod: 'CREDIT',
       storeCode
@@ -35,10 +35,20 @@ export const BillService = {
       if (endDate) {
         where.date.lte = new Date(endDate + 'T23:59:59.999+08:00');
       }
+    } else {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      thirtyDaysAgo.setHours(0, 0, 0, 0);
+      where.date = { gte: thirtyDaysAgo };
     }
+
+    const take = pageSize ? parseInt(pageSize, 10) : 100;
+    const skip = page && pageSize ? (parseInt(page, 10) - 1) * take : 0;
 
     const list = await prisma.sales.findMany({
       where,
+      take,
+      skip,
       include: {
         details: {
           where: { picked: { gt: 0 } },

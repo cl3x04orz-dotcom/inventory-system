@@ -281,7 +281,7 @@ export const PurchaseService = {
   // 4. 進貨查詢
   // ============================================================
   async getPurchaseHistory(payload: any) {
-    const { startDate, endDate, keyword, storeCode } = payload;
+    const { startDate, endDate, keyword, storeCode, page, pageSize } = payload;
 
     const where: any = { status: { not: 'VOID' }, storeCode };
 
@@ -297,10 +297,20 @@ export const PurchaseService = {
         e.setHours(23, 59, 59, 999);
         where.date.lte = e;
       }
+    } else {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      thirtyDaysAgo.setHours(0, 0, 0, 0);
+      where.date = { gte: thirtyDaysAgo };
     }
+
+    const take = pageSize ? parseInt(pageSize, 10) : 100;
+    const skip = page && pageSize ? (parseInt(page, 10) - 1) * take : 0;
 
     const purchases = await prisma.purchase.findMany({
       where,
+      take,
+      skip,
       orderBy: { date: 'desc' }
     });
 

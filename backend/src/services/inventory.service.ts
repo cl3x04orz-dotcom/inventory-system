@@ -255,17 +255,27 @@ export const InventoryService = {
 
   // 5. 取得調整歷史
   async getAdjustmentHistory(payload: any = {}) {
-    const { startDate, endDate, storeCode = 'MILI001' } = payload;
+    const { startDate, endDate, storeCode = 'MILI001', page, pageSize } = payload;
     const where: any = { storeCode };
 
     if (startDate || endDate) {
       where.date = {};
       if (startDate) where.date.gte = new Date(startDate);
       if (endDate) where.date.lte = new Date(endDate);
+    } else {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      thirtyDaysAgo.setHours(0, 0, 0, 0);
+      where.date = { gte: thirtyDaysAgo };
     }
+
+    const take = pageSize ? parseInt(pageSize, 10) : 100;
+    const skip = page && pageSize ? (parseInt(page, 10) - 1) * take : 0;
 
     return await prisma.inventoryAdjustment.findMany({
       where,
+      take,
+      skip,
       orderBy: { date: 'desc' }
     });
   },
@@ -326,14 +336,20 @@ export const InventoryService = {
 
   // 8. 盤點紀錄歷史
   async getStocktakeHistory(payload: any = {}) {
-    const { startDate, endDate, productName, diffOnly, storeCode = 'MILI001' } = payload;
+    const { startDate, endDate, productName, diffOnly, storeCode = 'MILI001', page, pageSize } = payload;
     const where: any = { storeCode };
 
     if (startDate || endDate) {
       where.date = {};
       if (startDate) where.date.gte = new Date(startDate);
       if (endDate) where.date.lte = new Date(endDate);
+    } else {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      thirtyDaysAgo.setHours(0, 0, 0, 0);
+      where.date = { gte: thirtyDaysAgo };
     }
+    
     if (productName) {
       where.productName = { contains: productName };
     }
@@ -341,8 +357,13 @@ export const InventoryService = {
       where.diff = { not: 0 };
     }
 
+    const take = pageSize ? parseInt(pageSize, 10) : 100;
+    const skip = page && pageSize ? (parseInt(page, 10) - 1) * take : 0;
+
     return await prisma.stocktake.findMany({
       where,
+      take,
+      skip,
       orderBy: { date: 'desc' }
     });
   },
