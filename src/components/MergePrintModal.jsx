@@ -101,7 +101,6 @@ export default function MergePrintModal({
         }
     }, [endDate]);
 
-    // [Fix] 去重與去空白：確保 systemCustomers 不會因隱藏空白（如 "永康 "）產生重複欄位
     const cleanSystemCustomers = React.useMemo(() => {
         const map = new Map();
         (systemCustomers || []).forEach(c => {
@@ -110,14 +109,27 @@ export default function MergePrintModal({
             const cleanName = String(rawName).trim();
             if (!cleanName) return;
 
+            const currentObj = typeof c === 'string'
+                ? { name: cleanName, isAiEnabled: false, schedule: [0, 1, 2, 3, 4, 5, 6], category: '市場' }
+                : { schedule: [0, 1, 2, 3, 4, 5, 6], category: '市場', ...c, name: cleanName };
+
             const existing = map.get(cleanName);
             if (!existing) {
-                map.set(cleanName, typeof c === 'string' ? { name: cleanName, isAiEnabled: false, schedule: [0,1,2,3,4,5,6], category: '市場' } : { ...c, name: cleanName });
+                map.set(cleanName, currentObj);
             } else {
-                const isObj = typeof c === 'object' && c !== null;
-                if (isObj && (c.isAiEnabled || (c.schedule && c.schedule.length < 7))) {
-                    map.set(cleanName, { ...existing, ...c, name: cleanName });
-                }
+                const isAiEnabled = Boolean(existing.isAiEnabled || currentObj.isAiEnabled);
+                // 合併兩者的排程 (非全空)
+                const sched1 = Array.isArray(existing.schedule) ? existing.schedule : [0, 1, 2, 3, 4, 5, 6];
+                const sched2 = Array.isArray(currentObj.schedule) ? currentObj.schedule : [0, 1, 2, 3, 4, 5, 6];
+                const schedule = Array.from(new Set([...sched1, ...sched2])).sort((a, b) => a - b);
+                
+                map.set(cleanName, {
+                    ...existing,
+                    ...currentObj,
+                    name: cleanName,
+                    isAiEnabled,
+                    schedule
+                });
             }
         });
         return Array.from(map.values());
@@ -134,7 +146,7 @@ export default function MergePrintModal({
         // 1. 檢查編輯中的設定
         for (const [key, val] of Object.entries(editingCustomers)) {
             const k = key.trim().replace(/[\.\s…]+$/g, '').toLowerCase();
-            if (k === cleanName || (cleanName.length > 2 && (k.startsWith(cleanName) || cleanName.startsWith(k)))) {
+            if (k === cleanName) {
                 return val;
             }
         }
@@ -147,7 +159,7 @@ export default function MergePrintModal({
                 const cacheMap = JSON.parse(cacheRaw);
                 for (const [key, val] of Object.entries(cacheMap)) {
                     const k = key.trim().replace(/[\.\s…]+$/g, '').toLowerCase();
-                    if (k === cleanName || (cleanName.length > 2 && (k.startsWith(cleanName) || cleanName.startsWith(k)))) {
+                    if (k === cleanName) {
                         backupSetting = val;
                         break;
                     }
@@ -155,11 +167,11 @@ export default function MergePrintModal({
             }
         } catch (e) {}
 
-        // 3. 從 cleanSystemCustomers 對照匹配
+        // 3. 從 cleanSystemCustomers 對照匹配 (必須 100% 精確對應)
         const orig = cleanSystemCustomers.find(c => {
             const nameStr = (typeof c === 'string' ? c : c?.name || '').trim().replace(/[\.\s…]+$/g, '').toLowerCase();
             if (!nameStr) return false;
-            return nameStr === cleanName || (cleanName.length > 2 && (nameStr.startsWith(cleanName) || cleanName.startsWith(nameStr)));
+            return nameStr === cleanName;
         });
 
         let origSchedule = backupSetting?.schedule;
@@ -214,16 +226,30 @@ export default function MergePrintModal({
         } catch (e) {}
 
         if (onUpdateCustomerSettings) {
-            await onUpdateCustomerSettings({
+            const success = await onUpdateCustomerSettings({
                 customerName: cleanName,
                 isAiEnabled: next.isAiEnabled,
                 schedule: next.schedule,
                 category: next.category
             });
-            setEditingCustomers(prev => ({
-                ...prev,
-                [cleanName]: { ...next, isSaving: false }
-            }));
+            if (success) {
+                const targetObj = cleanSystemCustomers.find(c => (typeof c === 'string' ? c : c.name) === cleanName);
+                if (targetObj && typeof targetObj === 'object') {
+                    targetObj.isAiEnabled = next.isAiEnabled;
+                    targetObj.schedule = next.schedule;
+                    targetObj.category = next.category;
+                }
+                setEditingCustomers(prev => {
+                    const copy = { ...prev };
+                    delete copy[cleanName];
+                    return copy;
+                });
+            } else {
+                setEditingCustomers(prev => ({
+                    ...prev,
+                    [cleanName]: { ...next, isSaving: false }
+                }));
+            }
         } else {
             setEditingCustomers(prev => ({
                 ...prev,
@@ -414,14 +440,14 @@ export default function MergePrintModal({
         return str;
     };
 
-    // Filter out retail walk-in customer records AND filter out OFF state customers (isAiEnabled === false)
+    // Filter out retail walk-in customer records AND filter out OFF state customers (isAiEnabled !== true)
     const RETAIL_NAMES = ['門市散客', '散客', '零售散客', '一般散客', 'POS散客', '一般顧客', 'null', 'undefined', ''];
     const filteredRecords = safeRecords.filter(record => {
         const cust = String(record.customer || '').trim();
         if (!cust) return false;
         if (RETAIL_NAMES.includes(cust)) return false;
 
-        // [Fix] 若該地點在「地點送貨排程管理」被設為 OFF 關閉 (isAiEnabled !== true)，100% 自動過濾隱藏
+        // 依據「地點送貨排程管理後台」的 AI 預測開關是否有啟用 (isAiEnabled === true)，有啟用才會有單據
         const setting = getCustSetting(cust);
         if (setting && setting.isAiEnabled !== true) {
             return false;
@@ -716,7 +742,7 @@ export default function MergePrintModal({
                                                     className={`group relative p-3 sm:p-4 rounded-xl sm:rounded-2xl border transition-all cursor-pointer ${isSelected ? 'bg-blue-600 border-blue-600 shadow-lg text-white scale-[1.02]' : 'bg-white border-gray-100 hover:border-blue-200 shadow-sm'}`}
                                                 >
                                                     <div className="flex justify-between items-start mb-2">
-                                                        <h4 className="font-black truncate text-sm sm:text-base max-w-[150px]">{record.customer}</h4>
+                                                        <h4 className="font-black truncate text-sm sm:text-base max-w-[180px]" title={record.customer}>{record.customer}</h4>
                                                         <div className={`px-1.5 py-0.5 rounded text-[9px] font-black ${isSelected ? 'bg-white/20' : 'bg-gray-100 text-gray-400'}`}>
                                                             {new Date(record.date).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
                                                         </div>

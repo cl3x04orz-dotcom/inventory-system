@@ -537,18 +537,12 @@ export const SalesService = {
     end.setHours(23, 59, 59, 999);
 
     const targetStoreCode = storeCode || 'MILI001';
-    const disabledCustomers = await prisma.customer.findMany({
-      where: { isAiEnabled: false, storeCode: targetStoreCode },
-      select: { customerName: true }
-    });
-    const disabledNames = disabledCustomers.map(c => String(c.customerName || '').trim());
     const retailNames = ['門市散客', '散客', '零售散客', '一般散客', 'POS散客', '一般顧客', 'null', 'undefined', ''];
-    const excludedCustomers = Array.from(new Set([...disabledNames, ...retailNames]));
 
     const sales = await prisma.sales.findMany({
       where: {
         status: { not: 'VOID' },
-        customer: { notIn: excludedCustomers },
+        customer: { notIn: retailNames },
         storeCode: targetStoreCode,
         date: {
           gte: start,
