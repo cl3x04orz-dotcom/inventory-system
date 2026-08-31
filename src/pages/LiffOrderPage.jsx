@@ -1336,8 +1336,9 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         : (cart[pid] || 0);
 
       if (totalCartQty + delta > remaining) {
-        const tagText = quotaInfo.isCommunityQuota ? "【本社區專屬限量】" : "";
-        alert(`【${prod.name}】${tagText}活動配額僅剩 ${remaining} 罐，無法再增加！`);
+        const tagText = quotaInfo.isCommunityQuota ? "【本社區專屬限量】\n" : "";
+        const unit = (prod?.isBundle || Number(prod?.bundleSize) > 1) ? '組' : '入';
+        alert(`【${prod.name}】\n${tagText}活動配額僅剩：${remaining} ${unit}\n\n已達加購上限，無法再增加數量囉！`);
         return;
       }
     }
@@ -1427,8 +1428,9 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
       if (prod && quotaInfo.hasQuota) {
         const remaining = quotaInfo.remaining;
         if (qty > remaining) {
-          const tagText = quotaInfo.isCommunityQuota ? "【本社區專屬限量】" : "";
-          alert(`【${prod.name}】${tagText}活動配額僅剩 ${remaining} 罐！`);
+          const tagText = quotaInfo.isCommunityQuota ? "【本社區專屬限量】\n" : "";
+          const unit = (prod?.isBundle || Number(prod?.bundleSize) > 1) ? '組' : '入';
+          alert(`【${prod.name}】\n${tagText}活動配額僅剩：${remaining} ${unit}\n\n已自動為您調整為上限數量！`);
           qty = remaining;
         }
       }
@@ -1614,8 +1616,9 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     if (total > 0 && quotaInfo.hasQuota) {
       const remaining = quotaInfo.remaining;
       if (total > remaining) {
-        const tagText = quotaInfo.isCommunityQuota ? "【本社區專屬限量】" : "";
-        alert(`【${flavorModalProduct.name}】${tagText}活動配額僅剩 ${remaining} 罐，您選擇了 ${total} 罐，已超出上限！`);
+        const tagText = quotaInfo.isCommunityQuota ? "【本社區專屬限量】\n" : "";
+        const unit = (flavorModalProduct?.isBundle || Number(flavorModalProduct?.bundleSize) > 1) ? '組' : '入';
+        alert(`【${flavorModalProduct.name}】\n${tagText}活動配額僅剩：${remaining} ${unit}\n您的選擇數量：${total} ${unit}\n\n選擇數量已超出上限！`);
         return;
       }
     }
@@ -5920,9 +5923,10 @@ ${freeNote(newFee, newMin)}
                               )}
                               {(() => {
                                 const qInfo = getProductQuotaInfo(product);
-                                if (!qInfo.hasQuota) return null;
+                                if (!qInfo.hasQuota || qInfo.remaining === null || qInfo.remaining === undefined) return null;
                                 const remaining = qInfo.remaining;
                                 const isComm = qInfo.isCommunityQuota;
+                                const unit = (product?.isBundle || Number(product?.bundleSize) > 1) ? '組' : '入';
                                 return (
                                   <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded mt-1 font-bold ${remaining === 0
                                     ? 'text-red-600 bg-red-50 border border-red-200'
@@ -5930,7 +5934,7 @@ ${freeNote(newFee, newMin)}
                                     }`}>
                                     {remaining === 0
                                       ? (isComm ? '🚫 本社區專屬額度已售完' : '🚫 已售完')
-                                      : (isComm ? `⚡️ 本社區獨家專屬 剩 ${remaining} 罐` : `⚡️ 活動限量 剩 ${remaining} 罐`)}
+                                      : (isComm ? `⚡️ 本社區獨家專屬 剩 ${remaining} ${unit}` : `⚡️ 活動限量 剩 ${remaining} ${unit}`)}
                                   </span>
                                 );
                               })()}
