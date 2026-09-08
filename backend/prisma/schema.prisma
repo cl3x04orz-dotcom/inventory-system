@@ -1,0 +1,650 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  userId       String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String
+  role         String   @default("EMPLOYEE")
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now())
+  permissions  Json     @default("[]")
+  storeCode    String   @default("MILI001")
+}
+
+model Product {
+  productId             String                  @id
+  productName           String
+  category              String?
+  defaultPrice          Decimal                 @default(0)
+  reserve               Decimal                 @default(0)
+  safetyStock           Int                     @default(0)
+  sortWeight            Int                     @default(0)
+  isActive              Boolean                 @default(true)
+  isPurchasable         Boolean                 @default(true) // 是否出現在進貨清單（與前台上架 isActive 完全獨立）
+  isDiscontinued        Boolean                 @default(false) // 停售/停產狀態（全系統隱藏）
+  imageUrl              String?
+  capacity              String? // 容量規格 (例如: "936ml", "360g", "6入/盒")
+  expiryDate            String?
+  hasFlavorAttributes   Boolean                 @default(false)
+  flavorChoices         Json                    @default("[]")
+  singlePrice           Decimal                 @default(0)
+  hasVolumePricing      Boolean                 @default(false)
+  volumePricingSettings Json?
+  packSize              Int                     @default(1)
+  dispatchSteps         Json                    @default("[]") // e.g. [28, 42, 70]
+  roundThreshold        Int?
+  posSettings           Json? // POS 專用設定集 overrides (price, isBundle, isActive, sortWeight, packSize, etc.)
+  autoSuppress          Boolean                 @default(false)
+  maxSuggestion         Int                     @default(0)
+  stopPickupThreshold   Int?
+  isBundle              Boolean                 @default(false)
+  bundleSize            Int                     @default(1)
+  maxTotalQty           Int?
+  soldQty               Int                     @default(0)
+  allowedCommunityIds   String[]                @default([])
+  communityQuotas       Json?                   @default("{}")
+  inventories           Inventory[]
+  salesDetails          SalesDetail[]
+  customPrices          CommunityProductPrice[]
+  barcodes              ProductBarcode[]
+  storeCode             String                  @default("MILI001")
+}
+
+model ProductBarcode {
+  id        String  @id @default(uuid())
+  productId String
+  barcode   String
+  type      String  @default("EAN13") // EAN13, STORE, CASE
+  isDefault Boolean @default(false)
+  storeCode String  @default("MILI001")
+
+  product Product @relation(fields: [productId], references: [productId], onDelete: Cascade)
+
+  @@index([barcode])
+  @@index([productId])
+}
+
+model Customer {
+  customerName String  @id
+  isAiEnabled  Boolean @default(false)
+  schedule     Json    @default("[]")
+  category     String  @default("市場")
+  storeCode    String  @default("MILI001")
+}
+
+model Inventory {
+  batchId     String    @id @default(uuid())
+  productId   String
+  quantity    Int
+  expiryDate  DateTime?
+  entryDate   DateTime  @default(now())
+  type        String
+  cost        Decimal   @default(0)
+  productName String?
+  product     Product   @relation(fields: [productId], references: [productId])
+  storeCode   String    @default("MILI001")
+}
+
+model InventorySnapshot {
+  id           String @id @default(uuid())
+  productId    String
+  storeCode    String @default("MILI001")
+  onHandQty    Int    @default(0)
+  reservedQty  Int    @default(0)
+  availableQty Int    @default(0)
+
+  @@unique([productId, storeCode])
+}
+
+model InventoryMovement {
+  id        String   @id @default(uuid())
+  productId String
+  storeCode String   @default("MILI001")
+  type      String   // PURCHASE, SALE, RETURN, ADJUSTMENT, TRANSFER, VOID_SALE
+  qty       Int      // 正數: 增加, 負數: 減少
+  refId     String?
+  operator  String?
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([productId, storeCode])
+  @@index([createdAt])
+}
+
+model Purchase {
+  purchaseId    String    @id
+  date          DateTime
+  vendor        String?
+  productId     String
+  quantity      Int
+  unitPrice     Decimal
+  expiryDate    DateTime?
+  buyer         String?
+  paymentMethod String?
+  status        String    @default("ORDERED")
+  operator      String
+  productName   String?
+  storeCode     String    @default("MILI001")
+
+  @@index([date])
+}
+
+model Sales {
+  saleId              String        @id
+  date                DateTime
+  salesRep            String
+  totalCash           Decimal       @default(0)
+  reserve             Decimal       @default(0)
+  finalTotal          Decimal       @default(0)
+  customer            String?
+  operator            String
+  paymentMethod       String?
+  status              String        @default("COMPLETED")
+  workHours           Decimal       @default(0)
+  paymentDate         DateTime?
+  actualPaymentMethod String?
+  cashCounts          Json?
+  
+  // Phase 0 POS Extensions
+  saleType            String        @default("WHOLESALE") // WHOLESALE, RETAIL, ONLINE
+  receiptNo           String?       @unique
+  subtotal            Decimal       @default(0)
+  discount            Decimal       @default(0)
+  tax                 Decimal       @default(0)
+  terminalId          String?
+  cashierId           String?
+  
+  details             SalesDetail[]
+  payments            SalePayment[]
+  storeCode           String        @default("MILI001")
+
+  @@index([date])
+}
+
+model SalesDetail {
+  id             String  @id @default(uuid())
+  saleId         String
+  productId      String
+  picked         Int     @default(0)
+  original       Int     @default(0)
+  returnQty      Int     @default(0)
+  sold           Int     @default(0)
+  unitPrice      Decimal
+  subtotal       Decimal
+  
+  // Phase 0 POS Extensions
+  productName    String?
+  unitCost       Decimal @default(0)
+  discountAmount Decimal @default(0)
+  taxAmount      Decimal @default(0)
+
+  product Product @relation(fields: [productId], references: [productId])
+  sale    Sales   @relation(fields: [saleId], references: [saleId], onDelete: Cascade)
+  storeCode String @default("MILI001")
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+model SalePayment {
+  id             String   @id @default(uuid())
+  saleId         String
+  method         String   // CASH, CARD, LINE_PAY, JKOPAY, APPLE_PAY, BANK_TRANSFER, OTHER
+  amount         Decimal
+  receivedAmount Decimal  @default(0)
+  changeAmount   Decimal  @default(0)
+  transactionNo  String?
+  gateway        String?
+  approvalCode   String?
+  cardLast4      String?
+  createdAt      DateTime @default(now())
+  storeCode      String   @default("MILI001")
+  sale           Sales    @relation(fields: [saleId], references: [saleId], onDelete: Cascade)
+
+  @@index([saleId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  storeCode  String?  @default("MILI001")
+  terminalId String?
+  userId     String?
+  ip         String?
+  device     String?
+  action     String
+  entity     String
+  entityId   String?
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+
+  @@index([storeCode])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model Expenditure {
+  saleId             String    @id
+  stall              Decimal   @default(0)
+  cleaning           Decimal   @default(0)
+  electricity        Decimal   @default(0)
+  gas                Decimal   @default(0)
+  parking            Decimal   @default(0)
+  goods              Decimal   @default(0)
+  bags               Decimal   @default(0)
+  others             Decimal   @default(0)
+  linePay            Decimal   @default(0)
+  serviceFee         Decimal   @default(0)
+  totalDeductions    Decimal   @default(0)
+  customer           String?
+  salesRep           String?
+  timestamp          DateTime  @default(now())
+  vehicleMaintenance Decimal   @default(0)
+  salary             Decimal   @default(0)
+  reserve            Decimal   @default(0)
+  note               String?
+  paymentMethod      String?
+  paymentDate        DateTime?
+  storeCode          String    @default("MILI001")
+
+  @@index([timestamp])
+}
+
+model PayrollSetting {
+  username        String  @id
+  baseSalary      Decimal @default(0)
+  attendanceBonus Decimal @default(0)
+  insurance       Decimal @default(0)
+  offDaysStandard Int     @default(8)
+  bonusTiersJson  Json    @default("[]")
+  empType         String  @default("FULL_TIME")
+  hourlyWage      Decimal @default(0)
+  commissionRate  Decimal @default(0)
+  storeCode       String  @default("MILI001")
+}
+
+model DailyRecord {
+  id        String   @id @default(uuid())
+  date      DateTime
+  username  String
+  type      String
+  value     Decimal  @default(0)
+  note      String?
+  timestamp DateTime @default(now())
+  storeCode String   @default("MILI001")
+}
+
+model EmployeeProfile {
+  username   String  @id
+  joinedDate String?
+  birthday   String?
+  identityId String?
+  contact    String?
+  note       String?
+  storeCode  String  @default("MILI001")
+}
+
+model GroupBuyCommunity {
+  communityId           String                  @id
+  communityCode         String                  @unique
+  communityName         String
+  communityType         String?
+  orderingMode          String?
+  serviceArea           String?
+  isDefault             Boolean                 @default(false)
+  icon                  String?
+  contactPerson         String?
+  contactPhone          String?
+  openMessage           String?
+  closeMessage          String?
+  defaultDeliveryTime   String?
+  defaultFreeShipping   Boolean                 @default(false)
+  freeShippingMin       Decimal                 @default(0)
+  shippingFee           Decimal                 @default(0)
+  defaultPaymentMethods Json                    @default("[]")
+  defaultRoute          String?
+  deliveryInstruction   String?
+  status                String                  @default("ACTIVE")
+  notes                 String?
+  createdBy             String?
+  updatedBy             String?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  deletedAt             DateTime?
+  customPrices          CommunityProductPrice[]
+  promotions            Promotion[]
+  storeCode             String                  @default("MILI001")
+}
+
+model GroupBuyOrder {
+  orderId              String                   @id
+  status               String                   @default("PENDING")
+  customerLineId       String?
+  customerName         String?
+  customerPhone        String?
+  deliveryAddress      String?
+  sourceGroup          String?
+  note                 String?
+  totalAmount          Decimal                  @default(0)
+  shippingFee          Decimal                  @default(0)
+  paymentMethod        String?
+  transferLastFive     String?
+  paymentStatus        String?
+  lineDisplayName      String?
+  source               String?                  @default("NORMAL")
+  confirmedAt          DateTime?
+  confirmedBy          String?
+  expectedDeliveryDate String?
+  rewardDiscountAmount Decimal                  @default(0)
+  rewardTierThreshold  Decimal                  @default(0)
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  details              GroupBuyOrderDetail[]
+  recipients           GroupBuyOrderRecipient[]
+  storeCode            String                   @default("MILI001")
+}
+
+model GroupBuyOrderDetail {
+  id          String        @id @default(uuid())
+  orderId     String
+  productId   String?
+  productName String?
+  unitPrice   Decimal       @default(0)
+  qty         Int           @default(0)
+  subtotal    Decimal       @default(0)
+  remark      String?
+  expiryDate  String?
+  order       GroupBuyOrder @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  storeCode   String        @default("MILI001")
+}
+
+model GroupBuyOrderRecipient {
+  recipientId   String                       @id @default(uuid())
+  orderId       String
+  recipientName String
+  note          String?
+  createdAt     DateTime                     @default(now())
+  order         GroupBuyOrder                @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  items         GroupBuyOrderRecipientItem[]
+
+  @@index([orderId])
+  storeCode     String                       @default("MILI001")
+}
+
+model GroupBuyOrderRecipientItem {
+  id          String                 @id @default(uuid())
+  recipientId String
+  productId   String
+  productName String
+  qty         Int
+  price       Int
+  subtotal    Int?                   @default(0)
+  remark      String?
+  expiryDate  String?
+  recipient   GroupBuyOrderRecipient @relation(fields: [recipientId], references: [recipientId], onDelete: Cascade)
+
+  @@index([recipientId])
+  storeCode   String                 @default("MILI001")
+}
+
+model GroupBuyCampaign {
+  campaignId         String    @id
+  communityId        String
+  campaignName       String
+  campaignType       String?
+  campaignStatus     String    @default("DRAFT")
+  version            Int       @default(1)
+  allowReorder       Boolean   @default(true)
+  themeColor         String?
+  displayOrder       Int       @default(0)
+  priority           Int       @default(0)
+  publishedAt        DateTime?
+  startTime          DateTime?
+  endTime            DateTime?
+  deliveryDate       DateTime?
+  deliveryStartTime  String?
+  deliveryEndTime    String?
+  systemAnnouncement String?
+  groupAnnouncement  String?
+  createdBy          String?
+  updatedBy          String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  storeCode          String    @default("MILI001")
+}
+
+model GroupBuyAuditLog {
+  logId     String   @id @default(uuid())
+  module    String
+  action    String
+  targetId  String?
+  fieldName String?
+  oldValue  String?
+  newValue  String?
+  operator  String
+  ipAddress String?
+  device    String?
+  createdAt DateTime @default(now())
+  storeCode String   @default("MILI001")
+}
+
+model GroupBuyOrderStatusHistory {
+  historyId String   @id @default(uuid())
+  orderId   String
+  status    String
+  remark    String?
+  operator  String
+  createdAt DateTime @default(now())
+  storeCode String   @default("MILI001")
+}
+
+model GroupBuyNotification {
+  notificationId String   @id @default(uuid())
+  orderId        String
+  memberId       String?
+  type           String
+  line           Boolean  @default(false)
+  email          Boolean  @default(false)
+  push           Boolean  @default(false)
+  content        String
+  status         String   @default("PENDING")
+  createdAt      DateTime @default(now())
+  storeCode      String   @default("MILI001")
+}
+
+model GroupBuySystemSetting {
+  settingKey   String @id
+  settingValue String
+  storeCode    String @default("MILI001")
+}
+
+model Vendor {
+  vendorName    String  
+  paymentMethod String  @default("CASH")
+  lineGroupId   String?
+  orderDays     String?
+  deliveryDays  String?
+  isActive      Boolean @default(true)
+  sortWeight    Int     @default(0)
+  @@id([vendorName, storeCode])
+  storeCode     String  @default("MILI001")
+}
+
+model ActivityLog {
+  id               String   @id @default(uuid())
+  timestamp        DateTime @default(now())
+  username         String
+  actionType       String
+  page             String?
+  details          String?
+  userAgent        String?
+  screenResolution String?
+  ipAddress        String?
+  storeCode        String   @default("MILI001")
+}
+
+model Stocktake {
+  id             String   @id @default(uuid())
+  date           DateTime @default(now())
+  productId      String
+  productName    String
+  bookQty        Int
+  physicalQty    Int
+  diff           Int
+  reason         String?
+  accountability String?
+  operator       String
+  storeCode      String   @default("MILI001")
+}
+
+model InventoryAdjustment {
+  id          String   @id @default(uuid())
+  date        DateTime @default(now())
+  productId   String
+  productName String
+  type        String
+  quantity    Int
+  operator    String
+  note        String?
+  storeCode   String   @default("MILI001")
+}
+
+model BuildingSetting {
+  building          String   @id
+  startTime         String?
+  endTime           String?
+  sortOrder         Int      @default(0)
+  adminNote         String?
+  promotionTemplate String?
+  updatedAt         DateTime @updatedAt
+  storeCode         String   @default("MILI001")
+}
+
+model GroupBinding {
+  groupId   String   @id
+  groupName String
+  updatedAt DateTime @updatedAt
+  storeCode String   @default("MILI001")
+}
+
+model Member {
+  memberId      String
+  displayName   String?
+  pictureUrl    String?
+  receiverName  String?
+  phone         String?
+  walletBalance          Decimal             @default(0)
+  redeemableSpendBalance Decimal             @default(0)
+  totalLifetimeSpend     Decimal             @default(0)
+  memberLevel            String              @default("General")
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  transactions           WalletTransaction[]
+  storeCode              String              @default("MILI001")
+
+  @@id([memberId, storeCode])
+}
+
+model WalletTransaction {
+  transactionId String   @id @default(uuid())
+  memberId      String
+  amount        Decimal
+  type          String
+  description   String?
+  createdAt     DateTime @default(now())
+  storeCode     String   @default("MILI001")
+  member        Member   @relation(fields: [memberId, storeCode], references: [memberId, storeCode], onDelete: Cascade)
+}
+
+model Subscription {
+  subscriptionId String   @id @default(uuid())
+  building       String
+  customerName   String
+  phone          String?
+  productId      String
+  productName    String
+  quantity       Int
+  frequency      String
+  paymentMethod  String   @default("奶包金")
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  note           String?
+  storeCode      String   @default("MILI001")
+}
+
+model CommunityProductPrice {
+  communityId String
+  productId   String
+  customPrice Decimal
+  promotions  Json?
+  promoId     String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  community   GroupBuyCommunity @relation(fields: [communityId], references: [communityId], onDelete: Cascade)
+  product     Product           @relation(fields: [productId], references: [productId], onDelete: Cascade)
+  promotion   Promotion?        @relation(fields: [promoId], references: [promoId], onDelete: SetNull)
+
+  @@id([communityId, productId])
+  storeCode   String            @default("MILI001")
+}
+
+model Promotion {
+  promoId             String   @id @default(uuid())
+  name                String
+  promoType           String   @default("BUY_X_GET_Y")
+  buyQty              Int      @default(0)
+  freeQty             Int      @default(0)
+  bundlePrice         Decimal?
+  isActive            Boolean  @default(true)
+  communityId         String?
+  rewardSelectionMode String   @default("AUTO_LOWEST_PRICE")
+  tiers               Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  community GroupBuyCommunity?      @relation(fields: [communityId], references: [communityId], onDelete: Cascade)
+  prices    CommunityProductPrice[]
+  storeCode String                  @default("MILI001")
+}
+
+model RewardConfig {
+  storeCode     String   @id @default("MILI001")
+  mode          String   @default("OFF")
+  testUserIds   String[] @default([])
+  headerImage   String?
+  tierRulesJson String   @default("[{\"spendMin\":5000,\"discount\":150},{\"spendMin\":10000,\"discount\":350},{\"spendMin\":15000,\"discount\":600}]")
+  updatedAt     DateTime @updatedAt
+}
+
+model StoreSetting {
+  id        String @id @default(uuid())
+  storeCode String @unique
+  status    String @default("active")
+
+  name           String
+  logoUrl        String?
+  primaryColor   String?
+  secondaryColor String?
+
+  phone   String?
+  address String?
+
+  lineOA  String?
+  linePay String?
+  liffId  String?
+
+  businessHours String?
+  timezone      String?
+  language      String?
+  currency      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

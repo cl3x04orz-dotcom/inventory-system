@@ -1,0 +1,123 @@
+import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
+export const getBackendUrl = (path = '') => {
+    let base = '';
+    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.startsWith('192.168.'))) {
+        base = '';
+    } else {
+        base = 'https://inventory-system-j6rs.onrender.com';
+    }
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${base}${cleanPath}`;
+};
+
+/**
+ * Unified Backend API Client
+ */
+export const callApi = async (apiUrl, action, payload, token = null, customTimeoutMs = null) => {
+    try {
+        let targetUrl = apiUrl || (typeof window !== 'undefined' && window.GAS_API_URL) || import.meta.env.VITE_GAS_API_URL;
+        if (!targetUrl || targetUrl.includes('github.io') || targetUrl.includes('script.google.com')) {
+            targetUrl = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.startsWith('192.168.')))
+                ? '/api'
+                : 'https://inventory-system-j6rs.onrender.com/api';
+        } else if (targetUrl === 'api' || targetUrl === '/api') {
+            targetUrl = '/api';
+        }
+
+        const isLongRunningAction = action === 'generatePdf' || action === 'getSmartPickSuggestion' || action === 'getSalesByDateRange' || action === 'importHistoryData';
+        const timeoutDuration = customTimeoutMs || (isLongRunningAction ? 180000 : 60000);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
+
+        const response = await fetch(targetUrl, {
+            method: 'POST',
+            redirect: 'follow', // GAS requirement
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json, text/plain, */*',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                action,
+                payload,
+                token
+            }),
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        // 檢查 Token 是否過期 (精確比對，避免 Forbidden 被誤判)
+        const isTokenExpired = data.error === 'TokenExpired' || data.error === 'Unauthorized' || data.error === 'Unauthorized: No valid token provided';
+        if (data.error && isTokenExpired) {
+            // 如果當前動作不是 renewToken，則嘗試自動續約並重試
+            if (action !== 'renewToken' && token) {
+                console.warn(`[API] Token 過期，嘗試自動續約: ${action}`);
+                try {
+                    const renewRes = await callGAS(apiUrl, 'renewToken', {}, token);
+                    if (renewRes && renewRes.success && renewRes.token) {
+                        console.log('[API] 自動續約成功，重試原始請求');
+                        
+                        // 更新本地存儲的 token (給下次其他請求用)
+                        const savedUser = safeSessionStorage.getItem('inventory_user');
+                        if (savedUser) {
+                            const userData = JSON.parse(savedUser);
+                            userData.token = renewRes.token;
+                            safeSessionStorage.setItem('inventory_user', JSON.stringify(userData));
+                            
+                            // 這裡我們發出一個事件，讓 App.jsx 知道要更新 state 中的 user
+                            window.dispatchEvent(new CustomEvent('token_renewed', { detail: userData }));
+                        }
+
+                        // 使用新 Token 重試原始請求
+                        return await callGAS(apiUrl, action, payload, renewRes.token, customTimeoutMs);
+                    }
+                } catch (renewError) {
+                    console.error('[API] 自動續約失敗:', renewError);
+                }
+            }
+            
+            // 如果續約失敗或沒提供 token，才丟出事件讓 App.jsx 跳出登入頁
+            window.dispatchEvent(new CustomEvent('auth_expired'));
+            throw new Error(data.error);
+        }
+
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        return data;
+    } catch (error) {
+        // ... (保持原有錯誤處理)
+        console.error(`API Error [${action}]:`, error);
+
+        if (error.name === 'AbortError') {
+            throw new Error('處理時間超過了瀏覽器連線上限（超時）。由於 Google 雲端處理合併列印較耗時，系統已自動放寬等待時間，若仍超時建議分段列印或檢查網路狀態。');
+        }
+
+        if (error.message.includes('Load failed') || error.message.includes('Failed to fetch')) {
+            throw new Error('連線失敗。請確認 GAS 已部署為「Anyone」且網址正確，並檢查瀏覽器是否阻擋了 CORS 請求。');
+        }
+
+        throw error;
+    }
+};
+
+// 米立微會員中心 V1 - API Helpers
+export const memberApi = {
+    getMember: (apiUrl, payload) => callApi(apiUrl, 'v1_getMember', payload),
+    saveMember: (apiUrl, payload) => callApi(apiUrl, 'v1_saveMember', payload),
+    getOrders: (apiUrl, payload) => callApi(apiUrl, 'v1_getOrders', payload),
+    reorder: (apiUrl, payload) => callApi(apiUrl, 'v1_reorder', payload),
+};
+
+// 相容性別名層 (100% 保障舊程式碼呼叫)
+export const callGAS = callApi;
+export const apiCall = (action, payload, token, customTimeoutMs) => callApi(null, action, payload, token, customTimeoutMs);

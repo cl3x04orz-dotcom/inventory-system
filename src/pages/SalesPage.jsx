@@ -1,0 +1,2326 @@
+import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
+import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { Save, RefreshCw, Calculator, DollarSign, GripVertical, ListOrdered, Printer, ChevronUp, ChevronDown, FileText, Settings } from 'lucide-react';
+
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { callGAS } from '../utils/api';
+import { sortProducts } from '../utils/constants';
+import { evaluateFormula } from '../utils/mathUtils';
+import MergePrintModal from '../components/MergePrintModal';
+import HistoryImportModal from '../components/HistoryImportModal';
+import ProductSortModal from '../components/ProductSortModal';
+import PrintTemplateConfigModal from '../components/PrintTemplateConfigModal';
+import { printNativeSpreadsheetHtml } from '../utils/printHelper';
+import PrintTemplate from './PrintTemplate';
+
+const getSafeNum = (v) => {
+    if (typeof v === 'string' && v.trim().startsWith('=')) return 0;
+    const n = Number(v);
+    return isNaN(n) ? 0 : n;
+};
+
+export default function SalesPage({ user, apiUrl, logActivity }) {
+    const [rows, setRows] = useState([]);
+    const [cashCounts, setCashCounts] = useState({ 1000: 0, 500: 0, 100: 0, 50: 0, 10: 0, 5: 0, 1: 0 });
+    // Initialize reserve with 5000 for Cash default
+    const [reserve, setReserve] = useState(5000);
+    const [expenses, setExpenses] = useState({
+        stall: 0, cleaning: 0, electricity: 0, gas: 0, gasRemark: '',
+        parking: 0, parkingRemark: '',
+        goods: 0, goodsVendor: '',
+        bags: 0, others: 0, othersRemark: '',
+        linePay: 0, serviceFee: 0,
+        salary: 0, salaryRemark: '',
+        reserveFund: 0, reserveFundRemark: '',
+        vehicleMaintenance: 0, vehicleMaintenanceRemark: ''
+    });
+    const [activeExpenseKey, setActiveExpenseKey] = useState(null); // tracking which expense triggered the modal
+    const [showVendorModal, setShowVendorModal] = useState(false);
+
+    // [New] 支出欄位順序定義 (用於導航與自動跳轉)
+    const EXPENSE_CATEGORIES = [
+        { key: 'stall', label: '攤位' },
+        { key: 'cleaning', label: '清潔' },
+        { key: 'electricity', label: '電費' },
+        { key: 'gas', label: '加油' },
+        { key: 'parking', label: '停車' },
+        { key: 'goods', label: '貨款' },
+        { key: 'bags', label: '塑膠袋' },
+        { key: 'others', label: '其他' },
+        { key: 'salary', label: '薪資發放' },
+        { key: 'reserveFund', label: '公積金' },
+        { key: 'vehicleMaintenance', label: '車輛保養' },
+        { key: 'linePay', label: 'Line Pay (收款)' },
+        { key: 'serviceFee', label: '服務費 (扣除)' }
+    ];
+
+    const closeRemarkModal = () => {
+        const currentKey = activeExpenseKey;
+        setShowVendorModal(false);
+        setActiveExpenseKey(null);
+
+        // 自動跳轉到下一個欄位
+        if (currentKey) {
+            const currentIndex = EXPENSE_CATEGORIES.findIndex(c => c.key === currentKey);
+            if (currentIndex !== -1 && currentIndex < EXPENSE_CATEGORIES.length - 1) {
+                const nextKey = EXPENSE_CATEGORIES[currentIndex + 1].key;
+                setTimeout(() => {
+                    const nextInput = document.getElementById(`input-expense-${nextKey}`);
+                    if (nextInput) {
+                        nextInput.focus();
+                        if (nextInput.select) nextInput.select();
+                    }
+                }, 50);
+            } else if (currentIndex === EXPENSE_CATEGORIES.length - 1) {
+                // 最後一個則跳到儲存按鈕
+                setTimeout(() => document.getElementById('btn-save-data')?.focus(), 50);
+            }
+        }
+    };
+    const [location, setLocation] = useState(''); // This will be used as "Sales Target"
+    const [targetSalesRep, setTargetSalesRep] = useState(''); // [New] 業績歸屬業務員 (修正時保留原始人名)
+    const [paymentType, setPaymentType] = useState('CASH');
+    const [originalDate, setOriginalDate] = useState(null); // [New] 保留原始單據日期
+    const [originalSaleId, setOriginalSaleId] = useState(null); // [New] 保留原始單據 ID 用於備註
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [workHours, setWorkHours] = useState(''); // [New] 工讀生工時輸入
+    const [isPartTime, setIsPartTime] = useState(false); // [New] 是否為工讀生
+    const [weather, setWeather] = useState('SUNNY'); // [New] 今日天氣狀況
+    // [New] 防止重複提交的 ID
+    const [submissionId, setSubmissionId] = useState(() => `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+
+    const [isPrinting, setIsPrinting] = useState(false);
+    const [isSorting, setIsSorting] = useState(false);
+    const [availableUsers, setAvailableUsers] = useState([]); // [New] 所有可用業務員清單
+    const [activeInput, setActiveInput] = useState(null); // { id: string, type: 'row'|'cash'|'expense', field?: string, denom?: number, key?: string }
+
+    // Today Records States (for merge printing)
+    const [showMergeModal, setShowMergeModal] = useState(false);
+    const [mergeRecords, setMergeRecords] = useState([]);
+    const [mergeStartDate, setMergeStartDate] = useState(new Date().toISOString().split('T')[0]);
+    const [mergeEndDate, setMergeEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedSaleIds, setSelectedSaleIds] = useState([]);
+    const [isMergePrinting, setIsMergePrinting] = useState(false);
+    const [isMergeSearchLoading, setIsMergeSearchLoading] = useState(false);
+    const [allAvailableProducts, setAllAvailableProducts] = useState([]); // All sorted products for merge print reference
+    const [systemCustomers, setSystemCustomers] = useState([]); // [New] 全系統客戶名單快取
+
+    // [New] History Import States
+    const [showHistoryImportModal, setShowHistoryImportModal] = useState(false);
+    const [historyImportStartDate, setHistoryImportStartDate] = useState(() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 1); // Default to yesterday
+        return d.toISOString().split('T')[0];
+    });
+    const [historyImportEndDate, setHistoryImportEndDate] = useState(() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 1); // Default to yesterday
+        return d.toISOString().split('T')[0];
+    });
+    const [historyImportRecords, setHistoryImportRecords] = useState([]);
+    const [selectedImportIds, setSelectedImportIds] = useState([]);
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
+    // [New] Product Sort Modal State
+    const [showSortModal, setShowSortModal] = useState(false);
+    const [isProductSortOpen, setIsProductSortOpen] = useState(false);
+    const [isPrintConfigOpen, setIsPrintConfigOpen] = useState(false);
+    const [isSavingSortOrder, setIsSavingSortOrder] = useState(false);
+
+    const handleSaveSortOrder = async (productIds) => {
+        setIsSavingSortOrder(true);
+        try {
+            const res = await callGAS(apiUrl, 'updateProductSortOrder', { productIds }, user.token);
+            if (res.success) {
+                const weightMap = {};
+                productIds.forEach((id, idx) => {
+                    weightMap[id] = (idx + 1) * 10;
+                });
+
+                setAllAvailableProducts(prev => {
+                    const updated = prev.map(p => ({
+                        ...p,
+                        sortWeight: weightMap[p.id] !== undefined ? weightMap[p.id] : (p.sortWeight || 0)
+                    }));
+                    return sortProducts(updated, 'name');
+                });
+
+                setRows(prevRows => {
+                    const updated = prevRows.map(r => ({
+                        ...r,
+                        sortWeight: weightMap[r.id] !== undefined ? weightMap[r.id] : (r.sortWeight || 0)
+                    }));
+                    return sortProducts(updated, 'name');
+                });
+
+                setShowSortModal(false);
+                alert('商品順序已成功儲存！');
+            } else {
+                alert('排序儲存失敗：' + (res.error || '未知錯誤'));
+            }
+        } catch (error) {
+            console.error('Failed to sync sort order:', error);
+            alert('排序儲存失敗：' + error.message);
+        } finally {
+            setIsSavingSortOrder(false);
+        }
+    };
+
+
+
+
+    // [New] Input Mode State for exclusive highlighting
+    const [inputMode, setInputMode] = useState('mouse'); // 'mouse' | 'keyboard'
+    const mousePos = React.useRef({ x: 0, y: 0 });
+
+    // [Fix] Modal scroll lock to prevent background scrolling
+    useEffect(() => {
+        if (showVendorModal || showMergeModal || showHistoryImportModal) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [showVendorModal, showMergeModal, showHistoryImportModal]);
+
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            // Calculate distance to filter out micro-movements or browser-synthesized events
+            const dx = Math.abs(e.clientX - mousePos.current.x);
+            const dy = Math.abs(e.clientY - mousePos.current.y);
+
+            // Only switch to mouse mode if moved significantly (> 5px)
+            if (dx > 5 || dy > 5) {
+                mousePos.current = { x: e.clientX, y: e.clientY };
+                if (inputMode !== 'mouse') setInputMode('mouse');
+            }
+        };
+        const handleKeyDown = () => {
+            if (inputMode !== 'keyboard') setInputMode('keyboard');
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [inputMode]);
+
+    // [New] Auto-scroll to center when active input changes
+    useEffect(() => {
+        if (activeInput?.id) {
+            const el = document.getElementById(activeInput.id);
+            if (el) {
+                // Scroll to center with smooth behavior
+                el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
+        }
+    }, [activeInput]);
+
+    // [Modified] Removed useEffect for paymentType to prevent overwriting cloned data. 
+    // Logic moved to manual toggle handlers.
+
+    // ... (load function remains here)
+
+    // ...
+
+    {/* Toggle on Left */ }
+    <div className="flex bg-[var(--bg-tertiary)] rounded-lg p-1 border border-[var(--border-primary)] self-start md:self-auto">
+        <button
+            onClick={() => {
+                setPaymentType('CASH');
+                setReserve(5000); // Manual reset
+            }}
+            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${paymentType === 'CASH'
+                ? 'bg-emerald-500 text-white shadow-sm'
+                : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                }`}
+        >
+            現金
+        </button>
+        <button
+            onClick={() => {
+                setPaymentType('CREDIT');
+                setReserve(0); // Manual reset
+            }}
+            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${paymentType === 'CREDIT'
+                ? 'bg-amber-500 text-white shadow-sm'
+                : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                }`}
+        >
+            賒銷
+        </button>
+    </div>
+
+
+    useEffect(() => {
+        const init = async () => {
+            if (!user?.token) return;
+            try {
+                // Determine if we are in correction/clone mode
+                const clonedRaw = safeSessionStorage.getItem('clonedSale');
+                const isCorrectionMode = !!clonedRaw;
+                if (isCorrectionMode) {
+                    setIsSubmitting(true);
+                }
+                
+                const targetUser = targetSalesRep || user.username;
+                
+                // --- Helper: Apply Data to State (Smart Merge) ---
+                const applyDataToState = (data, isBackgroundSync = false) => {
+                    const { products, systemCustomers, empType, usersList } = data;
+                    
+                    // [Fix] 將 Cloned 狀態的載入移出 setRows 內部，避免在 setState 內部調用其他 setState 造成的 React 狀態丟失
+                    if (clonedRaw && !isBackgroundSync) {
+                        try {
+                            const cloned = JSON.parse(clonedRaw);
+                            // cashCounts 復原邏輯：若 DB 有存面額資料則 100% 忠實帶入，不介入修改；若完全無面額資料才用 totalCash 貪婪分配做 fallback
+                            const hasCashCountData = cloned.cashCounts && Object.values(cloned.cashCounts).some(v => Number(v) > 0);
+                            if (hasCashCountData) {
+                                setCashCounts(prev => ({ 1000: 0, 500: 0, 100: 0, 50: 0, 10: 0, 5: 0, 1: 0, ...cloned.cashCounts }));
+                            } else if (cloned.totalCash > 0) {
+                                const totalWithReserve = Number(cloned.totalCash) + Number(cloned.reserve || 0);
+                                let remainder = Math.round(totalWithReserve);
+                                const thousands = Math.floor(remainder / 1000); remainder %= 1000;
+                                const fiveHundreds = Math.floor(remainder / 500); remainder %= 500;
+                                const hundreds = Math.floor(remainder / 100); remainder %= 100;
+                                const fifties = Math.floor(remainder / 50); remainder %= 50;
+                                const tens = Math.floor(remainder / 10); remainder %= 10;
+                                const fives = Math.floor(remainder / 5); remainder %= 5;
+                                const ones = remainder;
+                                setCashCounts({ 1000: thousands, 500: fiveHundreds, 100: hundreds, 50: fifties, 10: tens, 5: fives, 1: ones });
+                            }
+                            if (cloned.customer) setLocation(cloned.customer);
+                            if (cloned.salesRep) setTargetSalesRep(cloned.salesRep);
+                            if (cloned.paymentMethod) setPaymentType(cloned.paymentMethod);
+                            if (cloned.reserve !== undefined) setReserve(Number(cloned.reserve));
+                            if (cloned.expenses) setExpenses(prev => ({ ...prev, ...cloned.expenses }));
+                            if (cloned.originalDate) setOriginalDate(cloned.originalDate);
+                            if (cloned.originalSaleId) setOriginalSaleId(cloned.originalSaleId);
+                            if (cloned.workHours) setWorkHours(cloned.workHours);
+                        } catch (e) {
+                            console.error('Failed to parse cloned data', e);
+                        }
+                    }
+                    
+                    // 1. Process Products
+                    if (Array.isArray(products)) {
+                        // [Fix] 修正模式下，必須包含舊單中已選購的商品，即使該商品目前庫存為 0，否則會帶不進來！
+                        let clonedProductIds = new Set();
+                        if (clonedRaw) {
+                            try {
+                                const cloned = JSON.parse(clonedRaw);
+                                if (Array.isArray(cloned.salesData)) {
+                                    cloned.salesData.forEach(d => clonedProductIds.add(String(d.productId)));
+                                }
+                            } catch (e) {
+                                console.error('Failed to parse cloned salesData for filter', e);
+                            }
+                        }
+
+                        const content = products.filter(p => 
+                            (Number(p.stock) || 0) > 0 || 
+                            (Number(p.originalStock) || 0) > 0 ||
+                            clonedProductIds.has(String(p.id))
+                        );
+                        const sortedProducts = sortProducts(content, 'name');
+                        setAllAvailableProducts(sortProducts(products, 'name'));
+                        
+                        setRows(prevRows => {
+                            // Helper to initialize a clean row
+                            const createInitRow = (p) => {
+                                const localPriceKey = `last_price_${p.id}`;
+                                const localPrice = safeLocalStorage.getItem(localPriceKey);
+                                const pos = p.posSettings || {};
+                                // 嚴格判定：僅當 pos.isBundle 或 p.isBundle 明確為 true 時才視為捆裝
+                                const isBundle = pos.isBundle !== undefined ? Boolean(pos.isBundle) : Boolean(p.isBundle);
+                                const bundleSize = isBundle ? Number(pos.bundleSize !== undefined && pos.bundleSize !== null ? pos.bundleSize : (p.bundleSize || 1)) : 1;
+
+                                let rawCatalogPrice = Number(pos.price || p.singlePrice || p.single_price || p.price || p.defaultPrice || 0);
+                                let defaultSinglePrice = (isBundle && bundleSize > 1) ? (rawCatalogPrice / bundleSize) : rawCatalogPrice;
+                                defaultSinglePrice = Math.round(defaultSinglePrice * 100) / 100;
+
+                                let finalPrice = localPrice !== null && localPrice !== '' ? Number(localPrice) : defaultSinglePrice;
+
+                                return {
+                                    id: p.id,
+                                    name: p.name,
+                                    stock: Number(p.stock) || 0,
+                                    originalStock: Number(p.originalStock) || 0,
+                                    picked: 0,
+                                    original: 0,
+                                    returns: 0,
+                                    sold: 0,
+                                    price: finalPrice,
+                                    subtotal: 0,
+                                    sortWeight: p.sortWeight,
+                                    fromSheet: p._fromSheet,
+                                    isBundle,
+                                    bundleSize,
+                                    catalogPrice: rawCatalogPrice
+                                };
+                            };
+
+                            let newRows = [];
+                            
+                            // If user already has rows, perform SMART MERGE (Update stock only, keep inputs)
+                            if (prevRows.length > 0) {
+                                const existingMap = {};
+                                prevRows.forEach(r => existingMap[r.id] = r);
+                                
+                                newRows = sortedProducts.map(p => {
+                                    const existing = existingMap[p.id];
+                                    if (existing) {
+                                        const pos = p.posSettings || {};
+                                        const isBundle = pos.isBundle !== undefined ? Boolean(pos.isBundle) : Boolean(p.isBundle);
+                                        const bundleSize = isBundle ? Number(pos.bundleSize !== undefined && pos.bundleSize !== null ? pos.bundleSize : (p.bundleSize || 1)) : 1;
+                                        let rawCatalogPrice = Number(pos.price || p.singlePrice || p.single_price || p.price || p.defaultPrice || 0);
+
+                                        // Keep user inputs (picked, original, returns, price, subtotal), update inventory (stock, name)
+                                        return {
+                                            ...existing,
+                                            name: p.name,
+                                            stock: Number(p.stock) || 0,
+                                            originalStock: Number(p.originalStock) || 0,
+                                            sortWeight: p.sortWeight,
+                                            fromSheet: p._fromSheet,
+                                            isBundle,
+                                            bundleSize,
+                                            catalogPrice: rawCatalogPrice
+                                        };
+                                    } else {
+                                        return createInitRow(p);
+                                    }
+                                });
+                            } else {
+                                // First time initialization
+                                newRows = sortedProducts.map(p => createInitRow(p));
+                            }
+
+                            // [Fix] 只要 clonedRaw 存在，不論是否為初次初始化，皆確保舊單數據正確寫入（覆蓋）對應商品，避免因為 React StrictMode 重複觸發或 SMART MERGE 重置導致金額遺失！
+                            if (clonedRaw) {
+                                try {
+                                    const cloned = JSON.parse(clonedRaw);
+                                    newRows = newRows.map(row => {
+                                        const match = cloned.salesData.find(d => String(d.productId) === String(row.id));
+                                        if (match) {
+                                            const isBundle = Boolean(row.isBundle);
+                                            const bundleSize = isBundle ? Number(row.bundleSize || 1) : 1;
+                                            let rawPrice = Number(match.unitPrice || 0);
+                                            let loadUnitPrice = rawPrice;
+
+                                            // 🔑 修正全單相容性：若舊單數據為整組價格 ($100)，自動轉為單件單價 ($100 / 6 = 16.6667)，防止 6 * 100 = 600
+                                            if (match.picked > 1 && match.subtotal > 0 && (rawPrice * match.picked > Number(match.subtotal) * 1.2)) {
+                                                loadUnitPrice = Number(match.subtotal) / match.picked;
+                                            } else if (isBundle && bundleSize > 1) {
+                                                const catalogPackagePrice = Number(row.catalogPrice || row.price || 0);
+                                                const threshold = catalogPackagePrice > 0 ? (catalogPackagePrice / 1.5) : 30;
+                                                if (rawPrice >= threshold) {
+                                                    loadUnitPrice = rawPrice / bundleSize;
+                                                }
+                                            }
+
+                                            loadUnitPrice = Math.round(loadUnitPrice * 10000) / 10000;
+
+                                            const updated = {
+                                                ...row,
+                                                picked: match.picked,
+                                                original: match.original,
+                                                returns: match.returns,
+                                                price: loadUnitPrice
+                                            };
+                                            updated.sold = getSafeNum(updated.picked) + getSafeNum(updated.original) - getSafeNum(updated.returns);
+                                            
+                                            // 核心全系統公式：100% 遵循【小計 = 數量 × 單價】，絕對不上進行任何模數或包裝價覆蓋！
+                                            updated.subtotal = Math.round(updated.sold * getSafeNum(updated.price) * 100) / 100;
+
+                                            return updated;
+                                        }
+                                        return row;
+                                    });
+                                } catch (e) {
+                                    console.error('Failed to parse cloned salesData', e);
+                                }
+                            }
+                            return newRows;
+                        });
+                    }
+                    
+                    // 2. Process Customers
+                    if (Array.isArray(systemCustomers)) {
+                        setSystemCustomers(systemCustomers);
+                    }
+                    
+                    // 3. Process Emp Type
+                    if (empType && !isBackgroundSync) {
+                        setIsPartTime(empType === 'PART_TIME');
+                    }
+                    
+                    // 4. Process Users List
+                    if (isCorrectionMode && Array.isArray(usersList)) {
+                        setAvailableUsers(usersList);
+                    }
+                };
+                
+                // --- SWR: Phase 1 (Instant Load from LocalStorage) ---
+                const CACHE_KEY = 'SALES_PAGE_CACHE';
+                const cachedDataRaw = safeLocalStorage.getItem(CACHE_KEY);
+                let hasLoadedFromCache = false;
+                if (cachedDataRaw && !isCorrectionMode) {
+                    try {
+                        const cachedData = JSON.parse(cachedDataRaw);
+                        if (cachedData && cachedData.products) {
+                            applyDataToState(cachedData, false);
+                            hasLoadedFromCache = true;
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse sales page cache', e);
+                    }
+                }
+                
+                // --- SWR: Phase 2 (Background Sync with Google) ---
+                // Fetch all data in ONE call
+                const res = await callGAS(apiUrl, 'initSalesPageData', {
+                    targetUser: targetUser,
+                    isCorrectionMode: isCorrectionMode
+                }, user.token);
+                
+                if (res && res.success && res.data) {
+                    if (res.benchmark) {
+                        console.log(`[SalesPage Init Benchmark] Total: ${res.benchmark.total}ms`, res.benchmark);
+                    }
+                    
+                    // Save to local cache for next time
+                    safeLocalStorage.setItem(CACHE_KEY, JSON.stringify(res.data));
+                    
+                    // Apply to state (as background sync)
+                    applyDataToState(res.data, hasLoadedFromCache);
+                    
+                } else {
+                    console.error('Failed to init data:', res);
+                    if (!hasLoadedFromCache) {
+                        alert('載入資料失敗: ' + (res?.error || 'Unknown error'));
+                    }
+                }
+            } catch (error) {
+                console.error("Init data failed", error);
+                alert('載入資料失敗: ' + error.message);
+            } finally {
+                setIsSubmitting(false);
+            }
+        };
+        init();
+    }, [apiUrl, user?.token, user?.username]);
+
+    // [New] Ensure targetSalesRep is initialized to the current user
+    useEffect(() => {
+        if (!targetSalesRep && user?.username) {
+            setTargetSalesRep(user.username);
+        }
+    }, [user, targetSalesRep]);
+
+    // [New] 當業績歸屬業務員變更時，動態查詢其是否為工讀生，自動更新 isPartTime 狀態
+    useEffect(() => {
+        const fetchSalesRepEmpType = async () => {
+            if (!targetSalesRep || !user?.token) return;
+            try {
+                const res = await callGAS(apiUrl, 'getEmpType', { targetUser: targetSalesRep }, user.token);
+                if (res && res.empType) {
+                    setIsPartTime(res.empType === 'PART_TIME');
+                }
+            } catch (e) {
+                console.error('Failed to fetch empType for', targetSalesRep, e);
+            }
+        };
+        fetchSalesRepEmpType();
+    }, [targetSalesRep, apiUrl, user?.token]);
+
+    // Recalculate row
+    const handleRowChange = (id, field, value) => {
+        setRows(prev => prev.map(r => {
+            if (r.id !== id) return r;
+
+            // 如果值是公式（以 = 開頭），我們暫存字串不計算數字
+            if (typeof value === 'string' && value.trim().startsWith('=')) {
+                return { ...r, [field]: value };
+            }
+
+            // 1. Propose new values (Keep raw value for current field to allow decimals while typing)
+            let newPicked = field === 'picked' ? value : r.picked;
+            let newOriginal = field === 'original' ? value : r.original;
+            let newReturns = field === 'returns' ? value : r.returns;
+            let newPrice = field === 'price' ? value : r.price;
+
+            // 1.5. 防止負數價格
+            if (field === 'price' && getSafeNum(newPrice) < 0) {
+                newPrice = 0;
+            }
+
+            // 2. Local Price Memory Persistence
+            if (field === 'price') {
+                safeLocalStorage.setItem(`last_price_${id}`, getSafeNum(newPrice).toString());
+            }
+
+            // 3. Validate Stock Limits (Use getSafeNum for subtraction/comparison)
+            if (getSafeNum(newPicked) > r.stock) newPicked = r.stock;
+            if (getSafeNum(newPicked) < 0) newPicked = 0;
+
+            if (getSafeNum(newOriginal) > r.originalStock) newOriginal = r.originalStock;
+            if (getSafeNum(newOriginal) < 0) newOriginal = 0;
+
+            // 4. Validate Returns Limit (Cannot return more than taken)
+            const totalInHand = getSafeNum(newPicked) + getSafeNum(newOriginal);
+            if (getSafeNum(newReturns) > totalInHand) newReturns = totalInHand;
+            if (getSafeNum(newReturns) < 0) newReturns = 0;
+
+            // 5. Construct updated row
+            const updated = {
+                ...r,
+                picked: newPicked,
+                original: newOriginal,
+                returns: newReturns,
+                price: newPrice
+            };
+
+            // 6. Calculate Sold & Subtotal (Crucial: Use getSafeNum to avoid string concatenation)
+            updated.sold = getSafeNum(updated.picked) + getSafeNum(updated.original) - getSafeNum(updated.returns);
+            
+            const isBundle = Boolean(r.isBundle);
+            const bundleSize = isBundle ? Number(r.bundleSize || 1) : 1;
+            const currentPrice = getSafeNum(updated.price);
+
+            if (isBundle && bundleSize > 1 && updated.sold > 0 && (updated.sold % bundleSize === 0)) {
+                const catalogPackagePrice = Number(r.catalogPrice || 0);
+                const expectedSinglePrice = catalogPackagePrice > 0 ? (catalogPackagePrice / bundleSize) : 0;
+                if (expectedSinglePrice > 0 && Math.abs(currentPrice - expectedSinglePrice) < 0.05) {
+                    updated.subtotal = (updated.sold / bundleSize) * catalogPackagePrice;
+                } else {
+                    updated.subtotal = Math.round(updated.sold * currentPrice * 100) / 100;
+                }
+            } else {
+                updated.subtotal = Math.round(updated.sold * currentPrice * 100) / 100;
+            }
+
+            return updated;
+        }));
+    };
+
+    const handleBlur = (id, field, value) => {
+        if (typeof value === 'string' && value.trim().startsWith('=')) {
+            const result = evaluateFormula(value);
+            handleRowChange(id, field, result);
+        } else {
+            // Force numeric cleanup on blur (e.g., "10." becomes 10)
+            handleRowChange(id, field, getSafeNum(value));
+        }
+    };
+
+    const handleCashChange = (denom, value) => {
+        setCashCounts(prev => ({
+            ...prev,
+            [denom]: (typeof value === 'string' && value.trim().startsWith('=')) ? value : value
+        }));
+    };
+
+    const handleCashBlur = (denom, value) => {
+        if (typeof value === 'string' && value.trim().startsWith('=')) {
+            const result = evaluateFormula(value);
+            handleCashChange(denom, result);
+        } else {
+            handleCashChange(denom, getSafeNum(value));
+        }
+    };
+
+    const handleReserveChange = (value) => {
+        setReserve((typeof value === 'string' && value.trim().startsWith('=')) ? value : value);
+    };
+
+    const handleReserveBlur = (value) => {
+        if (typeof value === 'string' && value.trim().startsWith('=')) {
+            const result = evaluateFormula(value);
+            handleReserveChange(result);
+        } else {
+            handleReserveChange(getSafeNum(value));
+        }
+    };
+
+    const handleExpenseChange = (key, value) => {
+        setExpenses(prev => ({
+            ...prev,
+            [key]: (typeof value === 'string' && value.trim().startsWith('=')) ? value : value
+        }));
+    };
+
+    const handleExpenseBlur = (key, value) => {
+        let finalVal = value;
+        if (typeof value === 'string' && value.trim().startsWith('=')) {
+            finalVal = evaluateFormula(value);
+            handleExpenseChange(key, finalVal);
+        } else {
+            finalVal = getSafeNum(value);
+            handleExpenseChange(key, finalVal);
+        }
+        // Removed auto-modal trigger from blur to prevent navigation conflicts
+    };
+
+    const handleDragEnd = (result) => {
+        if (!result.destination) return;
+
+        const items = Array.from(rows);
+        const [reorderedItem] = items.splice(result.source.index, 1);
+        items.splice(result.destination.index, 0, reorderedItem);
+
+        // Update local state immediately for responsiveness
+        setRows(items);
+    };
+
+    const handleMoveRow = (idx, direction) => {
+        setRows(prev => {
+            const next = Array.from(prev);
+            if (direction === 'up') {
+                if (idx === 0) return prev;
+                const temp = next[idx];
+                next[idx] = next[idx - 1];
+                next[idx - 1] = temp;
+            } else if (direction === 'down') {
+                if (idx === next.length - 1) return prev;
+                const temp = next[idx];
+                next[idx] = next[idx + 1];
+                next[idx + 1] = temp;
+            } else if (direction === 'top') {
+                if (idx === 0) return prev;
+                const [target] = next.splice(idx, 1);
+                next.unshift(target);
+            } else if (direction === 'bottom') {
+                if (idx === next.length - 1) return prev;
+                const [target] = next.splice(idx, 1);
+                next.push(target);
+            }
+            return next;
+        });
+    };
+
+    const toggleSorting = async () => {
+        if (isSorting) {
+            // Ending sorting mode -> Perform sync
+            setIsSubmitting(true); // Reuse submitting overlay if needed, or just silent
+            try {
+                const productIds = rows.map(r => r.id);
+                const res = await callGAS(apiUrl, 'updateProductSortOrder', { productIds }, user.token);
+                if (res.success) {
+                    // 同步更新 rows 與 allAvailableProducts 中的 sortWeight
+                    const weightMap = {};
+                    rows.forEach((r, idx) => {
+                        const newWeight = (idx + 1) * 10;
+                        r.sortWeight = newWeight;
+                        weightMap[r.id] = newWeight;
+                    });
+                    setAllAvailableProducts(prev => 
+                        prev.map(p => weightMap[p.id] !== undefined ? { ...p, sortWeight: weightMap[p.id] } : p)
+                    );
+                    alert('順序已儲存！');
+                }
+            } catch (error) {
+                console.error('Failed to sync sort order:', error);
+                alert('排序儲存失敗：' + error.message);
+            } finally {
+                // 還原 rows：只保留有庫存的，或者已經有輸入領銷退資料的商品
+                setRows(prev => {
+                    const filtered = prev.filter(r => 
+                        (Number(r.stock) || 0) > 0 || 
+                        (Number(r.originalStock) || 0) > 0 ||
+                        Number(r.picked) > 0 ||
+                        Number(r.original) > 0 ||
+                        Number(r.returns) > 0 ||
+                        Number(r.sold) > 0
+                    );
+                    return sortProducts(filtered, 'name');
+                });
+                setIsSubmitting(false);
+                setIsSorting(false);
+            }
+        } else {
+            // Entering sorting mode
+            // [Performance Optimization] Prefetch all last_price values into memory in a single loop
+            // to avoid blocking the JS event loop with 199 consecutive disk reads inside setState.
+            const localPrices = {};
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('last_price_')) {
+                        const pId = key.substring('last_price_'.length);
+                        localPrices[pId] = localStorage.getItem(key);
+                    }
+                }
+            } catch (err) {
+                console.warn('Failed to prefetch local prices:', err);
+            }
+
+            // 將 allAvailableProducts 中的所有商品，補進 rows 裡面以顯示完整清單進行排序
+            setRows(prevRows => {
+                const existingMap = {};
+                prevRows.forEach(r => existingMap[r.id] = r);
+
+                const merged = allAvailableProducts.map(p => {
+                    const existing = existingMap[p.id];
+                    if (existing) {
+                        return existing;
+                    } else {
+                        // 建立一個預設為 0 庫存的乾淨列
+                        const localPrice = localPrices[p.id];
+                        let finalPrice = (localPrice !== undefined && localPrice !== null) ? Number(localPrice) : '';
+                        return {
+                            id: p.id,
+                            name: p.name,
+                            stock: Number(p.stock) || 0,
+                            originalStock: Number(p.originalStock) || 0,
+                            picked: 0,
+                            original: 0,
+                            returns: 0,
+                            sold: 0,
+                            price: finalPrice,
+                            subtotal: 0,
+                            sortWeight: p.sortWeight,
+                            fromSheet: p._fromSheet
+                        };
+                    }
+                });
+                
+                // 再次用 sortProducts 排序以確保進入 sorting 狀態時一開始順序正確
+                return sortProducts(merged, 'name');
+            });
+            setIsSorting(true);
+        }
+    };
+
+    // Navigation Helpers
+    const focusAndSelect = (id) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.focus();
+            el.select?.();
+            // Scroll is handled by activeInput useEffect
+        }
+    };
+
+
+
+
+
+    const handleKeyDown = (e, idx, field, prefix = 'input-') => {
+        const validKeys = ['Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+        if (!validKeys.includes(e.key)) return;
+
+        // Prevent default scrolling for arrow keys
+        if (e.key.startsWith('Arrow')) e.preventDefault();
+
+        const sequence = ['picked', 'original', 'returns', 'price'];
+        const colIdx = sequence.indexOf(field);
+
+        // Enter Logic (Modified: Move down in the same column)
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            let targetId = null;
+            if (idx < rows.length - 1) {
+                targetId = `${prefix}${idx + 1}-${field}`;
+            } else {
+                // 最後一列跳到側邊欄 (與 ArrowDown 一致)
+                targetId = 'input-cash-1000';
+            }
+            if (targetId) focusAndSelect(targetId);
+            return;
+        }
+
+        // Arrow Logic (Mainly for desktop table, keeps functionality)
+        let targetId = null;
+        if (e.key === 'ArrowUp') {
+            if (idx > 0) targetId = `${prefix}${idx - 1}-${field}`;
+        } else if (e.key === 'ArrowDown') {
+            if (idx < rows.length - 1) targetId = `${prefix}${idx + 1}-${field}`;
+            else targetId = 'input-cash-1000';
+        } else if (e.key === 'ArrowLeft') {
+            if (colIdx > 0) {
+                targetId = `${prefix}${idx}-${sequence[colIdx - 1]}`;
+            } else {
+                // At the first column (picked), jump to PREVIOUS row's last column (price)
+                if (idx > 0) {
+                    targetId = `${prefix}${idx - 1}-price`;
+                }
+            }
+        } else if (e.key === 'ArrowRight') {
+            if (colIdx < sequence.length - 1) {
+                targetId = `${prefix}${idx}-${sequence[colIdx + 1]}`;
+            } else {
+                // At the last column (price), jump to the NEXT row's first column (picked)
+                if (idx < rows.length - 1) {
+                    targetId = `${prefix}${idx + 1}-picked`;
+                } else {
+                    // Last row last col -> Jump to Sidebar
+                    targetId = 'input-cash-1000';
+                }
+            }
+        }
+
+        if (targetId) focusAndSelect(targetId);
+    };
+
+    const handleSidebarKeyDown = (e, targets = {}) => {
+        const { next, prev, up, down, left, right } = targets;
+        const validKeys = ['Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+        if (!validKeys.includes(e.key)) return;
+        if (e.key.startsWith('Arrow')) e.preventDefault();
+
+        let targetId = null;
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            targetId = next;
+        } else if (e.key === 'ArrowDown') {
+            targetId = down || next;
+        } else if (e.key === 'ArrowUp') {
+            targetId = up || prev;
+        } else if (e.key === 'ArrowLeft') {
+            targetId = left || prev;
+        } else if (e.key === 'ArrowRight') {
+            targetId = right || next;
+        }
+
+        if (targetId) {
+            focusAndSelect(targetId);
+        } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+            // Top of sidebar -> Back to Table (Last row, last col)
+            if (rows.length > 0) {
+                focusAndSelect(`input-${rows.length - 1}-price`);
+            }
+        }
+    };
+
+    const totalSalesAmount = rows.reduce((acc, r) => acc + (r.subtotal || 0), 0);
+    const totalCashCalc = Object.entries(cashCounts).reduce((acc, [denom, count]) => {
+        return acc + (Number(denom) * getSafeNum(count));
+    }, 0);
+    // If Credit, reserve is 0 effectively, and totalCashNet might not be relevant for balancing but let's keep calc
+    const totalCashNet = totalCashCalc - getSafeNum(reserve);
+
+    const totalExpensesPlusLinePay =
+        getSafeNum(expenses.stall) + getSafeNum(expenses.cleaning) + getSafeNum(expenses.electricity) +
+        getSafeNum(expenses.gas) + getSafeNum(expenses.parking) + getSafeNum(expenses.goods) +
+        getSafeNum(expenses.bags) + getSafeNum(expenses.others) + getSafeNum(expenses.linePay) +
+        getSafeNum(expenses.salary) + getSafeNum(expenses.reserveFund) + getSafeNum(expenses.vehicleMaintenance);
+
+    const isCredit = paymentType === 'CREDIT';
+
+    // Final Total Calculation Logic
+    // 扣除後總金額 = (總金額 - 預備金) + 支出 + Line Pay + 服務費 - 總繳回金額
+    // IF CASH: (Total Cash - Reserve) + Expenses + LinePay + ServiceFee - Total Sales Amount
+    // IF CREDIT: Just the Total Sales Amount (Product Subtotals)
+    const finalTotal = isCredit
+        ? totalSalesAmount
+        : (totalCashNet + totalExpensesPlusLinePay + getSafeNum(expenses.serviceFee) - totalSalesAmount);
+
+    const handleSubmit = async () => {
+        console.log('Save button clicked');
+        try {
+            const loc = String(location || '').trim();
+            if (!loc) {
+                alert('請輸入銷售對象！');
+                const locationInput = document.getElementById('input-location');
+                if (locationInput) locationInput.focus();
+                return;
+            }
+
+            // [New] 強制驗證支出備註
+            const mandatoryRemarkFields = [
+                { key: 'gas', label: '加油' },
+                { key: 'parking', label: '停車' },
+                { key: 'goods', label: '貨款' },
+                { key: 'others', label: '其他' },
+                { key: 'salary', label: '薪資發放' },
+                { key: 'reserveFund', label: '公積金' },
+                { key: 'vehicleMaintenance', label: '車輛保養' }
+            ];
+
+            for (const field of mandatoryRemarkFields) {
+                const val = getSafeNum(expenses[field.key]);
+                const remarkKey = field.key === 'goods' ? 'goodsVendor' : `${field.key}Remark`;
+                const remark = String(expenses[remarkKey] || '').trim();
+
+                if (val > 0 && !remark) {
+                    alert(`【${field.label}】支出已輸入金額，請務必填寫相關備註資訊！`);
+                    setActiveExpenseKey(field.key);
+                    setShowVendorModal(true);
+                    return; // 中止儲存
+                }
+            }
+
+            // [New] 工讀生必填工時
+            if (isPartTime && (!workHours || Number(workHours) <= 0)) {
+                alert('此單據業務為工讀人員，送出前請務必填寫「工讀計時」！');
+                document.getElementById('input-work-hours')?.focus();
+                return;
+            }
+
+            if (!user || !user.username) {
+                console.error('User info missing:', user);
+                alert('使用者資訊遺失，請重新登入');
+                return;
+            }
+
+            const payload = {
+                salesRep: targetSalesRep || user.username, // 業績歸屬人 (優先使用載入的業務)
+                operator: user.username,                   // 實際操作人 (當前登入者)
+                customer: location,
+                paymentMethod: paymentType,
+                salesData: rows.map(r => ({
+                    productId: r.id,
+                    picked: r.picked,
+                    original: r.original,
+                    returns: r.returns,
+                    sold: r.sold,
+                    unitPrice: r.price
+                })),
+                cashData: { totalCash: paymentType === 'CREDIT' ? 0 : totalCashNet, reserve },
+                expenseData: {
+                    ...expenses,
+                    reserve: expenses.reserveFund, // Map reserveFund to reserve for backend
+                    finalTotal
+                },
+                cashCounts: cashCounts, // [New] Pass detailed cash counts
+                submissionId: submissionId, // [New] 防止重複存檔的唯一辨識碼
+                originalDate: originalDate, // [New] 傳回原始日期
+                originalSaleId: originalSaleId, // [New] 傳回原始 ID 用於備註
+                workHours: workHours, // [New] 工時
+                weather: weather // [New] 天氣
+            };
+
+            setIsSubmitting(true);
+
+            const res = await callGAS(apiUrl, 'saveSales', payload, user.token);
+            if (!res.success) {
+                throw new Error(res.error || 'Unknown error from backend');
+            }
+
+            // Log activity
+            if (logActivity) {
+                logActivity({
+                    actionType: 'DATA_EDIT',
+                    page: '銷售登錄',
+                    details: JSON.stringify({
+                        customer: location,
+                        paymentMethod: paymentType,
+                        totalAmount: isCredit ? totalSalesAmount : finalTotal,
+                        productCount: rows.filter(r => r.sold > 0).length
+                    })
+                });
+            }
+
+            alert('保存成功！資料已寫入 Google Sheet。');
+            safeSessionStorage.removeItem('clonedSale');
+            window.location.reload();
+
+        } catch (e) {
+            console.error('handleSubmit error:', e);
+            alert('保存失敗: ' + (e.message || e.toString()));
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+
+
+    const handlePrint = async () => {
+        if (rows.length === 0) {
+            alert('沒有商品資料，無法列印');
+            return;
+        }
+
+        setIsPrinting(true);
+        try {
+            const printPayload = {
+                templateId: 'Template_領貨單',
+                data: {
+                    date: new Date().toISOString(),
+                    location: location,
+                    salesRep: user.username,
+                    totalSalesAmount: isCredit ? totalSalesAmount : finalTotal,
+                    totalCashCalc: totalCashNet,
+                    finalTotal: finalTotal,
+                    reserve: reserve,
+                    expenses: expenses,
+                    rows: rows.map(r => ({
+                        name: r.name,
+                        stock: r.stock,
+                        originalStock: r.originalStock,
+                        picked: r.picked,
+                        original: r.original,
+                        returns: r.returns,
+                        sold: r.sold,
+                        price: r.price,
+                        subtotal: r.subtotal
+                    }))
+                }
+            };
+
+            // ⚡ 0.1秒極速原生直印 (100% 精準對齊 Google 試算表排版與黑框樣式)
+            printNativeSpreadsheetHtml(printPayload);
+        } catch (e) {
+            console.error('Print failed:', e);
+            alert('列印失敗: ' + e.message);
+        } finally {
+            setIsPrinting(false);
+        }
+    };
+
+    // Load Merge Sales Records
+    const loadMergeRecords = async (start = mergeStartDate, end = mergeEndDate) => {
+        setIsMergeSearchLoading(true);
+        try {
+            // [Fix] 擴充結束日期時間戳至當天 23:59:59，確保今日白天發生的銷售與退貨單據不被凌晨 00:00:00 邊界攔截
+            let cleanEnd = end ? String(end).trim() : '';
+            if (cleanEnd && !cleanEnd.includes(' ')) {
+                cleanEnd = `${cleanEnd} 23:59:59`;
+            }
+            const records = await callGAS(apiUrl, 'getSalesByDateRange', {
+                startDate: start,
+                endDate: cleanEnd
+            }, user.token);
+            setMergeRecords(records);
+        } catch (error) {
+            console.error('載入銷售紀錄失敗:', error);
+            alert('載入銷售紀錄失敗: ' + error.message);
+        } finally {
+            setIsMergeSearchLoading(false);
+        }
+    };
+
+    // Merge Print Handler
+    const handleMergePrint = async (aiSuggestions = null, aiLocation = null, customPrintDate = null) => {
+        if (selectedSaleIds.length === 0 && !aiSuggestions) {
+            alert('請至少選擇一筆單據');
+            return;
+        }
+
+        setIsSubmitting(true);
+        setIsMergePrinting(true);
+        try {
+            // 1. 提取選中的單據
+            const selectedRecords = mergeRecords.filter(r => selectedSaleIds.includes(r.saleId));
+
+            // 2. 建立產品 Map（productId -> 各單據的數值陣列）
+            const productDataMap = {};
+
+            selectedRecords.forEach(record => {
+                record.salesData.forEach(item => {
+                    if (!productDataMap[item.productId]) {
+                        productDataMap[item.productId] = {
+                            productId: item.productId,
+                            productName: item.productName,
+                            picked: [],
+                            original: [],
+                            returns: [],
+                            sold: [],
+                            price: []
+                        };
+                    }
+                    productDataMap[item.productId].picked.push(item.picked);
+                    productDataMap[item.productId].original.push(item.original);
+                    productDataMap[item.productId].returns.push(item.returns);
+                    productDataMap[item.productId].sold.push(item.sold);
+                    productDataMap[item.productId].price.push(item.unitPrice);
+                });
+            });
+
+            // 3. 以主表格目前的品項清單 (rows) 為基底生成 mergedRows
+            // 確保 PDF 顯示範圍與主畫面中「可見」的品項完全一致
+            const mergedRows = rows.map(row => {
+                const p = productDataMap[String(row.id)];
+
+                // [Modified] 一律採用主表格目前的單價，不使用舊單據的歷史單價
+                const displayPrice = row.price || '';
+
+                const aiQty = aiSuggestions ? aiSuggestions[String(row.id)] : null;
+                const returnsVal = p ? p.returns.filter(v => v !== 0 && v !== '0' && v !== '').join(' / ') : '';
+
+                return {
+                    name: row.name,
+                    stock: returnsVal, // 1. 將【退貨數】數字搬到【原庫存】欄位呈現
+                    originalStock: returnsVal,
+                    picked: aiSuggestions ? (aiQty !== null && aiQty !== undefined ? aiQty : '') : '',
+                    original: p ? p.original.filter(v => v !== 0 && v !== '0' && v !== '').join(' / ') : '',
+                    returns: '', // 原欄位不重複顯示
+                    sold: '', // 2. 實際售出 (sold) 改為【空白】
+                    price: displayPrice,
+                    subtotal: ''
+                };
+            });
+
+            // 4. 調用 PDF 生成
+            const printPayload = {
+                templateId: 'Template_領貨單',
+                data: {
+                    date: customPrintDate || new Date().toISOString(),
+                    location: aiLocation || (selectedRecords.length > 0 ? selectedRecords[0].customer : '未定義地點'),
+                    salesRep: user.username,
+                    totalSalesAmount: '',
+                    totalCashCalc: '',
+                    finalTotal: '',
+                    reserve: '',
+                    expenses: {},
+                    rows: mergedRows
+                }
+            };
+
+            // ⚡ 0.1秒極速原生直印 (100% 精準對齊 Google 試算表排版與黑框樣式)
+            printNativeSpreadsheetHtml(printPayload);
+        } catch (e) {
+            console.error('合併列印失敗:', e);
+            alert('合併列印失敗: ' + e.message);
+        } finally {
+            setIsSubmitting(false);
+            setIsMergePrinting(false);
+        }
+    };
+
+    // History Import Logic
+    const loadHistoryRecords = async (start, end) => {
+        setIsHistoryLoading(true);
+        try {
+            const records = await callGAS(apiUrl, 'getSalesByDateRange', {
+                startDate: start,
+                endDate: end
+            }, user.token);
+            setHistoryImportRecords(records);
+        } catch (error) {
+            console.error('載入歷史紀錄失敗:', error);
+            alert('載入歷史紀錄失敗: ' + error.message);
+        } finally {
+            setIsHistoryLoading(false);
+        }
+    };
+
+    const handleOpenHistoryImport = () => {
+        setShowHistoryImportModal(true);
+        loadHistoryRecords(historyImportStartDate, historyImportEndDate);
+    };
+
+    const handleImportHistory = () => {
+        if (selectedImportIds.length === 0) return;
+
+        const selectedRecords = historyImportRecords.filter(r => selectedImportIds.includes(r.saleId));
+        if (selectedRecords.length === 0) return;
+
+        // Map product data for fast lookup and aggregation
+        const importDataMap = {};
+        selectedRecords.forEach(record => {
+            record.salesData.forEach(item => {
+                // Sum up returns
+                if (!importDataMap[item.productId]) importDataMap[item.productId] = 0;
+                importDataMap[item.productId] += (Number(item.returns) || 0);
+            });
+        });
+
+        // Update rows
+        setRows(prev => prev.map(row => {
+            const importReturns = importDataMap[String(row.id)];
+            if (importReturns !== undefined && importReturns > 0) {
+                const newOriginal = importReturns;
+                const newSold = getSafeNum(row.picked) + getSafeNum(newOriginal) - getSafeNum(row.returns);
+                const newSubtotal = newSold * getSafeNum(row.price);
+                return {
+                    ...row,
+                    original: newOriginal,
+                    sold: newSold,
+                    subtotal: newSubtotal
+                };
+            }
+            return row;
+        }));
+
+        setShowHistoryImportModal(false);
+        setSelectedImportIds([]);
+        alert(`已成功導入 ${selectedRecords.length} 筆紀錄的退貨資料！`);
+    };
+
+
+    return (
+        <>
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 h-full overflow-y-auto xl:overflow-hidden">
+                {isSubmitting && (
+                    <div className="loading-overlay">
+                        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-lg font-bold text-[var(--text-primary)]">
+                            {isMergePrinting ? "資料合併中，請稍後..." : "資料存檔中，請稍後..."}
+                        </p>
+                    </div>
+                )}
+                {/* Product Table */}
+                <div className="xl:col-span-2 glass-panel p-6 overflow-hidden flex flex-col h-auto min-h-[60vh] xl:h-[calc(100vh-10rem)]">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                        <h2 className="text-xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
+                            <RefreshCw size={20} className="text-[var(--accent-blue)]" /> 商品銷售登錄
+                        </h2>
+
+                        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full md:w-auto">
+
+                            {/* Group 1: Setup & Context (Toggle + Input) */}
+                            <div className="flex flex-col md:flex-row md:items-center gap-3 w-full md:w-auto">
+                                <div className="flex flex-row items-center gap-3 flex-1 md:flex-none">
+                                    {/* Toggle */}
+                                    <div className="flex bg-[var(--bg-tertiary)] rounded-lg p-1 border border-[var(--border-primary)] shrink-0">
+                                        <button
+                                            onClick={() => setPaymentType('CASH')}
+                                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${paymentType === 'CASH'
+                                                ? 'bg-emerald-500 text-white shadow-sm'
+                                                : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                                                }`}
+                                        >
+                                            現金
+                                        </button>
+                                        <button
+                                            onClick={() => setPaymentType('CREDIT')}
+                                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${paymentType === 'CREDIT'
+                                                ? 'bg-amber-500 text-white shadow-sm'
+                                                : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                                                }`}
+                                        >
+                                            賒銷
+                                        </button>
+                                    </div>
+
+                                    {/* Customer Input */}
+                                    <div className="flex items-center gap-2 flex-1 md:flex-none">
+                                        <label className="text-sm text-[var(--text-secondary)] font-bold whitespace-nowrap hidden md:block">銷售對象:</label>
+                                        <input
+                                            id="input-location"
+                                            type="text"
+                                            autoComplete="off"
+                                            list="system-customers-list"
+                                            className="input-field py-1 px-3 w-full md:w-40 lg:w-48"
+                                            placeholder="輸入銷售對象..."
+                                            value={location}
+                                            onChange={(e) => setLocation(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                // [Fix] 避免在輸入中文選字時 (IME) 按下 Enter 直接跳格
+                                                if (e.key === 'Enter') {
+                                                    if (e.nativeEvent.isComposing) return;
+
+                                                    e.preventDefault();
+                                                    if (isPartTime) {
+                                                        focusAndSelect('input-work-hours');
+                                                    } else {
+                                                        focusAndSelect('input-m-0-picked') || focusAndSelect('input-0-picked');
+                                                    }
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* [New] Sales Rep Override - Only show during correction */}
+                                {availableUsers.length > 0 && originalSaleId && (
+                                    <div className="flex items-center gap-2 w-full md:w-auto bg-[var(--accent-yellow-light)] border border-[var(--accent-yellow)]/30 px-3 py-1 rounded-lg animate-pulse">
+                                        <label className="text-sm text-[var(--accent-yellow)] font-bold whitespace-nowrap">業績歸屬:</label>
+                                        <select
+                                            value={targetSalesRep}
+                                            onChange={(e) => setTargetSalesRep(e.target.value)}
+                                            className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)] text-xs font-bold rounded p-1 focus:ring-1 focus:ring-[var(--accent-yellow)] outline-none"
+                                        >
+                                            {availableUsers.map(u => (
+                                                <option key={u} value={u}>{u}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Group 2: Action Buttons (2x2 Grid 上下放) */}
+                            <div className="grid grid-cols-2 gap-2 w-full md:w-auto">
+                                {/* Import Returns */}
+                                <button
+                                    onClick={handleOpenHistoryImport}
+                                    className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold rounded-lg border whitespace-nowrap transition-all bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]"
+                                >
+                                    <RefreshCw size={16} className="rotate-180 shrink-0" />
+                                    <span>導入退貨</span>
+                                </button>
+
+                                {/* Sort */}
+                                <button
+                                    onClick={() => setShowSortModal(true)}
+                                    className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold rounded-lg border whitespace-nowrap transition-all bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-indigo-500 hover:text-indigo-600 font-extrabold"
+                                >
+                                    <ListOrdered size={16} className="shrink-0 text-indigo-500" />
+                                    <span>更改順序</span>
+                                </button>
+
+                                {/* Merge Print */}
+                                <button
+                                    onClick={() => {
+                                        setShowMergeModal(!showMergeModal);
+                                        if (!showMergeModal) loadMergeRecords();
+                                    }}
+                                    className={`flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold rounded-lg border whitespace-nowrap transition-all ${showMergeModal
+                                        ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-blue)]'
+                                        }`}
+                                >
+                                    <Printer size={16} className="shrink-0" />
+                                    <span>合併列印</span>
+                                </button>
+
+                                {/* Print & Settings Group (Merged into 1 clean button to preserve layout) */}
+                                <div className="flex items-center rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] overflow-hidden hover:border-[var(--accent-blue)] transition-all">
+                                    <button
+                                        onClick={handlePrint}
+                                        disabled={isPrinting}
+                                        className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-2 text-xs font-bold text-[var(--text-secondary)] whitespace-nowrap ${isPrinting
+                                            ? 'bg-gray-400 text-white cursor-not-allowed'
+                                            : 'hover:text-[var(--accent-blue)]'
+                                            }`}
+                                    >
+                                        <Printer size={16} className="shrink-0" />
+                                        <span>{isPrinting ? '列印中...' : '列印單據'}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsPrintConfigOpen(true)}
+                                        title="自訂列印單據字體與排版"
+                                        className="px-2 py-2 text-xs font-bold border-l border-[var(--border-primary)] text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                    >
+                                        <Settings size={15} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* [New] Part-time Work Hours Banner - 工讀生工時輸入區（獨立一行） */}
+                    {isPartTime && (
+                        <div className="flex items-center mb-3 px-3 md:px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 h-14">
+                            {/* Left Column */}
+                            <div className="flex items-center gap-2 w-[72px] shrink-0">
+                                <span className="text-base w-5 flex justify-center shrink-0">⏱️</span>
+                                <span className="text-[10px] font-bold text-amber-800 leading-tight shrink-0">
+                                    工讀<br />計時
+                                </span>
+                            </div>
+
+                            {/* Middle Column */}
+                            <div className="flex items-center gap-2 flex-1 ml-1 md:ml-2">
+                                <input
+                                    id="input-work-hours"
+                                    type="number"
+                                    step="0.5"
+                                    min="0"
+                                    required
+                                    className={`bg-white border-2 text-amber-900 text-base font-bold rounded-lg px-2 py-1 w-16 text-center focus:ring-2 focus:ring-amber-400 outline-none transition-colors ${!workHours || Number(workHours) <= 0
+                                        ? 'border-red-300 bg-red-50'
+                                        : 'border-amber-300'
+                                        }`}
+                                    placeholder="0.5"
+                                    value={workHours}
+                                    onChange={(e) => setWorkHours(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            focusAndSelect('input-m-0-picked') || focusAndSelect('input-0-picked');
+                                        }
+                                    }}
+                                />
+                                <span className="text-xs md:text-sm text-amber-700 font-medium shrink-0">小時</span>
+                            </div>
+
+                            {/* Right Column */}
+                            <div className="w-14 shrink-0 ml-auto flex justify-end">
+                                {workHours && Number(workHours) > 0 && (
+                                    <div className="text-[10px] font-bold py-1 rounded-lg bg-amber-100 text-amber-600 border border-amber-200 leading-tight text-center w-full">
+                                        今日<br />{workHours} hr
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* [New] Weather Selector Banner - 樣式同工讀計時 */}
+                    <div className="flex items-center mb-3 px-3 md:px-4 py-2.5 rounded-xl bg-gradient-to-r from-[var(--bg-secondary)] to-[var(--bg-tertiary)] border border-[var(--border-primary)] h-14">
+                        {/* Left Column */}
+                        <div className="flex items-center gap-2 w-[72px] shrink-0">
+                            <span className="text-base w-5 flex justify-center shrink-0">{weather === 'SUNNY' ? '☀️' : '☔'}</span>
+                            <span className="text-[10px] font-bold text-[var(--text-primary)] leading-tight shrink-0">
+                                今日<br />天氣
+                            </span>
+                        </div>
+
+                        {/* Middle Column */}
+                        <div className="flex items-center flex-1 ml-1 md:ml-2">
+                            <div className="flex w-full max-w-[150px] bg-[var(--bg-primary)]/50 rounded-lg p-1 border border-[var(--border-primary)] shadow-sm">
+                                <button
+                                    type="button"
+                                    onClick={() => setWeather('SUNNY')}
+                                    className={`flex-1 flex justify-center items-center gap-1 px-2 py-1.5 text-[11px] md:text-xs font-black rounded-md transition-all ${weather === 'SUNNY'
+                                        ? 'bg-[var(--accent-yellow)] text-white shadow-md'
+                                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
+                                        }`}
+                                >
+                                    ☀️ 晴天
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setWeather('RAINY')}
+                                    className={`flex-1 flex justify-center items-center gap-1 px-2 py-1.5 text-[11px] md:text-xs font-black rounded-md transition-all ${weather === 'RAINY'
+                                        ? 'bg-[var(--accent-blue)] text-white shadow-md'
+                                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
+                                        }`}
+                                >
+                                    ☔ 雨天
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Right Column */}
+                        <div className="w-14 shrink-0 ml-auto flex justify-end">
+                            <div className={`text-[10px] font-bold py-1 rounded-lg transition-all duration-500 border leading-tight text-center w-full ${weather === 'SUNNY'
+                                ? 'bg-[var(--accent-yellow-light)] text-[var(--accent-yellow)] border-[var(--accent-yellow)]/30'
+                                : 'bg-[var(--accent-blue-light)] text-[var(--accent-blue)] border-[var(--accent-blue)]/30'
+                                }`}>
+                                今日<br />{weather === 'SUNNY' ? '晴天' : '雨天'}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-auto">
+                        {/* Mobile Card View (Visible on < md) */}
+                        <DragDropContext onDragEnd={handleDragEnd}>
+                            <Droppable droppableId="mobile-rows" isDropDisabled={!isSorting}>
+                                {(provided) => (
+                                    <div
+                                        {...provided.droppableProps}
+                                        ref={provided.innerRef}
+                                        className="md:hidden space-y-4"
+                                    >
+                                        {rows.map((row, idx) => (
+                                            <SalesMobileRow
+                                                key={`${row.id}-${idx}`}
+                                                row={row}
+                                                idx={idx}
+                                                isSorting={isSorting}
+                                                handleMoveRow={handleMoveRow}
+                                                handleRowChange={handleRowChange}
+                                                handleBlur={handleBlur}
+                                                setActiveInput={setActiveInput}
+                                                handleKeyDown={handleKeyDown}
+                                                rowsLength={rows.length}
+                                            />
+                                        ))}
+                                        {provided.placeholder}
+                                    </div>
+                                )}
+                            </Droppable>
+
+                            {/* Desktop Table View (Hidden on < md) */}
+                            <table className="hidden md:table w-full text-left border-collapse">
+                                <thead className="sticky top-0 z-10 text-[var(--text-secondary)] text-[13px] uppercase font-semibold tracking-wider">
+                                    <tr className="bg-[var(--bg-tertiary)]">
+                                        <th className="p-3 w-10 first:rounded-l-2xl"></th>
+                                        <th className="p-3 text-left">品項</th>
+                                        <th className="p-3 w-20 text-center">庫存</th>
+                                        <th className="p-3 w-24 text-center">領貨</th>
+                                        <th className="p-3 w-24 text-center">原貨</th>
+                                        <th className="p-3 w-24 text-center">退貨</th>
+                                        <th className="p-3 w-20 text-center">售出</th>
+                                        <th className="p-3 w-24 text-center">單價</th>
+                                        <th className="p-3 w-28 text-right last:rounded-r-2xl">繳回金額</th>
+                                    </tr>
+                                </thead>
+                                <Droppable droppableId="desktop-rows" isDropDisabled={!isSorting}>
+                                    {(provided) => (
+                                        <tbody
+                                            {...provided.droppableProps}
+                                            ref={provided.innerRef}
+                                            className="divide-y divide-[var(--border-primary)]"
+                                        >
+                                            {rows.map((row, idx) => (
+                                                <SalesDesktopRow
+                                                    key={`${row.id}-${idx}`}
+                                                    row={row}
+                                                    idx={idx}
+                                                    isSorting={isSorting}
+                                                    inputMode={inputMode}
+                                                    activeInput={activeInput}
+                                                    handleMoveRow={handleMoveRow}
+                                                    handleRowChange={handleRowChange}
+                                                    handleBlur={handleBlur}
+                                                    setActiveInput={setActiveInput}
+                                                    handleKeyDown={handleKeyDown}
+                                                    rowsLength={rows.length}
+                                                />
+                                            ))}
+                                            {provided.placeholder}
+                                        </tbody>
+                                    )}
+                                </Droppable>
+                            </table>
+                        </DragDropContext>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-[var(--border-primary)] flex justify-between items-center bg-[var(--bg-secondary)] p-4 rounded-lg">
+                        <span className="text-[var(--text-secondary)]">總繳回金額 (商品計算)</span>
+                        <span className={`text-2xl font-bold font-mono tabular-nums ${totalSalesAmount > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
+                            ${totalSalesAmount.toLocaleString()}
+                        </span>
+                    </div>
+                </div>
+
+                {/* Right Side: Cash, Expenses & Final Result (Unified Column) */}
+                <div className="flex flex-col h-auto xl:h-[calc(100vh-10rem)] gap-6">
+                    {/* Scrollable Content: Cash & Expenses */}
+                    <div className={`flex-1 xl:overflow-y-auto pr-0 xl:pr-2 space-y-6 transition-opacity ${isCredit ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
+
+                        {/* Overlay for locking if strictly needed, but pointer-events-none does the trick interactively */}
+
+                        <div className="glass-panel p-5 relative">
+                            {isCredit && <div className="absolute inset-0 z-50 cursor-not-allowed"></div>}
+
+                            <h2 className="text-lg font-bold mb-3 flex items-center gap-2 text-[var(--text-primary)]">
+                                <Calculator size={20} className="text-amber-500" /> 錢點清算
+                            </h2>
+                            {/* 修正模式提示：若為舊單（無面額明細），顯示提示 */}
+                            {originalSaleId && !Object.values(cashCounts).some(v => Number(v) > 0) && (
+                                <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700 flex items-start gap-1.5">
+                                    <span className="shrink-0">⚠️</span>
+                                    <span>此單建立時未記錄面額明細，錢點清算需重新填寫。</span>
+                                </div>
+                            )}
+                            {originalSaleId && Object.values(cashCounts).some(v => Number(v) > 0) && !Object.values(cashCounts).every((v, i, a) => i === 0 || Number(v) === 0) && (
+                                <div className="mb-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 flex items-start gap-1.5">
+                                    <span className="shrink-0">ℹ️</span>
+                                    <span>已從原始單據還原面額資料，請確認無誤。</span>
+                                </div>
+                            )}
+                            {/* Full-Width Cash Counter with 3-Column Grid */}
+                            <div className="space-y-0.5">
+                                {[1000, 500, 100, 50, 10, 5, 1].map((denom, idx, arr) => {
+                                    const currentId = `input-cash-${denom}`;
+                                    const nextId = idx < arr.length - 1 ? `input-cash-${arr[idx + 1]}` : 'input-reserve';
+                                    const prevId = idx > 0 ? `input-cash-${arr[idx - 1]}` : null;
+                                    const subtotal = denom * getSafeNum(cashCounts[denom]);
+                                    return (
+                                        <div key={denom} className="grid grid-cols-[60px_16px_1fr_80px] items-center gap-2 px-2 py-[5.6px] rounded-lg hover:bg-slate-50 transition-colors">
+                                            <span className="text-slate-600 font-mono font-bold text-base text-right">{denom}</span>
+                                            <span className="text-slate-300 text-xs text-center">×</span>
+                                            <input
+                                                id={currentId}
+                                                type="text"
+                                                inputMode="decimal"
+                                                autoComplete="off"
+                                                className="input-field text-center py-[5.6px] px-2 text-sm shadow-sm"
+                                                placeholder="0"
+                                                value={cashCounts[denom] || ''}
+                                                onChange={(e) => handleCashChange(denom, e.target.value)}
+                                                onBlur={(e) => handleCashBlur(denom, e.target.value)}
+                                                onFocus={() => setActiveInput({ id: currentId, type: 'cash', denom: denom })}
+                                                onKeyDown={(e) => handleSidebarKeyDown(e, {
+                                                    next: nextId,
+                                                    prev: prevId,
+                                                    right: nextId,
+                                                    left: prevId
+                                                })}
+                                                disabled={isCredit}
+                                            />
+                                            <div className="flex items-center justify-end">
+                                                <span className={`font-mono tabular-nums text-base font-black text-right ${subtotal > 0 ? 'text-blue-700' : 'text-slate-300'}`}>
+                                                    ${subtotal.toLocaleString()}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+
+                                {/* Reserve Fund */}
+                                <div className="border-t border-slate-100 mt-1 pt-1 grid grid-cols-[60px_16px_1fr_80px] items-center gap-2 px-2 py-[5.6px]">
+                                    <span className="text-slate-700 font-bold text-xs text-right">預備金</span>
+                                    <span className="text-slate-300 text-xs text-center">−</span>
+                                    <input
+                                        id="input-reserve"
+                                        type="text"
+                                        inputMode="decimal"
+                                        autoComplete="off"
+                                        className="input-field text-center py-[5.6px] px-2 text-sm border-rose-100 bg-rose-50/30 focus:ring-rose-200 shadow-sm"
+                                        value={reserve}
+                                        onChange={(e) => handleReserveChange(e.target.value)}
+                                        onBlur={(e) => handleReserveBlur(e.target.value)}
+                                        onFocus={() => setActiveInput({ id: 'input-reserve', type: 'reserve' })}
+                                        onKeyDown={(e) => handleSidebarKeyDown(e, {
+                                            next: 'input-expense-stall',
+                                            prev: 'input-cash-1',
+                                            right: 'input-expense-stall',
+                                            left: 'input-cash-1'
+                                        })}
+                                        disabled={isCredit}
+                                    />
+                                    <div className="flex items-center justify-end">
+                                        <span className={`font-mono tabular-nums text-base font-black text-right ${getSafeNum(reserve) > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
+                                            −${getSafeNum(reserve).toLocaleString()}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Final Result - Rounded Card */}
+                                <div className="mt-1.5 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-2xl px-5 py-2 flex items-center justify-between" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                                    <span className="text-[var(--text-secondary)] font-bold text-xs uppercase tracking-widest">點清結算</span>
+                                    <span className={`font-black font-mono tabular-nums text-3xl tracking-tight ${(isCredit ? 0 : totalCashNet) === 0
+                                        ? 'text-[var(--text-tertiary)]'
+                                        : (isCredit ? 0 : totalCashNet) > 0
+                                            ? 'text-[var(--accent-blue)]'
+                                            : 'text-[var(--accent-red)]'
+                                        }`}>
+                                        ${(isCredit ? 0 : totalCashNet).toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="glass-panel p-5 relative">
+                            {isCredit && <div className="absolute inset-0 z-50 cursor-not-allowed"></div>}
+
+                            <h2 className="text-lg font-bold mb-3 text-rose-500">支出與其他</h2>
+                            <div className="grid grid-cols-2 gap-2.5">
+                                {EXPENSE_CATEGORIES.map((item, idx, arr) => {
+                                    const { key, label } = item;
+                                    const currentId = `input-expense-${key}`;
+
+                                    // Sequential Navigation
+                                    const nextKey = idx < arr.length - 1 ? arr[idx + 1].key : 'save-data';
+                                    const nextId = idx < arr.length - 1 ? `input-expense-${nextKey}` : 'btn-save-data';
+                                    const prevId = idx > 0 ? `input-expense-${arr[idx - 1].key}` : 'input-reserve';
+
+                                    // Grid Navigation (2 columns)
+                                    const upKey = idx >= 2 ? arr[idx - 2].key : null;
+                                    const downKey = idx < arr.length - 2 ? arr[idx + 2].key : (idx === arr.length - 1 || idx === arr.length - 2 ? 'save-data' : arr[idx + 1].key);
+                                    const downId = downKey === 'save-data' ? 'btn-save-data' : `input-expense-${downKey}`;
+
+                                    return (
+                                        <div key={key}>
+                                            <div className="flex justify-between items-center mb-1 pr-1">
+                                                <label className="text-xs text-[var(--text-secondary)] font-medium">{label}</label>
+                                                {/* Remark Status Indicator / Trigger */}
+                                                {(['gas', 'parking', 'goods', 'others', 'salary', 'reserveFund', 'vehicleMaintenance'].includes(key)) && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setActiveExpenseKey(key);
+                                                            setShowVendorModal(true);
+                                                        }}
+                                                        className={`transition-all ${getSafeNum(expenses[key]) > 0
+                                                            ? (expenses[key === 'goods' ? 'goodsVendor' : `${key}Remark`] ? 'text-green-500 scale-110' : 'text-rose-500 animate-pulse scale-110')
+                                                            : 'text-gray-300 opacity-50 hover:opacity-100'
+                                                            }`}
+                                                        title="點擊填寫備註"
+                                                    >
+                                                        <Save size={12} strokeWidth={3} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <input
+                                                id={currentId}
+                                                type="text"
+                                                inputMode="decimal"
+                                                autoComplete="off"
+                                                className={`input-field py-[5.6px] text-sm transition-all ${(['gas', 'parking', 'goods', 'others', 'salary', 'reserveFund', 'vehicleMaintenance'].includes(key)) && getSafeNum(expenses[key]) > 0 && !expenses[key === 'goods' ? 'goodsVendor' : `${key}Remark`] ? 'border-rose-200 bg-rose-50/20' : ''}`}
+                                                value={expenses[key] || ''}
+                                                onChange={(e) => handleExpenseChange(key, e.target.value)}
+                                                onBlur={(e) => handleExpenseBlur(key, e.target.value)}
+                                                onFocus={() => setActiveInput({ id: currentId, type: 'expense', key: key })}
+                                                onKeyDown={(e) => handleSidebarKeyDown(e, {
+                                                    next: nextId,
+                                                    prev: prevId,
+                                                    right: nextId,
+                                                    left: prevId,
+                                                    up: upKey ? `input-expense-${upKey}` : 'input-reserve',
+                                                    down: downId
+                                                })}
+                                                disabled={isCredit}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+
+                        </div>
+                    </div>
+
+                    {/* Final Result Card (Fixed at bottom of the right column) */}
+                    <div className="p-6 glass-panel shadow-lg border-t-4 border-t-blue-600 opacity-100 pointer-events-auto">
+                        <div className="text-sm text-[var(--text-secondary)] mb-1 font-bold">扣除後總金額 (結算)</div>
+                        <div className={`text-4xl font-mono tabular-nums tracking-tight transition-all duration-300 ${Math.round(isCredit ? totalSalesAmount : finalTotal) === 0
+                                ? 'text-[var(--text-tertiary)] font-medium'
+                                : (isCredit ? totalSalesAmount : finalTotal) > 0
+                                    ? 'text-[var(--accent-blue)] font-black'
+                                    : 'text-[var(--accent-red)] font-black'
+                            }`}>
+                            ${(isCredit ? totalSalesAmount : finalTotal).toLocaleString()}
+                        </div>
+                        <button id="btn-save-data" onClick={handleSubmit} className="btn-primary w-full mt-6 flex justify-center items-center gap-2 py-4 text-lg">
+                            <Save size={20} /> 儲存資料
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+
+            {/* Print Template Config Modal */}
+            <PrintTemplateConfigModal
+                isOpen={isPrintConfigOpen}
+                onClose={() => setIsPrintConfigOpen(false)}
+                apiUrl={apiUrl}
+            />
+
+            {/* Merge Print Modal */}
+            <MergePrintModal
+                show={showMergeModal}
+                onClose={() => {
+                    setSelectedSaleIds([]);
+                    setShowMergeModal(false);
+                }}
+                records={mergeRecords}
+                selectedIds={selectedSaleIds}
+                startDate={mergeStartDate}
+                endDate={mergeEndDate}
+                onDateChange={(type, value) => {
+                    if (type === 'start') setMergeStartDate(value);
+                    else setMergeEndDate(value);
+                }}
+                onSearch={() => loadMergeRecords(mergeStartDate, mergeEndDate)}
+                onToggleSelect={(saleId) => {
+                    if (saleId === null) {
+                        setSelectedSaleIds([]);
+                    } else if (selectedSaleIds.includes(saleId)) {
+                        setSelectedSaleIds(selectedSaleIds.filter(id => id !== saleId));
+                    } else {
+                        setSelectedSaleIds([...selectedSaleIds, saleId]);
+                    }
+                }}
+                onMergePrint={handleMergePrint}
+                isPrinting={isMergePrinting}
+                isSearchLoading={isMergeSearchLoading}
+                systemCustomers={systemCustomers}
+                onUpdateCustomerSettings={async (payload) => {
+                    try {
+                        const cleanName = String(payload.customerName || '').trim();
+                        const cleanPayload = { ...payload, customerName: cleanName };
+                        const res = await callGAS(apiUrl, 'updateCustomerSettings', cleanPayload, user?.token);
+                        if (res && res.success) {
+                            setSystemCustomers(prev => {
+                                const list = Array.isArray(prev) ? prev : [];
+                                // 徹底過濾掉所有名稱匹配 cleanName 的新舊殘留條目 (包含字串與物件)
+                                const filtered = list.filter(c => {
+                                    const nameStr = typeof c === 'string' ? c : (c && c.name);
+                                    return String(nameStr || '').trim() !== cleanName;
+                                });
+                                const updatedList = [...filtered, {
+                                    name: cleanName,
+                                    isAiEnabled: payload.isAiEnabled === true,
+                                    schedule: Array.isArray(payload.schedule) ? payload.schedule : [0,1,2,3,4,5,6],
+                                    category: payload.category || '市場'
+                                }];
+
+                                // [Fix] 同步更新 SWR 本地快取，避免重新整理頁面 (F5) 時舊快取蓋掉最新設定！
+                                try {
+                                    const cachedRaw = safeLocalStorage.getItem('SALES_PAGE_CACHE');
+                                    if (cachedRaw) {
+                                        const cachedData = JSON.parse(cachedRaw);
+                                        cachedData.systemCustomers = updatedList;
+                                        safeLocalStorage.setItem('SALES_PAGE_CACHE', JSON.stringify(cachedData));
+                                    }
+                                } catch (e) {
+                                    console.error('更新本地快取失敗', e);
+                                }
+
+                                return updatedList;
+                            });
+                            return true;
+                        }
+                        return false;
+                    } catch (err) {
+                        console.error('儲存地點排程設定失敗:', err);
+                        alert('儲存地點排程設定失敗: ' + (err.message || err));
+                        return false;
+                    }
+                }}
+            />
+
+            {/* [New] 銷售對象自動完成清單 (僅在有輸入時顯示建議) */}
+            <datalist id="system-customers-list">
+                {location.trim().length > 0 && systemCustomers.map(c => {
+                    const name = typeof c === 'string' ? c : c.name;
+                    return <option key={name} value={name} />;
+                })}
+            </datalist>
+
+            {/* History Import Modal */}
+            <HistoryImportModal
+                show={showHistoryImportModal}
+                onClose={() => {
+                    setShowHistoryImportModal(false);
+                    setSelectedImportIds([]);
+                }}
+                records={historyImportRecords}
+                selectedIds={selectedImportIds}
+                onToggleSelect={(id) => {
+                    setSelectedImportIds(prev =>
+                        prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+                    );
+                }}
+                onImport={handleImportHistory}
+                startDate={historyImportStartDate}
+                endDate={historyImportEndDate}
+                onDateChange={(type, value) => {
+                    if (type === 'start') setHistoryImportStartDate(value);
+                    else setHistoryImportEndDate(value);
+                }}
+                onSearch={() => loadHistoryRecords(historyImportStartDate, historyImportEndDate)}
+                isLoading={isHistoryLoading}
+            />
+            {/* Expense Remark Modal */}
+            {showVendorModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/30 backdrop-blur-md animate-in fade-in duration-500">
+                    <div
+                        className="bg-white/95 rounded-[2.5rem] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] w-full max-w-3xl overflow-hidden border border-white/40 animate-in slide-in-from-bottom-8 duration-500"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="grid grid-cols-1 md:grid-cols-12">
+                            {/* Left Header Strip (or Top in mobile) */}
+                            <div className="md:col-span-4 bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 p-10 text-white flex flex-col justify-center relative overflow-hidden">
+                                <div className="absolute -right-8 -bottom-8 opacity-10 rotate-12">
+                                    <DollarSign size={160} />
+                                </div>
+                                <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-xl w-fit mb-6 shadow-inner ring-1 ring-white/20">
+                                    <DollarSign size={32} className="text-slate-200" />
+                                </div>
+                                <h3 className="text-3xl font-black tracking-tighter leading-tight">
+                                    {(() => {
+                                        switch (activeExpenseKey) {
+                                            case 'gas': return '加油備註';
+                                            case 'parking': return '停車備註';
+                                            case 'goods': return '貨款對象';
+                                            case 'others': return '其他支出';
+                                            case 'salary': return '薪資發放';
+                                            case 'reserveFund': return '公積金備註';
+                                            case 'vehicleMaintenance': return '車輛保養';
+                                            default: return '填寫備註';
+                                        }
+                                    })()}
+                                </h3>
+                                <div className="h-1 w-12 bg-slate-400/50 rounded-full mt-4"></div>
+                            </div>
+
+                            {/* Right Content Area */}
+                            <div className="md:col-span-8 p-10 space-y-8 bg-white flex flex-col justify-center">
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-end mb-2">
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-1">資訊輸入 / Remarks</label>
+                                        <span className="text-[10px] text-slate-300 font-bold italic">Save to Expenditures Sheet</span>
+                                    </div>
+                                    <div className="relative group">
+                                        <input
+                                            autoFocus
+                                            type="text"
+                                            className="w-full h-16 px-8 rounded-[1.25rem] border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-slate-800 focus:ring-8 focus:ring-slate-800/5 text-xl font-bold transition-all placeholder:text-slate-200 shadow-inner"
+                                            placeholder={(() => {
+                                                switch (activeExpenseKey) {
+                                                    case 'gas': return '輸入車牌號碼...';
+                                                    case 'parking': return '輸入車牌號碼...';
+                                                    case 'goods': return '輸入此筆廠商名稱...';
+                                                    case 'others': return '輸入該筆支出用途...';
+                                                    case 'salary': return '輸入發放對象姓名...';
+                                                    case 'vehicleMaintenance': return '輸入維修項目或車號...';
+                                                    case 'reserveFund': return '輸入公積金用途...';
+                                                    default: return '輸入資訊內容...';
+                                                }
+                                            })()}
+                                            value={(() => {
+                                                const rKey = activeExpenseKey === 'goods' ? 'goodsVendor' : `${activeExpenseKey}Remark`;
+                                                return expenses[rKey] || '';
+                                            })()}
+                                            onChange={(e) => {
+                                                const rKey = activeExpenseKey === 'goods' ? 'goodsVendor' : `${activeExpenseKey}Remark`;
+                                                handleExpenseChange(rKey, e.target.value);
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') closeRemarkModal();
+                                            }}
+                                        />
+                                        <div className="absolute left-0 -bottom-6 text-[10px] text-slate-400 font-medium opacity-0 group-focus-within:opacity-100 transition-opacity">
+                                            {activeExpenseKey === 'goods' ? '輸入廠商名稱後按下 Enter 鍵保存' : '輸入備註後按下 Enter 鍵保存'}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={closeRemarkModal}
+                                    className="w-full py-5 bg-slate-900 hover:bg-black text-white rounded-[1.25rem] font-black text-xl shadow-[0_15px_30px_-10px_rgba(0,0,0,0.3)] transition-all active:scale-[0.97] flex items-center justify-center gap-4 group"
+                                >
+                                    <span>保存資訊</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Product Drag & Drop Sorting Modal */}
+            <ProductSortModal
+                isOpen={showSortModal}
+                onClose={() => setShowSortModal(false)}
+                products={allAvailableProducts}
+                onSaveSortOrder={handleSaveSortOrder}
+                isSaving={isSavingSortOrder}
+            />
+        </>
+    );
+}
+
+// ==========================================
+// [Performance Optimization] Memoized Rows
+// ==========================================
+const SalesMobileRow = React.memo(({
+    row,
+    idx,
+    isSorting,
+    handleMoveRow,
+    handleRowChange,
+    handleBlur,
+    setActiveInput,
+    handleKeyDown,
+    rowsLength
+}) => {
+    const getSafeNum = (v) => {
+        const n = Number(v);
+        return isNaN(n) ? 0 : n;
+    };
+    return (
+        <Draggable draggableId={String(row.id)} index={idx} isDragDisabled={!isSorting}>
+            {(provided, snapshot) => (
+                <div
+                    ref={provided.innerRef}
+                    {...provided.draggableProps}
+                    className={`bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)] ${snapshot.isDragging ? 'shadow-2xl z-50 ring-2 ring-indigo-500' : ''}`}
+                >
+                    {/* Header: Name & Stock */}
+                    <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-2">
+                            {isSorting && (
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <div {...provided.dragHandleProps} className="text-[var(--text-tertiary)] cursor-grab active:cursor-grabbing p-1">
+                                        <GripVertical size={20} />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleMoveRow(idx, 'up')}
+                                        disabled={idx === 0}
+                                        className="p-1 text-blue-500 disabled:text-gray-300 rounded hover:bg-blue-50"
+                                    >
+                                        <ChevronUp size={16} strokeWidth={2.5} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleMoveRow(idx, 'down')}
+                                        disabled={idx === rowsLength - 1}
+                                        className="p-1 text-blue-500 disabled:text-gray-300 rounded hover:bg-blue-50"
+                                    >
+                                        <ChevronDown size={16} strokeWidth={2.5} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleMoveRow(idx, 'top')}
+                                        disabled={idx === 0}
+                                        className="px-1 text-indigo-600 disabled:text-gray-300 text-[10px] font-black rounded hover:bg-indigo-50"
+                                    >
+                                        置頂
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleMoveRow(idx, 'bottom')}
+                                        disabled={idx === rowsLength - 1}
+                                        className="px-1 text-indigo-600 disabled:text-gray-300 text-[10px] font-black rounded hover:bg-indigo-50"
+                                    >
+                                        置底
+                                    </button>
+                                </div>
+                            )}
+                            <div className="font-extrabold text-[var(--text-primary)] text-xl leading-tight whitespace-nowrap">{row.name}</div>
+                        </div>
+                        <div className="text-[10px] font-mono bg-transparent px-2 py-0.5 rounded-lg border border-slate-200/40 whitespace-nowrap">
+                            <span className="text-blue-500 font-bold">{row.stock}</span>
+                            <span className="text-slate-300 dark:text-slate-600 mx-1">/</span>
+                            <span className="text-orange-500 font-bold">{row.originalStock || 0}</span>
+                        </div>
+                    </div>
+                    
+                    <div className="bg-gray-50 rounded-lg p-2 mb-3 border border-gray-100">
+                        <div className="grid grid-cols-4 gap-2">
+                            <div className="flex flex-col gap-1 min-h-[56px]">
+                                <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">領貨</label>
+                                <input
+                                    id={`input-m-${idx}-picked`}
+                                    type="text"
+                                    inputMode="decimal"
+                                    autoComplete="off"
+                                    className="input-field text-center p-2 text-base font-bold bg-white"
+                                    value={row.picked || ''}
+                                    onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
+                                    onBlur={(e) => handleBlur(row.id, 'picked', e.target.value)}
+                                    onFocus={() => setActiveInput({ id: `input-m-${idx}-picked`, type: 'row', rowId: row.id, field: 'picked' })}
+                                    onKeyDown={(e) => handleKeyDown(e, idx, 'picked', 'input-m-')}
+                                    disabled={isSorting}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1 min-h-[56px]">
+                                <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">原貨</label>
+                                <input
+                                    id={`input-m-${idx}-original`}
+                                    type="text"
+                                    inputMode="decimal"
+                                    autoComplete="off"
+                                    className="input-field text-center p-2 text-base font-bold bg-white"
+                                    value={row.original || ''}
+                                    onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
+                                    onBlur={(e) => handleBlur(row.id, 'original', e.target.value)}
+                                    onFocus={() => setActiveInput({ id: `input-m-${idx}-original`, type: 'row', rowId: row.id, field: 'original' })}
+                                    onKeyDown={(e) => handleKeyDown(e, idx, 'original', 'input-m-')}
+                                    disabled={isSorting}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1 min-h-[56px]">
+                                <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">退貨</label>
+                                <input
+                                    id={`input-m-${idx}-returns`}
+                                    type="text"
+                                    inputMode="decimal"
+                                    autoComplete="off"
+                                    className="input-field text-center p-2 text-base font-bold text-red-600 bg-white"
+                                    value={row.returns || ''}
+                                    onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
+                                    onBlur={(e) => handleBlur(row.id, 'returns', e.target.value)}
+                                    onFocus={() => setActiveInput({ id: `input-m-${idx}-returns`, type: 'row', rowId: row.id, field: 'returns' })}
+                                    onKeyDown={(e) => handleKeyDown(e, idx, 'returns', 'input-m-')}
+                                    disabled={isSorting}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1 min-h-[56px]">
+                                <label className="text-[10px] text-[var(--text-secondary)] text-center font-bold">單價</label>
+                                <input
+                                    id={`input-m-${idx}-price`}
+                                    type="text"
+                                    inputMode="decimal"
+                                    autoComplete="off"
+                                    className="input-field text-center p-2 text-base font-bold bg-white"
+                                    value={row.price}
+                                    onChange={(e) => handleRowChange(row.id, 'price', e.target.value)}
+                                    onBlur={(e) => handleBlur(row.id, 'price', e.target.value)}
+                                    onFocus={() => setActiveInput({ id: `input-m-${idx}-price`, type: 'row', rowId: row.id, field: 'price' })}
+                                    onKeyDown={(e) => handleKeyDown(e, idx, 'price', 'input-m-')}
+                                    disabled={isSorting}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Summary Footer */}
+                    <div className="flex justify-between items-center pt-2 border-t border-[var(--border-primary)]">
+                        <div className="text-xs text-[var(--text-secondary)] font-bold">
+                            售出: <span className={`font-mono font-black tabular-nums text-base ml-1 ${getSafeNum(row.sold) > 0 ? 'text-blue-600' : 'text-slate-300'}`}>{row.sold}</span>
+                        </div>
+                        <div className="text-xs text-[var(--text-secondary)] font-bold">
+                            小計: <span className={`font-mono font-black tabular-nums text-base ml-1 ${getSafeNum(row.subtotal) > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
+                                ${getSafeNum(row.subtotal).toLocaleString()}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </Draggable>
+    );
+}, (prev, next) => {
+    return (
+        prev.row.picked === next.row.picked &&
+        prev.row.original === next.row.original &&
+        prev.row.returns === next.row.returns &&
+        prev.row.sold === next.row.sold &&
+        prev.row.price === next.row.price &&
+        prev.row.subtotal === next.row.subtotal &&
+        prev.row.sortWeight === next.row.sortWeight &&
+        prev.isSorting === next.isSorting &&
+        prev.idx === next.idx &&
+        prev.rowsLength === next.rowsLength
+    );
+});
+
+const SalesDesktopRow = React.memo(({
+    row,
+    idx,
+    isSorting,
+    inputMode,
+    activeInput,
+    handleMoveRow,
+    handleRowChange,
+    handleBlur,
+    setActiveInput,
+    handleKeyDown,
+    rowsLength
+}) => {
+    const prevActive = activeInput?.rowId === row.id;
+    return (
+        <Draggable draggableId={String(row.id)} index={idx} isDragDisabled={!isSorting}>
+            {(provided, snapshot) => (
+                <tr
+                    ref={provided.innerRef}
+                    {...provided.draggableProps}
+                    className={`transition-colors ${snapshot.isDragging ? 'bg-[var(--bg-tertiary)] shadow-xl z-50' : ''
+                        } ${inputMode === 'mouse' ? 'hover:bg-[var(--bg-hover)]' : ''
+                        } ${inputMode === 'keyboard' && prevActive ? 'bg-[var(--bg-hover)]' : ''
+                        }`}
+                >
+                    <td className="p-4">
+                        {isSorting && (
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                <div {...provided.dragHandleProps} className="text-[var(--text-tertiary)] cursor-grab active:cursor-grabbing p-1">
+                                    <GripVertical size={16} />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => handleMoveRow(idx, 'up')}
+                                    disabled={idx === 0}
+                                    className="p-1 text-blue-500 disabled:text-gray-300 rounded hover:bg-blue-50"
+                                    title="向上移動"
+                                >
+                                    <ChevronUp size={16} strokeWidth={2.5} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleMoveRow(idx, 'down')}
+                                    disabled={idx === rowsLength - 1}
+                                    className="p-1 text-blue-500 disabled:text-gray-300 rounded hover:bg-blue-50"
+                                    title="向下移動"
+                                >
+                                    <ChevronDown size={16} strokeWidth={2.5} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleMoveRow(idx, 'top')}
+                                    disabled={idx === 0}
+                                    className="px-1.5 py-0.5 text-indigo-600 disabled:text-gray-300 hover:bg-indigo-50 text-[10px] font-black rounded"
+                                    title="直接置頂"
+                                >
+                                    置頂
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleMoveRow(idx, 'bottom')}
+                                    disabled={idx === rowsLength - 1}
+                                    className="px-1.5 py-0.5 text-indigo-600 disabled:text-gray-300 hover:bg-indigo-50 text-[10px] font-black rounded"
+                                    title="直接置底"
+                                >
+                                    置底
+                                </button>
+                            </div>
+                        )}
+                    </td>
+                    <td className="p-4 text-[var(--text-primary)] font-extrabold text-xl whitespace-nowrap">{row.name}</td>
+                    <td className="p-4 text-center font-mono tracking-tighter tabular-nums text-sm text-[var(--text-secondary)]">
+                        <span className="text-blue-500">{row.stock}</span>
+                        <span className="text-[var(--text-tertiary)] mx-1">/</span>
+                        <span className="text-orange-500">{row.originalStock || 0}</span>
+                    </td>
+                    <td className="p-4">
+                        <input
+                            id={`input-${idx}-picked`}
+                            type="text"
+                            autoComplete="off"
+                            className="input-field text-center p-1 font-mono"
+                            value={row.picked || ''}
+                            onChange={(e) => handleRowChange(row.id, 'picked', e.target.value)}
+                            onBlur={(e) => handleBlur(row.id, 'picked', e.target.value)}
+                            onFocus={() => setActiveInput({ id: `input-${idx}-picked`, type: 'row', rowId: row.id, field: 'picked' })}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'picked')}
+                            disabled={isSorting}
+                        />
+                    </td>
+                    <td className="p-4">
+                        <input
+                            id={`input-${idx}-original`}
+                            type="text"
+                            autoComplete="off"
+                            className="input-field text-center p-1 font-mono"
+                            value={row.original || ''}
+                            onChange={(e) => handleRowChange(row.id, 'original', e.target.value)}
+                            onBlur={(e) => handleBlur(row.id, 'original', e.target.value)}
+                            onFocus={() => setActiveInput({ id: `input-${idx}-original`, type: 'row', rowId: row.id, field: 'original' })}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'original')}
+                            disabled={isSorting}
+                        />
+                    </td>
+                    <td className="p-4">
+                        <input
+                            id={`input-${idx}-returns`}
+                            type="text"
+                            autoComplete="off"
+                            className="input-field text-center p-1 text-red-600 font-mono"
+                            value={row.returns || ''}
+                            onChange={(e) => handleRowChange(row.id, 'returns', e.target.value)}
+                            onBlur={(e) => handleBlur(row.id, 'returns', e.target.value)}
+                            onFocus={() => setActiveInput({ id: `input-${idx}-returns`, type: 'row', rowId: row.id, field: 'returns' })}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'returns')}
+                            disabled={isSorting}
+                        />
+                    </td>
+                    <td className="p-4 text-center">
+                        <span className={`font-mono font-black tabular-nums text-lg ${(Number(row.sold) || 0) > 0 ? 'text-blue-600' : 'text-slate-300'}`}>
+                            {row.sold}
+                        </span>
+                    </td>
+                    <td className="p-4">
+                        <input
+                            id={`input-${idx}-price`}
+                            type="text"
+                            autoComplete="off"
+                            className="input-field text-center p-1 w-20 font-mono"
+                            value={row.price}
+                            onChange={(e) => handleRowChange(row.id, 'price', e.target.value)}
+                            onBlur={(e) => handleBlur(row.id, 'price', e.target.value)}
+                            onFocus={() => setActiveInput({ id: `input-${idx}-price`, type: 'row', rowId: row.id, field: 'price' })}
+                            onKeyDown={(e) => handleKeyDown(e, idx, 'price')}
+                            disabled={isSorting}
+                        />
+                    </td>
+                    <td className="p-4 text-right">
+                        <span className={`font-mono font-black tabular-nums text-lg ${(Number(row.subtotal) || 0) > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
+                            ${(Number(row.subtotal) || 0).toLocaleString()}
+                        </span>
+                    </td>
+                </tr>
+            )}
+        </Draggable>
+    );
+}, (prev, next) => {
+    const prevActive = prev.activeInput?.rowId === prev.row.id;
+    const nextActive = next.activeInput?.rowId === next.row.id;
+    return (
+        prev.row.picked === next.row.picked &&
+        prev.row.original === next.row.original &&
+        prev.row.returns === next.row.returns &&
+        prev.row.sold === next.row.sold &&
+        prev.row.price === next.row.price &&
+        prev.row.subtotal === next.row.subtotal &&
+        prev.row.sortWeight === next.row.sortWeight &&
+        prev.isSorting === next.isSorting &&
+        prev.idx === next.idx &&
+        prev.rowsLength === next.rowsLength &&
+        prev.inputMode === next.inputMode &&
+        prevActive === nextActive
+    );
+});

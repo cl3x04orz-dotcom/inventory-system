@@ -1,0 +1,7052 @@
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import {
+  ShoppingCart,
+  Plus,
+  Minus,
+  CheckCircle,
+  Package,
+  MapPin,
+  Phone,
+  User,
+  FileText,
+  ArrowRight,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  CreditCard,
+  Banknote,
+  Smartphone,
+  Clock,
+  History,
+  RotateCcw,
+  Home,
+  Wallet,
+  Calendar,
+  Trash2,
+  Gift,
+  Headphones,
+  ShieldCheck,
+  Mail,
+  X,
+  Megaphone,
+} from "lucide-react";
+import { callGAS, memberApi, getBackendUrl } from "../utils/api";
+import { copyToClipboard } from '../utils/clipboard';
+import { renderFormattedContent } from './LiffAnnouncementPage';
+import logoImg from "../assets/logo.png";
+import logoLiff from "../assets/logo_liff.jpg";
+import milkBoxMini from "../assets/milk_box_mini.png";
+import milkBoxClassic from "../assets/milk_box_classic.png";
+import milkBoxLuxury from "../assets/milk_box_luxury.png";
+import milkBoxHeader from "../assets/milk_box_header.png";
+
+// ── 品牌 Logo 元件 ──────────────────────────────────────────────
+const MilkZeroWasteLogo = ({ setting }) => (
+  <img
+    src={setting?.logoUrl || logoLiff}
+    alt={`${setting?.name || "米立微"} Logo`}
+    className="h-10 w-auto flex-shrink-0 object-contain"
+    style={{ aspectRatio: "728/197" }}
+  />
+);
+
+// ── 店家設定（改這裡就好）─────────────────────────────────────
+const BANK_INFO = {
+  bank: "玉山銀行 (808)",
+  account: "0934979271826",
+  name: "張庭瑜",
+};
+const LINE_PAY_URL = "https://line.me/ti/p/kjGUUdBqLE";
+const LINE_CONTACT_URL = "https://line.me/R/ti/p/@839rpabi";
+const LS_KEY = "mlw_customer"; // LocalStorage key
+
+// ── 法規與商城定型化政策文案 ─────────────────────────────────────
+const POLICY_CONTENT_MAP = {
+  shopping_notice: {
+    icon: '🛒',
+    title: '購物須知',
+    content: [
+      `1.【服務範疇與訂購】\n本商城「米立微 MilkZeroWaste」（米立微有限公司，統一編號：93545674）提供飲品、乳品及其他優選商品之線上預購服務，並依不同團購活動提供店面取貨及指定地點取貨。\n\n實際供應商品、取貨方式、配送範圍及相關活動內容，以商品頁面及下單時顯示之資訊為準。\n\n完成訂購前，請確認商品名稱、規格、數量、價格及取貨／配送方式是否正確。`,
+      `2.【訂單確認與通知】\n完成線上送出訂單後，系統將提供訂單確認資訊，並可能透過 LINE 或其他方式發送訂單明細通知。\n\n請您務必確認訂購品項、數量、金額及取貨／配送資訊。\n\n如發現訂單資料有誤，請儘速聯繫客服。`,
+      `3.【付款方式】\n本商城提供之付款方式以結帳頁面實際顯示為準。\n\n目前提供 LINE Pay 等線上付款方式。實際付款結果及訂單狀態，請以網站及付款服務顯示為準。\n\n如遇付款成功但訂單狀態異常，請勿重複付款，並儘速聯繫客服。`,
+      `4.【取貨與配送】\n本商城目前提供：\n• 店面取貨\n• 指定地點取貨\n\n實際取貨地點、時間及配送安排，以商品頁面、團購活動及訂單通知所載內容為準。\n\n目前不提供一般宅配服務。`,
+      `5.【商品保存】\n低溫乳品及其他需要冷藏保存之商品，於取貨或收到商品後，請依商品包裝所標示之保存方式及保存溫度儘速妥善保存，以維持商品品質。\n\n若商品於取貨或配送時有明顯破損、滲漏、短少或品項錯誤，請儘速聯繫客服。`,
+      `6.【商品缺貨或供應異常】\n如因供應商缺貨、物流、天候或其他不可預期因素，導致商品無法依原訂單供應，我們將視實際情況與您聯繫，並依相關規定提供替換商品、退款或其他合理處理方式。`,
+      `7.【退換貨及退款】\n如商品有瑕疵、破損、短少、品項錯誤或其他異常情況，請儘速聯繫客服。\n\n食品及飲品之退換貨、退款及通訊交易解除權，依相關法令及本商城「退換貨／退款政策」辦理。\n\n詳細內容請參閱「退換貨／退款政策」。`,
+      `8.【客服聯絡方式】\n如有訂單、商品、付款、取貨或配送相關問題，請聯繫：\n客服電話：0911-899-752\n客服 LINE：@milkzerowaste\n營業地址：台南市永康區永大路二段386-6號`
+    ]
+  },
+  refund_policy: {
+    icon: '🔄',
+    title: '退換貨／退款政策',
+    content: [
+      `1.【生鮮食品及冷藏商品之解除權例外】\n本商城部分商品屬於易於腐敗、保存期限較短或解約時即將逾期之食品及飲品，例如鮮乳、優酪乳等。\n\n依《消費者保護法》第19條及《通訊交易解除權合理例外情事適用準則》第2條規定，符合前述條件之商品，經本商城於交易前明確告知後，得排除消費者7日無條件解除契約之權利。\n\n因此，屬於上述合理例外情事之商品，不適用7日無條件退貨。\n\n但若商品本身具有瑕疵、破損、變質、失溫、品項錯誤或其他可歸責於本商城之問題，仍不影響消費者依法所享有之相關權利。`,
+      `2.【商品瑕疵與異常處理】\n若您於取貨或收到商品後發現商品有以下情況：\n• 商品包裝破損\n• 商品滲漏\n• 商品疑似失溫\n• 商品變質或有異常\n• 商品品項錯誤\n• 商品數量短少\n• 其他商品本身之瑕疵\n\n請於發現問題後儘速聯繫我們。\n\n為協助確認商品狀況，請提供訂單編號、商品照片或影片，以及問題說明。\n\n客服電話：0911-899-752\n客服 LINE：@milkzerowaste`,
+      `3.【商品異常之處理方式】\n經確認商品確有瑕疵、破損、品項錯誤、短少或其他可歸責於本商城之問題後，我們將依實際情況提供：\n• 商品補發或更換\n• 部分退款\n• 全額退款\n• 其他合理之處理方式\n\n實際處理方式將依商品狀況、訂單內容及相關法令判斷。`,
+      `4.【退款方式與時間】\n符合退款條件之訂單，將依原付款方式或適當方式辦理退款。\n\n使用 LINE Pay 等線上付款方式完成付款者，退款將依相關付款服務之作業流程辦理。\n\n本商城原則上於確認退款條件後 3～5 個工作天內完成退款作業；實際款項入帳時間仍可能受到 LINE Pay、金融機構或其他付款服務商作業時間影響。`,
+      `5.【商品保存與消費者責任】\n商品完成店面取貨或指定地點取貨後，請依商品包裝標示之保存方式及保存溫度妥善保存。\n\n如商品於交付後因消費者未依商品標示之方式保存，或其他可歸責於消費者之原因導致商品變質或損壞，相關退換貨或退款將依實際情況判斷。`,
+      `6.【退換貨注意事項】\n如發現商品異常，請盡可能保留：\n1. 問題商品。\n2. 商品完整包裝。\n3. 商品標示及有效日期。\n4. 商品異常照片或影片。\n5. 訂單相關資訊。\n\n上述資料有助於我們確認商品狀況及釐清責任。`,
+      `7.【客服聯絡方式】\n米立微 MilkZeroWaste\n米立微有限公司\n統一編號：93545674\n客服電話：0911-899-752\n客服 LINE：@milkzerowaste\n營業地址：台南市永康區永大路二段386-6號\n\n如本政策與中華民國現行強制性法令有所不同，依相關法令規定辦理。`
+    ]
+  },
+  shipping_policy: {
+    icon: '🚚',
+    title: '配送／取貨說明',
+    content: [
+      `1.【配送方式】\n本商城目前提供以下商品交付方式：\n• 🏪 店面取貨\n• 📍 指定地點取貨\n\n實際可選擇之取貨／配送方式，依商品、團購活動及下單時所顯示之選項為準。\n\n目前不提供一般宅配服務。`,
+      `2.【配送區域與運費】\n指定地點配送之服務範圍，依本商城實際開團之合作社區及指定配送區域為準。\n\n各配送區域之運費、免運門檻及配送條件，將於商品頁面、團購活動頁面或結帳時顯示。\n\n如訂單未達免運門檻，將依下單時所顯示之配送費用計算。`,
+      `3.【店面取貨】\n選擇店面取貨者，請於訂單指定之取貨時間至以下地址領取：\n台南市永康區永大路二段386-6號\n\n實際取貨時間及相關注意事項，以訂單通知或網站公告為準。\n\n領取商品時，建議確認商品品項及數量是否正確。`,
+      `4.【指定地點取貨】\n選擇指定地點取貨者，請依訂單或團購活動所載之指定地點及時間領取商品。\n\n不同團購活動之取貨地點及時間可能不同，請依當次活動及訂單通知為準。`,
+      `5.【無法聯繫或無法取貨】\n如配送人員抵達指定地點後無法聯繫收貨人，將透過電話或其他適當方式嘗試聯繫。\n\n若於合理等候時間內仍無法聯繫，且現場無適當之冷藏保存條件，為維護食品安全，配送人員可能將商品帶回門市或其他適當場所保存。\n\n如需再次配送，可能產生額外配送費用，實際處理方式將依訂單情況及配送條件與消費者聯繫確認。`,
+      `6.【食品保存】\n食品及飲品完成取貨或配送後，消費者應依商品包裝標示之保存方式及保存溫度儘速妥善保存。\n\n需要冷藏之商品，請於取貨或收到後儘速冷藏。\n\n如因消費者未依商品標示妥善保存，導致商品變質或其他問題，將依實際情況判斷責任。`,
+      `7.【配送異常】\n如商品於取貨或配送時發現有：\n• 商品破損\n• 包裝滲漏\n• 商品短少\n• 品項錯誤\n• 商品明顯異常\n\n請儘速與客服聯繫，並保留商品及相關包裝，以利確認及後續處理。`,
+      `8.【客服聯絡方式】\n如有配送、取貨或訂單相關問題，請聯繫：\n客服電話：0911-899-752\n客服 LINE：@milkzerowaste\n營業地址：台南市永康區永大路二段386-6號`
+    ]
+  },
+  payment_policy: {
+    icon: '💳',
+    title: '付款方式說明',
+    content: [
+      `1.【銀行轉帳】\n下單時請選擇「銀行轉帳」付款方式，完成訂單後，系統將提供指定銀行帳號及應付金額。請依訂單資訊完成轉帳，並於轉帳完成後，依網站提示輸入「轉帳帳號後五碼」，或透過客服提供相關付款資訊，以利本商城進行款項核對。款項確認後，訂單將依流程進行後續處理。\n\n銀行轉帳注意事項：\n• 請確認轉帳金額與訂單應付金額一致。\n• 完成轉帳後，請提供帳號後五碼，以利會計進行對帳。\n• 如轉帳金額與訂單金額不一致，請儘速聯繫客服確認。\n• 若款項尚未完成核對，訂單處理時間可能受到影響。`,
+      `2.【奶包金儲值扣抵】\n會員可使用帳號內已儲值之「奶包金」進行商品消費扣抵，可依訂單需求進行全額或部分扣抵。\n\n奶包金無折現功能，且無使用期限，會員可依需求使用。\n\n若訂單使用奶包金進行扣抵，其實際可使用金額及扣抵方式，以結帳頁面顯示為準。\n\n如訂單取消或符合退款條件，奶包金之返還方式將依本商城相關退款規定辦理。`,
+      `3.【LINE Pay】\n本商城支援 LINE Pay 即時付款服務。\n\n下單時請選擇「LINE Pay」付款方式，並依付款頁面提示完成付款。付款成功後，系統將依付款結果更新訂單付款狀態。\n\n如遇付款完成但訂單狀態未更新，請勿重複付款，並儘速聯繫客服協助確認。\n\nLINE Pay 實際付款流程及相關服務規範，依 LINE Pay 服務提供者之規定辦理。`,
+      `4.【現金付款】\n本商城部分訂單提供現金付款方式，適用於店面取貨、指定地點取貨或其他本商城指定之付款情況。下單時若結帳頁面提供「現金付款」選項，即可選擇現金付款。請於取貨或指定付款時間，依訂單應付金額支付現金。\n\n現金付款注意事項：\n• 請依訂單顯示之應付金額準備現金。\n• 建議準備接近訂單金額之現金，以利取貨流程順利進行。\n• 現金付款是否適用於特定商品、團購活動、取貨方式或指定地點，以商品頁面、結帳頁面及活動公告為準。\n• 如選擇現金付款但未於指定時間完成付款，可能影響訂單保留及後續處理。`,
+      `5.【付款確認與訂單處理】\n完成付款後，請確認訂單之付款狀態是否正確。不同付款方式之付款確認時間可能有所不同，訂單將於付款確認後依商城作業流程進行後續處理。\n\n如發生付款成功但訂單狀態異常、已扣款但訂單顯示未付款、銀行轉帳後無法核對、重複付款或付款金額與訂單金額不一致等情況，請勿重複付款，並儘速聯繫客服協助確認。`,
+      `6.【客服聯絡方式】\n米立微 MilkZeroWaste\n米立微有限公司\n統一編號：93545674\n客服電話：0911-899-752\n客服 LINE：@milkzerowaste\n營業地址：台南市永康區永大路二段386-6號`
+    ]
+  },
+  privacy_policy: {
+    icon: '🔒',
+    title: '隱私權保護政策',
+    content: [
+      `米立微有限公司（以下簡稱「本公司」，統一編號：93545674）非常重視您的個人資料及隱私權。為維護您的權益，請詳閱以下隱私權保護政策內容。本政策將說明本公司如何蒐集、處理及利用您於使用本商城服務時所提供之個人資料。`,
+      `1.【個人資料收集類別】\n當您使用本商城進行瀏覽、註冊會員、訂購商品、付款、取貨、配送、客服聯繫或參與相關活動時，我們可能依實際服務需要蒐集您的姓名、聯絡電話、Email、送貨或取貨相關資訊、LINE 帳號識別碼、訂單及交易紀錄，以及其他您主動提供之必要資料。`,
+      `2.【資料利用目的】\n本公司蒐集之個人資料，主要用於會員管理、訂單處理、商品取貨及配送、付款及金流對帳、退款處理、客服服務、訂單及服務通知、消費者聯繫、帳務處理、服務改善及內部統計分析等與本商城營運相關之用途。`,
+      `3.【資料提供與第三方使用】\n為完成訂單、付款、配送、通知或提供相關服務，本公司可能於必要範圍內，將相關資料提供予合作之金流、物流、配送、通訊或其他服務提供者使用。除法令另有規定或取得您的同意外，本公司不會任意將您的個人資料出租、出售或提供予無關之第三方。`,
+      `4.【資料保存與安全】\n本公司將依相關法令及業務所需之期間保存您的個人資料，並採取合理之技術及管理措施，防止個人資料遭未經授權之存取、竄改、洩漏、遺失或其他不當使用。當資料已無保存必要時，本公司將依相關規定進行刪除、停止使用或其他適當處理。`,
+      `5.【個人資料之權利】\n您依法得向本公司申請查詢、閱覽、補充、更正您的個人資料，並得依法請求停止蒐集、處理、利用或刪除個人資料。但如依法令或因本公司業務執行必要而有保存之必要者，得依相關規定辦理。`,
+      `6.【會員帳號與資料正確性】\n為確保訂單、付款、取貨及配送服務正常進行，請您提供正確、完整且最新之個人資料。如您提供之資料有變更，建議儘速於會員帳號內更新或聯繫客服協助處理。因資料錯誤、不完整或未及時更新所造成之訂單或服務問題，可能影響相關服務之正常進行。`,
+      `7.【LINE 及第三方服務】\n本商城可能使用 LINE、LINE Pay、物流、金流或其他第三方服務，以提供會員通知、付款、訂單處理或相關服務。相關資料之蒐集、處理及利用，除適用本政策外，亦可能受各該第三方服務提供者之隱私權政策及相關規範所約束。`,
+      `8.【Cookie 及網站使用紀錄】\n本商城可能使用 Cookie 或其他類似技術，以維持會員登入狀態、記錄購物車內容、改善網站功能及使用體驗，並進行網站流量及使用情形之統計分析。您可依所使用之瀏覽器設定管理或限制 Cookie，但部分網站功能可能因此受到影響。`,
+      `9.【政策修訂】\n本公司得因法令變更、服務內容調整或營運需要，適時修訂本隱私權保護政策。政策修訂後將公告於本商城網站，更新後之內容自公告日起生效。建議您定期查看本政策，以了解最新內容。`,
+      `10.【客服聯絡方式】\n如您對本隱私權保護政策、個人資料蒐集、處理或利用方式有任何疑問，或欲行使相關個人資料權利，請聯繫本公司客服。\n\n米立微 MilkZeroWaste\n米立微有限公司\n統一編號：93545674\n客服電話：0911-899-752\n客服 LINE：@milkzerowaste\n營業地址：台南市永康區永大路二段386-6號`
+    ]
+  },
+  terms_of_service: {
+    icon: '📜',
+    title: '網站服務條款',
+    content: [
+      `歡迎使用米立微 MilkZeroWaste 線上商城（以下簡稱「本網站」）。本網站由米立微有限公司（以下簡稱「本公司」，統一編號：93545674）營運。為保障您的權益，請您於使用本網站前詳閱以下服務條款。當您使用本網站服務，即表示您已閱讀、瞭解並同意接受本條款之內容。`,
+      `1.【條款認知與接受】\n當您存取、瀏覽、註冊會員、訂購商品或使用本網站提供之任何服務時，即表示您已閱讀、瞭解並同意接受本服務條款及本網站相關政策。若您不同意本條款內容，請停止使用本網站相關服務。`,
+      `2.【會員註冊與帳號】\n使用本網站部分功能可能需要註冊會員。註冊時請提供真實、正確及完整之資料，並於資料異動時適時更新。會員應妥善保管自己的帳號及相關登入資訊，如發現帳號遭他人未經授權使用，請儘速聯繫本公司客服。`,
+      `3.【使用者義務】\n您承諾於使用本網站時，遵守中華民國相關法令及本網站規定，不得利用本網站從事任何違法、詐欺、干擾系統運作、侵害他人權益或其他不當行為，亦不得以任何方式影響本網站正常營運。`,
+      `4.【訂購與商品資訊】\n本網站所提供之商品名稱、圖片、規格、價格、庫存、活動內容及其他商品資訊，均以網站實際顯示內容為準。完成訂購前，請確認商品名稱、規格、數量、價格及取貨或配送方式是否正確。若因商品供應、庫存、系統錯誤或其他不可預期因素導致訂單無法成立或履行，本公司將視實際情況與您聯繫並提供適當處理方式。`,
+      `5.【訂單成立與取消】\n您完成訂單送出後，系統將提供訂單相關資訊，但不代表本公司已無條件接受該訂單。訂單是否成立及後續處理，將依付款狀態、商品供應及本網站系統所顯示之訂單狀態為準。如有商品缺貨、供應異常、付款異常或其他無法履行訂單之情況，本公司得與您聯繫處理。`,
+      `6.【付款方式】\n本網站提供銀行轉帳、奶包金儲值扣抵、LINE Pay 及現金付款等方式，實際可使用之付款方式以商品頁面及結帳頁面顯示為準。各付款方式之使用規則，依本網站「付款方式」相關說明辦理。`,
+      `7.【取貨與配送】\n本網站提供店面取貨與指定地點取貨等服務，實際取貨地點、時間、配送範圍及相關安排，以商品頁面、團購活動及訂單通知所載內容為準。本網站目前不提供一般宅配服務。`,
+      `8.【智慧財產權聲明】\n本網站所包含之商標、Logo、商品圖片、攝影作品、文字、版面設計、網頁介面、程式、資料庫及其他內容，其智慧財產權除依法屬於第三方者外，均為本公司或合法權利人所有，受著作權法、商標法及其他相關智慧財產權法令保護。未經本公司或合法權利人事前書面授權，不得擅自複製、修改、重製、公開傳輸、散布、轉載、改作或以其他方式利用。`,
+      `9.【網站服務中斷或異常】\n本公司將盡合理努力維持本網站正常運作，但因系統維護、設備故障、網路異常、第三方服務中斷、天災、不可抗力或其他非本公司可控制之因素，可能造成網站暫時無法使用、資料傳輸延遲或服務中斷。本公司將於合理範圍內盡力恢復服務。`,
+      `10.【個人資料與隱私權】\n本網站對於會員及使用者個人資料之蒐集、處理及利用，依本網站「隱私權保護政策」及中華民國相關法令辦理。使用本網站即表示您已了解並同意本網站依相關政策及法令處理必要之個人資料。`,
+      `11.【服務條款之修改】\n本公司得因法令變更、服務內容調整、網站功能更新或營運需要，適時修改本服務條款。修改後之內容將公告於本網站，並自公告之日起生效。建議您定期查看本服務條款，以了解最新內容。`,
+      `12.【準據法與管轄法院】\n本服務條款之解釋與適用，均依中華民國法律辦理。如因本網站服務或本條款產生爭議，雙方應本於誠信原則協商處理；如仍無法解決，除法律另有強制規定外，同意以臺灣臺南地方法院為第一審管轄法院。`,
+      `13.【客服聯絡方式】\n如您對本服務條款、訂單、付款、取貨、配送或其他網站服務有任何疑問，請聯繫本公司客服。\n\n米立微 MilkZeroWaste\n米立微有限公司\n統一編號：93545674\n客服電話：0911-899-752\n客服 LINE：@milkzerowaste\n營業地址：台南市永康區永大路二段386-6號`
+    ]
+  }
+};
+
+// 自動補 0 與分機拆解輔助函數 (相容 09 手機、02-08 市話與 # 分機)
+const formatTaiwanPhone = (phone) => {
+  if (!phone) return { phone: "", ext: "" };
+  let str = String(phone).trim();
+  let ext = "";
+  if (str.includes("#")) {
+    const parts = str.split("#");
+    str = parts[0];
+    ext = parts[1] || "";
+  }
+  let digits = str.replace(/\D/g, "");
+  if (digits.length === 9 && digits.startsWith("9")) {
+    digits = "0" + digits;
+  } else if ((digits.length === 8 || digits.length === 9) && /^[2-8]/.test(digits)) {
+    digits = "0" + digits;
+  }
+  return { phone: digits, ext };
+};
+
+// 全域鎖：防止 React 嚴格模式或重複 Render 觸發多次 LIFF 初始化與登入轉址
+let isLiffInitStarted = false;
+let isLiffInitialized = false;
+
+export default function LiffOrderPage({ user, apiUrl, setting }) {
+  // ── 鎖定 body / html 避免 iOS 橡皮筋 & 網址列跳動 ──────────────
+  useEffect(() => {
+    document.title = setting?.name || "米立微";
+    document.documentElement.classList.add("liff-order-active");
+    document.body.classList.add("liff-order-active");
+    return () => {
+      document.documentElement.classList.remove("liff-order-active");
+      document.body.classList.remove("liff-order-active");
+    };
+  }, []);
+
+
+  // ── 自訂美化彈窗提示 ──────────────────────────────────────────
+  const [alertModal, setAlertModal] = useState({ show: false, message: '', callback: null });
+  const alert = (message, callback = null) => {
+    setAlertModal({ show: true, message, callback });
+  };
+  const [confirmModal, setConfirmModal] = useState({
+    show: false,
+    message: '',
+    onConfirm: null,
+    onCancel: null,
+    confirmText: '確定',
+    cancelText: '取消'
+  });
+
+  // ── 首頁公告狀態 ──────────────────────────────────────────────
+  const [dontShowToday, setDontShowToday] = useState(false);
+  const [announcementData, setAnnouncementData] = useState(null);
+  const [announcementModal, setAnnouncementModal] = useState({
+    show: false,
+    title: '',
+    content: '',
+    themeColor: 'purple'
+  });
+
+  // ── 商品 state ───────────────────────────────────────────────
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [cart, setCart] = useState({});
+  const [checkoutError, setCheckoutError] = useState("");
+
+  // ── 團購 V2 狀態 ───────────────────────────────────────────────
+  const [isGroupOrder, setIsGroupOrder] = useState(false);
+  const [activeRecipient, setActiveRecipient] = useState("");
+  const [groupCart, setGroupCart] = useState({});
+  const [groupGiftSelections, setGroupGiftSelections] = useState({}); // { [memberName]: { [promoId]: { [productId]: qty } } }
+  const [activeGroupMember, setActiveGroupMember] = useState("");
+  const [commonRecipients, setCommonRecipients] = useState(() => {
+    try {
+      const saved = localStorage.getItem("mlw_common_recipients");
+      return saved ? JSON.parse(saved) : [];
+    } catch (_) {
+      return [];
+    }
+  });
+  const [showAddRecipientModal, setShowAddRecipientModal] = useState(false);
+  const [newRecipientName, setNewRecipientName] = useState("");
+
+  const [activeCategory, setActiveCategory] = useState("");
+  const [sourceGroup, setSourceGroup] = useState("");
+  const [animatingProductId, setAnimatingProductId] = useState(null);
+  const tabBarRef = useRef(null);
+  const listRef = useRef(null);
+  const sectionRefs = useRef({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const searchInputRef = useRef(null);
+  const isManualScrollRef = useRef(false);
+  const manualScrollTimeoutRef = useRef(null);
+  // 記錄這次表單 Session 進入時的原始配送區域（用來比較所有區域變更警語）
+  const originalCommunityIdRef = useRef("");
+
+  // ── 口味規格 state ─────────────────────────────────────────────
+  const [flavorSelections, setFlavorSelections] = useState({}); // { [productId]: { [flavor]: qty } }
+  const [groupFlavorSelections, setGroupFlavorSelections] = useState({}); // { [recipientName]: { [productId]: { [flavor]: qty } } }
+  const [giftSelections, setGiftSelections] = useState({}); // { [promoId]: { [productId]: qty } }
+  const [showGiftModal, setShowGiftModal] = useState(null); // promoId
+  const [flavorModalProduct, setFlavorModalProduct] = useState(null);
+  const [tempFlavorQty, setTempFlavorQty] = useState({});
+
+  // ── 步驟機制 ─────────────────────────────────────────────────
+  // 'shop' | 'form' | 'confirm' | 'success' | 'orders' | 'cart' | 'member'
+  const [step, setStep] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const liffState = params.get("liff.state") || "";
+      const stepParam = params.get("step") || params.get("page_step") || (window.GAS_PARAMETERS && window.GAS_PARAMETERS.step);
+      if (stepParam === "orders" || liffState.includes("step=orders") || liffState.includes("/orders") || window.location.hash.includes("orders") || params.has("orders")) {
+        return "orders";
+      }
+      if (stepParam === "cart" || liffState.includes("step=cart") || window.location.hash.includes("cart") || params.has("cart")) {
+        return "cart";
+      }
+      if (stepParam === "member" || liffState.includes("step=member") || window.location.hash.includes("member") || params.has("member")) {
+        return "member";
+      }
+    } catch (_) { }
+    return "shop";
+  });
+
+  // ── 表單 state ───────────────────────────────────────────────
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [phoneExt, setPhoneExt] = useState("");
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [note, setNote] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("現金");
+  const [transferLastFive, setTransferLastFive] = useState("");
+  const [useWallet, setUseWallet] = useState(false);
+
+  // ── 送出 state ───────────────────────────────────────────────
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSyncingOrder, setIsSyncingOrder] = useState(false);
+  const [syncError, setSyncError] = useState("");
+  const [pendingLinePayUrlWeb, setPendingLinePayUrlWeb] = useState("");
+  const [pendingLinePayUrlApp, setPendingLinePayUrlApp] = useState("");
+  const [pendingLinePayUrlUniversal, setPendingLinePayUrlUniversal] = useState(null);
+  const [orderId, setOrderId] = useState("");
+  const [orderTime, setOrderTime] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [isReplenishmentSuccess, setIsReplenishmentSuccess] = useState(false);
+  const [replenishmentAmount, setReplenishmentAmount] = useState(0);
+  const [replenishmentRemark, setReplenishmentRemark] = useState("");
+
+  const handleCopy = async (text) => {
+    if (!text) return;
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  // ── 大樓群組綁定與管理員 State ──────────────────────────────
+  const [groupBindings, setGroupBindings] = useState({});
+  const [selectedBuilding, setSelectedBuilding] = useState(() => {
+    try {
+      const savedStr = localStorage.getItem("inventory_liff_order");
+      if (savedStr) {
+        const savedObj = JSON.parse(savedStr);
+        if (savedObj.building) return savedObj.building;
+      }
+    } catch (_) { }
+    return "一般用戶";
+  });
+  const [otherBuildingText, setOtherBuildingText] = useState("");
+  const [detailAddress, setDetailAddress] = useState("");
+  const [companyName, setCompanyName] = useState("");
+
+  // ── 新增：網址大樓參數、大樓時段設定與下單資訊 ───────────────
+  const [urlBuilding, setUrlBuilding] = useState("");
+  const [buildingSettings, setBuildingSettings] = useState([]);
+  const [tick, setTick] = useState(0);
+  const [successOrderTotal, setSuccessOrderTotal] = useState(0);
+  const [successOrderItems, setSuccessOrderItems] = useState([]);
+  const [successGroupCart, setSuccessGroupCart] = useState({});
+  const [successGroupGiftSelections, setSuccessGroupGiftSelections] = useState({});
+  const [successCartTotal, setSuccessCartTotal] = useState(0);
+  const [successShippingFee, setSuccessShippingFee] = useState(0);
+  const [successWalletDeduction, setSuccessWalletDeduction] = useState(0);
+  const [successRewardDiscount, setSuccessRewardDiscount] = useState(0);
+  const [successDeliveryDate, setSuccessDeliveryDate] = useState("");
+  const [successDeliveryTime, setSuccessDeliveryTime] = useState("");
+  const [isDetailExpanded, setIsDetailExpanded] = useState(true);
+  const [isNightOrder, setIsNightOrder] = useState(false);
+  const [isReorder, setIsReorder] = useState(false);
+  const [isMsgSentAuto, setIsMsgSentAuto] = useState(false);
+
+  // 會員中心狀態
+  const [memberProfile, setMemberProfile] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [isMemberLoading, setIsMemberLoading] = useState(false);
+  const [lineUserId, setLineUserId] = useState("");
+  const [linePictureUrl, setLinePictureUrl] = useState("");
+
+  // 滿額折抵設定
+  const [rewardConfig, setRewardConfig] = useState(null);
+  const [selectedRewardRule, setSelectedRewardRule] = useState(null); // { spendMin: 5000, discount: 150 } or null
+  const [expandedBoxIdx, setExpandedBoxIdx] = useState(null);
+  const [previewBox, setPreviewBox] = useState(null); // 用來控制獎品預覽 Bottom Sheet
+
+  // 當累積額度不足以使用目前選定的折抵規則時，自動歸零改為「不使用折抵」
+  useEffect(() => {
+    const currentSpend = Number(memberProfile?.RedeemableSpendBalance || 0);
+    if (selectedRewardRule && currentSpend < selectedRewardRule.spendMin) {
+      setSelectedRewardRule(null);
+    }
+  }, [memberProfile, selectedRewardRule]);
+
+  // V2 架構狀態
+  const [currentCommunity, setCurrentCommunity] = useState(null);
+  const [allCommunities, setAllCommunities] = useState([]);
+  const [selectedCity, setSelectedCity] = useState("");
+  const [selectedCommunityId, setSelectedCommunityId] = useState("");
+  const [showAreaModal, setShowAreaModal] = useState(false);
+  const [activeCampaign, setActiveCampaign] = useState(null);
+  const [nextOpenTime, setNextOpenTime] = useState(null);
+
+  // 📱 Mobile Footer & 政策彈窗控制狀態
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
+  const [activePolicyKey, setActivePolicyKey] = useState(null);
+
+  // 🛒 購物車彈出時動態捲軸防遮擋追蹤 Ref
+  const prevTotalQtyRef = useRef(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTick((t) => t + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // 雙軌狀態同步：當 isGroupOrder 啟用時，自動加總 groupCart 的每一項商品數量至 cart
+  useEffect(() => {
+    if (!isGroupOrder) return;
+    const newCart = {};
+    Object.values(groupCart).forEach((recipientItems) => {
+      if (recipientItems && typeof recipientItems === "object") {
+        Object.entries(recipientItems).forEach(([productId, qty]) => {
+          newCart[productId] = (newCart[productId] || 0) + qty;
+        });
+      }
+    });
+    setCart(newCart);
+  }, [groupCart, isGroupOrder]);
+
+  // 監聽網址參數與 Hash 變化（支援官方 LINE 圖文選單直接連動到指定分頁：訂單、購物車、會員等）
+  useEffect(() => {
+    const handleUrlCheck = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const liffState = params.get("liff.state") || "";
+        const stepParam = params.get("step") || params.get("page_step");
+        if (stepParam === "orders" || liffState.includes("step=orders") || liffState.includes("/orders") || window.location.hash.includes("orders") || params.has("orders")) {
+          setStep("orders");
+        } else if (stepParam === "cart" || liffState.includes("step=cart") || window.location.hash.includes("cart") || params.has("cart")) {
+          setStep("cart");
+        } else if (stepParam === "member" || liffState.includes("step=member") || window.location.hash.includes("member") || params.has("member")) {
+          setStep("member");
+        }
+      } catch (_) { }
+    };
+    handleUrlCheck();
+    window.addEventListener("hashchange", handleUrlCheck);
+    return () => window.removeEventListener("hashchange", handleUrlCheck);
+  }, []);
+
+  // 當進入「訂單」步驟且已取得 lineUserId 時，自動載入我的訂單列表
+  useEffect(() => {
+    if (step === "orders" && lineUserId) {
+      setIsMemberLoading(true);
+      memberApi.getOrders(apiUrl, { userId: lineUserId }).then(res => {
+        if (res && res.success) setOrders(res.orders || []);
+        setIsMemberLoading(false);
+      }).catch(err => setIsMemberLoading(false));
+    }
+  }, [step, lineUserId, apiUrl]);
+
+  const renderBottomNav = () => {
+    if (step === "success") return null;
+    return (
+      <div className="flex-shrink-0 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] flex justify-around items-center h-[60px] pb-safe z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+        <button onClick={() => setStep("shop")} className={`flex flex-col items-center justify-center flex-1 h-full ${step === 'shop' ? 'text-blue-600' : 'text-[var(--text-tertiary)]'}`}>
+          <Home size={22} />
+          <span className="text-[10px] mt-1 font-bold">首頁</span>
+        </button>
+        <button onClick={() => {
+          if (Object.keys(cart).length === 0) {
+            alert('購物車是空的');
+            return;
+          }
+          setStep("confirm");
+        }} className={`flex flex-col items-center justify-center flex-1 h-full relative ${step === 'form' || step === 'confirm' ? 'text-blue-600' : 'text-[var(--text-tertiary)]'}`}>
+          <div className="relative">
+            <ShoppingCart size={22} />
+            {Object.keys(cart).length > 0 && (
+              <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-[var(--bg-secondary)]">
+                {Object.values(cart).reduce((a, b) => a + b, 0)}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] mt-1 font-bold">購物車</span>
+        </button>
+        <button onClick={() => {
+          if (lineUserId) {
+            setIsMemberLoading(true);
+            memberApi.getOrders(apiUrl, { userId: lineUserId }).then(res => {
+              if (res && res.success) setOrders(res.orders || []);
+              setIsMemberLoading(false);
+            }).catch(err => setIsMemberLoading(false));
+          }
+          setStep("orders");
+        }} className={`flex flex-col items-center justify-center flex-1 h-full ${step === 'orders' ? 'text-blue-600' : 'text-[var(--text-tertiary)]'}`}>
+          <FileText size={22} />
+          <span className="text-[10px] mt-1 font-bold">訂單</span>
+        </button>
+        <button onClick={() => setStep("member")} className={`flex flex-col items-center justify-center flex-1 h-full ${step === 'member' ? 'text-blue-600' : 'text-[var(--text-tertiary)]'}`}>
+          <User size={22} />
+          <span className="text-[10px] mt-1 font-bold">會員</span>
+        </button>
+      </div>
+    );
+  };
+
+  // ── 監聽 LINE Pay 扣款成功重導向參數 ──────────────────────────────────────
+  useEffect(() => {
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      let liffStateParams = null;
+      const liffState = searchParams.get('liff.state');
+      if (liffState) {
+        try {
+          const stateStr = liffState.startsWith('?') ? liffState.slice(1) : liffState;
+          liffStateParams = new URLSearchParams(stateStr);
+        } catch (e) { }
+      }
+      const hashStr = window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '';
+      const hashParams = new URLSearchParams(hashStr);
+
+      const getP = (key) => liffStateParams?.get(key) || searchParams.get(key) || hashParams.get(key) || '';
+
+      const isReplenishment = getP('replenishmentSuccess') === 'true';
+      const isSuccess = getP('orderSuccess') === 'true' || isReplenishment;
+      const urlOrderId = getP('orderId');
+      const pendingOrderId = sessionStorage.getItem('mlw_linepay_pending_orderId') || localStorage.getItem('mlw_linepay_pending_orderId');
+      const sOrderId = urlOrderId || pendingOrderId;
+      const sAmt = getP('amount');
+      const sRemark = getP('remark') || '';
+
+      if (isReplenishment && sOrderId) {
+        // 清除 pending，避免重複觸發
+        sessionStorage.removeItem('mlw_linepay_pending_orderId');
+        localStorage.removeItem('mlw_linepay_pending_orderId');
+        setIsReplenishmentSuccess(true);
+        if (sAmt) setReplenishmentAmount(Number(sAmt));
+        if (sRemark) setReplenishmentRemark(sRemark);
+        setOrderId(sOrderId);
+        setPaymentMethod('LINE Pay 線上補繳');
+        setOrderTime(new Date().toLocaleString("zh-TW", { hour12: false }));
+        setStep('success');
+        return;
+      }
+
+      if ((isSuccess || pendingOrderId) && sOrderId) {
+        // 清除 pending，避免重複觸發
+        sessionStorage.removeItem('mlw_linepay_pending_orderId');
+        localStorage.removeItem('mlw_linepay_pending_orderId');
+        setOrderId(sOrderId);
+        setPaymentMethod('LINE Pay');
+        setStep('success');
+        setIsSyncingOrder(true);
+        setSyncError("");
+
+        const pollStatus = async () => {
+          let attempts = 0;
+          const maxAttempts = 6;
+          const delay = 1500;
+
+          while (attempts < maxAttempts) {
+            try {
+              const r = await fetch(getBackendUrl(`/api/linepay/check-status?orderId=${sOrderId}`));
+              const res = await r.json();
+
+              if (res.success && res.order && (res.isPaid || res.paymentStatus === '已付款' || res.paymentStatus === '已入帳' || res.order.paymentStatus === '已付款' || res.order.paymentStatus === '已入帳')) {
+                // Success Mapping
+                if (res.order.createdAt) {
+                  const d = new Date(res.order.createdAt);
+                  setOrderTime(d.toLocaleString("zh-TW", { hour12: false }));
+                }
+                if (res.order.totalAmount !== undefined) setSuccessOrderTotal(Number(res.order.totalAmount));
+                if (res.order.shippingFee !== undefined) setSuccessShippingFee(Number(res.order.shippingFee));
+                if (res.order.rewardDiscountAmount !== undefined) setSuccessRewardDiscount(Number(res.order.rewardDiscountAmount));
+
+                // 直接依據資料庫真實訂單資料渲染（Single Source of Truth，跨裝置、跨瀏覽器皆 100% 穩定）
+                const items = [];
+                const parseItem = (i, unitPrice) => {
+                  let cleanName = i.productName || '';
+                  let rem = i.remark || '';
+                  if (!rem && cleanName.includes('【口味備註：')) {
+                    const m = cleanName.match(/【口味備註：.*?】/);
+                    if (m) rem = m[0];
+                  }
+                  cleanName = cleanName.replace(/\s*\(?\s*【口味備註：.*?】\s*\)?/g, '').trim();
+                  const exp = i.expiryDate || products.find(p => p.id === (i.productId || i.id))?.expiryDate || '';
+                  return {
+                    id: i.productId || i.id,
+                    productId: i.productId || i.id,
+                    name: cleanName,
+                    qty: Number(i.qty),
+                    price: Number(unitPrice),
+                    subtotal: i.subtotal !== undefined && i.subtotal !== null ? Number(i.subtotal) : (Number(unitPrice) * Number(i.qty)),
+                    remark: rem,
+                    expiryDate: exp
+                  };
+                };
+
+                if (res.order.recipients && res.order.recipients.length > 0) {
+                  res.order.recipients.forEach(r => {
+                    (r.items || []).forEach(i => {
+                      items.push(parseItem(i, i.price));
+                    });
+                  });
+                } else if (res.order.details && res.order.details.length > 0) {
+                  res.order.details.forEach(i => {
+                    items.push(parseItem(i, i.unitPrice));
+                  });
+                }
+
+                if (items.length > 0) {
+                  setSuccessOrderItems(items);
+                  const cartTotal = items.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
+                  setSuccessCartTotal(cartTotal);
+                }
+
+                setIsSyncingOrder(false);
+                window.history.replaceState({}, document.title, window.location.pathname);
+                return;
+              }
+            } catch (err) {
+              console.error("Polling error:", err);
+            }
+            attempts++;
+            if (attempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
+          }
+
+          setSyncError("付款處理中，請稍後至訂單查詢確認");
+          setIsSyncingOrder(false);
+          window.history.replaceState({}, document.title, window.location.pathname);
+        };
+
+        pollStatus();
+        return;
+      }
+    } catch (e) {
+      console.error('Failed to parse LINE Pay callback params:', e);
+    }
+  }, []);
+
+  // 🛡️ LINE Pay 扣款雙重保障：背景輪詢對帳感應，自動跳轉感謝頁
+  const startLinePayStatusPolling = useCallback((targetOrderId) => {
+    if (!targetOrderId) return;
+    let attempts = 0;
+    const maxAttempts = 60; // 60 * 2s = 120s
+    const pollInterval = setInterval(async () => {
+      attempts++;
+      try {
+        const res = await fetch(getBackendUrl(`/api/linepay/check-status?orderId=${targetOrderId}`));
+        const data = await res.json();
+        if (data && data.isPaid) {
+          clearInterval(pollInterval);
+          console.log(`[LINE Pay Polling] Detected paid status for order #${targetOrderId}, redirecting...`);
+          setOrderId(targetOrderId);
+          setPaymentMethod('LINE Pay');
+          if (data.order && data.order.createdAt) {
+            const d = new Date(data.order.createdAt);
+            setOrderTime(d.toLocaleString("zh-TW", { hour12: false }));
+          }
+          if (data.order && data.order.totalAmount) {
+            setSuccessOrderTotal(Number(data.order.totalAmount));
+          }
+
+          if (data.order) {
+            const items = [];
+            const parseItem = (i, unitPrice) => {
+              let cleanName = i.productName || '';
+              let rem = i.remark || '';
+              if (!rem && cleanName.includes('【口味備註：')) {
+                const m = cleanName.match(/【口味備註：.*?】/);
+                if (m) rem = m[0];
+              }
+              cleanName = cleanName.replace(/\s*\(?\s*【口味備註：.*?】\s*\)?/g, '').trim();
+              const exp = i.expiryDate || products.find(p => p.id === (i.productId || i.id))?.expiryDate || '';
+              return {
+                id: i.productId || i.id,
+                productId: i.productId || i.id,
+                name: cleanName,
+                qty: Number(i.qty),
+                price: Number(unitPrice),
+                subtotal: i.subtotal !== undefined && i.subtotal !== null ? Number(i.subtotal) : (Number(unitPrice) * Number(i.qty)),
+                remark: rem,
+                expiryDate: exp
+              };
+            };
+
+            if (data.order.recipients && data.order.recipients.length > 0) {
+              data.order.recipients.forEach(r => {
+                (r.items || []).forEach(i => items.push(parseItem(i, i.price)));
+              });
+            } else if (data.order.details && data.order.details.length > 0) {
+              data.order.details.forEach(i => items.push(parseItem(i, i.unitPrice)));
+            }
+
+            if (items.length > 0) {
+              setSuccessOrderItems(items);
+            }
+          }
+
+          setStep('success');
+          setCart({});
+        }
+      } catch (e) {
+        console.error('LinePay polling check error:', e);
+      }
+      if (attempts >= maxAttempts) {
+        clearInterval(pollInterval);
+      }
+    }, 2000);
+  }, []);
+
+  // ── 載入商品與初始化資料（單次 API，後端已過濾） ─────────────────────────────────────────
+  const loadAllData = async (overrideBuilding = '') => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams(window.location.search);
+
+      // 解析 liff.state（LIFF 外部瀏覽器時，原始 query 藏在 liff.state 裡）
+      let liffStateParams = null;
+      const liffState = params.get('liff.state');
+      if (liffState) {
+        try {
+          const stateStr = liffState.startsWith('?') ? liffState.slice(1) : liffState;
+          liffStateParams = new URLSearchParams(stateStr);
+        } catch (e) { }
+      }
+      const getP = (key) => liffStateParams?.get(key) || params.get(key) || '';
+
+      const cParam = getP("c");
+      const urlGrp = getP("grp");
+      let buildingParam = (typeof overrideBuilding === 'string' ? overrideBuilding : '') || getP("building");
+      if (!buildingParam) {
+        try {
+          const savedStr = localStorage.getItem(LS_KEY);
+          if (savedStr) {
+            const savedObj = JSON.parse(savedStr);
+            if (savedObj.building) buildingParam = savedObj.building;
+          }
+        } catch (_) { }
+      }
+
+      // 載入滿額折抵設定
+      try {
+        const rRes = await callGAS(apiUrl, "getRewardConfig", {});
+        if (rRes && rRes.success && rRes.config) {
+          setRewardConfig(rRes.config);
+        }
+      } catch (rErr) {
+        console.warn("Failed to load reward config:", rErr);
+      }
+
+      // 載入商城首頁公告
+      try {
+        const annRes = await callGAS(apiUrl, "getLiffAnnouncement", {});
+        if (annRes && annRes.enabled) {
+          const currentHash = `${annRes.updatedAt}_${annRes.title}`;
+          const todayStr = new Date().toISOString().split('T')[0];
+          const suppressedDate = localStorage.getItem("mlw_announcement_suppressed_date");
+          const lastReadHash = localStorage.getItem("mlw_announcement_read_hash");
+
+          const annData = {
+            title: annRes.title,
+            content: annRes.content,
+            themeColor: annRes.themeColor || 'purple',
+            fontSize: annRes.fontSize || 'medium',
+            customColors: annRes.customColors,
+            buttonTextColor: annRes.buttonTextColor || 'white',
+            titleTextColor: annRes.titleTextColor || 'white',
+            hash: currentHash
+          };
+          setAnnouncementData(annData);
+
+          const isNewVersion = lastReadHash !== currentHash;
+          const isSuppressedToday = suppressedDate === todayStr;
+
+          if (isNewVersion || !isSuppressedToday) {
+            setAnnouncementModal({
+              show: true,
+              ...annData
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to load announcement:", err);
+      }
+
+      const initData = await callGAS(
+        apiUrl,
+        "v2_getLiffInitData",
+        {
+          c: cParam,
+          grp: urlGrp,
+          building: buildingParam
+        },
+        user?.token
+      );
+      if (initData) {
+        // V2 回傳包裝在 data 屬性內
+        const resData = initData.data || initData;
+
+        // A. 處理商品
+        if (Array.isArray(resData.products)) {
+          const activeProds = resData.products.filter((p) => p.isActive);
+          setProducts(activeProds);
+
+          // 自動將第一個分類設為 Active
+          const cats = activeProds.map((p) => p.category?.trim() || "其他");
+          const unique = [...new Set(cats)];
+          const firstCat =
+            unique.filter((c) => c !== "其他")[0] ||
+            (unique.includes("其他") ? "其他" : "");
+          if (firstCat) {
+            setActiveCategory(firstCat);
+          }
+        }
+        // B. 處理 V2 社區與檔期資料
+        if (resData.community) {
+          setCurrentCommunity(resData.community);
+          setSelectedBuilding(resData.community.CommunityName);
+
+          const isVirtual = ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(resData.community.CommunityName);
+          if (isVirtual) {
+            // 嘗試從 localStorage 帶入上次記錄的區域
+            try {
+              const prevSaved = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+              const savedCities = prevSaved.city || "";
+              const savedCommId = prevSaved.communityId || "";
+              // 確認 savedCommId 在可用社區清單中（以 resData.allCommunities 驗證）
+              const validComms = Array.isArray(resData.allCommunities) ? resData.allCommunities : [];
+              const isValidSaved = savedCommId && validComms.some(c => c.CommunityId === savedCommId);
+              if (isValidSaved) {
+                setSelectedCity(savedCities);
+                setSelectedCommunityId(savedCommId);
+                setShowAreaModal(false); // 有舊資料，直接跳過彈窗
+              } else {
+                setSelectedCommunityId("");
+                setSelectedCity("");
+                setShowAreaModal(true);
+              }
+            } catch (_) {
+              setSelectedCommunityId("");
+              setSelectedCity("");
+              setShowAreaModal(true);
+            }
+          } else {
+            setSelectedCommunityId(resData.community.CommunityId || "");
+            if (resData.community.CommunityName.startsWith("台南市")) {
+              setSelectedCity("台南市");
+            } else if (resData.community.CommunityName.startsWith("高雄市")) {
+              setSelectedCity("高雄市");
+            }
+          }
+        }
+        if (Array.isArray(resData.allCommunities)) {
+          setAllCommunities(resData.allCommunities);
+        }
+        if (resData.activeCampaign) {
+          setActiveCampaign(resData.activeCampaign);
+        }
+        if (resData.nextOpenTime) {
+          setNextOpenTime(resData.nextOpenTime);
+        }
+        if (Array.isArray(resData.buildingSettings)) {
+          setBuildingSettings(resData.buildingSettings);
+        }
+        if (resData.groupBindings && typeof resData.groupBindings === "object") {
+          setGroupBindings(resData.groupBindings);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load initialization data:", err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isTimeInWeeklyWindow = (nowDate, openDay, openTimeStr, closeDay, closeTimeStr) => {
+    if (openDay === undefined || openDay === '' || !openTimeStr || closeDay === undefined || closeDay === '' || !closeTimeStr) {
+      return false;
+    }
+    const [openH, openM] = openTimeStr.split(':').map(Number);
+    const [closeH, closeM] = closeTimeStr.split(':').map(Number);
+    const getWeekMinute = (day, hour, min) => day * 1440 + hour * 60 + min;
+    const openMin = getWeekMinute(Number(openDay), openH, openM);
+    const closeMin = getWeekMinute(Number(closeDay), closeH, closeM);
+    const curDay = nowDate.getDay();
+    const curMin = getWeekMinute(curDay, nowDate.getHours(), nowDate.getMinutes());
+
+    if (openMin < closeMin) {
+      return curMin >= openMin && curMin <= closeMin;
+    } else if (openMin > closeMin) {
+      return curMin >= openMin || curMin <= closeMin;
+    }
+    return false;
+  };
+
+  const getGroupBuyStatus = () => {
+    const isDevEnv = typeof window !== 'undefined' && (
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      /^192\.168\./.test(window.location.hostname) ||
+      /^10\./.test(window.location.hostname) ||
+      window.location.search.includes('test=1') ||
+      window.location.search.includes('bypass=1')
+    );
+
+    if (isDevEnv) {
+      return {
+        status: 'open',
+        message: '🧪 本地測試模式：開團已開啟，可自由測試下單與 LINE Pay',
+        endTime: '測試中'
+      };
+    }
+
+    const currentBuildingName = (selectedBuilding && selectedBuilding !== "其它") ? selectedBuilding : "一般散客";
+    const setting = buildingSettings.find(s => s.building === currentBuildingName);
+    if (!setting) return { status: 'open', message: '' };
+
+    const { start_time, end_time, is_auto, auto_open_day, auto_open_time, auto_close_day, auto_close_time } = setting;
+    const now = new Date();
+    const nowTime = now.getTime();
+    const dayNames = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+
+    // 1. 先檢測自動開關團
+    let isAutoOpen = false;
+    if (is_auto) {
+      isAutoOpen = isTimeInWeeklyWindow(now, auto_open_day, auto_open_time, auto_close_day, auto_close_time);
+    }
+
+    // 2. 檢測手動加開開關團
+    let isManualOpen = false;
+    let isManualUpcoming = false;
+    let isManualEnded = false;
+
+    if (start_time && end_time) {
+      const start = new Date(start_time.replace(/\//g, '-'));
+      const end = new Date(end_time.replace(/\//g, '-'));
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        if (nowTime >= start.getTime() && nowTime <= end.getTime()) {
+          isManualOpen = true;
+        } else if (nowTime < start.getTime()) {
+          isManualUpcoming = true;
+        } else if (nowTime > end.getTime()) {
+          isManualEnded = true;
+        }
+      }
+    }
+
+    // 3. 彙整狀態輸出
+    if (isAutoOpen) {
+      const autoEndStr = `${dayNames[auto_close_day]} ${auto_close_time}`;
+
+      // 計算倒數時間
+      const [closeH, closeM] = auto_close_time.split(':').map(Number);
+      const targetDate = new Date(now.getTime());
+      targetDate.setHours(closeH, closeM, 0, 0);
+
+      const currentDay = targetDate.getDay();
+      let dayDiff = Number(auto_close_day) - currentDay;
+      if (dayDiff < 0 || (dayDiff === 0 && now.getTime() > targetDate.getTime())) {
+        dayDiff += 7;
+      }
+      targetDate.setDate(targetDate.getDate() + dayDiff);
+
+      const diffMs = targetDate.getTime() - now.getTime();
+      let countdownStr = '';
+      if (diffMs > 0) {
+        const diffDays = Math.floor(diffMs / 86400000);
+        const diffHrs = Math.floor((diffMs % 86400000) / 3600000);
+        const diffMins = Math.floor((diffMs % 3600000) / 60000);
+        const diffSecs = Math.floor((diffMs % 60000) / 1000);
+        const dayStr = diffDays > 0 ? `${diffDays} 天 ` : '';
+        countdownStr = `${dayStr}${diffHrs} 小時 ${diffMins} 分 ${diffSecs} 秒`;
+      }
+
+      return {
+        status: 'open',
+        message: `⏰ 團購熱烈進行中！距離結單還剩：${countdownStr || '0 秒'} (每週 ${autoEndStr} 結單)`,
+        endTime: autoEndStr
+      };
+    }
+
+    if (isManualOpen) {
+      const end = new Date(end_time.replace(/\//g, '-'));
+      const diffMs = end.getTime() - now.getTime();
+      let countdownStr = '';
+      if (diffMs > 0) {
+        const diffHrs = Math.floor(diffMs / 3600000);
+        const diffMins = Math.floor((diffMs % 3600000) / 60000);
+        const diffSecs = Math.floor((diffMs % 60000) / 1000);
+        countdownStr = `${diffHrs} 小時 ${diffMins} 分 ${diffSecs} 秒`;
+      }
+      return {
+        status: 'open',
+        message: `⏰ 限時開團中！距離結單還剩：${countdownStr || '0 秒'} (將於 ${end_time} 結單)`,
+        endTime: end_time
+      };
+    }
+
+    if (isManualUpcoming) {
+      return {
+        status: 'upcoming',
+        message: `⚠️ 本期限時開團尚未開始！開團時間為：${start_time}，敬請期待。`,
+        startTime: start_time
+      };
+    }
+
+    if (is_auto) {
+      // 雖然啟用自動但目前時間未到
+      const autoStartStr = `${dayNames[auto_open_day]} ${auto_open_time}`;
+      const autoEndStr = `${dayNames[auto_close_day]} ${auto_close_time}`;
+      return {
+        status: 'ended',
+        message: `🛑 目前非開團時段。每週自動開團時間：${autoStartStr} 至 ${autoEndStr}。`
+      };
+    }
+
+    if (isManualEnded) {
+      return {
+        status: 'ended',
+        message: `🛑 本期限時開團已截止下單！謝謝大家的支持。`,
+        endTime: end_time
+      };
+    }
+
+    // 若都沒設，預設為開放
+    return { status: 'open', message: '' };
+  };
+
+  const gbStatus = getGroupBuyStatus();
+
+  const initLiffAndFetchInfo = async () => {
+    const hostName = window.location.hostname;
+    const isLocalhost = hostName === 'localhost' || hostName === '127.0.0.1' || /^192\.168\./.test(hostName) || /^10\./.test(hostName);
+    const isInClient = window.liff && window.liff.isInClient();
+
+    if (isLocalhost && !isInClient) {
+      console.warn("[Localhost Test] Skip LIFF SDK initialization entirely to avoid URL redirects.");
+      setLineUserId("test-guest-id");
+      setCustomerName("本地測試訪客");
+      setCustomerPhone("0912345678");
+      return true;
+    }
+
+    if (!window.liff) {
+      console.warn("LINE LIFF SDK is not loaded.");
+      return true; // Standalone browser test fallback
+    }
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const liffId = import.meta.env.VITE_LIFF_ID || params.get("liffId") || "2010308873-ur2zL2cc";
+      await window.liff.init({ liffId });
+      isLiffInitialized = true;
+
+      // ★ 關鍵：在 login redirect 之前先抓 context，存入 sessionStorage
+      // 因為 login redirect 後會跳到外部瀏覽器，getContext() 就失效了
+      const context = window.liff.getContext();
+      if (context) {
+        const gid = context.groupId || context.roomId || "";
+        if (gid) {
+          sessionStorage.setItem("liff_group_id", gid);
+          setSourceGroup(gid);
+        }
+      }
+
+      // login redirect 後回來，從 sessionStorage 還原 groupId
+      if (!window.liff.getContext()?.groupId) {
+        const savedGid = sessionStorage.getItem("liff_group_id");
+        if (savedGid) setSourceGroup(savedGid);
+      }
+
+      if (!window.liff.isLoggedIn()) {
+        window.liff.login();
+        return false; // Redirecting, abort active requests
+      }
+
+      // 1. 獲取 LINE 使用者資訊
+      const profile = await window.liff.getProfile();
+      if (profile?.userId) {
+        setLineUserId(profile.userId);
+        if (profile.pictureUrl) setLinePictureUrl(profile.pictureUrl);
+
+        // 呼叫後端 API 取得會員資料
+        try {
+          const mRes = await memberApi.getMember(apiUrl, {
+            userId: profile.userId,
+            displayName: profile.displayName || "",
+            pictureUrl: profile.pictureUrl || ""
+          });
+          if (mRes && mRes.success && mRes.member) {
+            setMemberProfile(mRes.member);
+            // 雲端資料與本地 LocalStorage 進行合併
+            const savedStr = localStorage.getItem(LS_KEY);
+            let savedObj = savedStr ? JSON.parse(savedStr) : {};
+
+            // 後端若有存檔，以後端為主
+            if (mRes.member.ReceiverName) {
+              setCustomerName(mRes.member.ReceiverName);
+              savedObj.name = mRes.member.ReceiverName;
+            } else if (profile.displayName && !savedObj.name) {
+              setCustomerName(profile.displayName);
+              savedObj.name = profile.displayName;
+            } else if (savedObj.name) {
+              setCustomerName(savedObj.name);
+            }
+
+            if (mRes.member.Phone) {
+              const { phone: pVal, ext: eVal } = formatTaiwanPhone(mRes.member.Phone);
+              setCustomerPhone(pVal);
+              if (eVal) setPhoneExt(eVal);
+              savedObj.phone = mRes.member.Phone;
+            } else if (savedObj.phone) {
+              const { phone: pVal, ext: eVal } = formatTaiwanPhone(savedObj.phone);
+              setCustomerPhone(pVal);
+              if (eVal) setPhoneExt(eVal);
+            }
+
+            if (lockedBuilding) {
+              setSelectedBuilding(lockedBuilding);
+              savedObj.building = lockedBuilding;
+            } else if (mRes.member.Community) {
+              setSelectedBuilding(mRes.member.Community);
+              savedObj.building = mRes.member.Community;
+            } else if (savedObj.building) {
+              setSelectedBuilding(savedObj.building);
+            }
+
+            if (mRes.member.FloorRoom) {
+              setDetailAddress(mRes.member.FloorRoom);
+              savedObj.detailAddress = mRes.member.FloorRoom;
+            } else if (savedObj.detailAddress) setDetailAddress(savedObj.detailAddress);
+
+            localStorage.setItem(LS_KEY, JSON.stringify(savedObj));
+          }
+        } catch (mErr) {
+          console.error("Fetch member failed:", mErr);
+          // Fallback 至純本地機制
+          if (profile.displayName) {
+            const saved = localStorage.getItem(LS_KEY);
+            if (!saved) setCustomerName(profile.displayName);
+          }
+        }
+      }
+
+      // 2. 再次確認 groupId（in-client 環境下 context 應該有值）
+      const ctx2 = window.liff.getContext();
+      if (ctx2) {
+        const gid2 = ctx2.groupId || ctx2.roomId || "";
+        if (gid2) {
+          sessionStorage.setItem("liff_group_id", gid2);
+          setSourceGroup(gid2);
+        }
+      }
+      return true;
+    } catch (err) {
+      console.error("LIFF init failed:", err);
+      return true;
+    }
+  };
+
+  const syncMemberToCloud = async () => {
+    if (!lineUserId) return;
+    const fullPhone = phoneExt.trim() ? `${customerPhone.trim()}#${phoneExt.trim()}` : customerPhone.trim();
+    try {
+      await memberApi.saveMember(apiUrl, {
+        userId: lineUserId,
+        displayName: customerName,
+        pictureUrl: linePictureUrl,
+        receiverName: customerName,
+        phone: fullPhone,
+        community: selectedBuilding,
+        floorRoom: detailAddress,
+        remark: note
+      });
+    } catch (err) {
+      console.warn("Sync member failed", err);
+    }
+  };
+
+  // 會員資料自動同步 (Debounce)
+  useEffect(() => {
+    if (!lineUserId || step !== "form") return;
+    const timer = setTimeout(() => {
+      syncMemberToCloud();
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [customerName, customerPhone, phoneExt, selectedBuilding, detailAddress, note, step, lineUserId]);
+
+  useEffect(() => {
+    let active = true;
+    const init = async () => {
+      if (isLiffInitStarted) return;
+      isLiffInitStarted = true;
+
+      // 先解析 URL 參數，讓 loadAllData 能帶正確的 building/grp
+      const params = new URLSearchParams(window.location.search);
+
+      // ★ LIFF 特殊行為：在外部瀏覽器開啟時，原始 query 會被放進 liff.state
+      // 例如：?page=liffOrder&liff.state=?building=清景麟
+      // 需要先解析 liff.state，再 fallback 到頂層 params
+      let liffStateParams = null;
+      const liffState = params.get('liff.state');
+      if (liffState) {
+        try {
+          // liff.state 值可能是 ?building=xxx 或 building=xxx
+          const stateStr = liffState.startsWith('?') ? liffState.slice(1) : liffState;
+          liffStateParams = new URLSearchParams(stateStr);
+        } catch (e) {
+          console.warn('Failed to parse liff.state:', e);
+        }
+      }
+
+      const getParam = (key) =>
+        (liffStateParams?.get(key)) || params.get(key) || '';
+
+      const buildingParam = getParam("building");
+      const urlGrp = getParam("grp");
+      if (buildingParam) {
+        setUrlBuilding(buildingParam);
+        setSelectedBuilding(buildingParam);
+        try {
+          const savedStr = localStorage.getItem(LS_KEY);
+          let savedObj = savedStr ? JSON.parse(savedStr) : {};
+          savedObj.building = buildingParam;
+          localStorage.setItem(LS_KEY, JSON.stringify(savedObj));
+        } catch (e) {
+          console.error("Failed to save urlBuilding to localStorage:", e);
+        }
+      }
+      if (urlGrp) {
+        setSourceGroup(urlGrp);
+      }
+
+      let liffReady = false;
+      let loadError = null;
+
+      // ★ 並行：LIFF init 與 GAS API 同時跑，互不阻塞
+      // 使用獨立 Promise，不使用 Promise.all 承接，以防其中一個 reject 影響另一個
+      const p1 = initLiffAndFetchInfo()
+        .then((res) => {
+          liffReady = res;
+        })
+        .catch((err) => {
+          console.error("LIFF init error in background:", err);
+        });
+
+      const p2 = loadAllData(buildingParam)
+        .catch((err) => {
+          loadError = err;
+        });
+
+      await Promise.all([p1, p2]);
+
+      if (!active) return;
+
+      // 如果正在重導向跳轉到 LINE 登入頁，直接忽略所有 API 載入錯誤，因為頁面即將銷毀
+      if (!liffReady) {
+        console.log("LIFF is redirecting, ignoring API load error.");
+        return;
+      }
+
+      // 如果 LIFF 已就緒（沒有跳轉），但資料載入失敗，才彈出警告
+      if (loadError) {
+        console.error("Initialization data load failed:", loadError);
+        alert("載入資料失敗: " + loadError.message);
+      }
+    };
+    init();
+
+    return () => {
+      active = false;
+    };
+  }, [apiUrl, user?.token]);
+
+  // ── 鎖定與已知大樓邏輯 ──────────────────────────────────────────
+  const lockedBuilding = useMemo(() => {
+    if (urlBuilding && urlBuilding !== "一般散客") return urlBuilding;
+    if (sourceGroup && groupBindings[sourceGroup] && groupBindings[sourceGroup] !== "一般散客") {
+      return groupBindings[sourceGroup];
+    }
+    // 如果 URL 沒有，但 localStorage 有儲存社區大樓且非一般用戶/散客，也將其視為 lockedBuilding
+    try {
+      const savedStr = localStorage.getItem("inventory_liff_order");
+      if (savedStr) {
+        const savedObj = JSON.parse(savedStr);
+        const b = savedObj.building;
+        const isVirtual = ["線上下單", "一般散客", "一般用戶", "上線下單", "線上下單", "一般常態", "常態零售"].includes(b);
+        if (b && !isVirtual) {
+          return b;
+        }
+      }
+    } catch (_) { }
+    return "";
+  }, [urlBuilding, sourceGroup, groupBindings]);
+
+  const knownBuildings = useMemo(() => {
+    const list = new Set();
+    buildingSettings.forEach((s) => {
+      if (s.building && s.building !== "一般散客") list.add(s.building);
+    });
+    Object.values(groupBindings).forEach((b) => {
+      if (b && b !== "一般散客") list.add(b);
+    });
+    if (urlBuilding && urlBuilding !== "一般散客") list.add(urlBuilding);
+    return Array.from(list);
+  }, [buildingSettings, groupBindings, urlBuilding]);
+
+  useEffect(() => {
+    if (urlBuilding) {
+      const matchedGid = Object.keys(groupBindings).find(
+        (key) => groupBindings[key] === urlBuilding
+      );
+      if (matchedGid) {
+        setSourceGroup(matchedGid);
+      } else {
+        setSourceGroup(urlBuilding);
+      }
+    }
+  }, [urlBuilding, groupBindings]);
+
+  useEffect(() => {
+    if (lockedBuilding) {
+      setSelectedBuilding(lockedBuilding);
+    }
+  }, [lockedBuilding]);
+
+  const displayGroupName = useMemo(() => {
+    if (!sourceGroup) return "";
+    if (groupBindings[sourceGroup]) return groupBindings[sourceGroup];
+    const isRawId = sourceGroup.includes("-") || (sourceGroup.length > 15 && /^[a-zA-Z0-9_-]+$/.test(sourceGroup));
+    if (isRawId) {
+      if (selectedBuilding && !["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(selectedBuilding)) {
+        return selectedBuilding;
+      }
+      if (currentCommunity?.CommunityName && !["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(currentCommunity.CommunityName)) {
+        return currentCommunity.CommunityName;
+      }
+    }
+    return sourceGroup;
+  }, [sourceGroup, groupBindings, selectedBuilding, currentCommunity]);
+
+  const isGeneralUser =
+    selectedBuilding === "一般用戶" ||
+    selectedBuilding === "一般散客" ||
+    selectedBuilding === "上線下單" ||
+    selectedBuilding === "線上下單" ||
+    selectedBuilding === "一般常態" ||
+    selectedBuilding === "常態零售";
+
+  // ── 安全解析白名單陣列 ───────────────────────────────────────────────
+  const parseAllowedCommunities = (val) => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val.map(String).map(s => s.trim());
+    if (typeof val === 'string') {
+      let str = val.trim();
+      if (str.startsWith('[') && str.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(str);
+          if (Array.isArray(parsed)) return parsed.map(String).map(s => s.trim());
+        } catch (e) { }
+      }
+      if (str.includes(',')) {
+        return str.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      return [str];
+    }
+    return [];
+  };
+
+  // ── 社區白名單與搜尋過濾邏輯 ───────────────────────────────────────────────
+  const filteredProducts = useMemo(() => {
+    // 統整顧客當前的所有可能社區識別標籤 (ID 與 大樓/社區名稱)
+    const activeIdentifiers = new Set();
+    if (selectedCommunityId) activeIdentifiers.add(String(selectedCommunityId).trim());
+    if (selectedBuilding && !["一般用戶", "一般散客", "上線下單", "線上下單", "一般常態", "常態零售", "其它"].includes(selectedBuilding)) {
+      activeIdentifiers.add(String(selectedBuilding).trim());
+    }
+    if (currentCommunity) {
+      if (currentCommunity.CommunityId || currentCommunity.communityId) {
+        activeIdentifiers.add(String(currentCommunity.CommunityId || currentCommunity.communityId).trim());
+      }
+      if (currentCommunity.CommunityName || currentCommunity.communityName) {
+        activeIdentifiers.add(String(currentCommunity.CommunityName || currentCommunity.communityName).trim());
+      }
+    }
+    if (Array.isArray(allCommunities) && selectedCommunityId) {
+      const match = allCommunities.find(c => (c.CommunityId || c.communityId) === selectedCommunityId);
+      if (match) {
+        if (match.CommunityName || match.communityName) activeIdentifiers.add(String(match.CommunityName || match.communityName).trim());
+        if (match.CommunityId || match.communityId) activeIdentifiers.add(String(match.CommunityId || match.communityId).trim());
+      }
+    }
+
+    const activeList = Array.from(activeIdentifiers);
+
+    // 1. 社區白名單過濾 (Allowed Communities Filtering)
+    let list = products.filter(p => {
+      const allowedRaw = p.allowedCommunityIds || p.allowed_community_ids;
+      const allowed = parseAllowedCommunities(allowedRaw);
+      if (allowed.length > 0) {
+        // 關鍵通配邏輯：當白名單包含「線上下單」或「一般散客」時，代表對所有行政區與散客全面開放！
+        const hasGlobalOnlineOption = allowed.some(id => {
+          const match = Array.isArray(allCommunities) ? allCommunities.find(c => (c.CommunityId || c.communityId) === id) : null;
+          const cName = match ? (match.CommunityName || match.communityName) : id;
+          return ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(cName) ||
+            ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(id);
+        });
+
+        const isGenericOnlineCustomer = activeList.some(identifier => {
+          const name = String(identifier).trim();
+          if (["一般用戶", "一般散客", "上線下單", "線上下單", "一般常態", "常態零售", "其它"].includes(name)) return true;
+          const cleanName = name.replace(/^(台南市|高雄市|台灣|臺灣)/, '').trim();
+          if (cleanName.endsWith('區') && !cleanName.includes('大樓') && !cleanName.includes('社區') && !cleanName.includes('華廈') && !cleanName.includes('莊園') && !cleanName.includes('山莊') && !cleanName.includes('大廈')) {
+            return true;
+          }
+          return false;
+        });
+
+        if (hasGlobalOnlineOption && isGenericOnlineCustomer) return true;
+
+        // 否則進行特定社區 ID / 大樓名稱匹配
+        return activeList.some(id => allowed.includes(id));
+      }
+      return true; // 未設定白名單 (空陣列/null) ➔ 全社區開放
+    });
+
+    // 2. 關鍵字搜尋過濾
+    if (!searchQuery.trim()) return list;
+    const query = searchQuery.toLowerCase().trim();
+    return list.filter((p) => p.name && p.name.toLowerCase().includes(query));
+  }, [products, searchQuery, selectedCommunityId, selectedBuilding, currentCommunity, allCommunities]);
+
+  // ── 分類邏輯 ─────────────────────────────────────────────────
+  const categories = useMemo(() => {
+    const cats = filteredProducts.map((p) => p.category?.trim() || "其他");
+    const unique = [...new Set(cats)];
+    const without = unique.filter((c) => c !== "其他");
+    return [...without, ...(unique.includes("其他") ? ["其他"] : [])];
+  }, [filteredProducts]);
+
+  const groupedProducts = useMemo(() => {
+    const map = {};
+    filteredProducts.forEach((p) => {
+      const cat = p.category?.trim() || "其他";
+      if (!map[cat]) map[cat] = [];
+      map[cat].push(p);
+    });
+    return categories
+      .map((cat) => ({ cat, items: map[cat] || [] }))
+      .filter((g) => g.items.length > 0);
+  }, [filteredProducts, categories]);
+
+  // 當分類變更時，若當前分類已失效，自動指向第一個可用分類
+  useEffect(() => {
+    if (categories.length > 0 && !categories.includes(activeCategory)) {
+      setActiveCategory(categories[0]);
+    }
+  }, [categories, activeCategory]);
+
+  // 當展開搜尋欄時，自動聚焦到輸入框上
+  useEffect(() => {
+    if (isSearchExpanded && searchInputRef.current) {
+      const timer = setTimeout(() => {
+        searchInputRef.current.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isSearchExpanded]);
+
+  const handleCategoryChange = (cat) => {
+    setActiveCategory(cat);
+
+    // 標記為手動點擊滾動，避免滾動監聽自動切換造成震盪
+    isManualScrollRef.current = true;
+    if (manualScrollTimeoutRef.current)
+      clearTimeout(manualScrollTimeoutRef.current);
+    manualScrollTimeoutRef.current = setTimeout(() => {
+      isManualScrollRef.current = false;
+    }, 800); // 800ms 平滑滾動結束後恢復監聽
+
+    // Tab 捲至中央
+    if (tabBarRef.current) {
+      const btn = tabBarRef.current.querySelector(
+        `[data-cat="${CSS.escape(cat)}"]`,
+      );
+      if (btn) {
+        const bar = tabBarRef.current;
+        bar.scrollTo({
+          left: btn.offsetLeft - bar.offsetWidth / 2 + btn.offsetWidth / 2,
+          behavior: "smooth",
+        });
+      }
+    }
+    // 捲至對應分類區塊（使用容器 scrollTo 代替 scrollIntoView，防止瀏覽器抖動與視窗位移）
+    const targetEl = sectionRefs.current[cat];
+    if (targetEl && listRef.current) {
+      listRef.current.scrollTo({
+        top: targetEl.offsetTop,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  // ── 滾動監聽 (Scroll Spy) ──────────────────────────────────────────
+  const handleScroll = useCallback((e) => {
+    if (isManualScrollRef.current) return;
+
+    const container = e.currentTarget;
+    const containerScrollTop = container.scrollTop;
+
+    const groupElements = Object.entries(sectionRefs.current)
+      .map(([cat, el]) => ({ cat, el }))
+      .filter((g) => g.el != null);
+
+    if (groupElements.length === 0) return;
+
+    // 當前滾動位置 (加一點偏移量 offset 做精準選中)
+    const currentScrollTop = containerScrollTop + 15;
+
+    let targetCat = groupElements[0].cat;
+    for (let i = 0; i < groupElements.length; i++) {
+      const g = groupElements[i];
+      if (g.el.offsetTop <= currentScrollTop) {
+        targetCat = g.cat;
+      } else {
+        break;
+      }
+    }
+
+    if (targetCat && targetCat !== activeCategory) {
+      setActiveCategory(targetCat);
+      if (tabBarRef.current) {
+        const btn = tabBarRef.current.querySelector(
+          `[data-cat="${CSS.escape(targetCat)}"]`,
+        );
+        if (btn) {
+          const bar = tabBarRef.current;
+          bar.scrollTo({
+            left: btn.offsetLeft - bar.offsetWidth / 2 + btn.offsetWidth / 2,
+            behavior: "smooth",
+          });
+        }
+      }
+    }
+  }, [activeCategory]);
+
+  // ── 購物車配額與狀態計算 ─────────────────────────────────────
+  const getProductQuotaInfo = useCallback((prod) => {
+    if (!prod) return { hasQuota: false, remaining: null, isCommunityQuota: false };
+
+    const commId = currentCommunity?.CommunityId;
+    const commName = currentCommunity?.CommunityName;
+    const cQuotas = prod.communityQuotas || {};
+
+    const matchedKey = [commId, commName].find(k => k && cQuotas[k] && typeof cQuotas[k].maxQty === 'number');
+    if (matchedKey) {
+      const qObj = cQuotas[matchedKey];
+      const maxQty = Number(qObj.maxQty || 0);
+      const soldQty = Number(qObj.soldQty || 0);
+      const remaining = Math.max(0, maxQty - soldQty);
+      return { hasQuota: true, remaining, isCommunityQuota: true, maxQty };
+    }
+
+    if (prod.maxTotalQty !== null && prod.maxTotalQty !== undefined) {
+      const remaining = Math.max(0, Number(prod.maxTotalQty) - Number(prod.soldQty || 0));
+      return { hasQuota: true, remaining, isCommunityQuota: false, maxQty: Number(prod.maxTotalQty) };
+    }
+
+    return { hasQuota: false, remaining: null, isCommunityQuota: false };
+  }, [currentCommunity]);
+
+  const handleUpdateQty = (pid, delta) => {
+    setAnimatingProductId(pid);
+    setTimeout(() => {
+      setAnimatingProductId((prev) => (prev === pid ? null : prev));
+    }, 150);
+
+    const prod = products.find(p => p.id === pid);
+    const quotaInfo = getProductQuotaInfo(prod);
+    if (prod && quotaInfo.hasQuota && delta > 0) {
+      const remaining = quotaInfo.remaining;
+
+      const totalCartQty = isGroupOrder
+        ? Object.values(groupCart).reduce((sum, itemMap) => sum + (itemMap?.[pid] || 0), 0)
+        : (cart[pid] || 0);
+
+      if (totalCartQty + delta > remaining) {
+        const tagText = quotaInfo.isCommunityQuota ? "【本社區專屬限量】\n" : "";
+        const unit = (prod?.isBundle || Number(prod?.bundleSize) > 1) ? '組' : '入';
+        alert(`【${prod.name}】\n${tagText}活動配額僅剩：${remaining} ${unit}\n\n已達加購上限，無法再增加數量囉！`);
+        return;
+      }
+    }
+
+    if (isGroupOrder) {
+      setGroupCart((prev) => {
+        const next = { ...prev };
+        // 智能尋找該商品的對應團員：優先使用 activeRecipient，若無或扣減時則自動找尋擁有該商品的團員 (如 👤 ㄌ)
+        const owners = Object.keys(next).filter(name => (next[name]?.[pid] || 0) > 0);
+        let targetRecipient = activeRecipient;
+        if (!targetRecipient || (delta < 0 && !owners.includes(targetRecipient))) {
+          if (owners.length > 0) {
+            targetRecipient = owners[0];
+          } else if (Object.keys(next).length === 1) {
+            targetRecipient = Object.keys(next)[0];
+          }
+        }
+
+        if (!targetRecipient) {
+          alert("請先選擇或新增團員姓名！");
+          return prev;
+        }
+
+        const recipientItems = next[targetRecipient] || {};
+        const currentQty = recipientItems[pid] || 0;
+        const qty = Math.max(0, currentQty + delta);
+        const nextItems = { ...recipientItems };
+        if (qty === 0) {
+          delete nextItems[pid];
+        } else {
+          nextItems[pid] = qty;
+        }
+        return {
+          ...next,
+          [targetRecipient]: nextItems,
+        };
+      });
+    } else {
+      setCart((prev) => {
+        const qty = Math.max(0, (prev[pid] || 0) + delta);
+        const next = { ...prev };
+        if (qty === 0) delete next[pid];
+        else next[pid] = qty;
+        return next;
+      });
+    }
+  };
+
+  const handleUpdateMemberQty = (memberName, pid, delta) => {
+    const prod = products.find(p => p.id === pid);
+    if (prod && prod.has_flavor_attributes) {
+      setActiveRecipient(memberName);
+      handleProductAction(prod, delta > 0);
+      return;
+    }
+    setGroupCart((prev) => {
+      const recipientItems = prev[memberName] || {};
+      const currentQty = recipientItems[pid] || 0;
+      const qty = Math.max(0, currentQty + delta);
+      const nextItems = { ...recipientItems };
+      if (qty === 0) {
+        delete nextItems[pid];
+      } else {
+        nextItems[pid] = qty;
+      }
+      return {
+        ...prev,
+        [memberName]: nextItems,
+      };
+    });
+  };
+
+  const handleSetQty = (pid, valStr) => {
+    let qty;
+    if (valStr === "") {
+      qty = "";
+    } else {
+      qty = parseInt(valStr, 10);
+      if (isNaN(qty)) qty = 0;
+      qty = Math.max(0, Math.min(99, qty));
+    }
+
+    // 配額上限限制
+    if (qty !== "" && qty > 0) {
+      const prod = products.find(p => p.id === pid);
+      const quotaInfo = getProductQuotaInfo(prod);
+      if (prod && quotaInfo.hasQuota) {
+        const remaining = quotaInfo.remaining;
+        if (qty > remaining) {
+          const tagText = quotaInfo.isCommunityQuota ? "【本社區專屬限量】\n" : "";
+          const unit = (prod?.isBundle || Number(prod?.bundleSize) > 1) ? '組' : '入';
+          alert(`【${prod.name}】\n${tagText}活動配額僅剩：${remaining} ${unit}\n\n已自動為您調整為上限數量！`);
+          qty = remaining;
+        }
+      }
+    }
+
+    setAnimatingProductId(pid);
+    setTimeout(() => {
+      setAnimatingProductId((prev) => (prev === pid ? null : prev));
+    }, 150);
+
+    if (isGroupOrder) {
+      setGroupCart((prev) => {
+        const next = { ...prev };
+        const owners = Object.keys(next).filter(name => (next[name]?.[pid] || 0) > 0);
+        let targetRecipient = activeRecipient;
+        if (!targetRecipient || !owners.includes(targetRecipient)) {
+          if (owners.length > 0) {
+            targetRecipient = owners[0];
+          } else if (Object.keys(next).length === 1) {
+            targetRecipient = Object.keys(next)[0];
+          }
+        }
+
+        if (!targetRecipient) {
+          alert("請先選擇或新增團員姓名！");
+          return prev;
+        }
+
+        const recipientItems = next[targetRecipient] || {};
+        const nextItems = { ...recipientItems };
+        if (qty === 0 || qty === "") {
+          delete nextItems[pid];
+        } else {
+          nextItems[pid] = qty;
+        }
+        return {
+          ...next,
+          [targetRecipient]: nextItems,
+        };
+      });
+    } else {
+      setCart((prev) => {
+        const next = { ...prev };
+        if (qty === 0 || qty === "") {
+          delete next[pid];
+        } else {
+          next[pid] = qty;
+        }
+        return next;
+      });
+    }
+  };
+
+  const handleProductAction = (product, isPlus) => {
+    const statusInfo = getGroupBuyStatus();
+    if (statusInfo.status === 'upcoming' || statusInfo.status === 'ended') {
+      alert(statusInfo.message);
+      return;
+    }
+    if (product.has_flavor_attributes) {
+      if (isGroupOrder && !activeRecipient) {
+        alert("請先選擇或新增團員姓名！");
+        return;
+      }
+      setFlavorModalProduct(product);
+      const currentFlavors = (isGroupOrder && activeRecipient)
+        ? (groupFlavorSelections[activeRecipient]?.[product.id] || {})
+        : (flavorSelections[product.id] || {});
+      const initialTemp = {};
+      product.flavor_choices.forEach((f) => {
+        initialTemp[f] = currentFlavors[f] || 0;
+      });
+      const currentTotal = Object.values(initialTemp).reduce(
+        (a, b) => a + b,
+        0,
+      );
+      if (isPlus && currentTotal === 0 && product.flavor_choices.length > 0) {
+        initialTemp[product.flavor_choices[0]] = 1;
+      }
+      setTempFlavorQty(initialTemp);
+    } else {
+      handleUpdateQty(product.id, isPlus ? 1 : -1);
+    }
+  };
+
+  const handleUpdateTempFlavorQty = (flavor, delta) => {
+    setTempFlavorQty((prev) => {
+      const val = Math.max(0, Math.min(99, (prev[flavor] || 0) + delta));
+      return { ...prev, [flavor]: val };
+    });
+  };
+
+  const handleSetTempFlavorQty = (flavor, valStr) => {
+    let val;
+    if (valStr === "") {
+      val = "";
+    } else {
+      val = parseInt(valStr, 10);
+      if (isNaN(val)) val = 0;
+    }
+    setTempFlavorQty((prev) => ({ ...prev, [flavor]: val }));
+  };
+
+  const calculateProductSubtotal = (product, qty) => {
+    if (!product || !qty) return 0;
+    const singlePrice = Number(product.single_price) || Number(product.price) || 0;
+    if (product.has_volume_pricing && product.volume_pricing_settings) {
+      let settings = product.volume_pricing_settings;
+      if (typeof settings === 'string') {
+        try { settings = JSON.parse(settings); } catch (e) { }
+      }
+      let tiers = [];
+      if (settings && Array.isArray(settings.tiers) && settings.tiers.length > 0) {
+        tiers = settings.tiers
+          .map(t => ({ target_quantity: Number(t.target_quantity || 0), package_price: Number(t.package_price || 0) }))
+          .filter(t => t.target_quantity > 0 && t.package_price > 0);
+      } else if (settings && Number(settings.target_quantity) > 0 && Number(settings.package_price) > 0) {
+        tiers = [{ target_quantity: Number(settings.target_quantity), package_price: Number(settings.package_price) }];
+      }
+      tiers.sort((a, b) => b.target_quantity - a.target_quantity);
+
+      if (tiers.length > 0) {
+        let remaining = qty;
+        let total = 0;
+        for (const tier of tiers) {
+          if (remaining >= tier.target_quantity) {
+            const count = Math.floor(remaining / tier.target_quantity);
+            total += count * tier.package_price;
+            remaining %= tier.target_quantity;
+          }
+        }
+        total += remaining * singlePrice;
+        return total;
+      }
+    }
+    return singlePrice * qty;
+  };
+
+  const getFlavorRemark = (productId, pFlavorSelections, pGroupFlavorSelections = null, pIsGroupOrder = false) => {
+    if (pIsGroupOrder && pGroupFlavorSelections && typeof pGroupFlavorSelections === "object") {
+      const combinedMap = {};
+      Object.values(pGroupFlavorSelections).forEach((recipientMap) => {
+        if (recipientMap && recipientMap[productId]) {
+          Object.entries(recipientMap[productId]).forEach(([flavor, qty]) => {
+            const num = Number(qty) || 0;
+            if (num > 0) {
+              combinedMap[flavor] = (combinedMap[flavor] || 0) + num;
+            }
+          });
+        }
+      });
+      const items = Object.entries(combinedMap)
+        .filter(([_, qty]) => qty > 0)
+        .map(([flavor, qty]) => `${flavor}x${qty}`);
+      if (items.length === 0) return "";
+      return `【口味備註：${items.join(", ")}】`;
+    }
+
+    const selections = pFlavorSelections[productId];
+    if (!selections) return "";
+    const items = Object.entries(selections)
+      .filter(([_, qty]) => qty > 0)
+      .map(([flavor, qty]) => `${flavor}x${qty}`);
+    if (items.length === 0) return "";
+    return `【口味備註：${items.join(", ")}】`;
+  };
+
+  const handleConfirmFlavors = () => {
+    if (!flavorModalProduct) return;
+    const pid = flavorModalProduct.id;
+
+    // 清理臨時口味數量，將空字串 "" 轉為 0，並限制上限為 99
+    const cleanedTempFlavorQty = {};
+    Object.entries(tempFlavorQty).forEach(([f, val]) => {
+      const parsed = parseInt(val, 10) || 0;
+      cleanedTempFlavorQty[f] = Math.max(0, Math.min(99, parsed));
+    });
+
+    const total = Object.values(cleanedTempFlavorQty).reduce((a, b) => a + b, 0);
+
+    // 配額檢查：支援社區專屬與全局限量
+    const quotaInfo = getProductQuotaInfo(flavorModalProduct);
+    if (total > 0 && quotaInfo.hasQuota) {
+      const remaining = quotaInfo.remaining;
+      if (total > remaining) {
+        const tagText = quotaInfo.isCommunityQuota ? "【本社區專屬限量】\n" : "";
+        const unit = (flavorModalProduct?.isBundle || Number(flavorModalProduct?.bundleSize) > 1) ? '組' : '入';
+        alert(`【${flavorModalProduct.name}】\n${tagText}活動配額僅剩：${remaining} ${unit}\n您的選擇數量：${total} ${unit}\n\n選擇數量已超出上限！`);
+        return;
+      }
+    }
+
+    setAnimatingProductId(pid);
+    setTimeout(() => {
+      setAnimatingProductId((prev) => (prev === pid ? null : prev));
+    }, 150);
+
+    if (isGroupOrder) {
+      if (!activeRecipient) {
+        alert("請先選擇或新增團員姓名！");
+        return;
+      }
+      setGroupCart((prev) => {
+        const recipientItems = prev[activeRecipient] || {};
+        const nextItems = { ...recipientItems };
+        if (total === 0) {
+          delete nextItems[pid];
+        } else {
+          nextItems[pid] = total;
+        }
+        return {
+          ...prev,
+          [activeRecipient]: nextItems,
+        };
+      });
+      setGroupFlavorSelections((prev) => {
+        const recipientFlavors = prev[activeRecipient] || {};
+        const nextFlavors = { ...recipientFlavors };
+        if (total === 0) {
+          delete nextFlavors[pid];
+        } else {
+          nextFlavors[pid] = cleanedTempFlavorQty;
+        }
+        return {
+          ...prev,
+          [activeRecipient]: nextFlavors,
+        };
+      });
+    } else {
+      setCart((prev) => {
+        const next = { ...prev };
+        if (total === 0) {
+          delete next[pid];
+        } else {
+          next[pid] = total;
+        }
+        return next;
+      });
+      setFlavorSelections((prev) => {
+        const next = { ...prev };
+        if (total === 0) {
+          delete next[pid];
+        } else {
+          next[pid] = cleanedTempFlavorQty;
+        }
+        return next;
+      });
+    }
+
+    setFlavorModalProduct(null);
+  };
+
+  const totalQty = Object.values(cart).reduce((s, q) => s + q, 0);
+
+  // 🛒 當購物車從 0 件變為 >0 件時，若使用者停留在最底部，自動平滑調校捲軸，讓頁尾順暢上推浮於購物車條上方
+  useEffect(() => {
+    const prev = prevTotalQtyRef.current;
+    if (prev === 0 && totalQty > 0) {
+      if (listRef.current) {
+        const el = listRef.current;
+        const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        if (distanceToBottom < 200) {
+          setTimeout(() => {
+            if (listRef.current) {
+              listRef.current.scrollTo({
+                top: listRef.current.scrollHeight,
+                behavior: "smooth"
+              });
+            }
+          }, 80);
+        }
+      }
+    }
+    prevTotalQtyRef.current = totalQty;
+  }, [totalQty]);
+
+  const { cartItems, cartTotal, discountDetails, availableGiftCredits, memberGiftCredits } = useMemo(() => {
+    let tempItems = Object.entries(cart).map(([pid, qty]) => {
+      const p = products.find((x) => x.id === pid);
+      return {
+        id: pid,
+        name: p?.name ?? pid,
+        price: Number(p?.single_price || p?.price || 0),
+        qty: qty,
+        freeQty: 0,
+        subtotal: 0,
+        product: p,
+        remark: p?.has_flavor_attributes ? getFlavorRemark(pid, flavorSelections, groupFlavorSelections, isGroupOrder) : "",
+        imageUrl: p?.imageUrl ?? "",
+        isGift: false,
+        expiryDate: p?.expiryDate || ""
+      };
+    }).filter(item => item.product);
+
+    let totalAmount = 0;
+    const discounts = [];
+    const availableGiftCredits = {}; // { [promoId]: { earned: number, selected: number } }
+    const memberGiftCredits = {}; // { [memberName]: { [promoId]: { earned: number, selected: number } } }
+    const finalCartItems = [];
+
+    // 分組
+    const promoGroups = {}; // promoId -> items
+    const standaloneItems = [];
+
+    for (const item of tempItems) {
+      if (item.product?.promoId && item.product?.promotion?.isActive) {
+        const pId = item.product.promoId;
+        if (!promoGroups[pId]) promoGroups[pId] = { promotion: item.product.promotion, items: [] };
+        promoGroups[pId].items.push(item);
+      } else {
+        standaloneItems.push(item);
+      }
+    }
+
+    // 處理促銷群組
+    for (const pId in promoGroups) {
+      const group = promoGroups[pId];
+      const promo = group.promotion;
+
+      if (promo.promoType === 'BUY_X_GET_Y') {
+        const mode = promo.rewardSelectionMode || 'AUTO_LOWEST_PRICE';
+        const rawTiers = Array.isArray(promo.tiers) && promo.tiers.length > 0
+          ? promo.tiers
+          : [{ buyQty: Number(promo.buyQty), freeQty: Number(promo.freeQty) }];
+        const sortedTiers = [...rawTiers]
+          .map(t => ({ buyQty: Number(t.buyQty) || 0, freeQty: Number(t.freeQty) || 0 }))
+          .filter(t => t.buyQty > 0)
+          .sort((a, b) => b.buyQty - a.buyQty);
+
+        let totalQtyInGroup = group.items.reduce((sum, item) => sum + item.qty, 0);
+
+        if (mode === 'AUTO_LOWEST_PRICE') {
+          let totalFreeAllowed = 0;
+          let totalSavedAmount = 0;
+
+          if (isGroupOrder && groupCart && typeof groupCart === 'object') {
+            for (const [memberName, memberItems] of Object.entries(groupCart)) {
+              if (!memberItems || typeof memberItems !== 'object') continue;
+              let memberExpandedUnits = [];
+              for (const item of group.items) {
+                const mQty = Number(memberItems[item.id] || 0);
+                for (let i = 0; i < mQty; i++) {
+                  memberExpandedUnits.push({ ...item, unitPrice: item.price });
+                }
+              }
+              let remainingQty = memberExpandedUnits.length;
+              let memberFree = 0;
+              for (const tier of sortedTiers) {
+                const groupSize = tier.buyQty + tier.freeQty;
+                if (groupSize > 0 && remainingQty >= groupSize) {
+                  const sets = Math.floor(remainingQty / groupSize);
+                  memberFree += sets * tier.freeQty;
+                  remainingQty -= sets * groupSize;
+                }
+              }
+              memberExpandedUnits.sort((a, b) => a.unitPrice - b.unitPrice);
+              for (let i = 0; i < memberFree; i++) {
+                if (memberExpandedUnits[i]) {
+                  totalSavedAmount += memberExpandedUnits[i].unitPrice;
+                }
+              }
+              totalFreeAllowed += memberFree;
+            }
+            for (const item of group.items) {
+              finalCartItems.push({ ...item, qty: item.qty, subtotal: item.qty * item.price, isGift: false });
+              totalAmount += item.qty * item.price;
+            }
+          } else {
+            let remainingQty = totalQtyInGroup;
+            for (const tier of sortedTiers) {
+              const groupSize = tier.buyQty + tier.freeQty;
+              if (groupSize > 0 && remainingQty >= groupSize) {
+                const sets = Math.floor(remainingQty / groupSize);
+                totalFreeAllowed += sets * tier.freeQty;
+                remainingQty -= sets * groupSize;
+              }
+            }
+            let expandedUnits = [];
+            for (const item of group.items) {
+              for (let i = 0; i < item.qty; i++) {
+                expandedUnits.push({ ...item, unitPrice: item.price });
+              }
+            }
+            expandedUnits.sort((a, b) => a.unitPrice - b.unitPrice);
+            for (let i = 0; i < expandedUnits.length; i++) {
+              expandedUnits[i].isFree = i < totalFreeAllowed;
+            }
+            for (const item of group.items) {
+              const unitsOfThisItem = expandedUnits.filter(u => u.id === item.id);
+              const freeCount = unitsOfThisItem.filter(u => u.isFree).length;
+              const paidCount = unitsOfThisItem.filter(u => !u.isFree).length;
+              if (paidCount > 0) {
+                finalCartItems.push({ ...item, qty: paidCount, subtotal: paidCount * item.price, isGift: false });
+                totalAmount += paidCount * item.price;
+              }
+              if (freeCount > 0) {
+                finalCartItems.push({ ...item, qty: freeCount, subtotal: 0, price: 0, isGift: true, remark: item.remark ? `${item.remark} (贈品)` : "贈品" });
+              }
+            }
+            totalSavedAmount = expandedUnits.filter(u => u.isFree).reduce((sum, u) => sum + u.unitPrice, 0);
+          }
+
+          if (totalFreeAllowed > 0) {
+            discounts.push(`✨ [${promo.name}] 已自動折抵 ${totalFreeAllowed} 件免費商品 (省 $${totalSavedAmount})`);
+          }
+
+        } else if (mode === 'CUSTOMER_SELECT') {
+          let earnedGifts = 0;
+          if (isGroupOrder && groupCart && typeof groupCart === 'object') {
+            for (const [memberName, memberItems] of Object.entries(groupCart)) {
+              if (!memberItems || typeof memberItems !== 'object') continue;
+              let memberGroupQty = 0;
+              for (const item of group.items) {
+                memberGroupQty += Number(memberItems[item.id] || 0);
+              }
+              let remaining = memberGroupQty;
+              let mEarned = 0;
+              for (const tier of sortedTiers) {
+                if (tier.buyQty > 0 && remaining >= tier.buyQty) {
+                  const sets = Math.floor(remaining / tier.buyQty);
+                  mEarned += sets * tier.freeQty;
+                  remaining -= sets * tier.buyQty;
+                }
+              }
+              earnedGifts += mEarned;
+
+              // 計算該成員已選取贈品
+              const mSelections = groupGiftSelections[memberName]?.[pId] || {};
+              const mSelectedCount = Object.values(mSelections).reduce((a, b) => a + Number(b), 0);
+              if (!memberGiftCredits[memberName]) memberGiftCredits[memberName] = {};
+              memberGiftCredits[memberName][pId] = { earned: mEarned, selected: mSelectedCount, promoName: promo.name };
+            }
+          } else {
+            let remaining = totalQtyInGroup;
+            for (const tier of sortedTiers) {
+              if (tier.buyQty > 0 && remaining >= tier.buyQty) {
+                const sets = Math.floor(remaining / tier.buyQty);
+                earnedGifts += sets * tier.freeQty;
+                remaining -= sets * tier.buyQty;
+              }
+            }
+          }
+
+          for (const item of group.items) {
+            finalCartItems.push({ ...item, qty: item.qty, subtotal: item.qty * item.price, isGift: false });
+            totalAmount += item.qty * item.price;
+          }
+
+          let selectedGiftsCount = 0;
+          if (isGroupOrder && groupCart && typeof groupCart === 'object') {
+            const aggregatedGifts = {}; // { [gPid]: totalQty }
+            Object.entries(groupGiftSelections || {}).forEach(([memberName, mGifts]) => {
+              const selections = mGifts?.[pId] || {};
+              Object.entries(selections).forEach(([gPid, gQty]) => {
+                if (gQty > 0) {
+                  selectedGiftsCount += gQty;
+                  aggregatedGifts[gPid] = (aggregatedGifts[gPid] || 0) + gQty;
+                }
+              });
+            });
+
+            Object.entries(aggregatedGifts).forEach(([gPid, totalGQty]) => {
+              const gProd = products.find(p => p.id === gPid);
+              if (gProd) {
+                finalCartItems.push({
+                  id: gPid,
+                  name: gProd.name,
+                  price: 0,
+                  qty: totalGQty,
+                  freeQty: 0,
+                  subtotal: 0,
+                  product: gProd,
+                  remark: "免費贈品",
+                  imageUrl: gProd.imageUrl || "",
+                  isGift: true,
+                  expiryDate: gProd.expiryDate || ""
+                });
+              }
+            });
+          } else {
+            const selections = giftSelections[pId] || {};
+            for (const [gPid, gQty] of Object.entries(selections)) {
+              if (gQty > 0) {
+                selectedGiftsCount += gQty;
+                const gProd = products.find(p => p.id === gPid);
+                if (gProd) {
+                  finalCartItems.push({
+                    id: gPid,
+                    name: gProd.name,
+                    price: 0,
+                    qty: gQty,
+                    freeQty: 0,
+                    subtotal: 0,
+                    product: gProd,
+                    remark: "贈品",
+                    imageUrl: gProd.imageUrl || "",
+                    isGift: true,
+                    expiryDate: gProd.expiryDate || ""
+                  });
+                }
+              }
+            }
+          }
+
+          availableGiftCredits[pId] = { earned: earnedGifts, selected: selectedGiftsCount, promoName: promo.name };
+          if (earnedGifts > 0) {
+            discounts.push(`✨ [${promo.name}] 獲得 ${earnedGifts} 件贈品額度 (已選 ${selectedGiftsCount} 件)`);
+          }
+
+        } else if (mode === 'SAME_PRODUCT') {
+          for (const item of group.items) {
+            let totalItemFree = 0;
+            if (isGroupOrder && groupCart && typeof groupCart === 'object') {
+              for (const [memberName, memberItems] of Object.entries(groupCart)) {
+                if (!memberItems || typeof memberItems !== 'object') continue;
+                let memberItemQty = Number(memberItems[item.id] || 0);
+                let remaining = memberItemQty;
+                for (const tier of sortedTiers) {
+                  if (tier.buyQty > 0 && remaining >= tier.buyQty) {
+                    const sets = Math.floor(remaining / tier.buyQty);
+                    totalItemFree += sets * tier.freeQty;
+                    remaining -= sets * tier.buyQty;
+                  }
+                }
+              }
+            } else {
+              let remaining = item.qty;
+              for (const tier of sortedTiers) {
+                if (tier.buyQty > 0 && remaining >= tier.buyQty) {
+                  const sets = Math.floor(remaining / tier.buyQty);
+                  totalItemFree += sets * tier.freeQty;
+                  remaining -= sets * tier.buyQty;
+                }
+              }
+            }
+
+            finalCartItems.push({ ...item, qty: item.qty, subtotal: item.qty * item.price, isGift: false });
+            totalAmount += item.qty * item.price;
+
+            if (totalItemFree > 0) {
+              finalCartItems.push({ ...item, qty: totalItemFree, subtotal: 0, price: 0, isGift: true, remark: item.remark ? `${item.remark} (贈品)` : "贈品" });
+              discounts.push(`✨ [${promo.name}] ${item.name} 滿贈獲得 ${totalItemFree} 件贈品`);
+            }
+          }
+        }
+
+      } else if (promo.promoType === 'BUNDLE_PRICE') {
+        const targetQty = Number(promo.buyQty);
+        const packagePrice = Number(promo.bundlePrice);
+
+        const totalQtyInGroup = group.items.reduce((sum, item) => sum + item.qty, 0);
+        const sets = Math.floor(totalQtyInGroup / targetQty);
+
+        let expandedUnits = [];
+        for (const item of group.items) {
+          for (let i = 0; i < item.qty; i++) {
+            expandedUnits.push({ ...item, unitPrice: item.price });
+          }
+        }
+        expandedUnits.sort((a, b) => b.unitPrice - a.unitPrice);
+
+        for (let i = 0; i < expandedUnits.length; i++) {
+          expandedUnits[i].isPartOfBundle = i < sets * targetQty;
+        }
+
+        const groupSubtotal = sets * packagePrice;
+
+        for (const item of group.items) {
+          const unitsOfThisItem = expandedUnits.filter(u => u.id === item.id);
+          const bundleCount = unitsOfThisItem.filter(u => u.isPartOfBundle).length;
+          const remainCount = unitsOfThisItem.filter(u => !u.isPartOfBundle).length;
+
+          let itemSub = remainCount * item.price;
+          if (bundleCount > 0 && sets * targetQty > 0) {
+            itemSub += (bundleCount / (sets * targetQty)) * groupSubtotal;
+          }
+          item.subtotal = Math.round(itemSub);
+        }
+
+        let sumOfItemSubtotals = group.items.reduce((sum, item) => sum + item.subtotal, 0);
+        const expectedTotal = groupSubtotal + expandedUnits.filter(u => !u.isPartOfBundle).reduce((sum, u) => sum + u.unitPrice, 0);
+
+        if (sumOfItemSubtotals !== expectedTotal && group.items.length > 0) {
+          group.items[0].subtotal += (expectedTotal - sumOfItemSubtotals);
+        }
+
+        totalAmount += expectedTotal;
+
+        for (const item of group.items) {
+          finalCartItems.push({ ...item, isGift: false });
+        }
+
+        if (sets > 0) {
+          const originalPriceForBundled = expandedUnits.filter(u => u.isPartOfBundle).reduce((sum, u) => sum + u.unitPrice, 0);
+          const savedAmount = originalPriceForBundled - groupSubtotal;
+          discounts.push(`✨ [${promo.name}] 組合優惠 (省 $${savedAmount})`);
+        }
+      }
+    }
+
+    // 處理獨立商品 (舊版商品層級促銷)
+    for (const item of standaloneItems) {
+      const p = item.product;
+      const singlePrice = item.price;
+
+      let legacyFreeQty = 0;
+      if (Array.isArray(p.promotions) && p.promotions.length > 0) {
+        let bestFree = 0;
+        for (const promo of p.promotions) {
+          const bx = Number(promo.buyX);
+          const gy = Number(promo.getY);
+          if (bx > 0 && gy > 0) {
+            const free = Math.floor(item.qty / (bx + gy)) * gy;
+            if (free > bestFree) bestFree = free;
+          }
+        }
+        legacyFreeQty = bestFree;
+        item.freeQty = legacyFreeQty;
+        item.subtotal = singlePrice * (item.qty - legacyFreeQty);
+      } else if (p.has_volume_pricing && p.volume_pricing_settings) {
+        item.subtotal = calculateProductSubtotal(p, item.qty);
+      } else {
+        item.subtotal = singlePrice * item.qty;
+      }
+      totalAmount += item.subtotal;
+
+      if (legacyFreeQty > 0) {
+        // split legacy free items as well
+        const paidQty = item.qty - legacyFreeQty;
+        if (paidQty > 0) {
+          finalCartItems.push({ ...item, qty: paidQty, isGift: false });
+        }
+        finalCartItems.push({ ...item, qty: legacyFreeQty, subtotal: 0, price: 0, isGift: true, remark: item.remark ? `${item.remark} (贈品)` : "贈品" });
+      } else {
+        finalCartItems.push({ ...item, isGift: false });
+      }
+    }
+
+    // 🛡️ 補強孤兒贈品追蹤：若付費商品被刪除/減購，強制將殘留贈品寫入 (earned: 0) 確保觸發防呆
+    if (isGroupOrder) {
+      Object.entries(groupGiftSelections || {}).forEach(([memberName, mGifts]) => {
+        Object.entries(mGifts || {}).forEach(([pId, selections]) => {
+          const selectedCount = Object.values(selections || {}).reduce((a, b) => a + Number(b), 0);
+          if (selectedCount > 0) {
+            if (!memberGiftCredits[memberName]) memberGiftCredits[memberName] = {};
+            if (!memberGiftCredits[memberName][pId]) {
+              const promo = products.find(p => p.promoId === pId)?.promotion;
+              memberGiftCredits[memberName][pId] = { earned: 0, selected: selectedCount, promoName: promo?.name || "已刪除活動" };
+            }
+          }
+        });
+      });
+    } else {
+      Object.entries(giftSelections || {}).forEach(([pId, selections]) => {
+        const selectedCount = Object.values(selections || {}).reduce((a, b) => a + Number(b), 0);
+        if (selectedCount > 0 && !availableGiftCredits[pId]) {
+          const promo = products.find(p => p.promoId === pId)?.promotion;
+          availableGiftCredits[pId] = { earned: 0, selected: selectedCount, promoName: promo?.name || "已刪除活動" };
+        }
+      });
+    }
+
+    return { cartItems: finalCartItems, cartTotal: totalAmount, discountDetails: discounts, availableGiftCredits, memberGiftCredits };
+  }, [cart, giftSelections, groupGiftSelections, products, flavorSelections, groupFlavorSelections, isGroupOrder, groupCart]);
+
+  // 🧹 自動重置/清理不足額度之贈品：當商品減購或刪除導致已選數量 > 可得數量時，直接重置讓客人重新挑選
+  useEffect(() => {
+    if (step === "success") return; // 避免在訂單成立後清空對帳單上的贈品紀錄！
+    if (isGroupOrder) {
+      setGroupGiftSelections(prev => {
+        let changed = false;
+        const next = { ...prev };
+        Object.entries(memberGiftCredits || {}).forEach(([memberName, mCredits]) => {
+          Object.entries(mCredits || {}).forEach(([pId, credit]) => {
+            if (credit.selected > credit.earned) {
+              if (next[memberName]?.[pId]) {
+                const nextMember = { ...next[memberName] };
+                delete nextMember[pId];
+                next[memberName] = nextMember;
+                changed = true;
+              }
+            }
+          });
+        });
+        return changed ? next : prev;
+      });
+    } else {
+      setGiftSelections(prev => {
+        let changed = false;
+        const next = { ...prev };
+        Object.entries(availableGiftCredits || {}).forEach(([pId, credit]) => {
+          if (credit.selected > credit.earned) {
+            delete next[pId];
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    }
+  }, [availableGiftCredits, memberGiftCredits, isGroupOrder, step]);
+
+  const shippingFee = useMemo(() => {
+    if (!isGeneralUser) return 0;
+    let activeComm = currentCommunity;
+    if (selectedCommunityId && allCommunities.length > 0) {
+      const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+      if (match) activeComm = match;
+    }
+    if (!activeComm || activeComm.DefaultFreeShipping) return 0;
+    const fee = Number(activeComm.ShippingFee) || 0;
+    if (fee <= 0) return 0;
+    const freeMin = Number(activeComm.FreeShippingMin) || 0;
+    if (freeMin > 0 && cartTotal >= freeMin) return 0;
+    return fee;
+  }, [isGeneralUser, currentCommunity, selectedCommunityId, allCommunities, cartTotal]);
+
+  const rewardDiscountAmount = useMemo(() => {
+    if (!selectedRewardRule) return 0;
+    return Number(selectedRewardRule.discount) || 0;
+  }, [selectedRewardRule]);
+
+  const netCartTotal = Math.max(0, cartTotal - rewardDiscountAmount);
+  const orderTotal = netCartTotal + shippingFee;
+
+  // (已移至元件頂部)
+
+  const getFullAddress = () => {
+    const bName =
+      selectedBuilding === "其它" ? otherBuildingText.trim() : selectedBuilding;
+
+    const isGeneral =
+      bName === "一般用戶" ||
+      bName === "一般散客" ||
+      bName === "上線下單" ||
+      bName === "線上下單" ||
+      bName === "一般常態" ||
+      bName === "常態零售";
+
+    // 如果是一般散客用戶，大樓名是散客標籤，後面拼上完整外送地址與公司名稱
+    if (isGeneral) {
+      let districtPrefix = "";
+      if (selectedCommunityId && allCommunities.length > 0) {
+        const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+        if (match) districtPrefix = match.CommunityName; // "台南市佳里區"
+      }
+
+      let baseAddr = detailAddress.trim();
+      // 如果輸入的地址不以已選取的行政區開頭，拼上行政區前綴
+      if (districtPrefix && !baseAddr.startsWith(districtPrefix)) {
+        baseAddr = districtPrefix + baseAddr;
+      }
+
+      const comp = companyName.trim();
+      if (comp) {
+        return `${bName} ${baseAddr} (${comp})`;
+      }
+      return `${bName} ${baseAddr}`;
+    }
+
+    if (!bName) return detailAddress.trim();
+    return `${bName} - ${detailAddress.trim()}`;
+  };
+
+
+
+  // ── 進入填寫步驟：從 LocalStorage 自動帶入舊資料 ─────────────
+  const handleProceedToForm = async () => {
+    // 🛡️ 雙向贈品防呆檢查（少選與多選溢額均自動攔截）
+    if (isGroupOrder) {
+      for (const [memberName, mCredits] of Object.entries(memberGiftCredits)) {
+        for (const [pId, credit] of Object.entries(mCredits)) {
+          if (credit.earned > 0 && credit.selected < credit.earned) {
+            setShowGiftModal(pId);
+            alert(`⚠️ 團員【${memberName}】尚有 ${credit.earned - credit.selected} 件贈品未選擇，請先完成選擇！`);
+            return;
+          }
+          if (credit.selected > credit.earned) {
+            setShowGiftModal(pId);
+            alert(credit.earned === 0
+              ? `⚠️ 團員【${memberName}】因付費商品已刪除/減購，不符合贈品資格，請重新調整贈品！`
+              : `⚠️ 團員【${memberName}】的贈品已超出額度！可得 ${credit.earned} 件，目前已選 ${credit.selected} 件，請點擊調整！`
+            );
+            return;
+          }
+        }
+      }
+    } else {
+      for (const [pId, credit] of Object.entries(availableGiftCredits)) {
+        if (credit.earned > 0 && credit.selected < credit.earned) {
+          setShowGiftModal(pId);
+          alert(`⚠️ 請先完成贈品選擇！還有 ${credit.earned - credit.selected} 件贈品尚未選擇。`);
+          return;
+        }
+        if (credit.selected > credit.earned) {
+          setShowGiftModal(pId);
+          alert(credit.earned === 0
+            ? `⚠️ 因付費商品已刪除/減購，您已無【${credit.promoName || '贈品'}】獲得額度，請重新調整/清空贈品！`
+            : `⚠️ 贈品數量已超出可獲得額度！可得 ${credit.earned} 件，目前已選 ${credit.selected} 件，請重新調整贈品。`
+          );
+          return;
+        }
+      }
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+      if (saved.name) {
+        setCustomerName(saved.name);
+      } else {
+        // 如果沒有儲存的名字，嘗試抓取 LINE 暱稱作為預填
+        if (isLiffInitialized && window.liff && window.liff.isLoggedIn()) {
+          try {
+            const profile = await window.liff.getProfile();
+            if (profile.displayName) setCustomerName(profile.displayName);
+          } catch (e) {
+            console.warn("Failed to get LIFF profile for prepopulating:", e);
+          }
+        }
+      }
+      if (saved.phone) {
+        const { phone: pVal, ext: eVal } = formatTaiwanPhone(saved.phone);
+        setCustomerPhone(pVal);
+        if (eVal) setPhoneExt(eVal);
+      }
+
+      const isLocked = !!lockedBuilding;
+
+      if (saved.building !== undefined || saved.detailAddress !== undefined) {
+        const savedBuilding = saved.building || "";
+        let savedDetail = saved.detailAddress || "";
+        const savedCompany = saved.companyName || "";
+
+        // 去除任何可能殘留的行政區前綴
+        if (allCommunities.length > 0) {
+          for (const c of allCommunities) {
+            if (savedDetail.startsWith(c.CommunityName)) {
+              savedDetail = savedDetail.substring(c.CommunityName.length).trim();
+              break;
+            }
+          }
+        }
+
+        if (isLocked) {
+          setSelectedBuilding(lockedBuilding);
+          setDetailAddress(savedDetail);
+          setCompanyName(savedCompany);
+        } else {
+          if (knownBuildings.includes(savedBuilding)) {
+            setSelectedBuilding(savedBuilding);
+            setDetailAddress(savedDetail);
+            setCompanyName(savedCompany);
+          } else if (savedBuilding) {
+            setSelectedBuilding("其它");
+            setOtherBuildingText(savedBuilding);
+            setDetailAddress(savedDetail);
+            setCompanyName(savedCompany);
+          } else {
+            setDetailAddress(savedDetail);
+            setCompanyName(savedCompany);
+          }
+        }
+      } else if (saved.address) {
+        let addr = String(saved.address).trim();
+        // 去除任何可能殘留的行政區前綴
+        if (allCommunities.length > 0) {
+          for (const c of allCommunities) {
+            if (addr.startsWith(c.CommunityName)) {
+              addr = addr.substring(c.CommunityName.length).trim();
+              break;
+            }
+          }
+        }
+        let matched = false;
+
+        if (isLocked) {
+          setSelectedBuilding(lockedBuilding);
+          if (addr.startsWith(lockedBuilding)) {
+            setDetailAddress(addr.slice(lockedBuilding.length).trim());
+          } else {
+            let foundOther = false;
+            for (const bName of knownBuildings) {
+              if (bName && addr.startsWith(bName)) {
+                setDetailAddress(addr.slice(bName.length).trim());
+                foundOther = true;
+                break;
+              }
+            }
+            if (!foundOther) {
+              setDetailAddress(addr);
+            }
+          }
+        } else {
+          for (const bName of knownBuildings) {
+            if (bName && addr.startsWith(bName)) {
+              setSelectedBuilding(bName);
+              setDetailAddress(addr.slice(bName.length).trim());
+              matched = true;
+              break;
+            }
+          }
+          if (!matched) {
+            setSelectedBuilding("其它");
+            setOtherBuildingText(addr);
+            setDetailAddress("");
+          }
+        }
+      }
+
+      // 一般散客：僅在當前未選取時才從上次紀錄帶入（優先使用本次下單選取的區域）
+      if (!selectedCity && saved.city) setSelectedCity(saved.city);
+      if (!selectedCommunityId && saved.communityId) setSelectedCommunityId(saved.communityId);
+
+      // 記錄這次 session 的原始配送區域（給 confirmModal 比較用）
+      originalCommunityIdRef.current = selectedCommunityId || saved.communityId || "";
+
+    } catch (_) { }
+
+    // 💡 團購模式 Clean Up：只保留有購買商品的成員
+    if (isGroupOrder) {
+      setGroupCart((prev) => {
+        const cleanedCart = {};
+        Object.entries(prev).forEach(([name, items]) => {
+          if (items && typeof items === "object") {
+            const hasItems = Object.values(items).some((qty) => Number(qty) > 0);
+            if (hasItems) {
+              cleanedCart[name] = items;
+            }
+          }
+        });
+        return cleanedCart;
+      });
+    }
+
+    setCheckoutError("");
+    setStep("form");
+  };
+
+  // ── 送出訂單 ─────────────────────────────────────────────────
+  const handleSubmitOrder = async () => {
+    if (selectedRewardRule && cartTotal < selectedRewardRule.discount) {
+      setIsSubmitting(false);
+      const diff = selectedRewardRule.discount - cartTotal;
+      alert(`⚠️ 小計 ($${cartTotal}) 低於折抵 ($${selectedRewardRule.discount})！\n還差 $${diff} 元！折抵金無法退現，\n將自動帶您回到選單頁面加購，\n滿 $${selectedRewardRule.discount} 元後方可下單結帳。`);
+      setStep("shop");
+      return;
+    }
+
+    // 🛡️ 強制雙向贈品防呆檢查（少選與多選溢額均自動攔截）
+    if (isGroupOrder) {
+      for (const [memberName, mCredits] of Object.entries(memberGiftCredits)) {
+        for (const [pId, credit] of Object.entries(mCredits)) {
+          if (credit.earned > 0 && credit.selected < credit.earned) {
+            setIsSubmitting(false);
+            setShowGiftModal(pId);
+            alert(`⚠️ 團員【${memberName}】尚有 ${credit.earned - credit.selected} 件贈品未選擇，請先完成選擇！`);
+            return;
+          }
+          if (credit.selected > credit.earned) {
+            setIsSubmitting(false);
+            setShowGiftModal(pId);
+            alert(credit.earned === 0
+              ? `⚠️ 團員【${memberName}】因付費商品已刪除/減購，不符合贈品資格，請重新調整贈品！`
+              : `⚠️ 團員【${memberName}】的贈品已超出額度！可得 ${credit.earned} 件，目前已選 ${credit.selected} 件，請點擊調整！`
+            );
+            return;
+          }
+        }
+      }
+    } else {
+      for (const [pId, credit] of Object.entries(availableGiftCredits)) {
+        if (credit.earned > 0 && credit.selected < credit.earned) {
+          setIsSubmitting(false);
+          setShowGiftModal(pId);
+          alert(`⚠️ 請先完成贈品選擇！還有 ${credit.earned - credit.selected} 件贈品尚未選擇。`);
+          return;
+        }
+        if (credit.selected > credit.earned) {
+          setIsSubmitting(false);
+          setShowGiftModal(pId);
+          alert(credit.earned === 0
+            ? `⚠️ 因付費商品已刪除/減購，您已無【${credit.promoName || '贈品'}】獲得額度，請重新調整/清空贈品！`
+            : `⚠️ 贈品數量已超出可獲得額度！可得 ${credit.earned} 件，目前已選 ${credit.selected} 件，請重新調整贈品。`
+          );
+          return;
+        }
+      }
+    }
+
+    const successItemsSnap = [...cartItems];
+    setIsSubmitting(true);
+    try {
+      const fullPhone = phoneExt.trim() ? `${customerPhone.trim()}#${phoneExt.trim()}` : customerPhone.trim();
+      // 儲存客戶資料到 LocalStorage（下次自動帶入）
+      // 正規化 detailAddress：去除行政區前綴再存，避免下次疊加
+      let saveDetail = detailAddress.trim();
+      if (isGeneralUser && selectedCommunityId && allCommunities.length > 0) {
+        const commMatch = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+        if (commMatch && saveDetail.startsWith(commMatch.CommunityName)) {
+          saveDetail = saveDetail.substring(commMatch.CommunityName.length).trim();
+        }
+      }
+      localStorage.setItem(
+        LS_KEY,
+        JSON.stringify({
+          name: customerName,
+          phone: fullPhone,
+          building: selectedBuilding === "其它" ? otherBuildingText.trim() : selectedBuilding,
+          detailAddress: saveDetail,
+          companyName: isGeneralUser ? companyName.trim() : "",
+          city: isGeneralUser ? selectedCity : "",
+          communityId: isGeneralUser ? selectedCommunityId : "",
+          address: getFullAddress(),
+        }),
+      );
+
+      let lineDisplayName = "";
+      let finalLineUserId = lineUserId || "";
+      if (isLiffInitialized && window.liff && window.liff.isLoggedIn()) {
+        try {
+          const profile = await window.liff.getProfile();
+          lineDisplayName = profile.displayName || "";
+          finalLineUserId = profile.userId || "";
+        } catch (e) {
+          console.warn("Failed to get LIFF profile for submitting order:", e);
+        }
+      }
+
+      const rewardDiscountAmount = selectedRewardRule ? Math.min(selectedRewardRule.discount, cartTotal) : 0;
+      const netCartTotal = Math.max(0, cartTotal - rewardDiscountAmount);
+      const maxDeduction = Math.min(memberProfile?.WalletBalance || 0, netCartTotal);
+      const currentOrderTotal = netCartTotal + shippingFee;
+      const currentPayAmount = useWallet ? Math.max(0, currentOrderTotal - maxDeduction) : currentOrderTotal;
+
+      const orderPayloadData = {
+        customerName,
+        customerPhone: fullPhone,
+        deliveryAddress: getFullAddress(),
+        CommunityId: (isGeneralUser && selectedCommunityId) ? selectedCommunityId : (currentCommunity?.CommunityId || ""),
+        CampaignId: activeCampaign?.CampaignId || "",
+        sourceGroup: (() => {
+          if (isGeneralUser && selectedCommunityId) {
+            const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+            if (match) return match.CommunityName;
+          }
+          return selectedBuilding === "其它" ? otherBuildingText.trim() : (selectedBuilding || "一般散客");
+        })(),
+        note,
+        paymentMethod: (currentPayAmount === 0 && selectedRewardRule && (!useWallet || maxDeduction === 0))
+          ? "滿額消費折抵"
+          : paymentMethod,
+        transferLastFive,
+        lineDisplayName,
+        lineUserId: finalLineUserId,
+        useWalletDeduction: useWallet,
+        walletDeductionAmount: maxDeduction,
+        selectedRewardThreshold: selectedRewardRule?.spendMin || 0,
+        rewardDiscountAmount: selectedRewardRule ? Math.min(selectedRewardRule.discount, cartTotal) : 0,
+        shippingFee,
+        isGroupOrder,
+        groupCart: isGroupOrder ? groupCart : undefined,
+        groupDetails: isGroupOrder ? (() => {
+          const details = {};
+          if (groupCart && typeof groupCart === "object") {
+            Object.entries(groupCart).forEach(([name, recipientItems]) => {
+              const validEntries = recipientItems && typeof recipientItems === "object"
+                ? Object.entries(recipientItems).filter(([_, qty]) => Number(qty) > 0)
+                : [];
+              const mGifts = groupGiftSelections[name] || {};
+
+              if (validEntries.length > 0 || Object.keys(mGifts).length > 0) {
+                details[name] = validEntries.map(([pid, qty]) => {
+                  const prod = products.find(p => p.id === pid);
+                  const sub = prod ? calculateProductSubtotal(prod, qty) : 0;
+                  const price = qty > 0 ? Math.round(sub / qty) : (prod ? (Number(prod.single_price) || Number(prod.price)) : 0);
+                  const rem = prod?.has_flavor_attributes ? getFlavorRemark(pid, {}, { [name]: groupFlavorSelections[name] }, true) : "";
+                  return {
+                    productId: pid,
+                    productName: prod?.name || pid,
+                    qty: Number(qty),
+                    price: price,
+                    subtotal: sub,
+                    remark: rem,
+                    expiryDate: prod?.expiryDate || ''
+                  };
+                });
+
+                Object.entries(mGifts).forEach(([pId, gObj]) => {
+                  if (gObj && typeof gObj === 'object') {
+                    Object.entries(gObj).forEach(([gPid, gQty]) => {
+                      if (Number(gQty) > 0) {
+                        const gProd = products.find(p => p.id === gPid);
+                        details[name].push({
+                          productId: gPid,
+                          productName: gProd?.name || gPid,
+                          qty: Number(gQty),
+                          price: 0,
+                          subtotal: 0,
+                          remark: "贈品"
+                        });
+                      }
+                    });
+                  }
+                });
+              }
+            });
+          }
+          return details;
+        })() : undefined,
+        items: cartItems.map((i) => ({
+          productId: i.id,
+          productName: i.name,
+          unitPrice: i.price,
+          qty: i.qty + (i.freeQty || 0),
+          subtotal: i.subtotal,
+          remark: i.remark,
+          expiryDate: i.expiryDate || '',
+        })),
+      };
+
+      // 1. 統一呼叫後端建立訂單 (狀態預設為「未付款」)
+      const res = await callGAS(
+        apiUrl,
+        "v2_createOrder",
+        orderPayloadData,
+        user.token,
+      );
+
+      if (res?.error) throw new Error(res.error);
+      const dbOrderId = res.orderId;
+
+      // 2. 如果是 LINE Pay，拿著真實 orderId 呼叫付款請求
+      if (paymentMethod === "LINE Pay" && currentPayAmount > 0) {
+        try {
+          const nowStr = new Date().toLocaleString("zh-TW", { hour12: false });
+
+          // 記錄 pending orderId，作為 LIFF 返回 URL 無參數時的備援
+          sessionStorage.setItem('mlw_linepay_pending_orderId', dbOrderId);
+          localStorage.setItem('mlw_linepay_pending_orderId', dbOrderId);
+
+          // 啟動背景輪詢對帳感應防護
+          startLinePayStatusPolling(dbOrderId);
+
+          // 自動背景發送明細：僅限官方帳號 1對1 聊天室 (包含圖文選單 Rich Menu)，排除社區 LINE 大群組洗版
+          if (isLiffInitialized && window.liff && window.liff.isInClient()) {
+            const context = window.liff.getContext();
+            const isGroupContext = context && (context.type === 'group' || context.type === 'room');
+
+            // 若顧客是在社區 LINE 大群組中開啟頁面，跳過自動發送 (防止群組訊息洗版)
+            if (!isGroupContext) {
+              try {
+                const text = `訂單已提交！\n【付款方式】${paymentMethod}\n【訂單編號】#${dbOrderId}\n【訂購姓名】${customerName}\n【合計金額】$${currentPayAmount}\n【轉帳後五碼】${transferLastFive || "無"}\n※ 詳細明細小幫手已在後台收到囉！`;
+                await window.liff.sendMessages([{ type: "text", text: text }]);
+                console.log("LIFF message sent automatically in 1-on-1 chat for LINE Pay");
+              } catch (e) {
+                console.error("Failed to auto-send LIFF message for LINE Pay:", e);
+              }
+            }
+          }
+
+          const lineRes = await fetch(getBackendUrl("/api/linepay/request"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              orderId: dbOrderId,
+              isExistingOrder: false,
+              amount: currentPayAmount,
+              productName: `米立微訂單 (${customerName})`,
+              clientHost: window.location.origin + window.location.pathname.replace(/\/$/, ''),
+              token: user?.token,
+              isLiff: window.liff && window.liff.isInClient && window.liff.isInClient()
+            })
+          });
+          const lineData = await lineRes.json();
+          if (lineData.success && (lineData.paymentUrlApp || lineData.paymentUrl)) {
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            const isInLiff = window.liff && window.liff.isInClient && window.liff.isInClient();
+
+            if (isInLiff) {
+              // 🚀 方案 B (已驗證)：直接利用 external: true 無縫跳轉外部 Safari
+              window.liff.openWindow({
+                url: lineData.paymentUrl,
+                external: true
+              });
+            } else {
+              const targetUrl = (isMobile && lineData.paymentUrlApp) ? lineData.paymentUrlApp : lineData.paymentUrl;
+              window.location.href = targetUrl;
+            }
+            return; // 確保中斷後續邏輯，等使用者跳回來才繼續
+          } else {
+            alert("LINE Pay 發起失敗：" + (lineData.message || "請稍後再試"));
+            setIsSubmitting(false);
+            return;
+          }
+        } catch (e) {
+          console.error("發起 LINE Pay 扣款失敗:", e);
+          alert("網路連線失敗，請稍後再試");
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // 3. 非 LINE Pay 的一般訂單：正常更新前端餘額與顯示完成畫面
+
+      if (memberProfile) {
+        setMemberProfile(prev => prev ? {
+          ...prev,
+          WalletBalance: useWallet ? Math.max(0, Number(prev.WalletBalance) - maxDeduction) : Number(prev.WalletBalance),
+          RedeemableSpendBalance: selectedRewardRule
+            ? Math.max(0, Number(prev.RedeemableSpendBalance || 0) - selectedRewardRule.spendMin + netCartTotal)
+            : Number(prev.RedeemableSpendBalance || 0) + netCartTotal,
+          TotalLifetimeSpend: Number(prev.TotalLifetimeSpend || 0) + netCartTotal
+        } : null);
+      }
+
+      setOrderId(res.orderId || "");
+      setOrderTime(new Date().toLocaleString("zh-TW", { hour12: false }));
+
+      const finalTotal = useWallet ? Math.max(0, orderTotal - maxDeduction) : orderTotal;
+      setSuccessOrderTotal(finalTotal);
+
+      // 自動背景發送明細：僅限官方帳號 1對1 聊天室 (包含圖文選單 Rich Menu)，排除社區 LINE 大群組洗版
+      if (isLiffInitialized && window.liff && window.liff.isInClient()) {
+        const context = window.liff.getContext();
+        const isGroupContext = context && (context.type === 'group' || context.type === 'room');
+
+        // 若顧客是在社區 LINE 大群組中開啟頁面，跳過自動發送 (防止群組訊息洗版)
+        if (!isGroupContext) {
+          try {
+            const text = `訂單已提交！\n【付款方式】${paymentMethod}\n【訂單編號】#${res.orderId || ""}\n【訂購姓名】${customerName}\n【合計金額】$${finalTotal}\n【轉帳後五碼】${transferLastFive || "無"}\n※ 詳細明細小幫手已在後台收到囉！`;
+            await window.liff.sendMessages([
+              {
+                type: "text",
+                text: text
+              }
+            ]);
+            setIsMsgSentAuto(true);
+            console.log("LIFF message sent automatically in 1-on-1 chat");
+          } catch (e) {
+            console.error("Failed to auto-send LIFF message:", e);
+          }
+        }
+      }
+
+      setSuccessOrderItems(successItemsSnap);
+      setSuccessGroupCart(JSON.parse(JSON.stringify(groupCart)));
+      setSuccessGroupGiftSelections(JSON.parse(JSON.stringify(groupGiftSelections)));
+      setSuccessCartTotal(cartTotal);
+      setSuccessShippingFee(shippingFee);
+      setSuccessWalletDeduction(useWallet ? maxDeduction : 0);
+      setSuccessRewardDiscount(rewardDiscountAmount);
+      setSuccessDeliveryDate(activeCampaign?.DeliveryDate || "");
+      setSuccessDeliveryTime(
+        activeCampaign?.DeliveryStartTime && activeCampaign?.DeliveryEndTime
+          ? `${activeCampaign.DeliveryStartTime}~${activeCampaign.DeliveryEndTime}`
+          : ""
+      );
+
+      setCart({});
+
+      // 若選擇 LINE Pay 且有應付金額，直接拉起 LINE Pay 扣款（不先顯示成功頁面）
+      if (paymentMethod === "LINE Pay" && finalTotal > 0 && res.orderId) {
+        setIsSubmitting(true);
+        try {
+          // 🛡️ 跳轉前存 pending orderId，返回後備援輪詢用（LIFF 環境 deeplink 返回時 URL 無參數）
+          sessionStorage.setItem('mlw_linepay_pending_orderId', res.orderId);
+          localStorage.setItem('mlw_linepay_pending_orderId', res.orderId);
+          const lineRes = await fetch(getBackendUrl("/api/linepay/request"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              orderId: res.orderId,
+              amount: finalTotal,
+              productName: `米立微訂單 #${res.orderId}`,
+              clientHost: window.location.origin + window.location.pathname.replace(/\/$/, ''),
+              isLiff: window.liff && window.liff.isInClient && window.liff.isInClient()
+            })
+          });
+          const lineData = await lineRes.json();
+          if (lineData.success && (lineData.paymentUrlApp || lineData.paymentUrl)) {
+            const payUrl2 = lineData.paymentUrl;
+            if (window.liff && window.liff.isInClient && window.liff.isInClient()) {
+              window.location.href = payUrl2;
+            } else {
+              const isMobile2 = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+              const targetUrl2 = (isMobile2 && lineData.paymentUrlApp) ? lineData.paymentUrlApp : payUrl2;
+              window.location.href = targetUrl2;
+            }
+            return;
+          } else {
+            alert("LINE Pay 金鑰或服務請求失敗：" + (lineData.message || "請稍後再試"));
+          }
+        } catch (e) {
+          console.error("自動拉起 LINE Pay 失敗:", e);
+        }
+      }
+
+      setStep("success");
+    } catch (err) {
+      setCheckoutError("送出訂單失敗: " + err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+
+
+  const getOaMessageUrl = () => {
+    const text = `訂單已提交！\n【付款方式】${paymentMethod}\n【訂單編號】#${orderId}\n【訂購姓名】${customerName}\n【合計金額】$${successOrderTotal || 0}\n【轉帳後五碼】${transferLastFive || "無"}\n※ 詳細明細小幫手已在後台收到囉！`;
+    return `https://line.me/R/oaMessage/@839rpabi/?text=${encodeURIComponent(text)}`;
+  };
+
+  function renderMobileFooter() {
+    return (
+      <footer className="w-full mt-3 mb-0 px-5 sm:px-6 pb-2.5 select-none animate-in fade-in duration-300">
+        <div className="pt-3 border-t border-[var(--border-primary)]/40 flex items-start justify-between text-xs gap-1">
+          {/* 左側：品牌招牌以下方公司與統編為底座居中 (不換行) */}
+          <div className="flex flex-col items-center text-center gap-0.5 shrink-0">
+            <div className="flex items-center gap-1 font-bold text-slate-700 text-xs whitespace-nowrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 shrink-0" />
+              <span>米立微 MilkZeroWaste</span>
+            </div>
+            <div className="text-[9.5px] sm:text-[10px] text-slate-500 font-medium whitespace-nowrap">
+              米立微有限公司 <span className="text-slate-300 mx-0.5">|</span> 統編 93545674
+            </div>
+          </div>
+
+          {/* 右側：客服與政策入口以下方完整版權為底座居中 (不換行) */}
+          <div className="flex flex-col items-center text-center gap-0.5 shrink-0">
+            <div className="flex items-center justify-center gap-1.5 sm:gap-2 font-medium text-blue-500 text-xs whitespace-nowrap">
+              <button
+                type="button"
+                onClick={() => setShowServiceModal(true)}
+                className="hover:underline flex items-center gap-0.5 cursor-pointer"
+              >
+                <Headphones size={12} className="text-emerald-500" />
+                <span>客服中心</span>
+              </button>
+              <span className="text-slate-300 font-normal">|</span>
+              <button
+                type="button"
+                onClick={() => setShowPolicyModal(true)}
+                className="hover:underline flex items-center gap-0.5 cursor-pointer"
+              >
+                <ShieldCheck size={12} className="text-emerald-500" />
+                <span>網站政策</span>
+              </button>
+            </div>
+            <div className="text-[9px] text-slate-400 font-mono tracking-wider whitespace-nowrap">
+              © 2026 MilkZeroWaste Ltd.
+            </div>
+          </div>
+        </div>
+      </footer>
+    );
+  }
+
+  function renderServiceModal() {
+    if (!showServiceModal) return null;
+    return (
+      <div className="fixed inset-0 z-[9995] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200 select-none">
+        <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in slide-in-from-bottom duration-200 max-h-[85vh] overflow-y-auto">
+          {/* Header */}
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3.5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-xs">
+                <Headphones size={20} />
+              </div>
+              <div className="flex flex-col text-left">
+                <h3 className="text-base font-extrabold text-slate-800 tracking-tight">客服中心</h3>
+                <p className="text-[10px] text-slate-400 font-medium">如有任何疑問，歡迎隨時聯繫專人為您服務</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowServiceModal(false)}
+              className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* 聯絡資訊方塊 */}
+          <div className="bg-gradient-to-br from-slate-50 via-slate-50 to-emerald-50/40 border border-slate-200/70 rounded-2xl p-4 space-y-2 shadow-xs">
+            <div className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>聯絡專線與資訊</span>
+            </div>
+
+            <a href="tel:0911899752" className="group flex items-center justify-between p-2.5 rounded-xl hover:bg-white transition-all border border-transparent hover:border-slate-200/60 shadow-xs hover:shadow-sm">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <Phone size={15} />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-[10px] text-slate-400 font-medium">專線電話</span>
+                  <span className="text-xs font-extrabold text-blue-600 group-hover:text-blue-700">0911-899-752</span>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">撥打專線</span>
+            </a>
+
+            <a
+              href="https://lin.ee/6N0AET0"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center justify-between p-2.5 rounded-xl hover:bg-white transition-all border border-transparent hover:border-slate-200/60 shadow-xs hover:shadow-sm"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 font-extrabold text-[10px]">
+                  LINE
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-[10px] text-slate-400 font-medium">官方 LINE 客服</span>
+                  <span className="text-xs font-extrabold text-emerald-600 group-hover:text-emerald-700">@milkzerowaste</span>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors">加入好友</span>
+            </a>
+
+            <a
+              href="https://maps.google.com/?q=台南市永康區永大路二段386-6號"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center justify-between p-2.5 rounded-xl hover:bg-white transition-all border border-transparent hover:border-slate-200/60 shadow-xs hover:shadow-sm"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shrink-0 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
+                  <MapPin size={15} />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-[10px] text-slate-400 font-medium">門市門牌地址</span>
+                  <span className="text-xs font-semibold text-slate-700 group-hover:text-emerald-700 transition-colors">台南市永康區永大路二段386-6號</span>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors">開啟地圖</span>
+            </a>
+          </div>
+
+          {/* 購物條款與選單 */}
+          <div className="space-y-2 py-1">
+            <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-1 mb-1">
+              購物說明與條款
+            </div>
+            {[
+              { key: 'shopping_notice', label: '購物須知', IconComp: Package, desc: '服務範疇、取貨與退款須知' },
+              { key: 'refund_policy', label: '退換貨／退款政策', IconComp: RefreshCw, desc: '消保法規範與退款處置說明' },
+              { key: 'shipping_policy', label: '配送／取貨說明', IconComp: MapPin, desc: '店面取貨、指定地點與大樓配送' },
+              { key: 'payment_policy', label: '付款方式說明', IconComp: CreditCard, desc: '銀行轉帳、LINE Pay、奶包金與現金' },
+            ].map(item => (
+              <button
+                type="button"
+                key={item.key}
+                onClick={() => {
+                  setShowServiceModal(false);
+                  setActivePolicyKey(item.key);
+                }}
+                className="group w-full flex justify-between items-center p-3.5 rounded-2xl bg-gradient-to-r from-slate-50 to-slate-50/50 hover:from-emerald-50/70 hover:to-teal-50/40 text-xs font-bold text-slate-800 transition-all border border-slate-200/70 hover:border-emerald-300 hover:shadow-md cursor-pointer active:scale-[0.99]"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-xs group-hover:bg-emerald-500 group-hover:text-white transition-all shrink-0">
+                    <item.IconComp size={18} />
+                  </span>
+                  <span className="flex flex-col text-left">
+                    <span className="font-extrabold text-slate-800 group-hover:text-emerald-950 text-xs">{item.label}</span>
+                    <span className="text-[10px] text-slate-400 font-medium group-hover:text-emerald-700/80">{item.desc}</span>
+                  </span>
+                </span>
+                <ChevronRight size={18} className="text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all" />
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowServiceModal(false)}
+            className="w-full py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-xs font-extrabold transition-all shadow-xs border border-slate-200/60 cursor-pointer"
+          >
+            關閉
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  function renderPolicyModal() {
+    if (!showPolicyModal) return null;
+    return (
+      <div className="fixed inset-0 z-[9995] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200 select-none">
+        <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col gap-4.5 animate-in slide-in-from-bottom duration-200 max-h-[85vh] overflow-y-auto">
+          {/* Header */}
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3.5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-xs">
+                <ShieldCheck size={20} />
+              </div>
+              <div className="flex flex-col text-left">
+                <h3 className="text-base font-extrabold text-slate-800 tracking-tight">網站政策條款</h3>
+                <p className="text-[10px] text-slate-400 font-medium">米立微官方個資防護與服務規範</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowPolicyModal(false)}
+              className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* 政策選單 */}
+          <div className="space-y-2.5 py-1">
+            {[
+              { key: 'privacy_policy', label: '隱私權保護政策', IconComp: ShieldCheck, desc: '個資安全、利用目的與法規保障' },
+              { key: 'terms_of_service', label: '網站服務條款', IconComp: FileText, desc: '使用者規範與臺南地方法院管轄' },
+            ].map(item => (
+              <button
+                type="button"
+                key={item.key}
+                onClick={() => {
+                  setShowPolicyModal(false);
+                  setActivePolicyKey(item.key);
+                }}
+                className="group w-full flex justify-between items-center p-4 rounded-2xl bg-gradient-to-r from-slate-50 to-slate-50/50 hover:from-emerald-50/70 hover:to-teal-50/40 text-xs font-bold text-slate-800 transition-all border border-slate-200/70 hover:border-emerald-300 hover:shadow-md cursor-pointer active:scale-[0.99]"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-xs group-hover:bg-emerald-500 group-hover:text-white transition-all shrink-0">
+                    <item.IconComp size={20} />
+                  </span>
+                  <span className="flex flex-col text-left">
+                    <span className="font-extrabold text-slate-800 group-hover:text-emerald-950 text-sm">{item.label}</span>
+                    <span className="text-[11px] text-slate-500 font-medium group-hover:text-emerald-700/90">{item.desc}</span>
+                  </span>
+                </span>
+                <ChevronRight size={18} className="text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all" />
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowPolicyModal(false)}
+            className="w-full py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-xs font-extrabold transition-all shadow-xs border border-slate-200/60 cursor-pointer"
+          >
+            關閉
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  function renderPolicyViewerModal() {
+    if (!activePolicyKey) return null;
+    const policyData = POLICY_CONTENT_MAP[activePolicyKey];
+    if (!policyData) return null;
+
+    const IconComp = activePolicyKey === 'privacy_policy' ? ShieldCheck :
+      activePolicyKey === 'terms_of_service' ? FileText :
+        activePolicyKey === 'shopping_notice' ? Package :
+          activePolicyKey === 'refund_policy' ? RefreshCw :
+            activePolicyKey === 'shipping_policy' ? MapPin : CreditCard;
+
+    return (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200 select-none">
+        <div className="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-200 max-h-[85vh]">
+          {/* Header */}
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3.5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-xs">
+                <IconComp size={20} />
+              </div>
+              <div className="flex flex-col text-left">
+                <h3 className="text-base font-extrabold text-slate-800 tracking-tight">
+                  {policyData.title}
+                </h3>
+                <p className="text-[10px] text-slate-400 font-medium">米立微官方權益規範條文</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActivePolicyKey(null)}
+              className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* 政策內文 */}
+          <div className="overflow-y-auto pr-1 text-xs text-slate-700 leading-relaxed space-y-3 font-medium">
+            {policyData.content.map((paragraph, idx) => (
+              <div key={idx} className="whitespace-pre-line bg-slate-50/70 p-4 rounded-2xl border border-slate-200/60 text-slate-700 shadow-xs hover:border-slate-300/80 transition-colors">
+                {paragraph}
+              </div>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setActivePolicyKey(null)}
+            className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs font-extrabold transition-all shadow-md shadow-emerald-600/20 cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            <CheckCircle size={16} />
+            <span>我已瞭解</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // 感謝頁
+  // ════════════════════════════════════════════════════════════
+  if (step === "success") {
+    if (isSyncingOrder) {
+      return (
+        <div className="min-h-screen bg-[var(--bg-secondary)] flex flex-col items-center justify-center p-4">
+          <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4" />
+          <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">正在同步付款結果...</h2>
+          <p className="text-[var(--text-secondary)] text-center text-sm">
+            請稍候，我們正在為您向 LINE Pay 確認扣款狀態
+          </p>
+        </div>
+      );
+    }
+
+    const activeGroupCart = Object.keys(successGroupCart).length > 0 ? successGroupCart : groupCart;
+    const activeGroupGiftSelections = Object.keys(successGroupGiftSelections).length > 0 ? successGroupGiftSelections : groupGiftSelections;
+
+    const getMemberGifts = (name) => {
+      const giftMap = {};
+      const memberItems = activeGroupCart[name] || {};
+
+      // 1. 自選贈品 (CUSTOMER_SELECT)
+      const mGifts = activeGroupGiftSelections[name] || {};
+      Object.entries(mGifts).forEach(([pId, gObj]) => {
+        if (gObj && typeof gObj === 'object') {
+          Object.entries(gObj).forEach(([gPid, gQty]) => {
+            if (Number(gQty) > 0) {
+              giftMap[gPid] = (giftMap[gPid] || 0) + Number(gQty);
+            }
+          });
+        }
+      });
+
+      // 2. 按促銷類別計算 AUTO_LOWEST_PRICE & SAME_PRODUCT 贈品
+      const promoGroups = {};
+      Object.entries(memberItems).forEach(([pid, qty]) => {
+        if (Number(qty) <= 0) return;
+        const p = products.find(x => x.id === pid);
+        if (p?.promoId && p?.promotion?.isActive) {
+          const pId = p.promoId;
+          if (!promoGroups[pId]) promoGroups[pId] = { promotion: p.promotion, items: [] };
+          promoGroups[pId].items.push({ id: pid, name: p.name, price: Number(p.single_price || p.price || 0), qty: Number(qty) });
+        }
+      });
+
+      Object.values(promoGroups).forEach(group => {
+        const promo = group.promotion;
+        if (promo.promoType === 'BUY_X_GET_Y') {
+          const mode = promo.rewardSelectionMode || 'AUTO_LOWEST_PRICE';
+          const rawTiers = Array.isArray(promo.tiers) && promo.tiers.length > 0
+            ? promo.tiers
+            : [{ buyQty: Number(promo.buyQty), freeQty: Number(promo.freeQty) }];
+          const sortedTiers = [...rawTiers]
+            .map(t => ({ buyQty: Number(t.buyQty) || 0, freeQty: Number(t.freeQty) || 0 }))
+            .filter(t => t.buyQty > 0)
+            .sort((a, b) => b.buyQty - a.buyQty);
+
+          if (mode === 'AUTO_LOWEST_PRICE') {
+            let memberExpandedUnits = [];
+            for (const item of group.items) {
+              for (let i = 0; i < item.qty; i++) {
+                memberExpandedUnits.push({ id: item.id, name: item.name, price: item.price });
+              }
+            }
+            let remainingQty = memberExpandedUnits.length;
+            let memberFree = 0;
+            for (const tier of sortedTiers) {
+              const groupSize = tier.buyQty + tier.freeQty;
+              if (groupSize > 0 && remainingQty >= groupSize) {
+                const sets = Math.floor(remainingQty / groupSize);
+                memberFree += sets * tier.freeQty;
+                remainingQty -= sets * groupSize;
+              }
+            }
+            memberExpandedUnits.sort((a, b) => a.price - b.price);
+            for (let i = 0; i < memberFree; i++) {
+              if (memberExpandedUnits[i]) {
+                const gPid = memberExpandedUnits[i].id;
+                giftMap[gPid] = (giftMap[gPid] || 0) + 1;
+              }
+            }
+          } else if (mode === 'SAME_PRODUCT') {
+            for (const item of group.items) {
+              let remaining = item.qty;
+              let itemFree = 0;
+              for (const tier of sortedTiers) {
+                if (tier.buyQty > 0 && remaining >= tier.buyQty) {
+                  const sets = Math.floor(remaining / tier.buyQty);
+                  itemFree += sets * tier.freeQty;
+                  remaining -= sets * tier.buyQty;
+                }
+              }
+              if (itemFree > 0) {
+                giftMap[item.id] = (giftMap[item.id] || 0) + itemFree;
+              }
+            }
+          }
+        }
+      });
+
+      const giftList = [];
+      Object.entries(giftMap).forEach(([gPid, gQty]) => {
+        const gProd = products.find(p => p.id === gPid);
+        if (gProd && gQty > 0) {
+          giftList.push({ name: gProd.name, qty: gQty });
+        }
+      });
+      return giftList;
+    };
+
+    const generateGroupOrderShareText = () => {
+      let text = `📋 【${setting?.name || "米立微"}團購】訂單對帳單 (單號: ${orderId})\n`;
+      text += `----------------------------------\n`;
+
+      let grandTotalQty = 0;
+      let grandTotalAmount = 0;
+
+      Object.entries(activeGroupCart).forEach(([name, items]) => {
+        if (!items || typeof items !== 'object') return;
+        const validItems = Object.entries(items).filter(([_, qty]) => Number(qty) > 0);
+        const giftList = getMemberGifts(name);
+
+        if (validItems.length === 0 && giftList.length === 0) return;
+
+        text += `👤 ${name}\n`;
+        let recipientSubtotal = 0;
+        validItems.forEach(([productId, qty]) => {
+          const product = products.find((p) => p.id === productId);
+          const subtotal = product ? calculateProductSubtotal(product, qty) : 0;
+          const rem = product?.has_flavor_attributes ? getFlavorRemark(productId, {}, { [name]: groupFlavorSelections[name] }, true) : "";
+          const remDisplay = rem ? ` ${rem}` : "";
+
+          recipientSubtotal += subtotal;
+          grandTotalQty += qty;
+          text += `   - ${product ? product.name : productId}${remDisplay} x ${qty} ($${subtotal})\n`;
+        });
+
+        giftList.forEach((g) => {
+          grandTotalQty += g.qty;
+          text += `   - 🎁 [贈品] ${g.name} x ${g.qty} ($0)\n`;
+        });
+
+        text += `   💰 小計：$${recipientSubtotal}\n`;
+        text += `----------------------------------\n`;
+        grandTotalAmount += recipientSubtotal;
+      });
+
+      if (successShippingFee > 0) {
+        text += `🚚 運費：$${successShippingFee}\n`;
+        grandTotalAmount += Number(successShippingFee);
+      }
+
+      text += `總計：${grandTotalQty} 件商品，共 $${grandTotalAmount} 元。\n`;
+      text += `(本文字由${setting?.name || "系統"}自動產生，請團員確認無誤後向團長繳款)`;
+      return text;
+    };
+
+    return (
+      <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
+        <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-6 pb-10">
+          {/* 成功 Header */}
+          <div className="flex flex-col items-center text-center pt-8 pb-4">
+            <div className="w-24 h-24 bg-emerald-100 dark:bg-emerald-950/40 rounded-full flex items-center justify-center mb-5 text-emerald-600 dark:text-emerald-400 shadow-md shadow-emerald-500/5 animate-bounce-subtle">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-black text-[var(--text-primary)] tracking-wide">
+              {syncError || (isReplenishmentSuccess ? "補繳完成！" : "訂單成立")}
+            </h2>
+            {syncError && (
+              <p className="text-center text-red-500 text-sm font-bold mt-2">
+                {syncError}
+              </p>
+            )}
+            <p className="text-sm font-bold text-[var(--text-secondary)] mt-2">
+              {isReplenishmentSuccess ? "感謝您的付款，我們已收到您的款項。" : "感謝您的訂購！"}
+            </p>
+            <p className="text-xs text-[var(--text-tertiary)] mt-1.5 max-w-[280px] leading-relaxed">
+              {isReplenishmentSuccess ? "後台已為您完成自動對帳與紀錄。" : "我們已收到您的訂單，配送前將透過 LINE 通知您。"}
+            </p>
+          </div>
+
+          {/* 📋 訂單資訊 Card */}
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl p-5 shadow-sm space-y-3.5 text-sm font-mono">
+            <div className="text-xs font-bold text-[var(--text-secondary)] font-sans flex items-center gap-1.5 mb-1.5">
+              {isReplenishmentSuccess ? "💳 補繳明細" : "📋 訂單資訊"}
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[var(--text-secondary)] font-medium font-sans">訂單編號</span>
+              <span className="font-bold text-[var(--text-primary)]">{orderId}</span>
+            </div>
+            {isReplenishmentSuccess && (
+              <div className="flex justify-between items-center text-emerald-600 font-bold font-sans">
+                <span>本次補繳金額</span>
+                <span className="font-mono text-base font-black">${replenishmentAmount || successOrderTotal} 元</span>
+              </div>
+            )}
+            {isReplenishmentSuccess && replenishmentRemark && (
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-[var(--text-secondary)] font-medium font-sans">補繳原因</span>
+                <span className="font-bold text-[var(--text-primary)] font-sans">{replenishmentRemark}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center">
+              <span className="text-[var(--text-secondary)] font-medium font-sans">完成時間</span>
+              <span className="text-[var(--text-primary)]">{orderTime}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[var(--text-secondary)] font-medium font-sans">付款方式</span>
+              <span className="font-semibold text-emerald-600 font-sans">✓ {paymentMethod}</span>
+            </div>
+          </div>
+
+          {/* 🛒 商品明細 Card */}
+          {successOrderItems.length > 0 && (
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl shadow-sm text-sm">
+              <div
+                onClick={() => setIsDetailExpanded(!isDetailExpanded)}
+                className="px-5 py-4 flex justify-between items-center cursor-pointer hover:bg-[var(--bg-hover)] transition-colors select-none rounded-t-2xl"
+              >
+                <span className="font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                  🛒 商品明細 (共 {successOrderItems.reduce((sum, item) => sum + item.qty, 0)} 件)
+                </span>
+                <ChevronDown
+                  size={18}
+                  className={`text-[var(--text-secondary)] transition-transform duration-300 ${isDetailExpanded ? 'rotate-180' : ''}`}
+                />
+              </div>
+              {isDetailExpanded && (
+                <div className="divide-y divide-[var(--border-primary)] border-t border-[var(--border-primary)]">
+                  {successOrderItems.map((item) => (
+                    <div key={item.id} className="flex items-center gap-3 px-5 py-3.5">
+                      {/* 商品圖片 */}
+                      <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-primary)] overflow-hidden shrink-0 flex items-center justify-center">
+                        {(() => {
+                          const imgUrl = item.imageUrl || products.find(p => p.id === (item.productId || item.id))?.imageUrl;
+                          return imgUrl ? (
+                            <img
+                              src={imgUrl}
+                              alt={item.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Package size={16} className="text-[var(--text-tertiary)]" />
+                          );
+                        })()}
+                      </div>
+
+                      {/* 名稱與備註 */}
+                      <div className="flex-1 min-w-0">
+                        {(() => {
+                          let displayName = item.name || '';
+                          let displayRemark = item.remark || '';
+                          if (!displayRemark && displayName.includes('【口味備註：')) {
+                            const m = displayName.match(/【口味備註：.*?】/);
+                            if (m) displayRemark = m[0];
+                          }
+                          displayName = displayName.replace(/\s*\(?\s*【口味備註：.*?】\s*\)?/g, '').trim();
+                          const expDate = item.expiryDate || products.find(p => p.id === (item.productId || item.id))?.expiryDate;
+
+                          return (
+                            <>
+                              <span className="font-semibold text-[var(--text-primary)] block truncate">
+                                {displayName}
+                              </span>
+                              {displayRemark ? (
+                                <span className="text-xs text-blue-600 block mt-0.5 truncate">
+                                  {displayRemark}
+                                </span>
+                              ) : null}
+                              {expDate ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-700 bg-orange-50 border border-orange-300 px-2 py-0.5 rounded-full mt-1 shadow-xs">
+                                  📅 效期至 {expDate}
+                                </span>
+                              ) : null}
+                            </>
+                          );
+                        })()}
+                      </div>
+
+                      {/* 數量與金額 */}
+                      <div className="text-right shrink-0 flex flex-col items-end">
+                        <div className="flex items-center">
+                          <span className="text-xs text-[var(--text-secondary)] mr-2 font-mono">
+                            x{item.qty}
+                          </span>
+                          <span className="font-mono font-bold text-[var(--text-primary)]">
+                            ${item.subtotal}
+                          </span>
+                        </div>
+                        {item.freeQty > 0 && (
+                          <span className="text-[10px] font-bold text-emerald-600 mt-0.5">
+                            (內含贈品: {item.freeQty}件)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 💰 金額摘要 Card (初次商城點餐專用，補繳成功頁面隱藏) */}
+          {!isReplenishmentSuccess && (
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl p-5 shadow-sm space-y-3 text-sm">
+              <div className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1.5 mb-1">
+                💰 金額摘要
+              </div>
+              <div className="flex justify-between text-[var(--text-secondary)] font-medium">
+                <span>商品金額</span>
+                <span className="font-mono">${successCartTotal}</span>
+              </div>
+              {successRewardDiscount > 0 && (
+                <div className="flex justify-between text-emerald-600 font-bold">
+                  <span>滿額自選折抵</span>
+                  <span className="font-mono font-black">-${successRewardDiscount}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-[var(--text-secondary)] font-medium">
+                <span>運費</span>
+                {successShippingFee > 0 ? (
+                  <span className="font-mono">+${successShippingFee}</span>
+                ) : (
+                  <span className="text-emerald-600 font-semibold">免運</span>
+                )}
+              </div>
+              {successWalletDeduction > 0 && (
+                <div className="flex justify-between text-rose-500 font-medium">
+                  <span>折扣 (奶包金折抵)</span>
+                  <span className="font-mono">-${successWalletDeduction}</span>
+                </div>
+              )}
+              <div className="pt-3 border-t border-[var(--border-primary)] flex justify-between items-center font-bold text-[var(--text-primary)]">
+                <span className="text-base">合計</span>
+                <span className="font-mono text-xl font-extrabold text-blue-600">${successOrderTotal}</span>
+              </div>
+            </div>
+          )}
+
+          {/* 👥 團購對帳單分享 Card */}
+          {isGroupOrder && !isReplenishmentSuccess && (
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl p-5 shadow-sm space-y-3 text-sm">
+              <div className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1.5 mb-1">
+                👥 團員對帳單 (Line 分享專用)
+              </div>
+              <div className="bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl p-3.5 font-mono text-xs text-[var(--text-primary)] whitespace-pre-wrap max-h-[220px] overflow-y-auto">
+                {generateGroupOrderShareText()}
+              </div>
+              <button
+                onClick={() => handleCopy(generateGroupOrderShareText())}
+                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/15"
+              >
+                {copied ? "✅ 已複製對帳單！" : "📋 複製對帳單文字"}
+              </button>
+            </div>
+          )}
+
+          {/* 📢 配送提醒 Card (初次商城點餐專用，補繳成功頁面隱藏) */}
+          {!isReplenishmentSuccess && (
+            <div className="bg-amber-50/55 border border-amber-200/85 rounded-2xl p-5 shadow-sm space-y-3 text-xs text-amber-900">
+              <div className="font-extrabold text-sm flex items-center gap-1.5 text-amber-800">
+                📢 配送注意事項
+              </div>
+              <div className="space-y-2 font-medium text-amber-800/90">
+                {paymentMethod === "現金" && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-amber-500 mt-0.5">✓</span>
+                    <span>採現金支付，<strong>請自備零錢</strong>，現場恕不找零。</span>
+                  </div>
+                )}
+                {paymentMethod === "轉帳" && (
+                  <div className="bg-white/80 border border-blue-100 rounded-xl p-3.5 space-y-2.5 text-xs text-blue-900 mb-2 font-sans">
+                    <p className="font-bold text-blue-800 flex items-center gap-1">🏦 請轉帳至以下帳戶</p>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="text-blue-700/80">銀行</span>
+                        <span className="font-semibold text-blue-950">{BANK_INFO.bank}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-blue-700/80">帳號</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold tracking-wider text-blue-950">{BANK_INFO.account}</span>
+                          <button
+                            onClick={() => handleCopy(BANK_INFO.account)}
+                            className="text-[10px] bg-blue-100 hover:bg-blue-200 text-blue-600 px-2 py-0.5 rounded font-bold"
+                          >
+                            {copied ? "已複製！" : "複製"}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-blue-700/80">戶名</span>
+                        <span className="font-semibold text-blue-950">{BANK_INFO.name}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-start gap-2">
+                  <span className="text-amber-500 mt-0.5">✓</span>
+                  <span>配送日將由官方LINE與您聯繫告知。</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-amber-500 mt-0.5">✓</span>
+                  <span>如需修改訂購項目或地址，請直接聯絡 LINE 客服。</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 客服與行動引導按鈕 */}
+          <div className="w-full flex flex-col gap-3 pt-2">
+
+            {/* 聯繫客服按鈕 */}
+            {(() => {
+              const isGeneral = isGeneralUser || !selectedBuilding || selectedBuilding === "其它";
+              const actionUrl = isGeneral ? getOaMessageUrl() : LINE_CONTACT_URL;
+              const isMsgSent = isGeneral && isMsgSentAuto;
+
+              if (isMsgSent) {
+                return (
+                  <div className="w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 text-emerald-600 bg-emerald-50 border border-emerald-200 text-sm select-none">
+                    <CheckCircle size={18} />
+                    訂單明細已自動發送給客服
+                  </div>
+                );
+              }
+
+              return (
+                <button
+                  onClick={() => window.open(actionUrl, "_blank")}
+                  className="w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-sm active:scale-95 transition-all flex-shrink-0"
+                >
+                  <span className="text-sm flex items-center gap-1.5">
+                    💬 有問題？立即聯絡 LINE 客服
+                  </span>
+                </button>
+              );
+            })()}
+
+            {/* 下方行動按鈕組 */}
+            <div className="grid grid-cols-2 gap-3 w-full">
+              <button
+                onClick={() => {
+                  setStep("shop");
+                  setCustomerName("");
+                  setCustomerPhone("");
+                  setDeliveryAddress("");
+                  setNote("");
+                  setPaymentMethod("現金");
+                  setTransferLastFive("");
+                  setIsNightOrder(false);
+                  setIsMsgSentAuto(false);
+                  setSuccessOrderItems([]);
+                  setSuccessCartTotal(0);
+                  setSuccessShippingFee(0);
+                  setSuccessWalletDeduction(0);
+                  setSuccessRewardDiscount(0);
+                  setSuccessDeliveryDate("");
+                  setSuccessDeliveryTime("");
+                  setIsDetailExpanded(true);
+                }}
+                className="py-3 rounded-xl font-bold text-sm bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-100 active:scale-95 transition-all"
+              >
+                🛍 再次購買
+              </button>
+              <button
+                onClick={() => {
+                  setStep("shop");
+                  setCustomerName("");
+                  setCustomerPhone("");
+                  setDeliveryAddress("");
+                  setNote("");
+                  setPaymentMethod("現金");
+                  setTransferLastFive("");
+                  setIsNightOrder(false);
+                  setIsMsgSentAuto(false);
+                  setSuccessOrderItems([]);
+                  setSuccessCartTotal(0);
+                  setSuccessShippingFee(0);
+                  setSuccessWalletDeduction(0);
+                  setSuccessRewardDiscount(0);
+                  setSuccessDeliveryDate("");
+                  setSuccessDeliveryTime("");
+                  setIsDetailExpanded(true);
+                }}
+                className="py-3 rounded-xl font-bold text-sm btn-secondary active:scale-95 transition-all"
+              >
+                🏠 返回首頁
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── 🍨 多規格口味選擇彈窗組件 ───────────────────────────────────────
+  const renderFlavorModal = () => {
+    if (!flavorModalProduct) return null;
+    return (
+      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-primary)] shadow-2xl w-full max-w-sm flex flex-col overflow-hidden glass-panel">
+          <div className="p-4 border-b border-[var(--border-primary)] flex justify-between items-center bg-[var(--bg-tertiary)]">
+            <div>
+              <h3 className="text-base font-bold text-[var(--text-primary)]">
+                {flavorModalProduct.name}
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                請選擇規格口味與數量
+              </p>
+            </div>
+            <button
+              onClick={() => setFlavorModalProduct(null)}
+              className="text-[var(--text-secondary)] hover:text-red-500 p-1.5 rounded-lg hover:bg-[var(--bg-hover)]"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+
+          <div className="p-4 space-y-4 max-h-[50vh] overflow-y-auto">
+            {flavorModalProduct.flavor_choices.map((flavor) => {
+              const count = tempFlavorQty[flavor] || 0;
+              return (
+                <div
+                  key={flavor}
+                  className="flex justify-between items-center py-1"
+                >
+                  <span className="font-semibold text-sm text-[var(--text-primary)]">
+                    {flavor}
+                  </span>
+                  <div className="flex items-center gap-1 bg-[var(--bg-primary)] rounded-lg p-0.5 border border-[var(--border-primary)] shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateTempFlavorQty(flavor, -1)}
+                      className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-100 active:scale-90"
+                    >
+                      <Minus size={12} />
+                    </button>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      min="0"
+                      max="99"
+                      value={count}
+                      onChange={(e) => handleSetTempFlavorQty(flavor, e.target.value)}
+                      onBlur={(e) => {
+                        if (e.target.value === "" || isNaN(parseInt(e.target.value, 10))) {
+                          handleSetTempFlavorQty(flavor, 0);
+                        }
+                      }}
+                      onFocus={(e) => e.target.select()}
+                      className="w-8 text-center font-bold font-mono text-sm bg-transparent border-0 p-0 focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateTempFlavorQty(flavor, 1)}
+                      className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-100 active:scale-90"
+                    >
+                      <Plus size={12} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* 總計與優惠提示 */}
+            <div className="bg-[var(--bg-tertiary)] p-3 rounded-xl border border-[var(--border-primary)] text-xs space-y-1 mt-2">
+              <div className="flex justify-between font-bold text-[var(--text-primary)]">
+                <span>本次已選總數：</span>
+                <span className="font-mono text-sm text-blue-600">
+                  {Object.values(tempFlavorQty).reduce((a, b) => a + b, 0)} 件
+                </span>
+              </div>
+              {flavorModalProduct.has_volume_pricing &&
+                flavorModalProduct.volume_pricing_settings && (() => {
+                  let s = flavorModalProduct.volume_pricing_settings;
+                  if (typeof s === 'string') {
+                    try { s = JSON.parse(s); } catch (e) { }
+                  }
+                  if (!s) return null;
+                  const tiers = Array.isArray(s.tiers) && s.tiers.length > 0
+                    ? s.tiers.filter(t => t.target_quantity && t.package_price)
+                    : (s.target_quantity ? [{ target_quantity: s.target_quantity, package_price: s.package_price }] : []);
+                  if (tiers.length === 0) return null;
+                  const tiersText = tiers.map(t => `任選 ${t.target_quantity} 入 $${t.package_price}`).join(' / ');
+                  return (
+                    <div className="text-red-500 font-semibold mt-1">
+                      ※ 本商品享組合價：{tiersText}（可口味混搭）
+                    </div>
+                  );
+                })()}
+            </div>
+          </div>
+
+          <div className="p-4 border-t border-[var(--border-primary)] flex gap-3 bg-[var(--bg-tertiary)]">
+            <button
+              onClick={() => setFlavorModalProduct(null)}
+              className="btn-secondary py-2.5 rounded-xl text-sm font-bold flex-1 transition-all duration-100 active:scale-95"
+            >
+              取消
+            </button>
+            <button
+              onClick={handleConfirmFlavors}
+              className="btn-primary py-2.5 rounded-xl text-sm font-bold flex-1 shadow-md shadow-blue-500/20 transition-all duration-100 active:scale-95"
+            >
+              確認加入
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── 🎁 贈品選擇 Bottom Sheet 抽屜組件 ─────────────────────────────
+  const renderGiftModal = () => {
+    if (!showGiftModal) return null;
+    const pId = showGiftModal;
+    const promoItems = products.filter(p => p.promoId === pId);
+    const promo = promoItems[0]?.promotion;
+
+    if (isGroupOrder) {
+      const membersWithGifts = Object.keys(groupCart || {}).filter(
+        name => (memberGiftCredits[name]?.[pId]?.earned || 0) > 0
+      );
+
+      if (membersWithGifts.length === 0) return null;
+
+      const currMember = (activeGroupMember && membersWithGifts.includes(activeGroupMember))
+        ? activeGroupMember
+        : (membersWithGifts.find(name => (memberGiftCredits[name]?.[pId]?.selected || 0) < (memberGiftCredits[name]?.[pId]?.earned || 0)) || membersWithGifts[0]);
+
+      const mCredits = memberGiftCredits[currMember]?.[pId] || { earned: 0, selected: 0 };
+      const mSelections = groupGiftSelections[currMember]?.[pId] || {};
+      const mRemaining = mCredits.earned - mCredits.selected;
+
+      const handleSetGroupGift = (prodId, num) => {
+        const current = mSelections[prodId] || 0;
+        const diff = num - current;
+        if (num < 0) return;
+        if (diff > 0 && mRemaining < diff) return;
+
+        setGroupGiftSelections(prev => ({
+          ...prev,
+          [currMember]: {
+            ...(prev[currMember] || {}),
+            [pId]: {
+              ...(prev[currMember]?.[pId] || {}),
+              [prodId]: num
+            }
+          }
+        }));
+      };
+
+      const nextIncomplete = membersWithGifts.find(
+        name => name !== currMember && (memberGiftCredits[name]?.[pId]?.selected || 0) < (memberGiftCredits[name]?.[pId]?.earned || 0)
+      );
+
+      return (
+        <div className="fixed inset-0 z-[9999] flex flex-col justify-end p-3 pb-[75px]">
+          {/* 遮罩背景 */}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-fadeIn"
+            onClick={() => setShowGiftModal(null)}
+          />
+
+          {/* Bottom Sheet 抽屜卡片 */}
+          <div className="relative z-50 bg-[var(--bg-secondary)] rounded-[28px] border border-[var(--border-primary)] shadow-2xl w-full max-w-md mx-auto flex flex-col overflow-hidden max-h-[80vh] animate-slideUp">
+            {/* 頂部拖拽條與 Header */}
+            <div className="pt-3 pb-2 px-4 border-b border-[var(--border-primary)] bg-[var(--bg-tertiary)] flex flex-col items-center relative">
+              <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mb-2 cursor-pointer" onClick={() => setShowGiftModal(null)} />
+              <div className="w-full flex justify-between items-center">
+                <div>
+                  <h3 className="text-base font-extrabold text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
+                    <span>🎉 選擇 👤【{currMember}】的贈品</span>
+                  </h3>
+                  <p className={`text-xs font-bold mt-0.5 ${mRemaining < 0 ? 'text-red-600 dark:text-red-400 font-extrabold animate-pulse' : 'text-amber-600 dark:text-amber-400'}`}>
+                    {promo?.name} ｜ 額度: {mCredits.earned} 件 / 已選: {mCredits.selected} 件 {mRemaining > 0 ? `(尚餘 ${mRemaining} 件)` : (mRemaining < 0 ? `⚠️ 超出 ${Math.abs(mRemaining)} 件，請扣減` : '✅ 已選完')}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowGiftModal(null)}
+                  className="text-[var(--text-secondary)] hover:text-red-500 p-1.5 rounded-lg hover:bg-[var(--bg-hover)] shrink-0"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              </div>
+            </div>
+
+            {/* 👥 團員頁籤切換 Bar */}
+            <div className="flex gap-2 p-2.5 overflow-x-auto border-b border-[var(--border-primary)] bg-[var(--bg-tertiary)] shrink-0 no-scrollbar">
+              {membersWithGifts.map(name => {
+                const mc = memberGiftCredits[name]?.[pId] || { earned: 0, selected: 0 };
+                const isDone = mc.selected === mc.earned && mc.earned > 0;
+                const isOver = mc.selected > mc.earned;
+                const isActive = currMember === name;
+                return (
+                  <button
+                    key={name}
+                    onClick={() => setActiveGroupMember(name)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all flex items-center gap-1 ${isActive
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : isOver
+                        ? 'bg-red-500/10 text-red-600 border border-red-300 dark:border-red-700 animate-pulse'
+                        : isDone
+                          ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-300 dark:border-emerald-700'
+                          : 'bg-amber-500/10 text-amber-600 border border-amber-300 dark:border-amber-700 animate-pulse'
+                      }`}
+                  >
+                    <span>👤 {name}</span>
+                    <span>{isOver ? `⚠️ (${mc.selected}/${mc.earned})` : (isDone ? `✅ (${mc.selected}/${mc.earned})` : `(${mc.selected}/${mc.earned})`)}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 贈品品項列表 */}
+            <div className="p-4 overflow-y-auto space-y-3 bg-[var(--bg-secondary)] min-h-[140px] max-h-[45vh]">
+              {promoItems.map((prod) => {
+                const qty = mSelections[prod.id] || 0;
+                return (
+                  <div key={prod.id} className="flex items-center justify-between p-3.5 border border-[var(--border-primary)] rounded-2xl hover:border-blue-200 hover:bg-blue-50/30 transition-all">
+                    <div className="font-bold text-sm text-[var(--text-primary)] pr-2 line-clamp-2">
+                      {prod.name}
+                    </div>
+                    <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] rounded-xl p-1 border border-[var(--border-primary)] shadow-sm shrink-0">
+                      <button
+                        onClick={() => handleSetGroupGift(prod.id, qty - 1)}
+                        disabled={qty === 0}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200 active:scale-95 disabled:opacity-30 transition-all font-extrabold"
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <span className="w-6 text-center font-extrabold font-mono text-base text-[var(--text-primary)]">
+                        {qty}
+                      </span>
+                      <button
+                        onClick={() => handleSetGroupGift(prod.id, qty + 1)}
+                        disabled={mRemaining <= 0}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200 active:scale-95 disabled:opacity-30 transition-all font-extrabold"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 底部完成 / 下一步按鈕 */}
+            <div className="p-4 border-t border-[var(--border-primary)] bg-[var(--bg-tertiary)]">
+              <button
+                onClick={() => {
+                  if (mRemaining === 0 && nextIncomplete) {
+                    setActiveGroupMember(nextIncomplete);
+                  } else {
+                    setShowGiftModal(null);
+                  }
+                }}
+                className={`w-full py-3.5 rounded-xl font-extrabold text-sm transition-all shadow-md active:scale-95 flex items-center justify-center gap-1 text-white ${mRemaining === 0 && nextIncomplete
+                  ? 'bg-amber-500 hover:bg-amber-600 animate-pulse'
+                  : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
+              >
+                {mRemaining > 0 ? (
+                  `確認 👤【${currMember}】的選取 (尚有 ${mRemaining} 件未選)`
+                ) : nextIncomplete ? (
+                  `下一步：選擇 👤【${nextIncomplete}】的贈品 ➔`
+                ) : (
+                  '完成全體團員贈品選取 ✅'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const credits = availableGiftCredits[pId] || { earned: 0, selected: 0 };
+    const selections = giftSelections[pId] || {};
+    const remaining = credits.earned - credits.selected;
+
+    const handleSetGift = (prodId, num) => {
+      const current = selections[prodId] || 0;
+      const diff = num - current;
+      if (num < 0) return;
+      if (diff > 0 && remaining < diff) return;
+
+      setGiftSelections(prev => ({
+        ...prev,
+        [pId]: {
+          ...(prev[pId] || {}),
+          [prodId]: num
+        }
+      }));
+    };
+
+    return (
+      <div className="fixed inset-0 z-[9999] flex flex-col justify-end p-3 pb-[75px]">
+        {/* 遮罩背景 */}
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-fadeIn"
+          onClick={() => setShowGiftModal(null)}
+        />
+
+        {/* Bottom Sheet 抽屜卡片 */}
+        <div className="relative z-50 bg-[var(--bg-secondary)] rounded-[28px] border border-[var(--border-primary)] shadow-2xl w-full max-w-md mx-auto flex flex-col overflow-hidden max-h-[75vh] animate-slideUp">
+          {/* 頂部拖拽條與 Header */}
+          <div className="pt-3 pb-3 px-4 border-b border-[var(--border-primary)] bg-[var(--bg-tertiary)] flex flex-col items-center relative">
+            <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mb-3 cursor-pointer" onClick={() => setShowGiftModal(null)} />
+            <div className="w-full flex justify-between items-center">
+              <div>
+                <h3 className="text-base font-extrabold text-blue-700 dark:text-blue-400">
+                  🎉 請選擇贈品: {promo?.name}
+                </h3>
+                <p className="text-xs text-amber-600 dark:text-amber-400 font-bold mt-0.5">
+                  已獲額度: {credits.earned} 件 / 已選: {credits.selected} 件 {remaining > 0 ? `(尚餘 ${remaining} 件)` : '✅ 已選完'}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowGiftModal(null)}
+                className="text-[var(--text-secondary)] hover:text-red-500 p-1.5 rounded-lg hover:bg-[var(--bg-hover)]"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+          </div>
+
+          {/* 贈品品項列表 */}
+          <div className="p-4 overflow-y-auto space-y-3 bg-[var(--bg-secondary)] min-h-[140px] max-h-[45vh]">
+            {promoItems.map((prod) => {
+              const qty = selections[prod.id] || 0;
+              return (
+                <div key={prod.id} className="flex items-center justify-between p-3.5 border border-[var(--border-primary)] rounded-2xl hover:border-blue-200 hover:bg-blue-50/30 transition-all">
+                  <div className="font-bold text-sm text-[var(--text-primary)] pr-2 line-clamp-2">
+                    {prod.name}
+                  </div>
+                  <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] rounded-xl p-1 border border-[var(--border-primary)] shadow-sm shrink-0">
+                    <button
+                      onClick={() => handleSetGift(prod.id, qty - 1)}
+                      disabled={qty === 0}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200 active:scale-95 disabled:opacity-30 transition-all font-extrabold"
+                    >
+                      <Minus size={14} />
+                    </button>
+                    <span className="w-6 text-center font-extrabold font-mono text-base text-[var(--text-primary)]">
+                      {qty}
+                    </span>
+                    <button
+                      onClick={() => handleSetGift(prod.id, qty + 1)}
+                      disabled={remaining === 0}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200 active:scale-95 disabled:opacity-30 transition-all font-extrabold"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 底部完成按鈕 */}
+          <div className="p-4 border-t border-[var(--border-primary)] bg-[var(--bg-tertiary)]">
+            <button
+              onClick={() => setShowGiftModal(null)}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-extrabold text-sm transition-all shadow-md active:scale-95 flex items-center justify-center gap-1"
+            >
+              確認選取 {remaining > 0 ? `(尚有 ${remaining} 件未選)` : '✅'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ════════════════════════════════════════════════════════════
+  // 訂單確認頁
+  // ════════════════════════════════════════════════════════════
+  if (step === "confirm") {
+    if (pendingLinePayUrlWeb && pendingLinePayUrlApp) {
+      return (
+        <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)] items-center justify-center p-4">
+          <div className="w-full bg-white dark:bg-[var(--bg-secondary)] rounded-2xl shadow-xl overflow-hidden p-8 text-center animate-in zoom-in-95 duration-300 border border-[var(--border-primary)]">
+            <div className="flex justify-center mb-6">
+              <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                <CheckCircle className="w-10 h-10 text-green-500" />
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">訂單已建立</h2>
+            <p className="text-[var(--text-secondary)] mb-6">請點擊下方按鈕進行付款 (測試版)</p>
+
+            <div className="space-y-3 mt-8">
+              <button
+                onClick={() => {
+                  const isInLiff = window.liff && window.liff.isInClient && window.liff.isInClient();
+
+                  if (isInLiff) {
+                    // 🚨 方案 B：業界標準外部跳轉
+                    // 在 LIFF 環境中，強迫使用 external: true 跳轉到外部 Safari，並使用 .web 網址
+                    // 配合後端 checkConfirmUrlBrowser: false，這應該能完美繞過所有阻擋！
+                    window.liff.openWindow({
+                      url: pendingLinePayUrlWeb,
+                      external: true
+                    });
+                  } else {
+                    window.location.href = pendingLinePayUrlWeb;
+                  }
+                }}
+                className="w-full py-4 px-6 bg-[#06C755] hover:bg-[#05b34c] text-white text-[17px] font-extrabold rounded-xl shadow-lg shadow-green-500/20 transition-transform transform active:scale-95 flex items-center justify-center gap-2"
+              >
+                <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" alt="LINE Pay" className="h-6 brightness-0 invert" />
+                確認送出訂單並付款
+              </button>
+            </div>
+
+            <div className="mt-6 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg text-left text-xs text-gray-600 dark:text-gray-300 break-all border border-red-300">
+              <div className="font-bold text-red-500 mb-1">🔍 終極除錯面板 (請截圖這塊給工程師)：</div>
+              <div>isInLiff: {String(window.liff && window.liff.isInClient && window.liff.isInClient())}</div>
+              <div className="mt-2">App URL: {pendingLinePayUrlApp || '無 (或尚未取得)'}</div>
+
+              <div className="mt-2 mb-2 font-bold">Web URL (確認無亂碼編碼):</div>
+              <textarea
+                readOnly
+                className="w-full text-[10px] p-2 bg-white dark:bg-black border border-gray-300 rounded h-12 break-all mb-2 font-mono"
+                value={pendingLinePayUrlWeb}
+              />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(pendingLinePayUrlWeb);
+                  alert("✅ 網址已複製！\\n\\n請直接離開 LINE (不要關閉)，打開手機內建的 Safari 瀏覽器，把網址貼上去並前往！\\n\\n藉此測試是否能成功滑出 Face ID。");
+                }}
+                className="w-full py-2 bg-gray-800 hover:bg-black text-white font-bold rounded shadow"
+              >
+                📋 複製 Web URL (去 Safari 貼上)
+              </button>
+            </div>
+
+            <p className="text-xs text-[var(--text-tertiary)] mt-6">官方認證的最佳跳轉實作</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (cartItems.length === 0) {
+      setStep("shop");
+      return null;
+    }
+
+    return (
+      <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
+        <div
+          className="p-4 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] flex items-center gap-3 flex-shrink-0"
+          style={{ touchAction: "none" }}
+        >
+          <button
+            onClick={() => setStep("shop")}
+            className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">
+            確認購物清單
+          </h2>
+        </div>
+
+        <div key="page-confirm" className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* 商品清單 */}
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-[var(--border-primary)] text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+              訂購商品
+            </div>
+            {cartItems.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border-primary)] last:border-0 text-sm"
+              >
+                {/* 圖片展示 */}
+                <div className="w-12 h-12 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-primary)] overflow-hidden shrink-0 flex items-center justify-center">
+                  {item.imageUrl ? (
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Package size={20} className="text-[var(--text-tertiary)]" />
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start">
+                    <div className="min-w-0 flex-1">
+                      <span className="font-semibold text-[var(--text-primary)] truncate block">
+                        {item.name}
+                      </span>
+                      {item.expiryDate && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-700 bg-orange-50 border border-orange-300 px-2 py-0.5 rounded-full mt-1 shadow-xs">
+                          📅 效期至 {item.expiryDate}
+                        </span>
+                      )}
+                    </div>
+                    {item.isGift ? (
+                      <span className="text-amber-700 dark:text-amber-300 font-bold bg-amber-100 dark:bg-amber-950/40 px-2 py-0.5 rounded text-xs ml-2 shrink-0 border border-amber-200 dark:border-amber-800">
+                        🎁 免費贈品
+                      </span>
+                    ) : (
+                      <span className="font-mono font-bold text-[var(--text-primary)] ml-2 shrink-0">
+                        ${item.subtotal}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center mt-1 text-xs text-[var(--text-secondary)]">
+                    {!item.isGift && (
+                      <div className="flex flex-col gap-1">
+                        <span>單價 ${item.price}</span>
+                      </div>
+                    )}
+                    {(() => {
+                      if (item.isGift) {
+                        return (
+                          <span className="w-8 text-center font-extrabold font-mono text-sm text-[var(--text-primary)] mr-2">
+                            x{item.qty}
+                          </span>
+                        );
+                      }
+                      if (isGroupOrder) {
+                        return (
+                          <span className="font-extrabold font-mono text-xs text-[var(--text-secondary)] bg-[var(--bg-tertiary)] px-2.5 py-1 rounded-lg border border-[var(--border-primary)] mr-1">
+                            共 {item.qty} 件
+                          </span>
+                        );
+                      }
+                      const product = products.find(p => p.id === item.id);
+                      if (!product) return null;
+                      return (
+                        <div className="flex items-center bg-[var(--bg-tertiary)] rounded-xl p-0.5 border border-[var(--border-primary)] shadow-sm select-none">
+                          <button
+                            onClick={() => handleProductAction(product, false)}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-all duration-100 active:scale-90"
+                          >
+                            <Minus size={12} />
+                          </button>
+                          {product.has_flavor_attributes ? (
+                            <span className="w-8 text-center font-extrabold font-mono text-sm text-[var(--text-primary)]">
+                              {item.qty}
+                            </span>
+                          ) : (
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              min="0"
+                              max="99"
+                              value={item.qty}
+                              onChange={(e) => handleSetQty(product.id, e.target.value)}
+                              onBlur={(e) => {
+                                if (e.target.value === "" || isNaN(parseInt(e.target.value, 10))) {
+                                  handleSetQty(product.id, 0);
+                                }
+                              }}
+                              onFocus={(e) => e.target.select()}
+                              className="w-8 text-center font-extrabold font-mono text-sm text-[var(--text-primary)] bg-transparent border-0 p-0 focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                          )}
+                          <button
+                            onClick={() => handleProductAction(product, true)}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-all duration-100 active:scale-90"
+                          >
+                            <Plus size={12} />
+                          </button>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  {item.remark && !item.isGift && (
+                    <div className="text-xs text-blue-600 font-medium mt-1">
+                      {item.remark}
+                    </div>
+                  )}
+                  {isGroupOrder && (
+                    <div className="mt-1.5 pt-1.5 border-t border-dashed border-[var(--border-primary)] space-y-1">
+                      {item.isGift ? (
+                        // 🎁 贈品品項：合併展示選取此款贈品之各團員與選取數量
+                        Object.entries(groupGiftSelections || {}).map(([name, pObj]) => {
+                          let gQty = 0;
+                          Object.values(pObj || {}).forEach(selections => {
+                            if (selections && selections[item.id]) gQty += Number(selections[item.id]);
+                          });
+                          if (gQty === 0) return null;
+                          return (
+                            <div key={name} className="flex justify-between items-center text-[11px] text-[var(--text-secondary)] font-sans">
+                              <span>👤 {name}</span>
+                              <span className="font-semibold font-mono">x{gQty}</span>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        // 🛒 一般付費商品：顯示各團員獨立加減與 🗑️ 刪除按鈕
+                        Object.entries(groupCart).map(([name, items]) => {
+                          if (!items || typeof items !== 'object') return null;
+                          const mQty = items[item.id] || 0;
+                          if (mQty === 0) return null;
+                          return (
+                            <div key={name} className="flex justify-between items-center text-xs text-[var(--text-primary)] font-sans py-0.5">
+                              <span className="font-medium text-slate-700 dark:text-slate-300 truncate mr-2">👤 {name}</span>
+                              <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] rounded-lg p-0.5 border border-[var(--border-primary)] shadow-2xs shrink-0">
+                                <button
+                                  onClick={() => handleUpdateMemberQty(name, item.id, -1)}
+                                  className="w-5 h-5 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-blue-600 active:scale-90"
+                                  title="減少此團員數量"
+                                >
+                                  <Minus size={10} />
+                                </button>
+                                <span className="w-5 text-center font-bold font-mono text-xs text-[var(--text-primary)]">
+                                  {mQty}
+                                </span>
+                                <button
+                                  onClick={() => handleUpdateMemberQty(name, item.id, 1)}
+                                  className="w-5 h-5 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-blue-600 active:scale-90"
+                                  title="增加此團員數量"
+                                >
+                                  <Plus size={10} />
+                                </button>
+                                <button
+                                  onClick={() => handleUpdateMemberQty(name, item.id, -mQty)}
+                                  className="w-5 h-5 flex items-center justify-center rounded-md text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-950/40 active:scale-90 ml-0.5"
+                                  title="刪除此團員此商品"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {/* 贈品挑選區塊 */}
+            {Object.entries(availableGiftCredits || {}).map(([pId, credits]) => {
+              if (credits.earned > 0 || credits.selected > 0) {
+                const promo = products.find(p => p.promoId === pId)?.promotion;
+                const remaining = credits.earned - credits.selected;
+                const isOver = remaining < 0;
+                return (
+                  <div key={pId} className={`px-4 py-3 border-t border-[var(--border-primary)] ${isOver ? 'bg-amber-50 dark:bg-amber-950/40' : 'bg-blue-50'}`}>
+                    <div className="flex justify-between items-center">
+                      <div className="flex flex-col">
+                        <span className={`font-bold text-sm ${isOver ? 'text-amber-800 dark:text-amber-300' : 'text-blue-800'}`}>🎉 {promo?.name || '促銷活動'} 贈品</span>
+                        <span className={`text-xs font-semibold mt-0.5 ${isOver ? 'text-amber-700 dark:text-amber-400' : 'text-blue-600'}`}>
+                          {isOver ? `⚠️ 贈品超出額度 (已獲得 ${credits.earned} 件，目前已選 ${credits.selected} 件)` : (remaining > 0 ? `已獲得 ${credits.earned} 件，尚未挑選 ${remaining} 件` : `✅ 已完成挑選 (${credits.selected}/${credits.earned} 件)`)}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setShowGiftModal(pId)}
+                        className={`px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm transition-all ${isOver ? 'bg-amber-600 text-white hover:bg-amber-700 animate-pulse' : (remaining > 0 ? 'bg-blue-600 text-white hover:bg-blue-700 animate-pulse' : 'bg-blue-200 text-blue-700')}`}
+                      >
+                        {isOver ? '⚠️ 調整贈品' : (remaining > 0 ? '🎁 點此挑選贈品' : '✅ 重新挑選')}
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })}
+            {/* 運費進度條與費用明細 */}
+            {(() => {
+              let activeComm = currentCommunity;
+              if (isGeneralUser && selectedCommunityId && allCommunities.length > 0) {
+                const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+                if (match) activeComm = match;
+              }
+
+              const hasShipping = isGeneralUser && activeComm && !activeComm.DefaultFreeShipping && Number(activeComm.ShippingFee) > 0;
+              const freeMin = Number(activeComm?.FreeShippingMin) || 0;
+              const fee = Number(activeComm?.ShippingFee) || 0;
+              const gap = freeMin > 0 ? Math.max(0, freeMin - cartTotal) : 0;
+              const progress = freeMin > 0 ? Math.min(100, Math.round((cartTotal / freeMin) * 100)) : 100;
+              const isFree = shippingFee === 0;
+
+              return hasShipping ? (
+                <div className="px-4 pt-3 pb-1 space-y-2">
+                  {/* 進度條 */}
+                  {freeMin > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center text-xs font-bold">
+                        {isFree ? (
+                          <span className="text-emerald-600 flex items-center gap-1">🎉 已達成免運門檻！已享免運</span>
+                        ) : (
+                          <span className="text-[var(--text-secondary)]">
+                            🚚 再買 <strong className="text-orange-500 font-extrabold font-mono">${gap}</strong> 即可免運
+                          </span>
+                        )}
+                        <span className="text-[10px] text-slate-400 font-mono font-normal">門檻 ${freeMin}</span>
+                      </div>
+                      {/* 軌道與小車車 */}
+                      <div className="relative w-full h-1.5 bg-slate-100 rounded-full border border-slate-200/60 overflow-visible">
+                        {/* 進度填充 */}
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${isFree ? 'bg-emerald-500' : 'bg-gradient-to-r from-orange-400 to-amber-500'}`}
+                          style={{ width: `${progress}%` }}
+                        />
+                        {/* 小車車圖示 */}
+                        <span
+                          className="absolute -top-[7px] text-base transition-all duration-300 pointer-events-none select-none"
+                          style={{
+                            left: `calc(${progress}% - 9px)`,
+                            transform: 'scaleX(-1)' // 將車車開的方向轉為朝右
+                          }}
+                        >
+                          🚚
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  {/* 費用明細 */}
+                  <div className="flex justify-between items-center text-sm text-[var(--text-secondary)]">
+                    <span>商品小計</span>
+                    <span className="font-mono">${cartTotal}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className={isFree ? 'text-emerald-600 font-semibold' : 'text-[var(--text-secondary)]'}>運費</span>
+                    {isFree ? (
+                      <span className="font-mono text-emerald-600 font-bold">免運</span>
+                    ) : (
+                      <span className="font-mono text-orange-500 font-semibold">+${fee}</span>
+                    )}
+                  </div>
+                </div>
+              ) : null;
+            })()}
+
+            <div className="flex justify-between items-center px-4 py-3 bg-[var(--bg-tertiary)]">
+              <span className="font-bold text-[var(--text-primary)]">應付總金額</span>
+              <span className="font-mono text-xl font-extrabold text-blue-600">
+                ${orderTotal}
+              </span>
+            </div>
+          </div>
+
+          {/* 👥 團員代訂明細 (團購模式專屬) */}
+          {isGroupOrder && (
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-4 py-2.5 border-b border-[var(--border-primary)] text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center justify-between">
+                <span>👥 團員代訂明細</span>
+                <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold">每人小計</span>
+              </div>
+              <div className="divide-y divide-[var(--border-primary)] max-h-[300px] overflow-y-auto">
+                {Object.entries(groupCart).map(([name, items]) => {
+                  if (!items || typeof items !== 'object') return null;
+                  const validItems = Object.entries(items).filter(([_, qty]) => Number(qty) > 0);
+                  if (validItems.length === 0) return null;
+
+                  let memberTotal = 0;
+                  return (
+                    <div key={name} className="p-4 space-y-1.5 bg-[var(--bg-secondary)]">
+                      <div className="flex justify-between items-center text-sm font-bold text-[var(--text-primary)]">
+                        <span>👤 {name}</span>
+                      </div>
+                      <div className="space-y-1 pl-4">
+                        {validItems.map(([productId, qty]) => {
+                          const product = products.find((p) => p.id === productId);
+                          const singlePrice = product ? (Number(product.single_price) || Number(product.price)) : 0;
+
+                          let subtotal = 0;
+                          if (product && product.has_volume_pricing && product.volume_pricing_settings) {
+                            subtotal = calculateProductSubtotal(product, qty);
+                          } else {
+                            subtotal = singlePrice * qty;
+                          }
+                          memberTotal += subtotal;
+
+                          return (
+                            <div key={productId} className="flex justify-between items-center text-xs text-[var(--text-secondary)] font-mono">
+                              <span className="font-sans">{product ? product.name : productId} x{qty}</span>
+                              <span>${subtotal}</span>
+                            </div>
+                          );
+                        })}
+                        {/* 🎁 展示該團員所選取的贈品明細 */}
+                        {(() => {
+                          const mGifts = groupGiftSelections[name] || {};
+                          const giftList = [];
+                          Object.entries(mGifts).forEach(([pId, gObj]) => {
+                            if (gObj && typeof gObj === 'object') {
+                              Object.entries(gObj).forEach(([gPid, gQty]) => {
+                                if (Number(gQty) > 0) {
+                                  const gProd = products.find(p => p.id === gPid);
+                                  if (gProd) {
+                                    giftList.push({ id: gPid, name: gProd.name, qty: gQty });
+                                  }
+                                }
+                              });
+                            }
+                          });
+                          if (giftList.length === 0) return null;
+                          return giftList.map((g, idx) => (
+                            <div key={idx} className="flex justify-between items-center text-xs text-amber-700 dark:text-amber-300 font-bold bg-amber-500/10 px-2.5 py-1 rounded-lg mt-1">
+                              <span className="font-sans flex items-center gap-1">
+                                <span>🎁</span>
+                                <span>[贈品] {g.name} x{g.qty}</span>
+                              </span>
+                              <span className="font-mono text-amber-600 dark:text-amber-400 font-extrabold">$0</span>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                      <div className="flex justify-end items-center text-xs font-bold text-blue-600 pt-1">
+                        <span>小計：${memberTotal} 元</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+        </div>
+
+        <div
+          className="p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] grid grid-cols-2 gap-3 flex-shrink-0"
+          style={{ touchAction: "none" }}
+        >
+          <button
+            onClick={() => setStep("shop")}
+            className="btn-secondary py-3 rounded-xl font-bold"
+          >
+            返回修改商品
+          </button>
+          <button
+            onClick={handleProceedToForm}
+            className="btn-primary py-3 rounded-xl font-bold flex items-center justify-center gap-1 shadow-md shadow-blue-500/20"
+          >
+            前往填寫資料 <ArrowRight size={16} />
+          </button>
+        </div>
+        {renderGiftModal()}
+        {renderFlavorModal()}
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // 填寫資料頁
+  // ════════════════════════════════════════════════════════════
+  if (step === "form") {
+    const safePhone = String(customerPhone || "");
+    const safeName = String(customerName || "");
+    const safeAddress = String(detailAddress || "");
+    const safeOther = String(otherBuildingText || "");
+    const safeTransfer = String(transferLastFive || "");
+
+    // 奶包金抵扣計算（以含運費的 orderTotal 為基準，但運費不可折抵）
+    const hasWallet = memberProfile?.WalletBalance > 0;
+    const maxDeduction = hasWallet ? Math.min(Number(memberProfile.WalletBalance), netCartTotal) : 0;
+    const payAmount = useWallet ? Math.max(0, orderTotal - maxDeduction) : orderTotal;
+    const isFullyCovered = useWallet && payAmount === 0;
+
+    const isPhoneValid = /^(09\d{8}|0[2-8]\d{7,8})$/.test(safePhone.trim());
+    const isBuildingValid =
+      isGeneralUser || (
+        selectedBuilding &&
+        (selectedBuilding !== "其它" || safeOther.trim())
+      );
+
+    // 找出目前選中的行政區前綴
+    let communityPrefix = "";
+    if (selectedCommunityId && allCommunities.length > 0) {
+      const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+      if (match) communityPrefix = match.CommunityName;
+    }
+
+    // 計算去除行政區前綴後的自填路名門牌
+    let userEnteredStreet = safeAddress.trim();
+    if (communityPrefix && userEnteredStreet.startsWith(communityPrefix)) {
+      userEnteredStreet = userEnteredStreet.substring(communityPrefix.length).trim();
+    }
+
+    // 如果是一般散客，配送地址與外送區域皆為必填，且「路名門牌自填部分」不可為空
+    const isGeneralAddressValid = !isGeneralUser || (
+      selectedCity !== "" &&
+      selectedCommunityId !== "" &&
+      userEnteredStreet !== ""
+    );
+
+    const canProceed =
+      safeName.trim() &&
+      isPhoneValid &&
+      isBuildingValid &&
+      isGeneralAddressValid &&
+      (isFullyCovered || paymentMethod !== "轉帳" || safeTransfer.trim().length === 5);
+
+    const paymentOptions = isFullyCovered
+      ? [
+        {
+          value: "奶包金扣抵",
+          Icon: Wallet,
+          label: "奶包金全額扣抵",
+        }
+      ]
+      : [
+        {
+          value: "現金",
+          Icon: Banknote,
+          label: "現金",
+        },
+        {
+          value: "轉帳",
+          Icon: CreditCard,
+          label: "銀行轉帳",
+        },
+        {
+          value: "LINE Pay",
+          Icon: Smartphone,
+          label: "LINE Pay",
+        },
+      ];
+
+    return (
+      <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
+        {/* Header */}
+        <div
+          className="p-4 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] flex items-center gap-3 flex-shrink-0"
+          style={{ touchAction: "none" }}
+        >
+          <button
+            onClick={() => setStep("confirm")}
+            className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <div>
+            <h2 className="text-lg font-bold text-[var(--text-primary)]">
+              配送資訊
+            </h2>
+            <p className="text-xs text-[var(--text-secondary)]">
+              {totalQty} 件商品，合計 ${orderTotal}{shippingFee > 0 ? `（含運 $${shippingFee}）` : ''}
+            </p>
+          </div>
+        </div>
+
+        <div key="page-info" className="flex-1 overflow-y-auto p-5 space-y-6">
+          {/* 收件資訊 */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+              收件資訊
+            </h3>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                <User size={12} /> 收件人姓名{" "}
+                <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)]"
+                placeholder="請輸入收件人姓名"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                <Phone size={12} /> 聯絡電話 <span className="text-red-500">*</span>
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="tel"
+                  className="input-field flex-1 p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)]"
+                  placeholder="手機或市話 (如 0912345678 或 062345678)"
+                  value={customerPhone}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, ""); // 自動過濾連字號、空格
+                    setCustomerPhone(val);
+                  }}
+                  maxLength={10}
+                />
+                <input
+                  type="tel"
+                  className="input-field w-28 p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-xs font-medium"
+                  placeholder="分機(選填)"
+                  value={phoneExt}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "");
+                    setPhoneExt(val);
+                  }}
+                  maxLength={6}
+                />
+              </div>
+              {safePhone.trim() && !/^(09\d{8}|0[2-8]\d{7,8})$/.test(safePhone.trim()) && (
+                <p className="text-[11px] text-red-500 font-medium">
+                  ⚠️ 請輸入正確的手機號碼 (09開頭10碼) 或市話 (含0區碼9-10碼)
+                </p>
+              )}
+            </div>
+
+            {/* 根據一般用戶與大樓用戶分流顯示 */}
+            {isGeneralUser ? (
+              <>
+                {/* 一般用戶：兩段式選擇縣市與外送區域、顯示地址與公司，隱藏大外框與任何大樓欄位 */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                    <MapPin size={12} className="text-blue-500" /> 選擇縣市 <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm font-bold"
+                    value={selectedCity}
+                    onChange={(e) => {
+                      setSelectedCity(e.target.value);
+                      setSelectedCommunityId(""); // 切換縣市時重設已選區域
+                      setDetailAddress(""); // 切換縣市時重置地址
+                    }}
+                  >
+                    <option value="">-- 請選擇縣市 --</option>
+                    <option value="台南市">台南市</option>
+                    <option value="高雄市">高雄市</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                    <MapPin size={12} className="text-emerald-500" /> 配送區域 <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm font-bold"
+                    value={selectedCommunityId}
+                    onChange={(e) => {
+                      const commId = e.target.value;
+
+                      // 如果「這次 session 的原始區域」存在，且這次選的不同 → 跳出運費警語
+                      if (originalCommunityIdRef.current && commId && commId !== originalCommunityIdRef.current) {
+                        const oldComm = allCommunities.find(c => c.CommunityId === originalCommunityIdRef.current);
+                        const newComm = allCommunities.find(c => c.CommunityId === commId);
+                        if (oldComm && newComm) {
+                          const oldFee = Number(oldComm.ShippingFee) || 0;
+                          const newFee = Number(newComm.ShippingFee) || 0;
+                          const oldMin = Number(oldComm.FreeShippingMin) || 0;
+                          const newMin = Number(newComm.FreeShippingMin) || 0;
+                          const feeText = (fee, min) => fee > 0 ? `$${fee}（滿$${min}免運）` : '免運';
+                          const freeNote = (fee, min) => {
+                            if (fee === 0) return '✅ 此區免運';
+                            if (min > 0 && cartTotal >= min) return `✅ 已達免運門檻（購物車 $${cartTotal} ≥ $${min}）`;
+                            if (min > 0) return `❌ 未達免運（差 $${min - cartTotal} 即免運）`;
+                            return '';
+                          };
+                          const applyChange = () => {
+                            originalCommunityIdRef.current = commId; // 更新基準區域
+                            setSelectedCommunityId(commId);
+                            // 智慧前綴帶入/替換邏輯
+                            const prefix = newComm.CommunityName;
+                            const currentAddr = detailAddress || "";
+                            if (!currentAddr.trim()) {
+                              setDetailAddress(prefix);
+                            } else {
+                              let replaced = false;
+                              for (const c of allCommunities) {
+                                if (currentAddr.startsWith(c.CommunityName)) {
+                                  const rest = currentAddr.substring(c.CommunityName.length);
+                                  setDetailAddress(prefix + rest);
+                                  replaced = true;
+                                  break;
+                                }
+                              }
+                              if (!replaced) setDetailAddress(prefix + currentAddr);
+                            }
+                          };
+                          setConfirmModal({
+                            show: true,
+                            message: `⚠️ 更改配送區域將影響運費
+
+原區域：${oldComm.CommunityName}
+運費：${feeText(oldFee, oldMin)}
+${freeNote(oldFee, oldMin)}
+
+新區域：${newComm.CommunityName}
+運費：${feeText(newFee, newMin)}
+${freeNote(newFee, newMin)}
+
+確定要變更嗎？`,
+                            onConfirm: applyChange,
+                            onCancel: null,
+                            confirmText: '確定變更',
+                            cancelText: '取消'
+                          });
+                          return; // 先不套用，等使用者確認
+                        }
+                      }
+
+                      // 首次選或相同區域直接套用
+                      setSelectedCommunityId(commId);
+
+                      // 智慧前綴帶入/替換邏輯
+                      if (commId) {
+                        const target = allCommunities.find(c => c.CommunityId === commId);
+                        if (target) {
+                          const prefix = target.CommunityName; // 例如 "台南市永康區"
+                          const currentAddr = detailAddress || "";
+
+                          // 1. 如果原本是空的，直接帶入
+                          if (!currentAddr.trim()) {
+                            setDetailAddress(prefix);
+                          } else {
+                            // 2. 檢查原本地址是否已經有其他選取區域的前綴，如果有，直接替換成新的前綴
+                            let replaced = false;
+                            for (const c of allCommunities) {
+                              if (currentAddr.startsWith(c.CommunityName)) {
+                                const rest = currentAddr.substring(c.CommunityName.length);
+                                setDetailAddress(prefix + rest);
+                                replaced = true;
+                                break;
+                              }
+                            }
+                            // 3. 如果原本有打字但沒有包含舊的行政區前綴，就把新前綴塞在最前面
+                            if (!replaced) {
+                              setDetailAddress(prefix + currentAddr);
+                            }
+                          }
+                        }
+                      }
+                    }}
+                    disabled={!selectedCity}
+                  >
+                    <option value="">{selectedCity ? "-- 請選擇外送區域 --" : "-- 請先選取縣市 --"}</option>
+                    {selectedCity && allCommunities
+                      .filter(c => !["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(c.CommunityName))
+                      .filter(c => c.CommunityName.startsWith(selectedCity))
+                      .map((c) => {
+                        // 去除「台南市」、「高雄市」前綴以縮短長度
+                        let shortName = c.CommunityName.replace("台南市", "").replace("高雄市", "");
+                        const fee = Number(c.ShippingFee) || 0;
+                        const min = Number(c.FreeShippingMin) || 0;
+
+                        // 縮短運費文字描述
+                        const ruleText = fee > 0 ? `$${fee}/滿$${min}免運` : '免運';
+
+                        return (
+                          <option key={c.CommunityId} value={c.CommunityId}>
+                            {shortName} ({ruleText})
+                          </option>
+                        );
+                      })}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                    公司 / 機關單位 / 大樓名稱 <span className="text-[var(--text-secondary)] text-[10px] font-normal">(選填)</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm font-semibold"
+                    placeholder="例：xx醫院x樓護理站、xx大樓A棟 (若無免填)"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                    <MapPin size={12} className="text-emerald-500" /> 外送地址 <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex items-center border border-[var(--border-primary)] rounded-xl bg-[var(--bg-secondary)] overflow-hidden shadow-sm">
+                    {/* 鎖定不可修改的行政區前綴 */}
+                    {(() => {
+                      if (selectedCommunityId && allCommunities.length > 0) {
+                        const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+                        if (match) {
+                          return (
+                            <span className="bg-slate-100 text-slate-800 font-extrabold text-sm px-3.5 py-2.5 border-r border-slate-200 select-none shrink-0">
+                              {match.CommunityName}
+                            </span>
+                          );
+                        }
+                      }
+                      return null;
+                    })()}
+                    <input
+                      type="text"
+                      className="w-full p-2.5 bg-transparent text-sm font-semibold focus:outline-none placeholder:font-normal"
+                      placeholder="請輸入收件路名、門牌與樓層"
+                      value={(() => {
+                        // 如果 detailAddress 中已經包含選中行政區的前綴，我們將其切掉，只在輸入框展示路名門牌
+                        let displayVal = detailAddress || "";
+                        if (selectedCommunityId && allCommunities.length > 0) {
+                          const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+                          if (match && displayVal.startsWith(match.CommunityName)) {
+                            displayVal = displayVal.substring(match.CommunityName.length);
+                          }
+                        }
+                        return displayVal;
+                      })()}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        // 當用戶輸入時，只保存路名門牌，我們會在送出及驗證時利用 getFullAddress 自動拼裝
+                        setDetailAddress(val);
+                      }}
+                    />
+                  </div>
+                  {selectedCommunityId && !userEnteredStreet && (
+                    <p className="text-[11px] text-red-500 font-medium mt-1">
+                      ⚠️ 請輸入詳細收件路名與門牌資訊
+                    </p>
+                  )}
+                </div>
+              </>
+            ) : (
+              /* 大樓用戶：與收件人姓名電話同層級展示，移除大外框與底色 */
+              <>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                    <MapPin size={12} /> 送達大樓 / 社區 / 單位 <span className="text-red-500">*</span>
+                  </label>
+                  <div className="w-full bg-[var(--bg-secondary)] p-3 rounded-xl border border-[var(--border-primary)] text-sm font-bold text-[var(--text-primary)] select-none">
+                    {selectedBuilding}
+                  </div>
+                </div>
+
+                {selectedBuilding === "其它" && (
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-[var(--text-secondary)]">
+                      自填大樓名稱 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm"
+                      placeholder="請輸入大樓/社區名稱"
+                      value={otherBuildingText}
+                      onChange={(e) => setOtherBuildingText(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                    <MapPin size={12} /> 樓層 / 戶號 / 科室 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-sm"
+                    placeholder="例：A棟12樓之3、3樓305室、5樓總務部辦公室"
+                    value={detailAddress}
+                    onChange={(e) => setDetailAddress(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                <FileText size={12} /> 備註
+              </label>
+              <textarea
+                className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)]"
+                rows={2}
+                placeholder=""
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* 🥛 奶箱福利卡片 (Apple + LINE 禮物風格) */}
+          {(() => {
+            if (!rewardConfig || rewardConfig.mode === "OFF") return null;
+            if (rewardConfig.mode === "TEST") {
+              const testIds = rewardConfig.testUserIds || [];
+              if (testIds.length > 0 && (!lineUserId || !testIds.includes(lineUserId))) return null;
+            }
+
+            const currentSpend = Number(memberProfile?.RedeemableSpendBalance || 0);
+            const rules = (rewardConfig.tierRules || [])
+              .filter(r => r.isActive !== false)
+              .sort((a, b) => (a.sortOrder ?? a.spendMin) - (b.sortOrder ?? b.spendMin));
+
+            const unlockedRules = rules.filter(r => currentSpend >= r.spendMin);
+
+            const getDummyPrizes = (spendMin) => {
+              if (spendMin < 10000) return [{ icon: '🎟️', text: '35元折價券' }, { icon: '🚚', text: '免運券' }];
+              if (spendMin < 15000) return [{ icon: '🎟️', text: '50元折價券' }, { icon: '🥤', text: '免費精選飲品' }];
+              return [{ icon: '🎧', text: 'AirPods (抽獎)' }, { icon: '💰', text: '1000元購物金' }, { icon: '🎟️', text: '100元折價券' }];
+            };
+
+            const getTierDecorations = (idx) => {
+              if (idx === 0) return { stars: '⭐⭐', tag: '' };
+              if (idx === 1) return { stars: '⭐⭐⭐⭐', tag: '🔥 人氣推薦', tagColor: 'text-orange-600 bg-orange-100 border-orange-200' };
+              return { stars: '⭐⭐⭐⭐⭐', tag: '👑 高價值', tagColor: 'text-amber-700 bg-amber-100 border-amber-200' };
+            };
+
+            return (
+              <div className="bg-[#F9FFFC] border border-[#D5F5E7] rounded-2xl p-4 space-y-4 shadow-sm relative overflow-hidden">
+                {/* 背景裝飾 */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-100/30 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />
+
+                {/* 第一層：奶箱總覽 */}
+                <div className="relative z-10 flex flex-col items-center text-center space-y-2 border-b border-[#E6F7F0] pb-4">
+                  <div className="flex items-center gap-2 text-emerald-800 font-bold text-sm">
+                    <img src={rewardConfig.headerImage || milkBoxClassic} alt="奶箱" className="w-6 h-6 object-contain drop-shadow-sm" />
+                    奶箱福利
+                  </div>
+                  <div className="text-slate-500 text-xs font-bold">目前累積消費</div>
+                  <div className="text-3xl font-black text-slate-900 font-mono tracking-tight">
+                    ${currentSpend.toLocaleString()}
+                  </div>
+                  {unlockedRules.length > 0 ? (
+                    <div className="bg-emerald-600 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-sm animate-pulse flex items-center gap-1.5 mt-1">
+                      <span>🎉 已解鎖 {unlockedRules.length} 個奶箱，請選擇一個立即開啟</span>
+                    </div>
+                  ) : (
+                    <div className="bg-slate-100 text-slate-500 text-xs font-bold px-4 py-1.5 rounded-full mt-1">
+                      💡 累積消費解鎖更多專屬奶箱
+                    </div>
+                  )}
+                </div>
+
+                {/* 第二層：奶箱列表 */}
+                <div className="relative z-10 space-y-2.5">
+                  {rules.map((rule, rIdx) => {
+                    const isUnlocked = currentSpend >= rule.spendMin;
+                    const isSelected = selectedRewardRule?.spendMin === rule.spendMin;
+                    const remBalance = Math.max(0, currentSpend - rule.spendMin);
+                    const boxName = rule.name || `尊榮奶箱 ($${rule.spendMin.toLocaleString()})`;
+                    const boxImg = rule.image || milkBoxMini;
+                    const { stars, tag, tagColor } = getTierDecorations(rIdx);
+
+                    return (
+                      <div
+                        key={rule.id || rIdx}
+                        className={`flex flex-col rounded-xl border transition-all relative overflow-hidden ${!isUnlocked
+                          ? "opacity-80 bg-slate-50/80 border-slate-200"
+                          : isSelected
+                            ? "bg-white border-2 border-emerald-500 shadow-md ring-4 ring-emerald-500/10 cursor-pointer"
+                            : "bg-white border-slate-200 hover:border-emerald-300 shadow-sm cursor-pointer"
+                          }`}
+                      >
+                        <div
+                          className="flex items-center gap-3 p-3 relative"
+                          onClick={() => {
+                            if (isUnlocked) setSelectedRewardRule(rule);
+                          }}
+                        >
+                          {/* Radio Icon */}
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${!isUnlocked ? "border-slate-300 bg-slate-100" : isSelected ? "border-emerald-600 bg-emerald-600" : "border-slate-300 bg-white"
+                            }`}>
+                            {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                          </div>
+
+                          {/* 奶箱圖片 */}
+                          <img
+                            src={boxImg}
+                            alt={boxName}
+                            className="w-[56px] h-[56px] object-contain shrink-0 drop-shadow-md scale-110"
+                            onError={(e) => { e.target.onerror = null; e.target.src = milkBoxMini; }}
+                          />
+
+                          {/* 奶箱資訊 */}
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <div className="flex items-center justify-between">
+                              <span className={isUnlocked ? "text-base font-black text-slate-900 truncate" : "text-base font-bold text-slate-500 truncate"}>
+                                {boxName}
+                              </span>
+                              {tag && (
+                                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${tagColor} whitespace-nowrap ml-1`}>
+                                  {tag}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-between mt-0.5">
+                              <span className="text-[10px] tracking-widest text-slate-400">
+                                {stars}
+                              </span>
+                              {isUnlocked ? (
+                                <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0">
+                                  ✔ 可開啟
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-[10px] font-bold shrink-0">
+                                  🔒 差 ${(rule.spendMin - currentSpend).toLocaleString()} 解鎖
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] font-bold text-slate-500 truncate mt-0.5">{rule.subtitle}</span>
+                          </div>
+                        </div>
+
+                        {/* 可能獲得預覽按鈕 */}
+                        <div
+                          className="bg-slate-50 px-3 py-1.5 flex justify-end border-t border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewBox(rule);
+                          }}
+                        >
+                          <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+                            可能獲得獎品
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </span>
+                        </div>
+
+                        {/* 如果選中，顯示折抵資訊 */}
+                        {isSelected && (
+                          <div className="px-3 pb-3 pt-2 border-t border-slate-100 bg-emerald-50/30">
+                            <div className="space-y-1.5 text-center text-[12px] font-bold">
+                              <div className="text-emerald-700 flex items-center justify-center gap-1">
+                                🎁 立即獲得優惠 <span className="text-base font-black">${rule.discount.toLocaleString()}</span>
+                              </div>
+                              <div className="text-slate-500 text-[11px]">
+                                開啟後累積消費將剩餘：<span className="font-mono">${remBalance.toLocaleString()}</span>
+                              </div>
+                              {cartTotal < rule.discount && (
+                                <div className="text-amber-900 bg-[#FFF9E8] p-2 rounded-lg border border-[#FDE68A] mt-1 shadow-2xs">
+                                  ⚠️ 再加購 ${rule.discount - cartTotal} 即可全額折抵 ${rule.discount}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* 第三層：存著不開 */}
+                <div className="relative z-10 pt-4 mt-2 border-t border-slate-200 border-dashed">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col items-center text-center space-y-2">
+                    <div className="text-sm font-black text-slate-800">🐄 不急著開？</div>
+                    <div className="text-xs text-slate-500 font-bold leading-relaxed">
+                      累積更多消費，<br />可直接解鎖更高級奶箱。
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedRewardRule(null);
+                        setExpandedBoxIdx(null);
+                      }}
+                      className={`mt-2 w-full py-2 rounded-lg text-xs font-black transition-all ${selectedRewardRule === null
+                        ? "bg-slate-800 text-white shadow-md border-b-4 border-slate-900"
+                        : "bg-white border-2 border-slate-300 text-slate-600 hover:bg-slate-100 hover:border-slate-400"
+                        }`}
+                    >
+                      {selectedRewardRule === null ? "✔ 目前已存著" : "暫不開啟，先存著"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Bottom Sheet for Prize Preview */}
+                {previewBox && (
+                  <div className="fixed inset-0 z-[100] flex flex-col justify-end">
+                    <div
+                      className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
+                      onClick={() => setPreviewBox(null)}
+                    />
+                    <div className="relative bg-white rounded-t-3xl shadow-2xl p-6 pb-10 animate-slide-up space-y-4">
+                      <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4" />
+
+                      <div className="flex items-center gap-4">
+                        <img src={previewBox.image || milkBoxMini} alt={previewBox.name} className="w-16 h-16 object-contain drop-shadow-md scale-110" />
+                        <div>
+                          <h3 className="text-xl font-black text-slate-900">{previewBox.name || '神秘奶箱'}</h3>
+                          <p className="text-sm font-bold text-slate-500 mt-0.5">{previewBox.subtitle}</p>
+                        </div>
+                      </div>
+
+                      <div className="bg-[#F9FFFC] border border-[#D5F5E7] rounded-xl p-4 mt-4">
+                        <div className="text-xs font-black text-emerald-800 mb-3 flex items-center gap-1.5">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          打開可能獲得以下獎項：
+                        </div>
+                        <div className="space-y-2">
+                          {(previewBox.prizes && previewBox.prizes.length > 0 ? previewBox.prizes : getDummyPrizes(previewBox.spendMin)).map((prize, idx) => (
+                            <div key={idx} className="flex items-center gap-3 bg-white border border-slate-100 p-2.5 rounded-lg shadow-2xs">
+                              <span className="text-xl">{prize.icon}</span>
+                              <span className="text-sm font-bold text-slate-700">{prize.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => setPreviewBox(null)}
+                        className="w-full bg-slate-900 text-white font-black py-3.5 rounded-xl mt-4 shadow-lg active:scale-95 transition-transform"
+                      >
+                        我知道了
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* 奶包金抵扣小卡 */}
+          {hasWallet && (
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 space-y-3 shadow-sm">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                    <Wallet size={16} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-amber-800 flex items-center gap-1.5">
+                      錢包折抵
+                      <span className="text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded-full">
+                        餘額 ${Number(memberProfile.WalletBalance)}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-amber-700/70">
+                      本筆消費最多可折抵 ${maxDeduction} 元
+                    </p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useWallet}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUseWallet(checked);
+                      if (checked && cartTotal - maxDeduction === 0) {
+                        setPaymentMethod("奶包金扣抵");
+                      } else if (paymentMethod === "奶包金扣抵") {
+                        setPaymentMethod("現金");
+                      }
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                </label>
+              </div>
+
+              {useWallet && (
+                <div className="border-t border-amber-200/50 pt-2.5 grid grid-cols-2 gap-y-1 text-xs">
+                  <div className="text-amber-700">商品小計：</div>
+                  <div className="text-right font-mono font-bold text-slate-700">${cartTotal}</div>
+                  {selectedRewardRule && rewardDiscountAmount > 0 && (<>
+                    <div className="text-amber-700">滿額自選折抵：</div>
+                    <div className="text-right font-mono font-bold text-emerald-600">-${rewardDiscountAmount}</div>
+                  </>)}
+                  {shippingFee > 0 && (<>
+                    <div className="text-amber-700">運費：</div>
+                    <div className="text-right font-mono font-bold text-orange-500">+${shippingFee}</div>
+                  </>)}
+                  {shippingFee === 0 && (() => {
+                    let activeComm = currentCommunity;
+                    if (isGeneralUser && selectedCommunityId && allCommunities.length > 0) {
+                      const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+                      if (match) activeComm = match;
+                    }
+                    return isGeneralUser && activeComm && !activeComm.DefaultFreeShipping && Number(activeComm.ShippingFee) > 0;
+                  })() && (<>
+                    <div className="text-amber-700">運費：</div>
+                    <div className="text-right font-mono font-bold text-emerald-600">免運</div>
+                  </>)}
+                  <div className="text-amber-700">奶包金折抵：</div>
+                  <div className="text-right font-mono font-bold text-red-600">-${maxDeduction}</div>
+                  <div className="text-amber-800 font-bold border-t border-dashed border-amber-200/60 pt-1.5">賸餘應付：</div>
+                  <div className="text-right font-mono font-black text-blue-600 text-sm border-t border-dashed border-amber-200/60 pt-1.5">${payAmount}</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 付款方式 */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+              付款方式
+            </h3>
+            <div className="space-y-2">
+              {paymentOptions.map(({ value, Icon, label: optLabel }) => {
+                const active = paymentMethod === value;
+                return (
+                  <div
+                    key={value}
+                    className={`flex flex-col rounded-xl border transition-all overflow-hidden ${active
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-[var(--border-primary)] bg-[var(--bg-secondary)] hover:border-blue-300"
+                      }`}
+                  >
+                    <label className="flex items-center gap-3 p-3.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="payment"
+                        value={value}
+                        checked={active}
+                        onChange={() => setPaymentMethod(value)}
+                        className="hidden"
+                      />
+                      <div
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${active ? "bg-blue-600 text-white" : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"}`}
+                      >
+                        <Icon size={18} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-[var(--text-primary)]">
+                          {optLabel}
+                        </div>
+                      </div>
+                      <div
+                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${active ? "border-blue-500" : "border-[var(--border-primary)]"}`}
+                      >
+                        {active && (
+                          <div className="w-2 h-2 rounded-full bg-blue-500" />
+                        )}
+                      </div>
+                    </label>
+
+                    {/* 抽屜伸縮內容 */}
+                    {active && (
+                      <div className="px-4 pb-3.5 border-t border-blue-100 pt-3 bg-white/40">
+                        {value === "現金" && (
+                          <div className="text-xs text-amber-700 font-medium">
+                            ※ 採現金支付，請自備零錢，現場不找零。
+                          </div>
+                        )}
+                        {value === "轉帳" && (
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-blue-800">
+                              您的帳戶後 5 碼 <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="tel"
+                              maxLength={5}
+                              className="input-field w-full p-3 rounded-xl border border-blue-300 bg-white text-center font-mono tracking-[0.5em] text-lg focus:bg-white focus:outline-none"
+                              placeholder="_ _ _ _ _"
+                              value={transferLastFive}
+                              onChange={(e) =>
+                                setTransferLastFive(
+                                  e.target.value.replace(/\D/g, "").slice(0, 5),
+                                )
+                              }
+                            />
+                          </div>
+                        )}
+                        {value === "LINE Pay" && (
+                          <div className="text-xs text-emerald-700 font-medium">
+                            ※ 確認送出訂單後，將引導您進行付款。
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* 下一步 */}
+        <div
+          className="p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] flex-shrink-0"
+          style={{ touchAction: "none" }}
+        >
+          {checkoutError && (
+            <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2">
+              <svg className="w-5 h-5 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm font-bold text-red-600 dark:text-red-400 whitespace-pre-line leading-relaxed">
+                {checkoutError}
+              </p>
+            </div>
+          )}
+
+          <button
+            onClick={() => {
+              if (canProceed && !isSubmitting) {
+                syncMemberToCloud();
+                handleSubmitOrder();
+              }
+            }}
+            disabled={!canProceed || isSubmitting}
+            className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${canProceed && !isSubmitting
+              ? "btn-primary shadow-md shadow-blue-500/20 active:scale-98"
+              : "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed"
+              }`}
+          >
+            {isSubmitting ? (
+              <>
+                <RefreshCw className="animate-spin" size={16} /> 送出中...
+              </>
+            ) : (
+              <>
+                確認送出訂單 <CheckCircle size={16} />
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* ⚠️ 配送區域變更確認 Dialog（form step 專用） */}
+        {confirmModal.show && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-[var(--bg-secondary)] w-full max-w-[300px] rounded-2xl p-5 shadow-2xl border border-[var(--border-primary)] flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+              <p className="text-sm font-bold text-[var(--text-primary)] leading-relaxed whitespace-pre-line text-center">
+                {confirmModal.message}
+              </p>
+              <div className="flex gap-2.5">
+                <button
+                  onClick={() => {
+                    setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null });
+                    if (confirmModal.onCancel) confirmModal.onCancel();
+                  }}
+                  className="flex-1 py-2.5 px-4 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs font-bold transition-all active:scale-95"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    const fn = confirmModal.onConfirm;
+                    setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null });
+                    if (fn) fn();
+                  }}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/15"
+                >
+                  確定變更
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (step === "member") {
+    return (
+      <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
+        <div className="h-[60px] px-4 flex items-center bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] shadow-sm">
+          <button onClick={() => setStep("shop")} className="p-2 -ml-2 text-[var(--text-secondary)]">
+            <ChevronLeft size={24} />
+          </button>
+          <h2 className="ml-2 font-bold text-lg">會員中心</h2>
+        </div>
+        <div className="flex-1 overflow-y-auto pb-6" style={{ WebkitOverflowScrolling: "touch" }}>
+          {/* Profile & Greeting Section */}
+          <div className="bg-[var(--bg-secondary)] px-6 pt-6 pb-6 mb-2 border-b border-[var(--border-primary)] flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+                  👋 {memberProfile?.DisplayName || customerName || "會員您好"}
+                </div>
+                <div className="text-sm text-[var(--text-secondary)] mt-1">歡迎回來！</div>
+              </div>
+              <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow flex-shrink-0">
+                {linePictureUrl ? (
+                  <img src={linePictureUrl} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    <User size={28} />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 配送日小卡 */}
+            <div className="mt-1 bg-blue-50/80 border border-blue-200 rounded-xl p-4 flex justify-between items-center shadow-sm relative overflow-hidden">
+              <div>
+                <div className="text-xs text-blue-700 font-bold mb-1 flex items-center gap-1.5">
+                  今天配送日
+                  <span className="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-bold scale-90">開發中</span>
+                </div>
+                <div className="text-lg font-black text-blue-900">6/28</div>
+                <div className="text-xs text-blue-800/80">下午15:00~17:00</div>
+              </div>
+              <Package size={32} className="text-blue-500/80" />
+            </div>
+
+            {/* 奶包金 & 會員卡 */}
+            <div className="flex gap-3 mt-1">
+              <div className="flex-1 bg-amber-50/80 border border-amber-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
+                <div className="text-xs text-amber-800 font-bold flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-1"><Banknote size={14} /> 奶包金餘額</span>
+                  <span className="text-[9px] bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-bold scale-90">開發中</span>
+                </div>
+                <div className="text-2xl font-black text-amber-700 font-mono">${memberProfile?.WalletBalance || 0}</div>
+              </div>
+              <div className="flex-1 bg-slate-50/80 border border-slate-200 rounded-xl p-4 flex flex-col justify-between shadow-sm">
+                <div className="text-xs text-slate-700 font-bold flex items-center gap-1"><CheckCircle size={14} /> 會員等級</div>
+                <div className="text-base font-black text-slate-800 mt-1">{
+                  !memberProfile?.MemberLevel || memberProfile.MemberLevel.trim().toUpperCase() === 'GENERAL' ? '一般會員' :
+                    memberProfile.MemberLevel.trim().toUpperCase() === 'VIP' ? 'VIP 會員' :
+                      memberProfile.MemberLevel.trim().toUpperCase() === 'VVIP' ? 'VVIP 會員' :
+                        memberProfile.MemberLevel
+                }</div>
+              </div>
+            </div>
+
+            {/* 快捷操作按鈕 */}
+            <div className="flex gap-3 mt-1">
+              <button onClick={() => {
+                if (lineUserId) {
+                  setIsMemberLoading(true);
+                  memberApi.getOrders(apiUrl, { userId: lineUserId }).then(res => {
+                    if (res && res.success) setOrders(res.orders || []);
+                    setIsMemberLoading(false);
+                  }).catch(err => setIsMemberLoading(false));
+                }
+                setStep("orders");
+              }} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center"><RotateCcw size={20} /></div>
+                <span className="text-xs font-bold text-[var(--text-primary)]">再訂一次</span>
+              </button>
+              <button onClick={() => {
+                if (lineUserId) {
+                  setIsMemberLoading(true);
+                  memberApi.getOrders(apiUrl, { userId: lineUserId }).then(res => {
+                    if (res && res.success) setOrders(res.orders || []);
+                    setIsMemberLoading(false);
+                  }).catch(err => setIsMemberLoading(false));
+                }
+                setStep("orders");
+              }} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center"><History size={20} /></div>
+                <span className="text-xs font-bold text-[var(--text-primary)]">查看訂單</span>
+              </button>
+              <button className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-tr from-transparent to-rose-500/10 pointer-events-none"></div>
+                <div className="absolute top-0 right-0 bg-rose-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-bl">
+                  開發中
+                </div>
+                <div className="w-10 h-10 rounded-full bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center"><Package size={20} /></div>
+                <span className="text-xs font-bold text-[var(--text-primary)]">最新優惠</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        {renderBottomNav()}
+      </div>
+    );
+  }
+
+  if (step === "orders") {
+    return (
+      <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
+        <div className="h-[60px] px-4 flex items-center bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] shadow-sm">
+          <h2 className="font-bold text-lg">我的訂單</h2>
+        </div>
+        <div className="flex-1 overflow-y-auto pb-6 pt-4" style={{ WebkitOverflowScrolling: "touch" }}>
+          <div className="px-3 flex flex-col gap-3">
+            {isMemberLoading ? (
+              <div className="py-10 flex flex-col items-center justify-center text-[var(--text-tertiary)]">
+                <RefreshCw size={24} className="animate-spin mb-2" />
+                <span className="text-sm">載入中...</span>
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="py-10 text-center text-[var(--text-tertiary)] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">
+                <Package size={32} className="mx-auto mb-2 opacity-50" />
+                沒有訂單紀錄
+              </div>
+            ) : (
+              orders.map(o => (
+                <div key={o.OrderId} className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl overflow-hidden shadow-sm">
+                  <div className="px-4 py-3 border-b border-[var(--border-primary)] flex justify-between items-center bg-[var(--bg-tertiary)]">
+                    <span className="text-sm font-medium text-[var(--text-secondary)]">{o.OrderId}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${o.Status === 'CONFIRMED' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                      }`}>{o.Status}</span>
+                  </div>
+                  <div className="p-4 flex flex-col gap-2 text-sm text-[var(--text-secondary)]">
+                    <div className="flex gap-2"><Clock size={16} className="mt-0.5 opacity-70 flex-shrink-0" /> <span>{new Date(o.CreatedAt).toLocaleString()}</span></div>
+                    {o.ExpectedDeliveryDate && (
+                      <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/60">
+                        <Calendar size={16} className="flex-shrink-0" />
+                        <span>預計出貨/配送日：{o.ExpectedDeliveryDate}</span>
+                      </div>
+                    )}
+                    <div className="flex gap-2"><MapPin size={16} className="mt-0.5 opacity-70 flex-shrink-0" /> <span className="line-clamp-2">{o.DeliveryAddress}</span></div>
+                    <div className="flex gap-2"><CreditCard size={16} className="mt-0.5 opacity-70 flex-shrink-0" /> <span>{o.PaymentMethod} ({o.PaymentStatus || '未付款'})</span></div>
+                    {o.Note && <div className="flex gap-2"><FileText size={16} className="mt-0.5 opacity-70 flex-shrink-0" /> <span>{o.Note}</span></div>}
+
+                    <div className="mt-2 pt-2 border-t border-[var(--border-primary)]">
+                      <div className="font-bold text-[var(--text-primary)] mb-2 flex justify-between">
+                        <span>{o.recipients && o.recipients.length > 0 ? "訂單總明細" : "訂單內容"}</span>
+                        <span className="text-blue-600 font-mono font-bold">Total: ${o.TotalAmount}</span>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        {o.items?.map((item, i) => {
+                          const expDate = item.ExpiryDate || item.expiryDate;
+                          return (
+                            <div key={i} className="flex flex-col gap-0.5 py-0.5">
+                              <div className="text-xs flex justify-between text-[var(--text-secondary)]">
+                                <span className="truncate flex-1">{item.ProductName} {item.Remark ? `(${item.Remark})` : ''}</span>
+                                <span className="flex-shrink-0 ml-2 font-mono">x {item.Qty}</span>
+                              </div>
+                              {expDate && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-700 bg-orange-50 border border-orange-300 px-2 py-0.5 rounded-full self-start shadow-xs">
+                                  📅 效期至 {expDate}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {Number(o.ShippingFee) > 0 && (
+                          <div className="text-xs flex justify-between text-[var(--text-secondary)] mt-1.5 pt-1.5 border-t border-dashed border-[var(--border-primary)]">
+                            <span>運費</span>
+                            <span className="font-mono font-semibold">+${o.ShippingFee}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {o.recipients && o.recipients.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-dashed border-[var(--border-primary)]">
+                        <div className="font-bold text-[var(--text-primary)] text-xs mb-2">
+                          👥 團員訂購明細
+                        </div>
+                        <div className="space-y-2">
+                          {o.recipients.map((r, ri) => {
+                            const rTotal = (r.items || []).reduce((sum, item) => sum + (item.subtotal != null && Number(item.subtotal) > 0 ? Number(item.subtotal) : (Number(item.price) * Number(item.qty))), 0);
+                            return (
+                              <div key={ri} className="bg-[var(--bg-tertiary)] p-2.5 rounded-xl border border-[var(--border-primary)]/50">
+                                <div className="font-bold text-xs text-[var(--text-primary)] mb-1.5 flex justify-between items-center">
+                                  <span>👤 {r.recipientName}</span>
+                                  <span className="text-blue-600 font-mono font-bold">${rTotal}</span>
+                                </div>
+                                <div className="space-y-1.5 pl-3.5 border-l-2 border-slate-200 dark:border-slate-700">
+                                  {(r.items || []).map((item, ii) => {
+                                    const itemSub = item.subtotal != null && Number(item.subtotal) > 0 ? Number(item.subtotal) : (Number(item.price) * Number(item.qty));
+                                    const pNameDisplay = item.productName + (item.remark && !String(item.productName || '').includes(item.remark) ? ` (${item.remark})` : '');
+                                    const expDate = item.expiryDate || item.ExpiryDate;
+                                    return (
+                                      <div key={ii} className="flex flex-col gap-0.5 py-0.5">
+                                        <div className="flex justify-between text-[11px] text-[var(--text-secondary)]">
+                                          <span className="truncate flex-1 pr-2">{pNameDisplay}</span>
+                                          <span className="flex-shrink-0 font-mono">x {item.qty} (${itemSub})</span>
+                                        </div>
+                                        {expDate && (
+                                          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-orange-700 bg-orange-50 border border-orange-300 px-1.5 py-0.2 rounded-full self-start shadow-xs">
+                                            📅 效期至 {expDate}
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3 border-t border-[var(--border-primary)] bg-[var(--bg-tertiary)]">
+                    <button
+                      onClick={async () => {
+                        setIsMemberLoading(true);
+                        try {
+                          const res = await memberApi.reorder(apiUrl, { orderId: o.OrderId, userId: lineUserId });
+                          if (res && res.success) {
+                            const newCart = {};
+                            const newFlavorSelections = {};
+
+                            // 雙重保險：優先使用 res.items 重組購物車與口味選擇，防止後端 cart 缺漏或大小寫對不上
+                            if (Array.isArray(res.items) && res.items.length > 0) {
+                              res.items.forEach(item => {
+                                const pid = item.ProductId || item.productId;
+                                if (!pid) return;
+
+                                const qty = Number(item.Qty || item.qty || 1);
+                                newCart[pid] = (newCart[pid] || 0) + qty;
+
+                                // 解析 Remark 內的口味備註，例如 "【口味備註：原味x2, 巧克力x1】"
+                                const remarkStr = item.Remark || item.remark || '';
+                                if (remarkStr) {
+                                  const cleanRemark = remarkStr.replace(/【口味備註：(.*?)】/, '$1');
+                                  const parts = cleanRemark.split(/[,，\s+]/);
+                                  const flavorMap = {};
+
+                                  parts.forEach(part => {
+                                    // 匹配 "規格x數量" (如 "原味x2", "(巧克力)x1")
+                                    const match = part.trim().match(/^\(?([^\s*x:：)]+)\)?\s*[*xX:：]\s*(\d+)$/);
+                                    if (match) {
+                                      const flavor = match[1];
+                                      const fQty = Number(match[2]);
+                                      if (flavor && fQty > 0) {
+                                        flavorMap[flavor] = (flavorMap[flavor] || 0) + fQty;
+                                      }
+                                    }
+                                  });
+
+                                  if (Object.keys(flavorMap).length > 0) {
+                                    newFlavorSelections[pid] = {
+                                      ...(newFlavorSelections[pid] || {}),
+                                      ...flavorMap
+                                    };
+                                  }
+                                }
+                              });
+                            }
+
+                            const finalCart = Object.keys(newCart).length > 0 ? newCart : (res.cart || {});
+                            setCart(finalCart);
+                            setFlavorSelections(newFlavorSelections);
+
+                            if (o.recipients && o.recipients.length > 0) {
+                              const nextGroupCart = {};
+                              const nextGroupFlavors = {};
+                              o.recipients.forEach(r => {
+                                if (!r.recipientName) return;
+                                nextGroupCart[r.recipientName] = {};
+                                (r.items || []).forEach(ri => {
+                                  const pid = ri.productId || ri.ProductId;
+                                  if (!pid) return;
+                                  nextGroupCart[r.recipientName][pid] = Number(ri.qty || ri.Qty || 0);
+                                  const remStr = ri.remark || ri.Remark || '';
+                                  if (remStr) {
+                                    const cleanRemark = remStr.replace(/【口味備註：(.*?)】/, '$1');
+                                    const parts = cleanRemark.split(/[,，\s+]/);
+                                    const flavorMap = {};
+                                    parts.forEach(part => {
+                                      const match = part.trim().match(/^\(?([^\s*x:：)]+)\)?\s*[*xX:：]\s*(\d+)$/);
+                                      if (match) {
+                                        const flavor = match[1];
+                                        const fQty = Number(match[2]);
+                                        if (flavor && fQty > 0) {
+                                          flavorMap[flavor] = (flavorMap[flavor] || 0) + fQty;
+                                        }
+                                      }
+                                    });
+                                    if (Object.keys(flavorMap).length > 0) {
+                                      if (!nextGroupFlavors[r.recipientName]) nextGroupFlavors[r.recipientName] = {};
+                                      nextGroupFlavors[r.recipientName][pid] = flavorMap;
+                                    }
+                                  }
+                                });
+                              });
+                              setGroupCart(nextGroupCart);
+                              setGroupFlavorSelections(nextGroupFlavors);
+                              setIsGroupOrder(true);
+                            }
+
+                            if (res.delivery) {
+                              setSelectedBuilding(res.delivery.community || "");
+                              setDetailAddress(res.delivery.floorRoom || "");
+                            }
+                            if (res.payment) setPaymentMethod(res.payment.method || "");
+                            if (res.remark) setNote(res.remark.note || "");
+
+                            setIsReorder(true);
+                            setStep("confirm");
+                          } else {
+                            alert("讀取訂單失敗");
+                          }
+                        } catch (err) {
+                          alert("網路連線錯誤");
+                        } finally {
+                          setIsMemberLoading(false);
+                        }
+                      }}
+                      className="w-full py-2 flex items-center justify-center gap-2 rounded-lg font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
+                    >
+                      <RotateCcw size={16} /> 再訂一次
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+            {renderMobileFooter()}
+          </div>
+        </div>
+        {renderBottomNav()}
+      </div>
+    );
+  }
+
+
+
+  if (step === "member") {
+    return (
+      <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
+        <div className="h-[60px] px-4 flex items-center bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] shadow-sm">
+          <h2 className="font-bold text-lg">會員中心</h2>
+        </div>
+        <div className="flex-1 overflow-y-auto pb-6" style={{ WebkitOverflowScrolling: "touch" }}>
+          {/* Profile & Greeting Section */}
+          <div className="bg-[var(--bg-secondary)] px-6 pt-6 pb-6 mb-2 border-b border-[var(--border-primary)] flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+                  👋 {memberProfile?.DisplayName || customerName || "會員您好"}
+                </div>
+                <div className="text-sm text-[var(--text-secondary)] mt-1">歡迎回來！</div>
+              </div>
+              <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow flex-shrink-0">
+                {linePictureUrl ? (
+                  <img src={linePictureUrl} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    <User size={28} />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 配送日小卡 */}
+            <div className="mt-1 bg-blue-50 border border-blue-100 rounded-xl p-4 flex justify-between items-center relative overflow-hidden">
+              <div>
+                <div className="text-xs text-blue-600 font-bold mb-1 flex items-center gap-1.5">
+                  今天配送日
+                  <span className="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-bold scale-90">開發中</span>
+                </div>
+                <div className="text-lg font-bold text-[var(--text-primary)]">6/28</div>
+                <div className="text-xs text-[var(--text-secondary)]">下午15:00~17:00</div>
+              </div>
+              <Package size={32} className="text-blue-200" />
+            </div>
+
+            {/* 奶包金 & 會員卡 */}
+            <div className="flex gap-3 mt-1">
+              <div className="flex-1 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 rounded-xl p-4 relative overflow-hidden">
+                <div className="text-xs text-amber-700 font-bold flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-1"><Banknote size={14} /> 奶包金餘額</span>
+                  <span className="text-[9px] bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-bold scale-90">開發中</span>
+                </div>
+                <div className="text-2xl font-black text-amber-600">${memberProfile?.WalletBalance || 0}</div>
+              </div>
+              <div className="flex-1 bg-gradient-to-br from-gray-50 to-slate-50 border border-gray-200 rounded-xl p-4 flex flex-col justify-between">
+                <div className="text-xs text-gray-500 font-bold flex items-center gap-1"><CheckCircle size={14} /> 會員等級</div>
+                <div className="text-base font-bold text-[var(--text-primary)] mt-1">{
+                  !memberProfile?.MemberLevel || memberProfile.MemberLevel.trim().toUpperCase() === 'GENERAL' ? '一般會員' :
+                    memberProfile.MemberLevel.trim().toUpperCase() === 'VIP' ? 'VIP 會員' :
+                      memberProfile.MemberLevel.trim().toUpperCase() === 'VVIP' ? 'VVIP 會員' :
+                        memberProfile.MemberLevel
+                }</div>
+              </div>
+            </div>
+
+            {/* 快捷操作按鈕 */}
+            <div className="flex gap-3 mt-1">
+              <button onClick={() => setStep("shop")} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600"><RotateCcw size={20} /></div>
+                <span className="text-xs font-bold text-[var(--text-primary)]">再訂一次</span>
+              </button>
+              <button onClick={() => setStep("orders")} className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600"><History size={20} /></div>
+                <span className="text-xs font-bold text-[var(--text-primary)]">查看訂單</span>
+              </button>
+              <button className="flex-1 py-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl flex flex-col items-center justify-center gap-2 transition-colors relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-tr from-transparent to-rose-500/10 pointer-events-none"></div>
+                <div className="absolute top-0 right-0 bg-rose-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-bl">
+                  開發中
+                </div>
+                <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-600"><Package size={20} /></div>
+                <span className="text-xs font-bold text-[var(--text-primary)]">最新優惠</span>
+              </button>
+            </div>
+          </div>
+          {renderMobileFooter()}
+        </div>
+        {renderBottomNav()}
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
+      {/* 頂部固定導覽列 */}
+
+      <div
+        className="flex-shrink-0 flex flex-col z-10 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] shadow-sm"
+        style={{ touchAction: "pan-x" }}
+      >
+        {/* Header */}
+        <div className="h-[60px] px-3 flex justify-between items-center">
+          <div className="flex-1 flex justify-start items-center gap-3">
+            <MilkZeroWasteLogo setting={setting} />
+            {isGeneralUser ? (
+              <button
+                onClick={() => setShowAreaModal(true)}
+                className={`text-xs font-bold px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all active:scale-95 duration-100 ${selectedCommunityId
+                  ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+                  : "bg-blue-600 text-white border-blue-700 animate-pulse shadow shadow-blue-500/20"
+                  }`}
+              >
+                <span>📍</span>
+                <span>
+                  {(() => {
+                    if (selectedCommunityId && allCommunities.length > 0) {
+                      const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+                      if (match) {
+                        return match.CommunityName.replace("台南市", "").replace("高雄市", "");
+                      }
+                    }
+                    return "選擇配送地區";
+                  })()}
+                </span>
+              </button>
+            ) : (
+              sourceGroup && (
+                <span className="text-xs bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-lg border border-blue-100">
+                  {displayGroupName}
+                </span>
+              )
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => {
+                const nextExpanded = !isSearchExpanded;
+                setIsSearchExpanded(nextExpanded);
+                if (!nextExpanded) {
+                  setSearchQuery("");
+                }
+              }}
+              className={`p-1.5 rounded-lg transition-colors duration-100 ${isSearchExpanded
+                ? "bg-blue-50 text-blue-600 dark:bg-blue-950/40"
+                : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                }`}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </button>
+            {announcementData && (
+              <button
+                onClick={() => setAnnouncementModal({ show: true, ...announcementData })}
+                className="p-1.5 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 transition-colors relative cursor-pointer"
+                title="查看商城公告"
+              >
+                <Megaphone size={16} />
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-purple-500 rounded-full animate-ping" />
+              </button>
+            )}
+            <button
+              onClick={() => loadAllData()}
+              className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            </button>
+          </div>
+        </div>
+
+        {/* 團購限時防呆 Banner 提示 */}
+        {gbStatus.message && (
+          <div className={`px-4 py-2 text-xs font-bold flex flex-col items-center justify-center border-t border-[var(--border-primary)] ${gbStatus.status === 'upcoming'
+            ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+            : gbStatus.status === 'ended'
+              ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+              : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+            }`}>
+            {gbStatus.message.includes(' (') ? (
+              <>
+                <div className="flex items-center justify-center gap-1">
+                  <span>{gbStatus.message.split(' (')[0]}</span>
+                </div>
+                <div className="text-[10px] opacity-90 mt-0.5 font-normal tracking-wide">
+                  ({gbStatus.message.split(' (')[1].replace(')', '')})
+                </div>
+              </>
+            ) : (
+              <div className="text-center">{gbStatus.message}</div>
+            )}
+          </div>
+        )}
+
+        {/* 團購代訂控制區 */}
+        <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-t border-[var(--border-primary)] flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-extrabold text-[var(--text-primary)]">👥 團購代訂模式</span>
+            </div>
+            <button
+              onClick={() => {
+                const nextVal = !isGroupOrder;
+                setIsGroupOrder(nextVal);
+                if (nextVal && commonRecipients.length > 0 && !activeRecipient) {
+                  setActiveRecipient(commonRecipients[0]);
+                }
+              }}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all border ${isGroupOrder
+                ? "bg-blue-600 text-white border-transparent"
+                : "bg-transparent border-[var(--border-primary)] text-[var(--text-secondary)]"
+                }`}
+            >
+              {isGroupOrder ? "已啟用" : "啟用代訂"}
+            </button>
+          </div>
+
+          {isGroupOrder && (
+            <div className="flex flex-col gap-2 mt-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[var(--text-secondary)] whitespace-nowrap font-medium">當前團員:</span>
+                <div className="flex-1 relative">
+                  <select
+                    value={activeRecipient}
+                    onChange={(e) => setActiveRecipient(e.target.value)}
+                    className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-lg pl-2.5 pr-8 py-1.5 text-xs font-bold text-[var(--text-primary)] focus:outline-none appearance-none"
+                  >
+                    {commonRecipients.map((name) => {
+                      const qty = Object.values(groupCart[name] || {}).reduce((a, b) => a + b, 0);
+                      return (
+                        <option key={name} value={name}>
+                          👤 {name} {qty > 0 ? `(已選購 ${qty} 件)` : "(未購)"}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--text-secondary)]">
+                    <ChevronDown size={14} />
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAddRecipientModal(true)}
+                  className="px-2 py-1.5 bg-blue-50 text-blue-600 text-xs font-bold rounded-lg border border-blue-100 whitespace-nowrap"
+                >
+                  ➕ 新增團員
+                </button>
+              </div>
+
+              {/* 常用成員快速切換 Tab 區 */}
+              {commonRecipients.length > 0 && (
+                <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none" style={{ WebkitOverflowScrolling: "touch" }}>
+                  {commonRecipients.map((name) => {
+                    const qty = Object.values(groupCart[name] || {}).reduce((a, b) => a + b, 0);
+                    const isActive = activeRecipient === name;
+                    return (
+                      <div
+                        key={name}
+                        className={`flex items-center gap-1 flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${isActive
+                          ? "bg-blue-50 text-blue-600 border-blue-300"
+                          : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)]"
+                          }`}
+                      >
+                        <button
+                          onClick={() => setActiveRecipient(name)}
+                          className="flex items-center gap-1.5 focus:outline-none"
+                        >
+                          <span>{name}</span>
+                          {qty > 0 && <span className="px-1.5 bg-blue-600 text-white rounded-full text-[9px] font-bold">{qty}</span>}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmModal({
+                              show: true,
+                              message: `確認刪除成員「${name}」？`,
+                              confirmText: "確定",
+                              cancelText: "取消",
+                              onConfirm: () => {
+                                const updated = commonRecipients.filter(x => x !== name);
+                                setCommonRecipients(updated);
+                                localStorage.setItem("mlw_common_recipients", JSON.stringify(updated));
+
+                                setGroupCart(prev => {
+                                  const next = { ...prev };
+                                  delete next[name];
+                                  return next;
+                                });
+
+                                if (activeRecipient === name) {
+                                  setActiveRecipient(updated.length > 0 ? updated[0] : "");
+                                }
+                              },
+                              onCancel: null
+                            });
+                          }}
+                          className="text-slate-400 hover:text-red-500 ml-1.5 select-none font-sans font-bold flex items-center justify-center w-3 h-3 hover:bg-red-100 rounded-full"
+                          style={{ fontSize: "11px" }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 展開式搜尋欄位 */}
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-in-out ${isSearchExpanded
+            ? "max-h-[60px] opacity-100 py-2 border-t border-[var(--border-primary)]"
+            : "max-h-0 opacity-0 py-0 border-t-0"
+            } px-4 bg-[var(--bg-secondary)]`}
+        >
+          <div className="relative flex items-center">
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="搜尋商品名稱..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 text-xs font-semibold rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all duration-150"
+            />
+            <div className="absolute left-3 text-[var(--text-tertiary)] flex items-center pointer-events-none">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </div>
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 p-1 rounded-full text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all"
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 分類 Tab 列 */}
+        {!loading && categories.length > 1 && (
+          <div className="relative">
+            <div
+              ref={tabBarRef}
+              className="h-12 px-3 border-t border-[var(--border-primary)] flex items-center gap-1.5 overflow-x-auto relative scrollbar-none"
+              style={{
+                WebkitOverflowScrolling: "touch",
+                scrollbarWidth: "none",
+                msOverflowStyle: "none",
+              }}
+            >
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  data-cat={cat}
+                  onClick={() => handleCategoryChange(cat)}
+                  className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 whitespace-nowrap border ${activeCategory === cat
+                    ? "bg-[var(--text-primary)] text-[var(--bg-primary)] border-transparent shadow-sm"
+                    : "bg-transparent border-[var(--border-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+            <div className="absolute right-0 top-[1px] bottom-0 w-8 bg-gradient-to-l from-[var(--bg-secondary)] to-transparent pointer-events-none z-10" />
+          </div>
+        )}
+      </div>
+
+      {/* 主內容區 */}
+      {loading ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-2 text-[var(--text-secondary)]">
+          <RefreshCw className="animate-spin text-blue-500" size={32} />
+          <span>商品載入中...</span>
+        </div>
+      ) : (
+        <>
+          {/* 商品列表 */}
+          <div
+            ref={listRef}
+            onScroll={handleScroll}
+            className={`flex-1 overflow-y-auto ${totalQty > 0 ? (isGeneralUser && selectedCommunityId ? 'pb-[116px]' : 'pb-[80px]') : 'pb-3'} relative overscroll-contain`}
+          >
+            {products.length === 0 ? (
+              <div className="text-center py-16 text-[var(--text-secondary)]">
+                目前沒有商品
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="text-center py-16 text-[var(--text-secondary)]">
+                找不到符合「{searchQuery}」的商品
+              </div>
+            ) : (
+              groupedProducts.map(({ cat, items }) => (
+                <div
+                  key={cat}
+                  ref={(el) => {
+                    sectionRefs.current[cat] = el;
+                  }}
+                  data-category={cat}
+                >
+                  <div className="flex items-center gap-3 px-4 pt-5 pb-2.5">
+                    <span className="text-base font-extrabold text-[var(--text-primary)] whitespace-nowrap">
+                      {cat}
+                    </span>
+                    <div className="flex-1 h-px bg-[var(--border-primary)]" />
+                  </div>
+                  <div className="px-4 space-y-2.5">
+                    {items.map((product) => {
+                      const qty = isGroupOrder ? (groupCart[activeRecipient]?.[product.id] || 0) : (cart[product.id] || 0);
+                      const itemInCart = cartItems.find(i => i.id === product.id);
+                      const freeQty = itemInCart ? itemInCart.freeQty : 0;
+                      return (
+                        <div
+                          key={product.id}
+                          className={`flex bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden shadow-[0_3px_10px_rgba(0,0,0,0.04)],0,0,0.2)] transition-all duration-150 ${animatingProductId === product.id ? "scale-95" : "scale-100"}`}
+                        >
+                          <div
+                            className="w-[100px] flex-shrink-0 bg-[var(--bg-tertiary)]"
+                            style={{ minHeight: 100 }}
+                          >
+                            {product.imageUrl ? (
+                              <img
+                                src={product.imageUrl}
+                                alt={product.name}
+                                className="w-full h-full object-cover"
+                                style={{ minHeight: 100 }}
+                                onError={(e) => {
+                                  e.target.style.display = "none";
+                                  e.target.parentNode.classList.add(
+                                    "flex",
+                                    "items-center",
+                                    "justify-center",
+                                  );
+                                }}
+                              />
+                            ) : (
+                              <div
+                                className="w-full h-full flex items-center justify-center"
+                                style={{ minHeight: 100 }}
+                              >
+                                <Package
+                                  className="text-[var(--text-tertiary)]"
+                                  size={28}
+                                />
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
+                            <div>
+                              <div className="flex flex-wrap items-baseline gap-1.5">
+                                <h3 className="font-extrabold text-[18px] text-[var(--text-primary)] leading-snug">
+                                  {product.name}
+                                  {product.capacity && String(product.capacity).trim() && (
+                                    <span className="font-bold text-[14px] text-[var(--text-secondary)] opacity-75 ml-1.5 font-sans">
+                                      {String(product.capacity).trim()}
+                                    </span>
+                                  )}
+                                </h3>
+                                {product.isBundle && (
+                                  <span className="text-[10px] text-amber-800 bg-amber-500/10 border border-amber-200/30 px-1 py-0.5 rounded font-bold shrink-0">
+                                    捆裝 {product.bundleSize}入
+                                  </span>
+                                )}
+                                {(() => {
+                                  // 1. 優先使用綁定的團購促銷活動 (product.promotion)
+                                  const groupPromo = product.promotion;
+                                  if (groupPromo && groupPromo.isActive !== false) {
+                                    if (groupPromo.promoType === 'BUY_X_GET_Y') {
+                                      let tierText = '';
+                                      if (Array.isArray(groupPromo.tiers) && groupPromo.tiers.length > 0) {
+                                        tierText = groupPromo.tiers.map(t => `買 ${t.buyQty} 送 ${t.freeQty}`).join(' 🔥 ');
+                                      } else if (groupPromo.buyQty > 0 && groupPromo.freeQty > 0) {
+                                        tierText = `買 ${groupPromo.buyQty} 送 ${groupPromo.freeQty}`;
+                                      }
+                                      if (tierText) {
+                                        return (
+                                          <span className="text-[10px] text-emerald-800 bg-emerald-500/10 border border-emerald-200/30 px-1.5 py-0.5 rounded font-bold shrink-0">
+                                            🔥 {tierText}
+                                          </span>
+                                        );
+                                      }
+                                    } else if (groupPromo.promoType === 'BUNDLE_PRICE') {
+                                      return (
+                                        <span className="text-[10px] text-purple-800 bg-purple-500/10 border border-purple-200/30 px-1.5 py-0.5 rounded font-bold shrink-0">
+                                          🎉 任選 {groupPromo.buyQty} 件 ${groupPromo.bundlePrice}
+                                        </span>
+                                      );
+                                    }
+                                  }
+
+                                  // 2. 次之使用 product.promotions 陣列
+                                  if (Array.isArray(product.promotions) && product.promotions.length > 0) {
+                                    return product.promotions.map((promo, idx) => {
+                                      let text = '';
+                                      if (Array.isArray(promo.tiers) && promo.tiers.length > 0) {
+                                        text = promo.tiers.map(t => `買 ${t.buyQty} 送 ${t.freeQty}`).join(' 🔥 ');
+                                      } else if (promo.buyX > 0 && promo.getY > 0) {
+                                        text = `買 ${promo.buyX} 送 ${promo.getY}`;
+                                      }
+                                      if (!text) return null;
+                                      return (
+                                        <span key={idx} className="text-[10px] text-emerald-800 bg-emerald-500/10 border border-emerald-200/30 px-1.5 py-0.5 rounded font-bold shrink-0">
+                                          🔥 {text}
+                                        </span>
+                                      );
+                                    });
+                                  }
+
+                                  // 3. 舊版單一商品欄位 (product.buy_x)
+                                  if (product.buy_x > 0 && product.get_y > 0) {
+                                    return (
+                                      <span className="text-[10px] text-emerald-800 bg-emerald-500/10 border border-emerald-200/30 px-1.5 py-0.5 rounded font-bold shrink-0">
+                                        🔥 買 {product.buy_x} 送 {product.get_y}
+                                      </span>
+                                    );
+                                  }
+
+                                  return null;
+                                })()}
+                              </div>
+                              {product.expiryDate && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-700 bg-orange-50 border border-orange-300 px-2 py-0.5 rounded-full mt-1 shadow-xs">
+                                  📅 效期至 {product.expiryDate}
+                                </span>
+                              )}
+                              {(() => {
+                                const qInfo = getProductQuotaInfo(product);
+                                if (!qInfo.hasQuota || qInfo.remaining === null || qInfo.remaining === undefined) return null;
+                                const remaining = qInfo.remaining;
+                                const isComm = qInfo.isCommunityQuota;
+                                const unit = (product?.isBundle || Number(product?.bundleSize) > 1) ? '組' : '入';
+                                return (
+                                  <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded mt-1 font-bold ${remaining === 0
+                                    ? 'text-red-600 bg-red-50 border border-red-200'
+                                    : 'text-purple-600 dark:text-purple-300 bg-purple-500/10 border border-purple-200/50'
+                                    }`}>
+                                    {remaining === 0
+                                      ? (isComm ? '🚫 本社區專屬額度已售完' : '🚫 已售完')
+                                      : (isComm ? `⚡️ 本社區獨家專屬 剩 ${remaining} ${unit}` : `⚡️ 活動限量 剩 ${remaining} ${unit}`)}
+                                  </span>
+                                );
+                              })()}
+                            </div>
+                            <div className="flex flex-col mt-1.5">
+                              <div className="flex justify-between items-center">
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-bold text-blue-600 font-mono flex items-center gap-1.5">
+                                    <span>
+                                      $
+                                      {product.single_price || product.price}
+                                    </span>
+                                    {qty > 0 && freeQty > 0 && (
+                                      <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 border border-emerald-100 px-1 py-0.5 rounded leading-none flex items-center">
+                                        贈{freeQty},共{qty + freeQty}件
+                                      </span>
+                                    )}
+                                  </span>
+                                  {product.has_volume_pricing &&
+                                    product.volume_pricing_settings && (() => {
+                                      const s = product.volume_pricing_settings;
+                                      const tiers = Array.isArray(s.tiers) && s.tiers.length > 0
+                                        ? s.tiers.filter(t => t.target_quantity && t.package_price)
+                                        : (s.target_quantity ? [{ target_quantity: s.target_quantity, package_price: s.package_price }] : []);
+                                      if (tiers.length === 0) return null;
+                                      return (
+                                        <div className="flex flex-wrap gap-1 mt-0.5">
+                                          {tiers.map((t, idx) => (
+                                            <span key={idx} className="text-[10px] bg-rose-50 text-rose-600 px-1 py-0.2 rounded font-bold border border-rose-200 leading-none">
+                                              任選 {t.target_quantity} 入 ${t.package_price}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      );
+                                    })()}
+                                </div>
+                                <div className="flex items-center gap-0.5">
+                                  {qty > 0 && (
+                                    <>
+                                      <button
+                                        onClick={() =>
+                                          handleProductAction(product, false)
+                                        }
+                                        className="w-7 h-7 flex items-center justify-center rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-100 active:scale-90"
+                                      >
+                                        <Minus size={13} />
+                                      </button>
+                                      {product.has_flavor_attributes ? (
+                                        <span className="w-7 text-center font-bold font-mono text-sm">
+                                          {qty}
+                                        </span>
+                                      ) : (
+                                        <input
+                                          type="number"
+                                          inputMode="numeric"
+                                          pattern="[0-9]*"
+                                          min="0"
+                                          max={(() => {
+                                            const qInfo = getProductQuotaInfo(product);
+                                            return qInfo.hasQuota ? qInfo.remaining : 99;
+                                          })()}
+                                          value={qty}
+                                          onChange={(e) => handleSetQty(product.id, e.target.value)}
+                                          onBlur={(e) => {
+                                            if (e.target.value === "" || isNaN(parseInt(e.target.value, 10))) {
+                                              handleSetQty(product.id, 0);
+                                            }
+                                          }}
+                                          onFocus={(e) => e.target.select()}
+                                          className="w-7 text-center font-bold font-mono text-sm bg-transparent border-0 p-0 focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        />
+                                      )}
+                                    </>
+                                  )}
+                                  {(() => {
+                                    const qInfo = getProductQuotaInfo(product);
+                                    const isSoldOut = qInfo.hasQuota && qInfo.remaining === 0;
+                                    return (
+                                      <button
+                                        onClick={() => !isSoldOut && handleProductAction(product, true)}
+                                        disabled={isSoldOut}
+                                        className={`w-7 h-7 flex items-center justify-center rounded-lg shadow-sm transition-all duration-100 ${isSoldOut
+                                          ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
+                                          : qty > 0
+                                            ? 'bg-slate-700 text-white hover:bg-slate-800 active:scale-90'
+                                            : 'bg-blue-500 text-white hover:bg-blue-600 active:scale-90'
+                                          }`}
+                                      >
+                                        <Plus size={13} />
+                                      </button>
+                                    );
+                                  })()}
+                                </div>
+                              </div>
+
+                              {qty > 0 && product.has_flavor_attributes && (
+                                <div
+                                  className="text-[10px] text-blue-600 font-medium mt-1.5 select-none cursor-pointer"
+                                  onClick={() =>
+                                    handleProductAction(product, true)
+                                  }
+                                >
+                                  {getFlavorRemark(
+                                    product.id,
+                                    flavorSelections,
+                                    isGroupOrder ? groupFlavorSelections : null,
+                                    isGroupOrder
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
+            )}
+            {renderMobileFooter()}
+          </div>
+
+          {/* 浮動購物車 */}
+          {totalQty > 0 && (
+            <div
+              className="absolute bottom-[60px] left-0 right-0 bg-[var(--bg-secondary)]/95 backdrop-blur-sm border-t border-[var(--border-primary)] shadow-2xl flex flex-col"
+              style={{ touchAction: "none" }}
+            >
+              {/* 免運進度小車車 (僅散客且有設定免運規則時顯示) */}
+              {isGeneralUser && (
+                <div className="w-full px-4 pt-3 pb-1 border-b border-[var(--border-primary)]/40 select-none">
+                  {(() => {
+                    let activeComm = null;
+                    if (selectedCommunityId && allCommunities.length > 0) {
+                      activeComm = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+                    }
+
+                    if (!activeComm) {
+                      return (
+                        <div
+                          onClick={() => setShowAreaModal(true)}
+                          className="flex justify-between items-center text-xs font-semibold text-blue-600 cursor-pointer hover:underline py-0.5 animate-pulse"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span>🚚</span>
+                            <span>請先點擊設定送貨地區以計算免運</span>
+                          </span>
+                          <span className="text-[10px] bg-blue-100 px-1.5 py-0.5 rounded font-bold">點我設定</span>
+                        </div>
+                      );
+                    }
+
+                    const freeMin = Number(activeComm.FreeShippingMin) || 0;
+                    const fee = Number(activeComm.ShippingFee) || 0;
+
+                    // 如果運費是 0 或者沒有免運門檻 (預設免運)
+                    if (fee === 0 || activeComm.DefaultFreeShipping) {
+                      return (
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 py-0.5">
+                          <span>🎉</span>
+                          <span>此地區外送一律免運費！</span>
+                        </div>
+                      );
+                    }
+
+                    const isFree = cartTotal >= freeMin;
+                    const gap = Math.max(0, freeMin - cartTotal);
+                    const progress = Math.min(100, Math.round((cartTotal / freeMin) * 100));
+
+                    return (
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center text-xs font-bold">
+                          {isFree ? (
+                            <span className="text-emerald-600 flex items-center gap-1">🎉 已達成免運門檻！已享免運</span>
+                          ) : (
+                            <span className="text-[var(--text-secondary)]">
+                              🚚 再買 <strong className="text-orange-500 font-extrabold font-mono">${gap}</strong> 即可免運
+                            </span>
+                          )}
+                          <span className="text-[10px] text-slate-400 font-mono font-normal">門檻 ${freeMin}</span>
+                        </div>
+                        {/* 軌道與小車車 */}
+                        <div className="relative w-full h-1.5 bg-slate-100 rounded-full border border-slate-200/60 overflow-visible">
+                          {/* 進度填充 */}
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${isFree ? 'bg-emerald-500' : 'bg-gradient-to-r from-orange-400 to-amber-500'}`}
+                            style={{ width: `${progress}%` }}
+                          />
+                          {/* 小車車圖示 */}
+                          <span
+                            className="absolute -top-[7px] text-base transition-all duration-300 pointer-events-none select-none"
+                            style={{
+                              left: `calc(${progress}% - 9px)`,
+                              transform: 'scaleX(-1)' // 將車車開的方向轉為朝右
+                            }}
+                          >
+                            🚚
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* 🎁 促銷達標不打斷提示 Banner */}
+              {Object.entries(availableGiftCredits).map(([pId, credit]) => {
+                if (credit.earned <= 0) return null;
+                const isComplete = credit.selected >= credit.earned;
+                return (
+                  <div key={pId} className="w-full px-4 py-2 bg-amber-500/10 border-b border-amber-200/50 flex justify-between items-center text-xs font-bold text-amber-800 select-none">
+                    <span className="flex items-center gap-1 truncate mr-2">
+                      <span className="text-sm">🎉</span>
+                      <span className="truncate">已符合「{credit.promoName || '促銷優惠'}」，請選擇 {credit.earned} 件贈品</span>
+                    </span>
+                    <button
+                      onClick={() => setShowGiftModal(pId)}
+                      className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-extrabold flex items-center gap-1 transition-all ${isComplete ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white animate-pulse'}`}
+                    >
+                      🎁 {isComplete ? `贈品已選 (${credit.selected}/${credit.earned})` : `選擇贈品 (${credit.selected}/${credit.earned})`}
+                    </button>
+                  </div>
+                );
+              })}
+
+              {/* 購物車核心按鈕列 */}
+              <div className="px-4 py-3 flex justify-between items-center">
+                <div
+                  onClick={() => setStep("confirm")}
+                  className="flex items-center gap-3 cursor-pointer select-none group"
+                >
+                  <div className="relative bg-blue-100 text-blue-600 p-2.5 rounded-full group-hover:scale-105 transition-transform">
+                    <ShoppingCart size={20} />
+                    <span className="absolute -top-1 -right-1.5 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold border-2 border-white">
+                      {totalQty}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-[var(--text-secondary)] font-semibold flex items-center gap-1">
+                      已選 {totalQty} 件 <span className="text-blue-500 font-bold">查看購物車</span>
+                    </div>
+                    <div className="text-2xl font-black text-blue-600 font-mono">
+                      ${cartTotal}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setStep("confirm")}
+                  className="btn-primary px-5 py-2.5 rounded-xl font-bold flex items-center gap-1 shadow-md shadow-blue-500/20"
+                >
+                  前往結帳 <ArrowRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* 🎁 贈品選擇 Bottom Sheet 抽屜選單 */}
+      {renderGiftModal()}
+
+      {/* 多規格口味選擇彈窗 */}
+      {renderFlavorModal()}
+      {renderBottomNav()}
+
+      {/* 📱 Mobile 客服中心與網站政策彈窗 */}
+      {renderServiceModal()}
+      {renderPolicyModal()}
+      {renderPolicyViewerModal()}
+
+      {/* 自訂美化彈窗提示 */}
+      {alertModal.show && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[var(--bg-secondary)] w-full max-w-[280px] rounded-2xl p-5 shadow-2xl border border-[var(--border-primary)] flex flex-col items-center gap-4 text-center animate-in zoom-in-95 duration-200">
+            <p className="text-sm font-bold text-[var(--text-primary)] leading-relaxed whitespace-pre-line">
+              {alertModal.message}
+            </p>
+            <button
+              onClick={() => {
+                const cb = alertModal.callback;
+                setAlertModal({ show: false, message: '', callback: null });
+                if (cb) cb();
+              }}
+              className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/15"
+            >
+              確定
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 確認 Dialog（有取消/確定雙按鈕）*/}
+      {confirmModal.show && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[var(--bg-secondary)] w-full max-w-[300px] rounded-2xl p-5 shadow-2xl border border-[var(--border-primary)] flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+            <p className="text-sm font-bold text-[var(--text-primary)] leading-relaxed whitespace-pre-line text-center">
+              {confirmModal.message}
+            </p>
+            <div className="flex gap-2.5">
+              <button
+                onClick={() => {
+                  setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null, confirmText: '確定', cancelText: '取消' });
+                  if (confirmModal.onCancel) confirmModal.onCancel();
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs font-bold transition-all active:scale-95"
+              >
+                {confirmModal.cancelText || '取消'}
+              </button>
+              <button
+                onClick={() => {
+                  const fn = confirmModal.onConfirm;
+                  setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null, confirmText: '確定', cancelText: '取消' });
+                  if (fn) fn();
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/15"
+              >
+                {confirmModal.confirmText || '確定'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 👥 新增團員彈窗 (AddRecipientModal) */}
+      {showAddRecipientModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[var(--bg-secondary)] w-full max-w-[320px] rounded-2xl p-5 shadow-2xl border border-[var(--border-primary)] flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+            <div className="text-center">
+              <h3 className="text-base font-extrabold text-[var(--text-primary)] flex items-center justify-center gap-1.5">
+                👥 新增團購成員
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-1.5">
+                請輸入成員姓名，以便進行代訂與對帳。
+              </p>
+            </div>
+
+            <input
+              type="text"
+              placeholder="輸入成員姓名 (例如: 王小明)"
+              value={newRecipientName}
+              onChange={(e) => setNewRecipientName(e.target.value)}
+              className="w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)] text-sm font-bold focus:outline-none text-[var(--text-primary)]"
+            />
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowAddRecipientModal(false);
+                  setNewRecipientName("");
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs font-bold transition-all active:scale-95"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  const name = newRecipientName.trim();
+                  if (!name) {
+                    alert("姓名不得為空");
+                    return;
+                  }
+                  if (commonRecipients.includes(name)) {
+                    alert("該成員已存在於名單中");
+                    return;
+                  }
+                  const updatedRecipients = [...commonRecipients, name];
+                  setCommonRecipients(updatedRecipients);
+                  localStorage.setItem("mlw_common_recipients", JSON.stringify(updatedRecipients));
+                  setActiveRecipient(name);
+                  setShowAddRecipientModal(false);
+                  setNewRecipientName("");
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/15"
+              >
+                確定新增
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📍 外送地區設定彈窗 (AreaModal) */}
+      {showAreaModal && isGeneralUser && (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[var(--bg-secondary)] w-full max-w-[320px] rounded-2xl p-5 shadow-2xl border border-[var(--border-primary)] flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+            <div className="text-center">
+              <h3 className="text-base font-extrabold text-[var(--text-primary)] flex items-center justify-center gap-1.5">
+                <MapPin size={18} className="text-blue-500" />
+                設定送貨地區
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-1.5">
+                請先選擇您所在的縣市區域以計算運費
+              </p>
+            </div>
+
+            {/* 兩段式選單 */}
+            <div className="space-y-3 py-1">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">選擇縣市</label>
+                <select
+                  className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)] text-sm font-bold"
+                  value={selectedCity}
+                  onChange={(e) => {
+                    setSelectedCity(e.target.value);
+                    setSelectedCommunityId(""); // 重置區域
+                    setDetailAddress(""); // 重置地址
+                  }}
+                >
+                  <option value="">-- 請選擇縣市 --</option>
+                  <option value="台南市">台南市</option>
+                  <option value="高雄市">高雄市</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">配送區域</label>
+                <select
+                  className="input-field w-full p-2.5 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)] text-sm font-bold"
+                  value={selectedCommunityId}
+                  onChange={(e) => {
+                    const commId = e.target.value;
+                    setSelectedCommunityId(commId);
+
+                    // 智慧前綴地址預填
+                    if (commId) {
+                      const target = allCommunities.find(c => c.CommunityId === commId);
+                      if (target) {
+                        const prefix = target.CommunityName;
+                        const currentAddr = detailAddress || "";
+                        if (!currentAddr.trim()) {
+                          setDetailAddress(prefix);
+                        } else {
+                          let replaced = false;
+                          for (const c of allCommunities) {
+                            if (currentAddr.startsWith(c.CommunityName)) {
+                              const rest = currentAddr.substring(c.CommunityName.length);
+                              setDetailAddress(prefix + rest);
+                              replaced = true;
+                              break;
+                            }
+                          }
+                          if (!replaced) {
+                            setDetailAddress(prefix + currentAddr);
+                          }
+                        }
+                      }
+                    }
+                  }}
+                  disabled={!selectedCity}
+                >
+                  <option value="">{selectedCity ? "-- 請選擇外送區域 --" : "-- 請先選取縣市 --"}</option>
+                  {selectedCity && allCommunities
+                    .filter(c => !["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(c.CommunityName))
+                    .filter(c => c.CommunityName.startsWith(selectedCity))
+                    .map((c) => {
+                      let shortName = c.CommunityName.replace("台南市", "").replace("高雄市", "");
+                      const fee = Number(c.ShippingFee) || 0;
+                      const min = Number(c.FreeShippingMin) || 0;
+                      const ruleText = fee > 0 ? `$${fee}/滿$${min}免運` : '免運';
+                      return (
+                        <option key={c.CommunityId} value={c.CommunityId}>
+                          {shortName} ({ruleText})
+                        </option>
+                      );
+                    })}
+                </select>
+              </div>
+            </div>
+
+            {/* 運費規則預覽 */}
+            {selectedCommunityId && (() => {
+              const match = allCommunities.find(c => c.CommunityId === selectedCommunityId);
+              if (match) {
+                const fee = Number(match.ShippingFee) || 0;
+                const min = Number(match.FreeShippingMin) || 0;
+                return (
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700 font-semibold space-y-1">
+                    <p className="flex items-center gap-1">
+                      <span>🚚</span>
+                      <span>此區運費：<strong>${fee} 元</strong></span>
+                    </p>
+                    {min > 0 ? (
+                      <p className="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
+                        <span>💡</span>
+                        <span>單筆商品滿 <strong>${min} 元</strong> 即可享免運！</span>
+                      </p>
+                    ) : (
+                      <p className="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
+                        <span>💡</span>
+                        <span>此區無免運優惠門檻。</span>
+                      </p>
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {/* 送出與關閉 */}
+            <div className="flex gap-2.5 pt-1.5">
+              {/* 如果已經有選過的區域，才允許按取消關閉 */}
+              {selectedCommunityId && (
+                <button
+                  type="button"
+                  onClick={() => setShowAreaModal(false)}
+                  className="btn-secondary py-2.5 rounded-xl text-xs font-bold flex-1 transition-all active:scale-95"
+                >
+                  取消
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!selectedCity || !selectedCommunityId) {
+                    alert("請確實選擇縣市與配送區域！");
+                    return;
+                  }
+                  setShowAreaModal(false);
+                }}
+                disabled={!selectedCity || !selectedCommunityId}
+                className="btn-primary py-2.5 rounded-xl text-xs font-bold flex-1 shadow-md shadow-blue-500/20 transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+              >
+                確認送出
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 首頁彈出式公告 Modal ── */}
+      {announcementModal.show && (
+        <div className="fixed inset-0 z-[100] flex flex-col justify-center items-center p-3.5 sm:p-4 select-none">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setAnnouncementModal(prev => ({ ...prev, show: false }))}></div>
+          <div className="relative w-full max-w-[330px] sm:max-w-[360px] animate-[bounceIn_0.4s_ease-out] my-auto">
+            <div
+              className={`backdrop-blur-2xl bg-gradient-to-br border shadow-2xl rounded-3xl p-4.5 sm:p-5 relative overflow-hidden flex flex-col max-h-[78vh] ${announcementModal.themeColor === 'blue' ? 'from-blue-600/30 via-sky-600/20 to-cyan-700/30 border-blue-400/40 text-blue-50' :
+                announcementModal.themeColor === 'dark' ? 'from-gray-900/90 via-slate-900/90 to-black/95 border-gray-700/60 text-gray-100' :
+                  announcementModal.themeColor === 'emerald' ? 'from-emerald-700/30 via-teal-600/20 to-green-700/30 border-emerald-400/40 text-emerald-50' :
+                    announcementModal.themeColor === 'amber' ? 'from-amber-600/30 via-orange-600/20 to-yellow-600/30 border-amber-400/40 text-amber-50' :
+                      announcementModal.themeColor === 'rose' ? 'from-rose-600/30 via-pink-600/20 to-red-600/30 border-rose-400/40 text-rose-50' :
+                        announcementModal.themeColor === 'indigo' ? 'from-indigo-700/30 via-blue-600/20 to-purple-800/30 border-indigo-400/40 text-indigo-50' :
+                          announcementModal.themeColor === 'custom' ? 'border-white/30 text-white' :
+                            'from-purple-700/30 via-fuchsia-600/20 to-pink-700/30 border-purple-400/40 text-purple-50'
+                }`}
+              style={announcementModal.themeColor === 'custom' && announcementModal.customColors ? {
+                background: `linear-gradient(135deg, ${announcementModal.customColors.start}, ${announcementModal.customColors.end})`
+              } : {}}
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
+
+              <div className="relative z-10 text-center flex flex-col h-full space-y-3">
+                <div className="w-11 h-11 rounded-2xl bg-white/15 mx-auto flex items-center justify-center shrink-0 shadow-inner border border-white/20">
+                  <Megaphone className="w-5.5 h-5.5 text-white drop-shadow-sm" />
+                </div>
+
+                <h3 className={`text-lg sm:text-xl font-extrabold tracking-tight drop-shadow-sm shrink-0 px-1 ${announcementModal.titleTextColor === 'black' ? 'text-slate-950 font-black' : 'text-white'
+                  }`}>
+                  {announcementModal.title}
+                </h3>
+
+                <div className="w-10 h-0.5 bg-white/30 mx-auto rounded-full shrink-0"></div>
+
+                <div className={`leading-relaxed text-white/95 font-medium whitespace-pre-wrap text-left bg-black/25 p-3.5 rounded-2xl border border-white/10 overflow-y-auto max-h-[42vh] shadow-inner my-1 ${announcementModal.fontSize === 'small' ? 'text-xs' :
+                  announcementModal.fontSize === 'large' ? 'text-base' :
+                    announcementModal.fontSize === 'xlarge' ? 'text-lg' :
+                      'text-[13.5px] sm:text-sm'
+                  }`}>
+                  {renderFormattedContent(announcementModal.content)}
+                </div>
+
+                {/* 底部按鈕與今日不再提示選項 (按鈕在上、勾選在下) */}
+                <div className="flex flex-col items-center space-y-2 pt-1">
+                  <button
+                    onClick={() => {
+                      const todayStr = new Date().toISOString().split('T')[0];
+                      localStorage.setItem("mlw_announcement_read_hash", announcementModal.hash);
+                      if (dontShowToday) {
+                        localStorage.setItem("mlw_announcement_suppressed_date", todayStr);
+                      } else {
+                        localStorage.removeItem("mlw_announcement_suppressed_date");
+                      }
+                      setAnnouncementModal(prev => ({ ...prev, show: false }));
+                    }}
+                    className={`w-full py-3 rounded-xl font-extrabold tracking-wide shadow-lg transition-all active:scale-95 text-sm sm:text-base shrink-0 cursor-pointer ${announcementModal.buttonTextColor === 'black' ? 'text-slate-950 font-black' : 'text-white font-extrabold'
+                      } ${announcementModal.themeColor === 'blue' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 border border-blue-300/30 shadow-blue-500/20' :
+                        announcementModal.themeColor === 'dark' ? 'bg-white hover:bg-gray-100 border border-gray-200 shadow-white/10' :
+                          announcementModal.themeColor === 'emerald' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 border border-emerald-300/30 shadow-emerald-500/20' :
+                            announcementModal.themeColor === 'amber' ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border border-amber-300/30 shadow-amber-500/20' :
+                              announcementModal.themeColor === 'rose' ? 'bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 border border-rose-300/30 shadow-rose-500/20' :
+                                announcementModal.themeColor === 'indigo' ? 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 border border-indigo-300/30 shadow-indigo-500/20' :
+                                  announcementModal.themeColor === 'custom' ? 'border border-white/20 shadow-md' :
+                                    'bg-gradient-to-r from-purple-500 to-fuchsia-500 hover:from-purple-600 hover:to-fuchsia-600 border border-purple-300/30 shadow-purple-500/20'
+                      }`}
+                    style={announcementModal.themeColor === 'custom' && announcementModal.customColors ? {
+                      backgroundColor: announcementModal.customColors.button,
+                      color: announcementModal.buttonTextColor === 'black' ? '#0f172a' : '#ffffff'
+                    } : {}}
+                  >
+                    我知道了
+                  </button>
+
+                  <label className="inline-flex items-center justify-center gap-1.5 cursor-pointer text-[11.5px] font-medium text-white/80 hover:text-white transition-colors select-none pt-0.5 pb-0.5">
+                    <input
+                      type="checkbox"
+                      checked={dontShowToday}
+                      onChange={e => setDontShowToday(e.target.checked)}
+                      className="w-3.5 h-3.5 rounded border-white/30 bg-black/20 text-purple-500 accent-purple-500 cursor-pointer"
+                    />
+                    <span>今日不再提示</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <style>{`
+            @keyframes bounceIn {
+              0% { transform: scale(0.8); opacity: 0; }
+              60% { transform: scale(1.05); opacity: 1; }
+              100% { transform: scale(1); opacity: 1; }
+            }
+          `}</style>
+        </div>
+      )}
+
+    </div>
+  );
+}

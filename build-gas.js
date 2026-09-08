@@ -1,0 +1,72 @@
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+
+const version = process.env.VITE_APP_VERSION || Date.now().toString();
+process.env.VITE_APP_VERSION = version;
+
+console.log(`[GAS Build] Running vite build with VITE_APP_VERSION=${version}...`);
+try {
+  execSync('npx vite build', {
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      VITE_APP_VERSION: version
+    }
+  });
+} catch (error) {
+  console.error('Vite build failed:', error);
+  process.exit(1);
+}
+
+const distDir = './dist';
+const htmlFile = path.join(distDir, 'index.html');
+let html = fs.readFileSync(htmlFile, 'utf8');
+let output = html;
+
+// 1. 注入 Error Handlers
+const errorHandlerScript = `
+  <script>
+    window.addEventListener('error', function(e) {
+      document.body.innerHTML = '<div style="color: red; padding: 20px; font-family: sans-serif; word-break: break-all;">' +
+        '<h3>System Error</h3>' +
+        '<p>Message: ' + e.message + '</p>' +
+        '<p>File: ' + e.filename + ':' + e.lineno + ':' + e.colno + '</p>' +
+        '<pre style="background: #eee; padding: 10px; overflow: auto;">' + (e.error && e.error.stack ? e.error.stack : '') + '</pre>' +
+        '</div>';
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      document.body.innerHTML = '<div style="color: red; padding: 20px; font-family: sans-serif; word-break: break-all;">' +
+        '<h3>Unhandled Promise Rejection</h3>' +
+        '<p>Reason: ' + e.reason + '</p>' +
+        '<pre style="background: #eee; padding: 10px; overflow: auto;">' + (e.reason && e.reason.stack ? e.reason.stack : '') + '</pre>' +
+        '</div>';
+    });
+  </script>`;
+
+output = output.replace(/([\s\S]*)(<\/head>\s*<body>)/i, `$1$2${errorHandlerScript}`);
+
+// 2. 注入 GAS parameters，以利 iframe 下的前端能獲取到 query 參數，以及當前專案對應的 API 網址
+const gasParamsScript = `
+  <script>
+    window.GAS_PARAMETERS = <?!= typeof parameters !== 'undefined' ? parameters : '{}' ?>;
+    window.GAS_API_URL = <?!= typeof currentApiUrl !== 'undefined' ? JSON.stringify(currentApiUrl) : '""' ?>;
+    window.GAS_GUEST_TOKEN = <?!= typeof guestToken !== 'undefined' ? JSON.stringify(guestToken) : '""' ?>;
+  </script>
+`;
+output = output.replace(/([\s\S]*)(<\/head>\s*<body>)/i, `$1$2${gasParamsScript}`);
+
+fs.writeFileSync('Client.html', output);
+console.log('Successfully generated Client.html for GAS (CDN version)');
+
+// ====== Update Code.gs APP_VERSION ======
+const codeGsPath = './Code.gs';
+if (fs.existsSync(codeGsPath)) {
+  let codeGs = fs.readFileSync(codeGsPath, 'utf8');
+  const nowStr = process.env.VITE_APP_VERSION || Date.now().toString();
+  codeGs = codeGs.replace(/const\s+APP_VERSION\s*=\s*['"](.*?)['"];/, `const APP_VERSION = '${nowStr}';`);
+  fs.writeFileSync(codeGsPath, codeGs);
+  console.log(`Successfully updated APP_VERSION in Code.gs to ${nowStr}`);
+} else {
+  console.warn('Code.gs not found. Could not update APP_VERSION.');
+}

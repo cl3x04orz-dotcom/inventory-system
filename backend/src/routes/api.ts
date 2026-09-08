@@ -1,0 +1,230 @@
+import { FastifyInstance } from 'fastify';
+import jwt from 'jsonwebtoken';
+import { apiRouter } from '../controllers/api.controller.js';
+
+const JWT_SECRET = (process.env.JWT_SECRET || '').trim();
+
+// Actions that do not require authentication
+const publicActions = ['getStoreSetting', 'login', 'register', 'checkInit', 'loginAdminByPassword', 'v2_getLiffInitData', 'v2_createOrder', 'v1_getMember', 'v1_saveMember', 'v1_getOrders', 'v1_reorder', 'getProductStock', 'getRewardConfig', 'getPrintTemplateConfig', 'savePrintTemplateConfig', 'getWebPushPublicKey', 'submitDriverDelivery', 'confirmPendingOrder', 'batchConfirmPendingOrders', 'getLiffAnnouncement'];
+
+// Action to Permission mapping (from Code.gs)
+const actionPermissions: Record<string, string> = {
+  saveStoreSetting: 'system_config',
+  saveRewardConfig: 'system_config',
+  saveLiffAnnouncement: 'sales_pending',
+  admin_adjustMemberSpend: 'sales_pending',
+  saveSales: 'sales_entry',
+  createRetailSale: 'sales_entry',
+  getSalesHistory: 'sales_report',
+  getReportDataBatch: 'sales_report',
+  getRecentSalesToday: 'sales_entry',
+  getSalesByDateRange: 'sales_report',
+  getTemplatesList: 'sales_entry',
+  generatePdf: 'sales_entry',
+  getSmartPickSuggestion: 'sales_entry',
+  getAllUniqueCustomers: 'sales_entry',
+  initSalesPageData: 'sales_entry',
+  updateCustomerSettings: 'sales_entry',
+
+  addPurchase: 'purchase_entry',
+  getPurchaseSuggestions: 'purchase_entry',
+  getPurchaseHistory: 'purchase_history',
+  voidAndFetchPurchase: 'purchase_history',
+  confirmPurchaseReceipt: 'purchase_entry',
+  getVendors: 'purchase_entry',
+  updateVendorStatus: 'purchase_entry',
+  updateVendorSortOrder: 'purchase_entry',
+
+  adjustInventory: 'inventory_adjust',
+  getAdjustmentHistory: 'inventory_history',
+  getInventory: 'inventory_adjust',
+  getInventoryWithSafety: 'inventory_adjust',
+  updateSafetyStock: 'inventory_adjust',
+  getInventoryValuation: 'inventory_valuation',
+  getInventoryForStocktake: 'inventory_stocktake',
+  saveStocktake: 'inventory_stocktake',
+  getStocktakeHistory: 'inventory_history',
+  updateProductSortOrder: 'system_config',
+  updateProductDetails: 'system_config',
+  updateProductPurchasable: 'system_config',
+
+  getPendingOrders: 'sales_pending',
+  updatePendingOrder: 'sales_pending',
+  confirmPendingOrder: 'sales_pending',
+  deletePendingOrder: 'sales_pending',
+  batchConfirmPendingOrders: 'sales_pending',
+  batchConfirmPayments: 'sales_pending',
+  mergeOrders: 'sales_pending',
+  batchDeletePendingOrders: 'sales_pending',
+  batchSetDeliveryDates: 'sales_pending',
+  saveGroupBinding: 'sales_pending',
+  updateOrderStatus: 'sales_pending',
+  saveBuildingSettings: 'sales_pending',
+  deleteBuildingSettings: 'sales_pending',
+  renameBuildingSettings: 'sales_pending',
+  reorderBuildings: 'sales_pending',
+  admin_getMembers: 'sales_pending',
+  admin_adjustWallet: 'sales_pending',
+  getCommunities: 'sales_pending',
+  saveCommunityArea: 'sales_pending',
+  deleteCommunityArea: 'sales_pending',
+  getCommunityCustomPrices: 'sales_pending',
+  saveCommunityCustomPrice: 'sales_pending',
+  deleteCommunityCustomPrice: 'sales_pending',
+
+  getUsers: 'system_config',
+  addUser: 'system_config',
+  deleteUser: 'system_config',
+  updateUserPermissions: 'system_config',
+  updateUserRole: 'system_config',
+  updateUserStatus: 'system_config',
+  updateUserPassword: 'system_config',
+
+  getActivityLogs: 'system_activity_logs'
+};
+
+export async function apiRoutes(app: FastifyInstance) {
+  app.post('/api', async (request, reply) => {
+    const { action, payload, token } = request.body as {
+      action: string;
+      payload: any;
+      token?: string;
+    };
+
+    if (!action) {
+      return reply.status(400).send({ error: 'Missing action parameter' });
+    }
+
+    const trimmedAction = action.trim();
+    let user: any = null;
+
+    // 1. Authenticate token if action is not public
+    if (!publicActions.includes(trimmedAction)) {
+      if (!token) {
+        return reply.status(401).send({ error: 'Unauthorized: No valid token provided' });
+      }
+
+      try {
+        user = jwt.verify(token, JWT_SECRET);
+      } catch (err) {
+        return reply.send({ error: 'TokenExpired' }); // Match Apps Script return for client-side auto-renew
+      }
+
+      // 2. Perform RBAC validation (SUPER_ADMIN, BOSS, and ADMIN bypass all checks)
+      if (user.role !== 'SUPER_ADMIN' && user.role !== 'BOSS' && user.role !== 'ADMIN') {
+        const requiredPerm = actionPermissions[trimmedAction];
+        if (requiredPerm) {
+          const userPerms = user.permissions || [];
+          const category = requiredPerm.split('_')[0];
+          const hasPerm = userPerms.includes(requiredPerm) || userPerms.includes(category);
+
+          if (!hasPerm) {
+            return reply.status(403).send({
+              error: `Forbidden: 您目前不具備執行 [${requiredPerm}] 模組操作的權限`
+            });
+          }
+        }
+      }
+    }
+
+    try {
+      // 3. Store Middleware (Store Resolver)
+      // 解析目前的 storeCode，這將作為後續所有 DB 查詢的隔離邊界
+      let currentStoreCode = 'MILI001';
+      
+      if (user && user.storeCode) {
+        // 未來：從 JWT 取得 storeCode (最安全)
+        currentStoreCode = user.storeCode;
+      } else if (payload && payload.storeCode) {
+        // 過渡期或公開 API：從 payload 取得 (例如登入或點餐頁)
+        currentStoreCode = payload.storeCode;
+      }
+
+      // 確保傳給 Controller 的 user 與 payload 絕對帶有 storeCode
+      if (user) {
+        user.storeCode = currentStoreCode;
+      }
+
+      // 4. Inject operator and metadata into payload
+      const enrichedPayload = payload ? { ...payload } : {};
+      // Super Admin 跨店操作不能被覆蓋 storeCode
+      const superAdminActions = ['getTenants', 'createTenant', 'updateTenant', 'deleteTenant', 'impersonateTenant'];
+      if (!superAdminActions.includes(trimmedAction)) {
+        enrichedPayload.storeCode = currentStoreCode;
+      }
+      enrichedPayload.serverTimestamp = new Date();
+      if (!enrichedPayload.operator) {
+        enrichedPayload.operator = user ? (user.displayName || user.name || user.username || 'Unknown') : 'System';
+      }
+      enrichedPayload.userRole = user ? user.role : 'Guest';
+      enrichedPayload.rawToken = token;
+
+      // 5. Route to Controller
+      const result = await apiRouter(trimmedAction, enrichedPayload, user);
+      return result;
+    } catch (error: any) {
+      app.log.error(error);
+      return reply.send({ error: error.message || 'Internal Server Error' });
+    }
+  });
+
+  // 獲取伺服器對外 IP 的除錯路由 (Render Outbound IP)
+  app.get('/api/debug-ip', async (req, reply) => {
+    try {
+      const response = await fetch('https://api.ipify.org?format=json');
+      const data = await response.json();
+      return reply.send({
+        success: true,
+        message: 'This is the outbound IP you need to whitelist in LINE Pay Merchant Center',
+        ip: data.ip
+      });
+    } catch (error) {
+      return reply.status(500).send({ success: false, error: 'Failed to fetch IP' });
+    }
+  });
+
+  // GET /api/backup - 一鍵備份資料庫並下載 Excel 檔
+  app.get('/api/backup', async (request, reply) => {
+    const { token, secret } = request.query as { token?: string; secret?: string };
+
+    const BACKUP_SECRET_KEY = (process.env.BACKUP_SECRET_KEY || '').trim();
+    let isAuthorized = false;
+    let currentUser: any = null;
+
+    if (secret && BACKUP_SECRET_KEY && secret === BACKUP_SECRET_KEY) {
+      isAuthorized = true;
+    } else if (token && JWT_SECRET) {
+      try {
+        currentUser = jwt.verify(token, JWT_SECRET) as any;
+        if (currentUser.role === 'BOSS') {
+          isAuthorized = true;
+        }
+      } catch (err) {
+        return reply.status(401).send({ error: 'TokenExpired' });
+      }
+    }
+
+    if (!isAuthorized) {
+      return reply.status(403).send({ error: 'Forbidden: 權限不足或無效的金鑰/Token' });
+    }
+
+    try {
+
+      // 動態載入 BackupService 避免循環依賴
+      const { BackupService } = await import('../services/backup.service.js');
+      const storeCode = currentUser && currentUser.role === 'BOSS' && !currentUser.storeCode ? 'MILI001' : (currentUser?.storeCode || 'MILI001');
+      const excelBuffer = await BackupService.exportDatabaseToExcel(storeCode);
+
+      const timeStr = new Date().toISOString().replace(/[-:T]/g, '').substring(0, 14);
+      const filename = `database_backup_${timeStr}.xlsx`;
+
+      reply
+        .header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        .header('Content-Disposition', `attachment; filename="${filename}"`)
+        .send(excelBuffer);
+    } catch (err: any) {
+      app.log.error(err);
+      return reply.status(500).send({ error: err.message || '備份下載失敗' });
+    }
+  });
+}

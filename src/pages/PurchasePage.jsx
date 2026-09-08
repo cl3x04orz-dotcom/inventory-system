@@ -1,0 +1,899 @@
+import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
+import React, { useState, useEffect, useCallback } from 'react';
+import { PlusCircle } from 'lucide-react';
+import { callGAS } from '../utils/api';
+import { evaluateFormula } from '../utils/mathUtils';
+import PurchaseConfigModal from '../components/PurchaseConfigModal';
+
+const getSafeNum = (v) => {
+    if (typeof v === 'string' && v.trim().startsWith('=')) return 0;
+    const n = Number(v);
+    return isNaN(n) ? 0 : n;
+};
+
+export default function PurchasePage({ user, apiUrl, logActivity }) {
+    // Each item now includes its own vendor field
+    const currentYear = new Date().getFullYear().toString();
+    const [items, setItems] = useState([
+        { id: Date.now(), vendor: '', productName: '', quantity: '', unitPrice: '', expiryYear: currentYear, expiryMonth: '', expiryDay: '', paymentMethod: 'CASH' }
+    ]);
+    const [suggestions, setSuggestions] = useState({ vendors: [], vendorProductMap: {} });
+    const [allProductNames, setAllProductNames] = useState([]); // [新增] 所有已存在的產品名稱
+    const [newProductsToSetup, setNewProductsToSetup] = useState([]); // [新增] 待設定的新產品
+    const [setupData, setSetupData] = useState({}); // [新增] 新產品的設定值
+    const [loading, setLoading] = useState(false);
+    const [showConfigModal, setShowConfigModal] = useState(false); // [New] 管理廠商與商品後台開關
+
+    const loadSuggestions = useCallback(async () => {
+        try {
+            const data = await callGAS(apiUrl, 'getPurchaseSuggestions', {}, user.token);
+            if (data.vendors) setSuggestions(data);
+            
+            // [新增] 抓取完整的產品主檔清單
+            const products = await callGAS(apiUrl, 'getProducts', { purchasableOnly: true }, user.token);
+            if (Array.isArray(products)) {
+                setAllProductNames(products.map(p => p.name));
+            }
+
+            // [新增] 跨設備從 PostgreSQL 雲端資料庫同步最新進貨產品排序
+            const cloudOrderRes = await callGAS(apiUrl, 'getPurchaseProductOrder', {}, user.token);
+            if (cloudOrderRes && cloudOrderRes.order && Array.isArray(cloudOrderRes.order)) {
+                safeLocalStorage.setItem('purchase_product_order', JSON.stringify(cloudOrderRes.order));
+            }
+        } catch (e) {
+            console.error("Failed to fetch suggestions", e);
+        }
+    }, [apiUrl, user.token]);
+
+    useEffect(() => {
+        if (user?.token) loadSuggestions();
+    }, [user.token, loadSuggestions]);
+
+    // [New] Handle Correction/Clone from safeSessionStorage
+    useEffect(() => {
+        const cloned = safeSessionStorage.getItem('clonedPurchase');
+        if (cloned) {
+            try {
+                const data = JSON.parse(cloned);
+                const original = data.originalRecord || data; // Handle both direct and nested formats
+
+                // Formulate the item for the purchase page
+                const expiry = original.expiry ? new Date(original.expiry) : null;
+                const newItem = {
+                    id: Date.now(),
+                    vendor: original.vendor || '',
+                    productName: original.productName || '',
+                    quantity: original.quantity || '',
+                    unitPrice: original.unitPrice || '',
+                    expiryYear: expiry ? expiry.getFullYear().toString() : currentYear,
+                    expiryMonth: expiry ? (expiry.getMonth() + 1).toString() : '',
+                    expiryDay: expiry ? expiry.getDate().toString() : '',
+                    paymentMethod: original.paymentMethod || 'CASH'
+                };
+
+                setItems([newItem]);
+                safeSessionStorage.removeItem('clonedPurchase');
+
+                // Optional: show a small toast or log
+                console.log("Loaded cloned purchase data");
+            } catch (e) {
+                console.error("Failed to parse cloned purchase", e);
+            }
+        }
+    }, [currentYear]);
+
+    // Auto-switch payment method per item when vendor changes
+    useEffect(() => {
+        setItems(prev => prev.map(item => {
+            const defMethod = suggestions.vendorDefaults?.[item.vendor];
+            if (defMethod && item.paymentMethod !== defMethod) {
+                return { ...item, paymentMethod: defMethod };
+            }
+            return item;
+        }));
+    }, [suggestions.vendorDefaults, items.map(i => i.vendor).join(',')]);
+
+
+
+    // Helper to get product list for a specific vendor, strictly sorted by independent purchase product order
+    const getProductSuggestions = (currentVendor) => {
+        const activeSet = new Set(allProductNames);
+        let list = [];
+        if (currentVendor && suggestions.vendorProductMap[currentVendor]) {
+            list = suggestions.vendorProductMap[currentVendor].filter(pName => activeSet.has(pName));
+        } else {
+            const allProducts = new Set();
+            Object.values(suggestions.vendorProductMap || {}).forEach(pList => 
+                pList.forEach(p => {
+                    if (activeSet.has(p)) {
+                        allProducts.add(p);
+                    }
+                })
+            );
+            if (allProducts.size > 0) {
+                list = Array.from(allProducts);
+            } else {
+                list = Array.from(activeSet);
+            }
+        }
+
+        // 獨立進貨作業排序 (purchase_product_order)，完全不影響 POS、銷售或報表
+        let customOrder = [];
+        try {
+            const saved = safeLocalStorage.getItem('purchase_product_order');
+            if (saved) customOrder = JSON.parse(saved);
+        } catch (e) {}
+
+        if (customOrder && customOrder.length > 0) {
+            const orderMap = {};
+            customOrder.forEach((name, idx) => { orderMap[name] = idx; });
+            list.sort((a, b) => {
+                const wA = orderMap[a] !== undefined ? orderMap[a] : 999999;
+                const wB = orderMap[b] !== undefined ? orderMap[b] : 999999;
+                return wA - wB;
+            });
+        }
+
+        return list;
+    };
+
+    const handleItemChange = (id, field, value) => {
+        setItems(prev => prev.map(item => {
+            if (item.id !== id) return item;
+
+            let newItem = { ...item, [field]: value };
+
+            // [新增] 當產品名稱變更時，自動嘗試帶出該廠商的歷史進貨單價
+            if (field === 'productName' && value) {
+                const historyPrice = suggestions.vendorProductPriceMap?.[item.vendor]?.[value];
+                if (historyPrice !== undefined) {
+                    newItem.unitPrice = historyPrice;
+                }
+            }
+
+            // 如果值是公式（以 = 開頭），我們暫存字串不計算數字
+            if (field === 'quantity' || field === 'unitPrice') {
+                if (typeof value === 'string' && value.trim().startsWith('=')) {
+                    return newItem;
+                }
+            }
+
+            return newItem;
+        }));
+    };
+
+    const handleBlur = (id, field, value) => {
+        if (field === 'quantity' || field === 'unitPrice') {
+            if (typeof value === 'string' && value.trim().startsWith('=')) {
+                const result = evaluateFormula(value);
+                handleItemChange(id, field, result);
+            } else if (value !== '') {
+                // Force numeric cleanup on blur (only if not empty)
+                handleItemChange(id, field, getSafeNum(value));
+            }
+            // If empty, leave as empty string so validation can catch it
+        }
+    };
+
+    const addItem = () => {
+        setItems(prev => [...prev, {
+            id: Date.now() + Math.random(),
+            vendor: '',
+            productName: '',
+            quantity: '',
+            unitPrice: '',
+            expiryYear: currentYear,
+            expiryMonth: '',
+            expiryDay: '',
+            paymentMethod: 'CASH'
+        }]);
+    };
+
+    const removeItem = (id) => {
+        if (items.length > 1) {
+            setItems(prev => prev.filter(item => item.id !== id));
+        }
+    };
+
+    const focusAndSelect = (id) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.focus();
+            el.select?.();
+            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    };
+
+    const handleKeyDown = (e, idx, field) => {
+        const isMobile = e.target.id.includes('-m-');
+        const prefix = isMobile ? 'item-m-' : 'item-';
+        const fields = ['vendor', 'product', 'qty', 'price', 'year', 'month', 'day'];
+        const fieldIdx = fields.indexOf(field);
+
+        if (e.key === 'Enter') {
+            // [Fix] 避免在輸入中文選字時 (IME) 按下 Enter 直接跳格
+            if (e.nativeEvent.isComposing) return;
+            
+            e.preventDefault();
+            // [Modified] Enter on Price -> New Row
+            if (field === 'price') {
+                addItem();
+                setTimeout(() => focusAndSelect(`${prefix}${idx + 1}-vendor`), 50);
+            } else if (fieldIdx < fields.length - 1) {
+                // Other fields -> Next field
+                focusAndSelect(`${prefix}${idx}-${fields[fieldIdx + 1]}`);
+            } else if (idx < items.length - 1) {
+                // Last field (day) -> Next row vendor
+                focusAndSelect(`${prefix}${idx + 1}-vendor`);
+            } else {
+                // Last row last field -> New row
+                addItem();
+                setTimeout(() => focusAndSelect(`${prefix}${idx + 1}-vendor`), 50);
+            }
+        } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            if (fieldIdx < fields.length - 1) {
+                focusAndSelect(`${prefix}${idx}-${fields[fieldIdx + 1]}`);
+            } else if (idx < items.length - 1) {
+                focusAndSelect(`${prefix}${idx + 1}-vendor`);
+            }
+        } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            if (fieldIdx > 0) {
+                focusAndSelect(`${prefix}${idx}-${fields[fieldIdx - 1]}`);
+            } else if (idx > 0) {
+                focusAndSelect(`${prefix}${idx - 1}-day`);
+            }
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (idx < items.length - 1) {
+                focusAndSelect(`${prefix}${idx + 1}-${field}`);
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (idx > 0) {
+                focusAndSelect(`${prefix}${idx - 1}-${field}`);
+            }
+        }
+    };
+
+    const handleSetupKeyDown = (e, pIdx, field) => {
+        const fields = ['packSize', 'dispatchSteps', 'roundThreshold', 'maxSuggestion'];
+        const fIdx = fields.indexOf(field);
+
+        if (e.key === 'Enter') {
+            if (e.nativeEvent.isComposing) return;
+            e.preventDefault();
+            
+            if (fIdx < fields.length - 1) {
+                const nextId = `setup-${pIdx}-${fields[fIdx+1]}`;
+                setTimeout(() => {
+                    const el = document.getElementById(nextId);
+                    if (el) {
+                        el.focus();
+                        if (typeof el.select === 'function') el.select();
+                    }
+                }, 10);
+            } else if (pIdx < newProductsToSetup.length - 1) {
+                const nextId = `setup-${pIdx+1}-${fields[0]}`;
+                setTimeout(() => {
+                    const el = document.getElementById(nextId);
+                    if (el) {
+                        el.focus();
+                        if (typeof el.select === 'function') el.select();
+                    }
+                }, 10);
+            } else {
+                handleSubmit(e);
+            }
+        } else if (e.key === 'ArrowRight') {
+            if (fIdx < fields.length - 1) {
+                const nextId = `setup-${pIdx}-${fields[fIdx+1]}`;
+                document.getElementById(nextId)?.focus();
+            }
+        } else if (e.key === 'ArrowLeft') {
+            if (fIdx > 0) {
+                const prevId = `setup-${pIdx}-${fields[fIdx-1]}`;
+                document.getElementById(prevId)?.focus();
+            }
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (pIdx < newProductsToSetup.length - 1) {
+                const nextId = `setup-${pIdx+1}-${field}`;
+                document.getElementById(nextId)?.focus();
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (pIdx > 0) {
+                const prevId = `setup-${pIdx-1}-${field}`;
+                document.getElementById(prevId)?.focus();
+            }
+        }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        // VALIDATION STEP
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            // [Modified] Expiry is now optional
+            if (!item.vendor.trim() || !item.productName.trim() || !item.quantity || item.unitPrice === '') {
+                alert(`錯誤：第 ${i + 1} 列資料不完整！\n請確認「廠商」、「產品名稱」、「數量」、「單價」皆已填寫。`);
+                return;
+            }
+        }
+
+        // [新增] 偵測新產品
+        const newOnes = items
+            .map(i => i.productName.trim())
+            .filter(name => name && !allProductNames.includes(name));
+        
+        const uniqueNewOnes = Array.from(new Set(newOnes));
+        
+        if (uniqueNewOnes.length > 0 && newProductsToSetup.length === 0) {
+            // 初始化設定資料
+            const initialSetup = {};
+            uniqueNewOnes.forEach(name => {
+                initialSetup[name] = {
+                    packSize: "",
+                    dispatchSteps: "",
+                    roundThreshold: "",
+                    autoSuppress: true,
+                    maxSuggestion: ""
+                };
+            });
+            setSetupData(initialSetup);
+            setNewProductsToSetup(uniqueNewOnes);
+            return; // 暫停提交，等待使用者完成設定
+        }
+
+        setLoading(true);
+
+        const payloadItems = items.map(item => {
+            let expiryString = "";
+            if (item.expiryYear && item.expiryMonth && item.expiryDay) {
+                const m = item.expiryMonth.padStart(2, '0');
+                const d = item.expiryDay.padStart(2, '0');
+                expiryString = `${item.expiryYear}-${m}-${d}`;
+            }
+
+            return {
+                vendor: item.vendor,
+                productName: item.productName,
+                quantity: Number(item.quantity),
+                price: Number(item.unitPrice),
+                expiry: expiryString,
+                paymentMethod: item.paymentMethod
+            };
+        });
+
+        // The API expects { vendor, items: [...] } usually, but since vendor is now per-item,
+        // we might need to adjust the backend or payload structure.
+        // Assuming backend supports `vendor` inside items if top-level `vendor` is missing, 
+        // OR we just pass the first one as dummy if backend requires it.
+        // Let's look at the instruction: "addPurchaseService" implementation.
+        // It says: "const rowVendor = item.vendor || data.vendor;" 
+        // So it supports per-item vendor! Perfect.
+
+        try {
+            // [新增] 產生唯一 ID 防止重複提交
+            const submissionId = `purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+            const result = await callGAS(apiUrl, 'addPurchase', {
+                items: payloadItems,
+                operator: user.username,
+                submissionId: submissionId,
+                newProductSettings: setupData // [新增] 傳入新產品設定
+            }, user.token);
+
+            // Log activity
+            if (logActivity) {
+                const methods = Array.from(new Set(payloadItems.map(i => i.paymentMethod)));
+                logActivity({
+                    actionType: 'DATA_EDIT',
+                    page: '進貨作業',
+                    details: JSON.stringify({
+                        vendorCount: new Set(payloadItems.map(i => i.vendor)).size,
+                        productCount: payloadItems.length,
+                        totalPrice: payloadItems.reduce((acc, i) => acc + (i.quantity * i.price), 0),
+                        paymentMethods: methods.join(', ')
+                    })
+                });
+            }
+
+            alert(`成功進貨 ${result.count} 筆商品！`);
+            // Reset
+            setItems([{ id: Date.now(), vendor: '', productName: '', quantity: '', unitPrice: '', expiryYear: currentYear, expiryMonth: '', expiryDay: '', paymentMethod: 'CASH' }]);
+            setNewProductsToSetup([]);
+            setSetupData({});
+            // 更新本地產品清單
+            setAllProductNames(prev => [...prev, ...Object.keys(setupData)]);
+        } catch (err) {
+            alert('進貨失敗: ' + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="max-w-[90rem] mx-auto p-4">
+            {loading && (
+                <div className="loading-overlay">
+                    <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-lg font-bold text-[var(--text-primary)]">資料存盤中，請稍後...</p>
+                </div>
+            )}
+            <div className="glass-panel p-6">
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
+                        進貨作業
+                    </h2>
+                    <button
+                        type="button"
+                        onClick={() => setShowConfigModal(true)}
+                        className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black rounded-xl text-xs transition-all shadow-md shadow-emerald-100 dark:shadow-none"
+                    >
+                        ⚙️ 管理廠商與商品
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* Items Grid */}
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between px-2">
+                            <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider">商品清單</h3>
+                            <span className="text-xs text-[var(--text-tertiary)]">共 {items.length} 項商品</span>
+                        </div>
+
+                        <datalist id="vendors-list">
+                            {suggestions.vendors.map((v, i) => <option key={i} value={v} />)}
+                        </datalist>
+
+                        {items.map((item, idx) => {
+                            const currentProductSuggestions = getProductSuggestions(item.vendor);
+
+                            return (
+                                <div key={item.id} className="group relative p-0 md:p-4 bg-transparent md:bg-[var(--bg-tertiary)] rounded-none md:rounded-xl border-b md:border border-[var(--border-primary)] hover:md:shadow-lg transition-all duration-200 mb-6 md:mb-0">
+                                    {/* Number Badge */}
+                                    <div className="md:absolute md:-left-2 md:top-1/2 md:-translate-y-1/2 mb-2 md:mb-0 flex items-center justify-between md:block">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                                                <span className="text-[10px] font-bold text-emerald-600"> {idx + 1}</span>
+                                            </div>
+                                            <span className="md:hidden text-sm font-bold text-[var(--text-secondary)]">商品資料</span>
+                                        </div>
+                                    </div>
+
+                                    {/* MOBILE VIEW (Horizontal Layout) */}
+                                    <div className="md:hidden space-y-3 pb-4">
+                                        {/* Vendor */}
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">廠商:</label>
+                                            <input
+                                                id={`item-m-${idx}-vendor`}
+                                                list="vendors-list"
+                                                autoComplete="off"
+                                                className="input-field flex-1 py-1.5 px-3"
+                                                placeholder="廠商名稱"
+                                                value={item.vendor}
+                                                onChange={e => handleItemChange(item.id, 'vendor', e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'vendor')}
+                                            />
+                                        </div>
+
+                                        {/* Product */}
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">產品名稱:</label>
+                                            <input
+                                                id={`item-m-${idx}-product`}
+                                                list={`products-list-${idx}`}
+                                                autoComplete="off"
+                                                className="input-field flex-1 py-1.5 px-3"
+                                                placeholder="產品名稱"
+                                                value={item.productName}
+                                                onChange={e => handleItemChange(item.id, 'productName', e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'product')}
+                                            />
+                                            <datalist id={`products-list-${idx}`}>
+                                                {currentProductSuggestions.map((n, i) => <option key={i} value={n} />)}
+                                            </datalist>
+                                        </div>
+
+                                        {/* Qty */}
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">數量:</label>
+                                            <input
+                                                id={`item-m-${idx}-qty`}
+                                                type="text"
+                                                inputMode="decimal"
+                                                autoComplete="off"
+                                                className="input-field flex-1 py-1.5 px-3"
+                                                placeholder="0"
+                                                value={item.quantity}
+                                                onChange={e => handleItemChange(item.id, 'quantity', e.target.value)}
+                                                onBlur={e => handleBlur(item.id, 'quantity', e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'qty')}
+                                            />
+                                        </div>
+
+                                        {/* Price */}
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">單價:</label>
+                                            <input
+                                                id={`item-m-${idx}-price`}
+                                                type="text"
+                                                inputMode="decimal"
+                                                autoComplete="off"
+                                                className="input-field flex-1 py-1.5 px-3"
+                                                placeholder="0"
+                                                value={item.unitPrice}
+                                                onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)}
+                                                onBlur={e => handleBlur(item.id, 'unitPrice', e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'price')}
+                                            />
+                                        </div>
+
+
+
+                                        {/* Expiry */}
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-sm font-bold text-[var(--text-secondary)] whitespace-nowrap w-[70px]">有效期限:</label>
+                                            <div className="flex flex-1 gap-1 items-center">
+                                                <input
+                                                    id={`item-m-${idx}-year`}
+                                                    type="number"
+                                                    className="input-field flex-[2] py-1.5 px-1 text-center"
+                                                    placeholder="YYYY"
+                                                    value={item.expiryYear}
+                                                    onChange={e => handleItemChange(item.id, 'expiryYear', e.target.value)}
+                                                    onKeyDown={(e) => handleKeyDown(e, idx, 'year')}
+                                                />
+                                                <span className="text-slate-300">/</span>
+                                                <input
+                                                    id={`item-m-${idx}-month`}
+                                                    type="number"
+                                                    className="input-field flex-1 py-1.5 px-1 text-center"
+                                                    placeholder="MM"
+                                                    value={item.expiryMonth}
+                                                    onChange={e => handleItemChange(item.id, 'expiryMonth', e.target.value)}
+                                                    onKeyDown={(e) => handleKeyDown(e, idx, 'month')}
+                                                />
+                                                <span className="text-slate-300">/</span>
+                                                <input
+                                                    id={`item-m-${idx}-day`}
+                                                    type="number"
+                                                    className="input-field flex-1 py-1.5 px-1 text-center"
+                                                    placeholder="DD"
+                                                    value={item.expiryDay}
+                                                    onChange={e => handleItemChange(item.id, 'expiryDay', e.target.value)}
+                                                    onKeyDown={(e) => handleKeyDown(e, idx, 'day')}
+                                                />
+
+                                                {/* Delete Button Mobile */}
+                                                {items.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeItem(item.id)}
+                                                        className="w-8 h-8 ml-1 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center border border-red-500/20"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* DESKTOP VIEW (Original Grid Layout) */}
+                                    <div className="hidden md:grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+
+                                        {/* Vendor (3 cols) */}
+                                        <div className="col-span-12 md:col-span-3">
+                                            <label className="text-[10px] font-bold text-[var(--text-secondary)] mb-1 uppercase">
+                                                廠商
+                                            </label>
+                                            <input
+                                                id={`item-${idx}-vendor`}
+                                                list="vendors-list"
+                                                autoComplete="off"
+                                                className="input-field w-full py-1.5 px-2 text-sm"
+                                                placeholder="廠商"
+                                                value={item.vendor}
+                                                onChange={e => handleItemChange(item.id, 'vendor', e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'vendor')}
+                                                autoFocus={idx === items.length - 1}
+                                            />
+                                        </div>
+
+                                        {/* Product (3 cols) */}
+                                        <div className="col-span-12 md:col-span-3">
+                                            <label className="text-[10px] font-bold text-[var(--text-secondary)] mb-1 uppercase">
+                                                產品名稱
+                                            </label>
+                                            <input
+                                                id={`item-${idx}-product`}
+                                                list={`products-list-${idx}`}
+                                                autoComplete="off"
+                                                className="input-field w-full py-1.5 px-2 text-sm"
+                                                placeholder="產品名稱"
+                                                value={item.productName}
+                                                onChange={e => handleItemChange(item.id, 'productName', e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'product')}
+                                            />
+                                        </div>
+
+                                        {/* Qty (1 col) */}
+                                        <div className="col-span-6 md:col-span-1">
+                                            <label className="text-[10px] font-bold text-[var(--text-secondary)] mb-1 text-center block uppercase">
+                                                數量
+                                            </label>
+                                            <input
+                                                id={`item-${idx}-qty`}
+                                                type="text"
+                                                inputMode="decimal"
+                                                autoComplete="off"
+                                                className="input-field w-full py-1.5 px-1 text-center text-sm"
+                                                placeholder="0"
+                                                value={item.quantity}
+                                                onChange={e => handleItemChange(item.id, 'quantity', e.target.value)}
+                                                onBlur={e => handleBlur(item.id, 'quantity', e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'qty')}
+                                            />
+                                        </div>
+
+                                        {/* Price (1 col) */}
+                                        <div className="col-span-6 md:col-span-1">
+                                            <label className="text-[10px] font-bold text-[var(--text-secondary)] mb-1 text-center block uppercase">
+                                                單價
+                                            </label>
+                                            <input
+                                                id={`item-${idx}-price`}
+                                                type="text"
+                                                inputMode="decimal"
+                                                autoComplete="off"
+                                                className="input-field w-full py-1.5 px-1 text-center text-sm"
+                                                placeholder="0"
+                                                value={item.unitPrice}
+                                                onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)}
+                                                onBlur={e => handleBlur(item.id, 'unitPrice', e.target.value)}
+                                                onKeyDown={(e) => handleKeyDown(e, idx, 'price')}
+                                            />
+                                        </div>
+
+                                        {/* Expiry (3 cols) */}
+                                        <div className="col-span-12 md:col-span-3 flex items-end gap-1">
+                                            <div className="flex-1">
+                                                <label className="text-[10px] font-bold text-[var(--text-secondary)] mb-1 uppercase">
+                                                    有效期限
+                                                </label>
+                                                <div className="grid grid-cols-[1.5fr_auto_1fr_auto_1fr] gap-1 items-center">
+                                                    <input
+                                                        id={`item-${idx}-year`}
+                                                        className="input-field py-1.5 px-0.5 text-center text-sm font-mono"
+                                                        placeholder="YYYY"
+                                                        value={item.expiryYear}
+                                                        onChange={e => handleItemChange(item.id, 'expiryYear', e.target.value)}
+                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'year')}
+                                                    />
+                                                    <span className="text-[var(--text-tertiary)] text-[10px]">/</span>
+                                                    <input
+                                                        id={`item-${idx}-month`}
+                                                        className="input-field py-1.5 px-0.5 text-center text-sm font-mono"
+                                                        placeholder="MM"
+                                                        value={item.expiryMonth}
+                                                        onChange={e => handleItemChange(item.id, 'expiryMonth', e.target.value)}
+                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'month')}
+                                                    />
+                                                    <span className="text-[var(--text-tertiary)] text-[10px]">/</span>
+                                                    <input
+                                                        id={`item-${idx}-day`}
+                                                        className="input-field py-1.5 px-0.5 text-center text-sm font-mono"
+                                                        placeholder="DD"
+                                                        value={item.expiryDay}
+                                                        onChange={e => handleItemChange(item.id, 'expiryDay', e.target.value)}
+                                                        onKeyDown={(e) => handleKeyDown(e, idx, 'day')}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+
+
+                                        {/* Action (Delete) */}
+                                        <div className="col-span-12 md:col-span-1 flex items-end justify-center">
+                                            {items.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeItem(item.id)}
+                                                    className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all flex items-center justify-center mb-[2px]"
+                                                    title="刪除"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div className="flex gap-4 mt-8 pt-6 border-t border-[var(--border-primary)]">
+                        <button
+                            type="button"
+                            onClick={addItem}
+                            className="btn-secondary flex-1 py-4 text-base font-semibold flex items-center justify-center gap-2 hover:scale-105 transition-transform"
+                        >
+                            <span className="text-xl">➕</span> 新增一列
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="btn-primary flex-[2] py-4 text-lg font-bold shadow-lg shadow-emerald-100 hover:shadow-xl hover:shadow-emerald-200 hover:scale-105 transition-all flex items-center justify-center gap-2"
+                        >
+                            {loading ? (
+                                <>
+                                    <span className="animate-spin">⏳</span> 處理中...
+                                </>
+                            ) : (
+                                <>
+                                    <span className="text-xl">✅</span> 確認全部進貨
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            {/* [新增] 新產品設定彈窗 */}
+            {newProductsToSetup.length > 0 && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col border border-slate-200 animate-in fade-in zoom-in duration-200">
+                        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+                            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500 text-white text-sm">📦</span>
+                                偵測到新產品，請完成初始設定
+                            </h2>
+                            <p className="text-sm text-slate-500 mt-1">這些品項將會自動建立至產品主檔，請填寫 AI 補貨建議所需的參數。</p>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                            {newProductsToSetup.map((name, pIdx) => (
+                                <div key={name} className="p-5 rounded-xl border border-slate-200 bg-slate-50/30 hover:border-emerald-200 transition-colors">
+                                    <h3 className="text-base font-bold text-emerald-700 mb-4 flex items-center gap-2">
+                                        <span className="w-1.5 h-6 bg-emerald-500 rounded-full"></span>
+                                        <span className="font-extrabold text-lg">{name}</span>
+                                    </h3>
+                                    
+                                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
+                                        {/* Pack Size */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">包裝規格 (I)</label>
+                                            <input 
+                                                id={`setup-${pIdx}-packSize`}
+                                                type="number"
+                                                className="input-field w-full py-1.5 text-sm"
+                                                placeholder="填9 4領 5不領"
+                                                autoComplete="off"
+                                                value={setupData[name]?.packSize}
+                                                onChange={e => setSetupData(prev => ({
+                                                    ...prev,
+                                                    [name]: { ...prev[name], packSize: e.target.value }
+                                                }))}
+                                                onKeyDown={e => handleSetupKeyDown(e, pIdx, 'packSize')}
+                                                autoFocus={pIdx === 0}
+                                            />
+                                        </div>
+
+                                        {/* Dispatch Steps */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">發貨階梯 (J)</label>
+                                            <input 
+                                                id={`setup-${pIdx}-dispatchSteps`}
+                                                type="text"
+                                                className="input-field w-full py-1.5 text-sm"
+                                                placeholder="例如: 28, 42"
+                                                autoComplete="off"
+                                                value={setupData[name]?.dispatchSteps}
+                                                onChange={e => setSetupData(prev => ({
+                                                    ...prev,
+                                                    [name]: { ...prev[name], dispatchSteps: e.target.value }
+                                                }))}
+                                                onKeyDown={e => handleSetupKeyDown(e, pIdx, 'dispatchSteps')}
+                                            />
+                                        </div>
+
+                                        {/* Round Threshold */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">領貨門檻 (K)</label>
+                                            <input 
+                                                id={`setup-${pIdx}-roundThreshold`}
+                                                type="number"
+                                                className="input-field w-full py-1.5 text-sm"
+                                                placeholder=""
+                                                autoComplete="off"
+                                                value={setupData[name]?.roundThreshold}
+                                                onChange={e => setSetupData(prev => ({
+                                                    ...prev,
+                                                    [name]: { ...prev[name], roundThreshold: e.target.value }
+                                                }))}
+                                                onKeyDown={e => handleSetupKeyDown(e, pIdx, 'roundThreshold')}
+                                            />
+                                        </div>
+
+                                        {/* Max Suggestion */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">建議上限 (M)</label>
+                                            <input 
+                                                id={`setup-${pIdx}-maxSuggestion`}
+                                                type="number"
+                                                className="input-field w-full py-1.5 text-sm"
+                                                placeholder=""
+                                                autoComplete="off"
+                                                value={setupData[name]?.maxSuggestion}
+                                                onChange={e => setSetupData(prev => ({
+                                                    ...prev,
+                                                    [name]: { ...prev[name], maxSuggestion: e.target.value }
+                                                }))}
+                                                onKeyDown={e => handleSetupKeyDown(e, pIdx, 'maxSuggestion')}
+                                            />
+                                        </div>
+
+                                        {/* Auto Suppress */}
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">智慧抑制 (L)</label>
+                                            <div className="flex items-center gap-3 h-[38px]">
+                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="sr-only peer"
+                                                        checked={setupData[name]?.autoSuppress}
+                                                        onChange={e => setSetupData(prev => ({
+                                                            ...prev,
+                                                            [name]: { ...prev[name], autoSuppress: e.target.checked }
+                                                        }))}
+                                                    />
+                                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex gap-4">
+                            <button 
+                                type="button"
+                                onClick={() => setNewProductsToSetup([])}
+                                className="px-6 py-3 rounded-xl border border-slate-200 text-slate-500 font-bold hover:bg-white transition-all"
+                            >
+                                取消提交
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={(e) => handleSubmit(e)}
+                                className="flex-1 px-6 py-3 rounded-xl bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                            >
+                                完成設定並確認進貨
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {showConfigModal && (
+                <PurchaseConfigModal
+                    isOpen={showConfigModal}
+                    onClose={() => {
+                        setShowConfigModal(false);
+                        loadSuggestions();
+                    }}
+                    apiUrl={apiUrl}
+                    token={user.token}
+                    vendorProductMap={suggestions.vendorProductMap}
+                />
+            )}
+        </div>
+    );
+}

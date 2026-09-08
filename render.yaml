@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: inventory-system
+    runtime: node
+    buildCommand: cd backend && npm install && npm run build
+    startCommand: cd backend && npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: GAS_API_URL
+        sync: false
+      - key: PORT
+        value: "10000"
+      - key: LINE_PAY_CHANNEL_ID
+        sync: false
+      - key: LINE_PAY_CHANNEL_SECRET
+        sync: false
+      - key: LINE_PAY_ENV
+        value: "production"

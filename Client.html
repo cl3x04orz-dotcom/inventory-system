@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="apple-touch-icon" href="./logo192.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="米立微MilkZeroWaste" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <!-- 強制瀏覽器不快取 HTML，確保每次都取得最新版本 -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <title>米立微 MilkZeroWaste</title>
+  <script type="module" crossorigin src="/inventory-system/assets/index-439a8d64.js"></script>
+  <link rel="stylesheet" href="/inventory-system/assets/index-0e90bd10.css">
+</head>
+
+<body>
+  <script>
+    window.GAS_PARAMETERS = <?!= typeof parameters !== 'undefined' ? parameters : '{}' ?>;
+    window.GAS_API_URL = <?!= typeof currentApiUrl !== 'undefined' ? JSON.stringify(currentApiUrl) : '""' ?>;
+    window.GAS_GUEST_TOKEN = <?!= typeof guestToken !== 'undefined' ? JSON.stringify(guestToken) : '""' ?>;
+  </script>
+
+  <script>
+    window.addEventListener('error', function(e) {
+      document.body.innerHTML = '<div style="color: red; padding: 20px; font-family: sans-serif; word-break: break-all;">' +
+        '<h3>System Error</h3>' +
+        '<p>Message: ' + e.message + '</p>' +
+        '<p>File: ' + e.filename + ':' + e.lineno + ':' + e.colno + '</p>' +
+        '<pre style="background: #eee; padding: 10px; overflow: auto;">' + (e.error && e.error.stack ? e.error.stack : '') + '</pre>' +
+        '</div>';
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      document.body.innerHTML = '<div style="color: red; padding: 20px; font-family: sans-serif; word-break: break-all;">' +
+        '<h3>Unhandled Promise Rejection</h3>' +
+        '<p>Reason: ' + e.reason + '</p>' +
+        '<pre style="background: #eee; padding: 10px; overflow: auto;">' + (e.reason && e.reason.stack ? e.reason.stack : '') + '</pre>' +
+        '</div>';
+    });
+  </script>
+  <div id="root"></div>
+  
+</body>
+
+</html>

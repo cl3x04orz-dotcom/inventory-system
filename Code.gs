@@ -1,0 +1,1118 @@
+/**
+ * Serves the React App
+ */
+const APP_VERSION = '1788875152392';
+ // 版本號：A2:3/24
+
+// ── CacheService Helper 函數 ───────────────────────────────────────
+function getCachedData(key) {
+    try {
+        const cache = CacheService.getScriptCache();
+        const cached = cache.get(key);
+        if (cached) {
+            return JSON.parse(cached);
+        }
+    } catch (e) {
+        console.warn("Read cache failed for key: " + key, e);
+    }
+    return null;
+}
+
+function setCachedData(key, data, ttlSeconds) {
+    try {
+        const cache = CacheService.getScriptCache();
+        cache.put(key, JSON.stringify(data), ttlSeconds || 600); // 預設 10 分鐘
+    } catch (e) {
+        console.warn("Set cache failed for key: " + key, e);
+    }
+}
+
+function clearCache(key) {
+    try {
+        const cache = CacheService.getScriptCache();
+        cache.remove(key);
+    } catch (e) {
+        console.warn("Clear cache failed for key: " + key, e);
+    }
+}
+
+function doGet(e) {
+    const template = HtmlService.createTemplateFromFile('Client');
+    template.parameters = JSON.stringify(e && e.parameter ? e.parameter : {});
+    template.currentApiUrl = ScriptApp.getService().getUrl();
+    
+    // 如果是 LIFF 頁面，預先生成 guest Token 注入 HTML，免去前端一次 AJAX 登入連線
+    let guestToken = '';
+    const isLiff = e && e.parameter && (e.parameter.page === 'liffOrder' || e.parameter.building || e.parameter.grp);
+    if (isLiff) {
+        try {
+            var tokenPayload = {
+                username: 'guest',
+                role: 'EMPLOYEE',
+                permissions: ['sales_liff'],
+                timestamp: new Date().getTime(),
+                exp: new Date().getTime() + (12 * 60 * 60 * 1000) // 12 小時
+            };
+            guestToken = createJWT(tokenPayload);
+        } catch(err) {
+            console.error('Failed to pre-generate guest token in doGet:', err);
+        }
+    }
+    template.guestToken = guestToken;
+    
+    return template.evaluate()
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setTitle('Inventory System')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * Main API Router
+ */
+function apiHandler(request) {
+    let { action, payload } = request;
+    if (action) action = action.trim();
+    
+    // 版本檢查 (免 Token)
+    if (action === 'getVersion') return { version: APP_VERSION };
+
+    // 檢查 Token (存在於 root 或 payload)
+    const token = request.token || (payload && payload.token);
+    const user = (typeof verifyToken !== 'undefined' && token) ? verifyToken(token) : null;
+
+    // 公開路徑 (不需要權限)
+    if (action === 'login') return login(payload);
+    if (action === 'register') return register(payload);
+    if (action === 'checkInit') return typeof checkDbInit !== 'undefined' ? checkDbInit() : { success: true };
+    if (action === 'loginAdminByPassword') return typeof loginAdminByPassword !== 'undefined' ? loginAdminByPassword(payload) : { error: '後端服務缺失: loginAdminByPassword' };
+
+    // 身份驗證失敗攔截 (LIFF 公開路徑可豁免驗證)
+    const publicLiffActions = ['v1_getMember', 'v1_saveMember', 'v1_getOrders', 'v1_reorder', 'getLiffInitData', 'savePendingOrder', 'v2_getLiffInitData', 'v2_createOrder', 'v2_getCommunities', 'v2_getCampaigns', 'getLiffAnnouncement'];
+    
+    if (!publicLiffActions.includes(action)) {
+        if (!user) {
+            return { error: 'Unauthorized: No valid token provided' };
+        }
+        if (user.__expired) {
+            return { error: 'TokenExpired' }; // 特殊錯誤碼讓前端強制登出
+        }
+        
+        // [Fix] 抗體機制：一旦發現 Token 內帶有不合法的亂碼名稱 (如 ???)，視為壞死通行證，強制前端登出洗掉 Token
+        if (user.username && user.username.includes('?')) {
+            console.warn(`[Security] 偵測到壞死 Token (使用者: ${user.username})，已觸發強制登出。`);
+            return { error: 'TokenExpired' }; 
+        }
+    }
+
+    // Token 展延機制
+    if (action === 'renewToken') {
+        var newTokenPayload = {
+            username: user.username,
+            role: user.role,
+            permissions: user.permissions || [],
+            timestamp: new Date().getTime(),
+            exp: new Date().getTime() + (12 * 60 * 60 * 1000) // 12 小時
+        };
+        return { success: true, token: createJWT(newTokenPayload) };
+    }
+
+    // --- RBAC 細分化權限映射表 (後端最終防線) ---
+    // 已更新為細分權限 ID (例如 sales -> sales_entry, sales_report)
+    const actionToPermission = {
+        // Sales (銷售管理)
+        'saveSales': 'sales_entry', 
+        'getSalesHistory': 'sales_report',
+        'getReportDataBatch': 'sales_report',
+        'getRecentSalesToday': 'sales_entry', // Today's records for merge printing
+        'getSalesByDateRange': 'sales_entry', // Date range records for merge printing
+        'getTemplatesList': 'sales_entry', // Allow sales entry to list templates
+        'generatePdf': 'sales_entry', // Allow sales entry to generate PDF
+        'getSmartPickSuggestion': 'sales_entry', // [New] AI Replenishment
+        'getAllUniqueCustomers': 'sales_entry', // [New] AI Customer List
+        'initSalesPageData': 'sales_entry', // [New] Combined API for SalesPage
+        
+        // Purchase (進貨管理)
+        'addPurchase': 'purchase_entry', 
+        'getPurchaseSuggestions': 'purchase_entry',
+        'getPurchaseHistory': 'purchase_history',
+        'voidAndFetchPurchase': 'purchase_history',
+        'confirmPurchaseReceipt': 'purchase_entry',
+        
+        // Inventory (庫存管理)
+        'adjustInventory': 'inventory_adjust',
+        'getAdjustmentHistory': 'inventory_history',
+        'getInventory': 'inventory_adjust',
+        'getInventoryWithSafety': 'inventory_adjust',
+        'updateSafetyStock': 'inventory_adjust',
+        'getInventoryValuation': 'inventory_valuation',
+        'getInventoryForStocktake': 'inventory_stocktake',
+        'saveStocktake': 'inventory_stocktake',
+        'getStocktakeHistory': 'inventory_history',
+        'getProducts': null, // 任何登入使用者（含點餐訪客）皆可獲取商品列表
+        'updateProductSortOrder': 'system_config',
+        'updateProductDetails': 'system_config',
+        
+        // Group Buy Orders (團購)
+        'savePendingOrder': null, // 任何登入使用者可下單
+        'getPendingOrders': 'sales_pending',
+        'updatePendingOrder': 'sales_pending',
+        'confirmPendingOrder': 'sales_pending',
+        'deletePendingOrder': 'sales_pending',
+        'getGroupBindings': null,
+        'saveGroupBinding': 'sales_pending',
+        'updateOrderStatus': 'sales_pending',
+        'getBuildingSettings': null,
+        'saveBuildingSettings': 'sales_pending',
+        'getSubscriptions': 'sales_pending',
+        'saveSubscription': 'sales_pending',
+        'deleteSubscription': 'sales_pending',
+        'generateSubscriptionOrders': 'sales_pending',
+        'getLiffInitData': null,
+        'v2_getLiffInitData': null,
+        'v2_createOrder': null,
+        'getLiffAnnouncement': null,
+        'saveLiffAnnouncement': 'system_config',
+        
+        // Finance (財務管理)
+        'getExpenditures': null, // [Modification] Anyone can call, filtering happens in service
+        'saveExpenditure': 'finance_expenditure',
+        'getReceivables': 'finance_receivable',
+        'markAsPaid': 'finance_receivable',
+        'getPayables': 'finance_payable',
+        'markPayableAsPaid': 'finance_payable',
+        'getProfitAnalysis': 'analytics_profit', // 毛利分析歸類於數據分析
+        'getCustomersList': 'analytics_profit',  // 提供給毛利分析的自動完成清單
+        'getSalesRepsList': 'analytics_profit',
+
+        // Payroll (薪資管理) - 新增
+        'getPayrollData': 'finance_payroll',
+        'saveDailyRecord': 'finance_payroll',
+        'savePayrollSettings': 'finance_payroll',
+        'getEmployeeProfile': 'finance_payroll',
+        'saveEmployeeProfile': 'finance_payroll',
+        'getEmpType': null, // 任何登入使用者都可查詢自己的員工類型
+        
+        // Analytics (數據分析)
+        'getSalesRanking': 'analytics_sales',
+        'getCustomerRanking': 'analytics_customer',
+        'getTurnoverRate': 'analytics_turnover',
+        'getCustomerAnalytics': 'analytics_customer_detail',
+        
+        // Sales Adjustment (作廢/修正)
+        'voidAndFetchSale': 'sales_report',
+        
+        // System (系統管理)
+        'getUsers': 'system_config',
+        'addUser': 'system_config',
+        'deleteUser': 'system_config',
+        'updateUserPermissions': 'system_config',
+        'updateUserStatus': 'system_config',
+        'saveLiffAnnouncement': 'sales_pending',
+        
+        // Activity Logging (操作紀錄)
+        'logActivity': null, // 所有人都可以記錄自己的活動
+        'getActivityLogs': 'system_activity_logs', // 需要特殊權限才能查看
+
+        // 米立微會員中心 V1 (開放給前端會員)
+        'v1_getMember': null,
+        'v1_saveMember': null,
+        'v1_getOrders': null,
+        'v1_reorder': null
+    };
+
+    // 進行授權校驗 (Authorization)
+    if (!user || user.role !== 'BOSS') {
+        const requiredPerm = actionToPermission[action];
+        const userPerms = user ? (user.permissions || []) : [];
+        
+        // 檢查是否具有「細分權限」或是「大類別權限」(相容舊格式)
+        // 例如：若使用者擁有舊的 'sales' 權限，則也能通過 check (sales_entry -> sales)
+        const category = requiredPerm ? requiredPerm.split('_')[0] : null;
+        const hasPerm = (requiredPerm && userPerms.includes(requiredPerm)) || 
+                        (category && userPerms.includes(category));
+        
+        // 如果該 Action 需要權限，且使用者既無細分權限也無大類別權限，則攔截
+        if (requiredPerm && !hasPerm) {
+            console.warn(`User ${user.username} 試圖越權執行 ${action} (Need: ${requiredPerm})`);
+            return { error: `Forbidden: 您目前不具備執行 [${requiredPerm}] 模組操作的權限` };
+        }
+    }
+
+    try {
+        // 自動注入 Metadata (保留原有邏輯)
+        if (payload && typeof payload === 'object') {
+            payload.serverTimestamp = new Date();
+            if (!payload.operator) {
+                payload.operator = user ? (user.displayName || user.name || user.username || 'Unknown') : 'System';
+            }
+            payload.userRole = user ? user.role : 'Guest';
+        }
+
+        switch (action) {
+            case 'getMe': return user;
+
+            // 米立微會員中心 V1
+            case 'v1_getMember': return typeof v1_getMemberService !== 'undefined' ? v1_getMemberService(payload) : {error: 'Service missing'};
+            case 'v1_saveMember': return typeof v1_saveMemberService !== 'undefined' ? v1_saveMemberService(payload) : {error: 'Service missing'};
+            case 'v1_getOrders': return typeof v1_getOrdersService !== 'undefined' ? v1_getOrdersService(payload) : {error: 'Service missing'};
+            case 'v1_reorder': return typeof v1_reorderService !== 'undefined' ? v1_reorderService(payload) : {error: 'Service missing'};
+            case 'getLiffAnnouncement': return typeof getLiffAnnouncementService !== 'undefined' ? getLiffAnnouncementService(payload) : { enabled: false, title: '', content: '', themeColor: 'purple' };
+            case 'saveLiffAnnouncement': return typeof saveLiffAnnouncementService !== 'undefined' ? saveLiffAnnouncementService(payload, user) : { error: 'Service missing' };
+            
+            // 銷售頁面整合 API (解決卡頓)
+            case 'initSalesPageData': return typeof initSalesPageDataService !== 'undefined' ? initSalesPageDataService(payload, user) : {error: 'Service missing'};
+            
+            // 庫存與異動
+            case 'adjustInventory': return typeof adjustInventoryService !== 'undefined' ? adjustInventoryService(payload, user) : {error: 'Service missing'};
+            case 'getAdjustmentHistory': return typeof getAdjustmentHistory !== 'undefined' ? getAdjustmentHistory(payload) : {error: 'Service missing'};
+
+            // User Management (權限管理)
+            case 'getUsers': return getUsersService();
+            case 'addUser': return addUserService(payload);
+            case 'deleteUser': return deleteUserService(payload);
+            case 'updateUserPermissions': return updateUserPermissionsService(payload);
+            case 'updateUserStatus': return updateUserStatusService(payload);
+
+            // Inventory & Purchase
+            case 'getProducts': return typeof getProductsService !== 'undefined' ? getProductsService() : {error: '後端服務缺失: getProductsService'}; 
+            case 'updateProductSortOrder':
+                {
+                    const res = typeof updateProductSortOrderService !== 'undefined' ? updateProductSortOrderService(payload) : {error: '後端服務缺失: updateProductSortOrderService'};
+                    if (res && !res.error) {
+                        clearCache('liff_products');
+                    }
+                    return res;
+                }
+            case 'updateProductDetails':
+                {
+                    const res = typeof updateProductDetailsService !== 'undefined' ? updateProductDetailsService(payload, user) : {error: '後端服務缺失: updateProductDetailsService'};
+                    if (res && !res.error) {
+                        clearCache('liff_products');
+                    }
+                    return res;
+                }
+            // Group Buy Orders (團購)
+            case 'v2_getLiffInitData': return typeof v2_getLiffInitDataService !== 'undefined' ? v2_getLiffInitDataService(payload) : {error: '後端服務缺失: v2_getLiffInitDataService'};
+            case 'v2_createOrder': return typeof v2_createOrderService !== 'undefined' ? v2_createOrderService(payload) : {error: '後端服務缺失: v2_createOrderService'};
+            case 'v2_getCommunities': return typeof v2_getCommunitiesService !== 'undefined' ? v2_getCommunitiesService(payload) : {error: '後端服務缺失: v2_getCommunitiesService'};
+            case 'v2_getCampaigns': return typeof v2_getCampaignsService !== 'undefined' ? v2_getCampaignsService(payload) : {error: '後端服務缺失: v2_getCampaignsService'};
+            case 'v2_saveCommunity': return typeof v2_saveCommunityService !== 'undefined' ? v2_saveCommunityService(payload, user) : {error: '後端服務缺失: v2_saveCommunityService'};
+            case 'v2_saveCampaign': return typeof v2_saveCampaignService !== 'undefined' ? v2_saveCampaignService(payload, user) : {error: '後端服務缺失: v2_saveCampaignService'};
+            case 'savePendingOrder': return typeof savePendingOrderService !== 'undefined' ? savePendingOrderService(payload, user) : {error: '後端服務缺失: savePendingOrderService'};
+            case 'getPendingOrders': return typeof getPendingOrdersService !== 'undefined' ? getPendingOrdersService(payload, user) : {error: '後端服務缺失: getPendingOrdersService'};
+            case 'updatePendingOrder': return typeof updatePendingOrderService !== 'undefined' ? updatePendingOrderService(payload, user) : {error: '後端服務缺失: updatePendingOrderService'};
+            case 'confirmPendingOrder': return typeof confirmPendingOrderService !== 'undefined' ? confirmPendingOrderService(payload, user) : {error: '後端服務缺失: confirmPendingOrderService'};
+            case 'deletePendingOrder': return typeof deletePendingOrderService !== 'undefined' ? deletePendingOrderService(payload, user) : {error: '後端服務缺失: deletePendingOrderService'};
+            case 'getGroupBindings': return typeof getGroupBindingsService !== 'undefined' ? getGroupBindingsService(payload, user) : {error: '後端服務缺失: getGroupBindingsService'};
+            case 'saveGroupBinding':
+                {
+                    const res = typeof saveGroupBindingService !== 'undefined' ? saveGroupBindingService(payload, user) : {error: '後端服務缺失: saveGroupBindingService'};
+                    if (res && !res.error) {
+                        clearCache('liff_group_bindings');
+                    }
+                    return res;
+                }
+            case 'updateOrderStatus': return typeof updateOrderStatusService !== 'undefined' ? updateOrderStatusService(payload, user) : {error: '後端服務缺失: updateOrderStatusService'};
+            case 'getSubscriptions': return typeof getSubscriptionsService !== 'undefined' ? getSubscriptionsService(payload, user) : {error: '後端服務缺失: getSubscriptionsService'};
+            case 'saveSubscription': return typeof saveSubscriptionService !== 'undefined' ? saveSubscriptionService(payload, user) : {error: '後端服務缺失: saveSubscriptionService'};
+            case 'deleteSubscription': return typeof deleteSubscriptionService !== 'undefined' ? deleteSubscriptionService(payload, user) : {error: '後端服務缺失: deleteSubscriptionService'};
+            case 'generateSubscriptionOrders': return typeof generateSubscriptionOrdersService !== 'undefined' ? generateSubscriptionOrdersService(payload, user) : {error: '後端服務缺失: generateSubscriptionOrdersService'};
+            case 'getBuildingSettings': return typeof getBuildingSettingsService !== 'undefined' ? getBuildingSettingsService(payload, user) : {error: '後端服務缺失: getBuildingSettingsService'};
+            case 'saveBuildingSettings':
+                {
+                    const res = typeof saveBuildingSettingsService !== 'undefined' ? saveBuildingSettingsService(payload, user) : {error: '後端服務缺失: saveBuildingSettingsService'};
+                    if (res && !res.error) {
+                        clearCache('liff_building_settings');
+                    }
+                    return res;
+                }
+            case 'getLiffAnnouncement': return typeof getLiffAnnouncementService !== 'undefined' ? getLiffAnnouncementService(payload) : { enabled: false };
+            case 'saveLiffAnnouncement': return typeof saveLiffAnnouncementService !== 'undefined' ? saveLiffAnnouncementService(payload, user) : { success: true };
+            case 'getLiffInitData':
+                {
+                    // 1. 商品列表快取
+                    let products = getCachedData('liff_products');
+                    if (!products) {
+                        products = typeof getProductsService !== 'undefined' ? getProductsService() : [];
+                        setCachedData('liff_products', products, 21600); // 6 小時
+                    }
+
+                    // 2. 群組對照快取
+                    let groupBindings = getCachedData('liff_group_bindings');
+                    if (!groupBindings) {
+                        groupBindings = typeof getGroupBindingsService !== 'undefined' ? getGroupBindingsService(payload, user) : {};
+                        setCachedData('liff_group_bindings', groupBindings, 21600); // 6 小時
+                    }
+
+                    // 3. 大樓設定快取
+                    let buildingSettings = getCachedData('liff_building_settings');
+                    if (!buildingSettings) {
+                        buildingSettings = typeof getBuildingSettingsService !== 'undefined' ? getBuildingSettingsService(payload, user) : [];
+                        setCachedData('liff_building_settings', buildingSettings, 21600); // 6 小時
+                    }
+                    
+                    let targetBuilding = '';
+                    if (payload) {
+                        if (payload.building) {
+                            targetBuilding = String(payload.building).trim();
+                        } else if (payload.grp) {
+                            const grpStr = String(payload.grp).trim();
+                            if (groupBindings && groupBindings[grpStr]) {
+                                targetBuilding = groupBindings[grpStr];
+                            }
+                        }
+                    }
+                    
+                    if (targetBuilding) {
+                        // 1. 大樓設定只回傳該大樓的設定（以及一般散客設定作為備用）
+                        if (Array.isArray(buildingSettings)) {
+                            buildingSettings = buildingSettings.filter(function(s) {
+                                return s.building === targetBuilding || s.building === '一般散客';
+                            });
+                        }
+                        // 2. 群組對照表也可以只回傳跟該大樓相關的
+                        if (groupBindings && typeof groupBindings === 'object') {
+                            const filteredBindings = {};
+                            for (let k in groupBindings) {
+                                if (groupBindings[k] === targetBuilding) {
+                                    filteredBindings[k] = targetBuilding;
+                                }
+                            }
+                            groupBindings = filteredBindings;
+                        }
+                    }
+                    
+                    return {
+                        products: products,
+                        groupBindings: groupBindings,
+                        buildingSettings: buildingSettings
+                    };
+                }
+            case 'getInventory': return typeof getInventoryService !== 'undefined' ? getInventoryService() : {error: '後端服務缺失: getInventoryService'}; 
+            case 'getPurchaseSuggestions': return typeof getPurchaseSuggestionsService !== 'undefined' ? getPurchaseSuggestionsService() : {error: '後端服務缺失: getPurchaseSuggestionsService'}; 
+            case 'addPurchase': return typeof addPurchaseService !== 'undefined' ? addPurchaseService(payload, user) : {error: '後端服務缺失: addPurchaseService (進貨功能)'}; 
+            case 'getPurchaseHistory': return typeof getPurchaseHistory !== 'undefined' ? getPurchaseHistory(payload) : {error: '後端服務缺失: getPurchaseHistory'};
+            case 'voidAndFetchPurchase': return typeof voidAndFetchPurchaseService !== 'undefined' ? voidAndFetchPurchaseService(payload, user) : {error: '後端服務缺失: voidAndFetchPurchaseService'};
+            case 'confirmPurchaseReceipt': return typeof confirmPurchaseReceipt !== 'undefined' ? confirmPurchaseReceipt(payload, user) : {error: '後端服務缺失: confirmPurchaseReceipt'};
+            case 'saveVendorDefault': return typeof saveVendorDefaultService !== 'undefined' ? saveVendorDefaultService(payload) : {error: '後端服務缺失: saveVendorDefaultService'};
+
+            // 估值與盤點
+            case 'getInventoryWithSafety': return typeof getInventoryWithSafety !== 'undefined' ? getInventoryWithSafety() : {error: 'Service missing'};
+            case 'updateSafetyStock': return typeof updateSafetyStock !== 'undefined' ? updateSafetyStock(payload) : {error: 'Service missing'};
+            case 'getInventoryValuation': return typeof getInventoryValuation !== 'undefined' ? getInventoryValuation() : {error: 'Service missing'};
+            case 'getInventoryForStocktake': return typeof getInventoryForStocktake !== 'undefined' ? getInventoryForStocktake() : {error: 'Service missing'};
+            case 'saveStocktake': return typeof saveStocktake !== 'undefined' ? saveStocktake(payload) : {error: 'Service missing'};
+            case 'getStocktakeHistory': return typeof getStocktakeHistory !== 'undefined' ? getStocktakeHistory(payload) : {error: 'Service missing'};
+
+            // Sales & Analytics
+            case 'saveSales': return typeof saveSalesService !== 'undefined' ? saveSalesService(payload, user) : {error: 'Service missing'}; 
+            case 'getSalesHistory': return typeof getSalesHistory !== 'undefined' ? getSalesHistory(payload) : {error: 'Service missing'}; 
+            case 'getReportDataBatch':
+                {
+                    const safeCall = (fn, arg1, arg2) => {
+                        try {
+                            return fn(arg1, arg2);
+                        } catch (e) {
+                            console.warn('Batch API safeCall error:', e);
+                            return [];
+                        }
+                    };
+
+                    const salesRes = typeof getSalesHistory !== 'undefined' ? safeCall(getSalesHistory, payload) : { data: [] };
+                    const expendituresRes = safeCall(getExpendituresService, payload, user);
+                    const purchaseRes = payload.fetchPivotData && typeof getPurchaseHistory !== 'undefined' ? safeCall(getPurchaseHistory, payload) : [];
+                    const inventoryRes = payload.fetchPivotData && typeof getInventoryService !== 'undefined' ? safeCall(getInventoryService) : null;
+                    const adjustmentRes = payload.fetchPivotData && typeof getAdjustmentHistory !== 'undefined' ? safeCall(getAdjustmentHistory, payload) : [];
+                    
+                    return {
+                        sales: salesRes,
+                        expenditures: expendituresRes,
+                        purchases: purchaseRes,
+                        inventory: inventoryRes,
+                        adjustments: adjustmentRes
+                    };
+                }
+            case 'getRecentSalesToday': return typeof getRecentSalesToday !== 'undefined' ? getRecentSalesToday(payload) : {error: 'Service missing'};
+            case 'getSalesByDateRange': return typeof getSalesByDateRange !== 'undefined' ? getSalesByDateRange(payload) : {error: 'Service missing'};
+            case 'getSaleToClone': return typeof getSaleToCloneService !== 'undefined' ? getSaleToCloneService(payload) : {error: 'Service missing'};
+            case 'getSmartPickSuggestion': return typeof getSmartPickSuggestionService !== 'undefined' ? getSmartPickSuggestionService(payload.customer, payload.dayOfWeek, payload.weather, payload.currentOriginals) : {error: 'Service missing'};
+            case 'getAllUniqueCustomers': return typeof getAllUniqueCustomersService !== 'undefined' ? getAllUniqueCustomersService() : {error: 'Service missing'};
+            case 'voidAndFetchSale': return typeof voidAndFetchSaleService !== 'undefined' ? voidAndFetchSaleService(payload, user) : {error: 'Service missing'};
+            case 'getTemplatesList': return typeof getTemplatesListService !== 'undefined' ? getTemplatesListService() : {error: 'Service missing'};
+            case 'generatePdf': return typeof generatePdfService !== 'undefined' ? generatePdfService(payload) : {error: 'Service missing'}; 
+            case 'getSalesRanking': return typeof getSalesRanking !== 'undefined' ? getSalesRanking(payload) : {error: 'Service missing'};
+            case 'getCustomerRanking': return typeof getCustomerRanking !== 'undefined' ? getCustomerRanking(payload) : {error: 'Service missing'};
+            case 'getCustomerAnalytics': return typeof getCustomerAnalyticsService !== 'undefined' ? getCustomerAnalyticsService(payload) : {error: 'Service missing'};
+            case 'getProfitAnalysis': return typeof getProfitAnalysis !== 'undefined' ? getProfitAnalysis(payload) : {error: 'Service missing'};
+            case 'getTurnoverRate': return typeof getTurnoverRate !== 'undefined' ? getTurnoverRate(payload) : {error: 'Service missing'};
+            case 'getCustomersList': return typeof getCustomersList !== 'undefined' ? getCustomersList(payload) : {error: 'Service missing'};
+            case 'getSalesRepsList': return typeof getSalesRepsList !== 'undefined' ? getSalesRepsList(payload) : {error: 'Service missing'};
+            
+            // Payroll
+            case 'getPayrollData': return getPayrollDataService(payload, user);
+            case 'saveDailyRecord': return saveDailyRecordService(payload, user);
+            case 'savePayrollSettings': return savePayrollSettingsService(payload, user);
+            case 'getEmployeeProfile': return getEmployeeProfileService(payload, user);
+            case 'saveEmployeeProfile': return saveEmployeeProfileService(payload, user);
+            case 'savePayrollToExpenditure': return savePayrollToExpenditureService(payload, user);
+            case 'getEmpType': return getEmpTypeService(payload, user);
+
+            // 支出管理
+            case 'getExpenditures': return getExpendituresService(payload, user);
+            case 'saveExpenditure': return saveExpenditureService(payload);
+
+            // 帳款管理 (Assuming these are in other files or need to be defined if missing)
+            case 'getReceivables': return typeof getReceivablesService !== 'undefined' ? getReceivablesService(payload) : {error: 'Service missing'};
+            case 'markAsPaid': return typeof markAsPaidService !== 'undefined' ? markAsPaidService(payload) : {error: 'Service missing'};
+            case 'getPayables': return typeof getPayablesService !== 'undefined' ? getPayablesService(payload) : {error: 'Service missing'};
+            case 'markPayableAsPaid': return typeof markPayableAsPaidService !== 'undefined' ? markPayableAsPaidService(payload) : {error: 'Service missing'};
+
+            // Activity Logging (操作紀錄)
+            case 'logActivity': return typeof logActivityService !== 'undefined' ? logActivityService(payload) : {error: 'Service missing'};
+            case 'getActivityLogs': return typeof getActivityLogsService !== 'undefined' ? getActivityLogsService(payload, user.role, user.username) : {error: 'Service missing'};
+
+            default: 
+                // [Hex Debug] 若發生未知動作，記錄其 Hex 編碼以檢查有無不可見字元
+                var actionHex = "";
+                if (action) {
+                    for (var i = 0; i < action.length; i++) {
+                        actionHex += action.charCodeAt(i).toString(16) + " ";
+                    }
+                }
+                console.error("Unknown action hex: " + actionHex.trim());
+                throw new Error('Unknown action: [' + action + '] (length: ' + (action ? action.length : 0) + ')');
+        }
+    } catch (error) {
+        return { error: error.message };
+    }
+}
+
+/**
+ * Handle POST requests
+ */
+function doPost(e) {
+    try {
+        const request = JSON.parse(e.postData.contents);
+        
+        // ----------------------------------------
+        // 判斷是否為 LINE Webhook 請求
+        // ----------------------------------------
+        if (request.events && Array.isArray(request.events)) {
+            return handleLineWebhook_(request.events);
+        }
+        
+        // ----------------------------------------
+        // 原有 React 前端 API 路由
+        // ----------------------------------------
+        const result = apiHandler(request);
+        return ContentService.createTextOutput(JSON.stringify(result))
+            .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+        return ContentService.createTextOutput(JSON.stringify({ error: err.toString() }))
+            .setMimeType(ContentService.MimeType.JSON);
+    }
+}
+
+/**
+ * [API] 使用者登入 (已修正讀取方式)
+ */
+function login(payload) {
+    if (!payload.username || !payload.password) return { error: "請輸入帳號和密碼" };
+
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+    if (!sheet) return { error: "使用者資料庫不存在" };
+
+    var data = sheet.getDataRange().getDisplayValues();
+    
+    for (var i = 1; i < data.length; i++) {
+        var rowUser = data[i][1]; 
+        var rowPass = data[i][2]; 
+        var rowRole = data[i][3]; 
+        var rowStatus = data[i][4]; 
+        var rowPerms = data[i][6]; 
+
+        if (String(rowUser).trim() === String(payload.username).trim()) {
+            if (rowStatus !== 'ACTIVE') return { error: "此帳號已被停用" };
+
+            var isValidPass = false;
+            // 優先檢查純文字密碼
+            if (payload.password === rowPass) {
+                isValidPass = true;
+            } else {
+                // 檢查 Hash
+                var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, payload.password);
+                var computedHash = Utilities.base64Encode(digest);
+                if (computedHash === rowPass) isValidPass = true;
+            }
+
+            if (isValidPass) {
+                var permissions = [];
+                try {
+                    if (rowPerms && String(rowPerms).trim() !== "") {
+                        var permStr = String(rowPerms).trim();
+                        permStr = permStr.replace(/[“”]/g, '"').replace(/[’‘]/g, "'");
+                        if (permStr.startsWith('[') && permStr.endsWith(']')) {
+                            permissions = JSON.parse(permStr);
+                        } else {
+                            permissions = [permStr];
+                        }
+                    }
+                } catch(e) { permissions = []; }
+                
+                if (!Array.isArray(permissions)) permissions = [];
+
+                var tokenPayload = {
+                    username: rowUser,
+                    role: rowRole,
+                    timestamp: new Date().getTime(),
+                    permissions: permissions 
+                };
+                
+                var token = createJWT(tokenPayload);
+                
+                return { 
+                    success: true, 
+                    token: token,
+                    username: rowUser, 
+                    role: rowRole,
+                    permissions: permissions 
+                };
+            } else {
+                return { error: "密碼錯誤" };
+            }
+        }
+    }
+    return { error: "找不到此帳號" };
+}
+
+/**
+ * [Service] 獲取使用者列表 (已修正讀取方式)
+ */
+function getUsersService(passedSs) {
+    const cache = CacheService.getScriptCache();
+    const CACHE_KEY = 'USERS_CACHE_LIST';
+    const cachedStr = cache.get(CACHE_KEY);
+    if (cachedStr) {
+        try {
+            return { list: JSON.parse(cachedStr), cached: true };
+        } catch (e) {}
+    }
+
+    var ss = passedSs || SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Users");
+    if (!sheet) return { list: [], cached: false };
+  
+    var data = sheet.getDataRange().getDisplayValues();
+    var users = [];
+    
+    for (var i = 1; i < data.length; i++) {
+        if(!data[i][1]) continue; 
+        
+        var perms = [];
+        try {
+            var rowPerms = data[i][6]; 
+            if (rowPerms) {
+                var permStr = String(rowPerms).trim();
+                permStr = permStr.replace(/[“”]/g, '"').replace(/[’‘]/g, "'");
+                if (permStr.startsWith('[')) {
+                    perms = JSON.parse(permStr);
+                } else if (permStr) {
+                    perms = [permStr];
+                }
+            }
+        } catch(e) { perms = []; }
+        
+        if (!Array.isArray(perms)) perms = [];
+
+        users.push({
+            userid: data[i][0],
+            username: data[i][1],
+            role: data[i][3],
+            status: data[i][4],
+            permissions: perms
+        });
+    }
+
+    try {
+        cache.put(CACHE_KEY, JSON.stringify(users), 300);
+    } catch (e) {}
+
+    return { list: users, cached: false };
+}
+
+/**
+ * [Service] 更新使用者權限
+ */
+function updateUserPermissionsService(payload) {
+    if (!payload.username) return { error: "Missing username" };
+
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+    if (!sheet) return { error: "No Users sheet" };
+    
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+        if (data[i][1] == payload.username) {
+            var permString = JSON.stringify(payload.permissions || []);
+            sheet.getRange(i + 1, 7).setValue(permString); 
+            return { success: true };
+        }
+    }
+    return { error: "User not found" };
+}
+
+/**
+ * [Service] 新增使用者
+ */
+function addUserService(payload) {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+    if (!sheet) {
+        sheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet("Users");
+        sheet.appendRow(["UserID", "Username", "PasswordHash", "Role", "Status", "CreatedAt", "Permissions"]);
+    }
+    
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+        if (data[i][1] == payload.username) {
+            return { error: "此帳號(姓名)已存在" };
+        }
+    }
+    
+    var newID = Utilities.getUuid(); 
+    var timestamp = Utilities.formatDate(new Date(), "Asia/Taipei", "yyyy/MM/dd HH:mm:ss");
+
+    var passwordHash = payload.password;
+    if (payload.password) {
+        var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, payload.password);
+        passwordHash = Utilities.base64Encode(digest);
+    }
+
+    sheet.appendRow([
+        newID,
+        payload.username,
+        passwordHash, 
+        payload.role || "EMPLOYEE",
+        "ACTIVE",
+        timestamp,
+        "[]"
+    ]);
+    
+    return { success: true };
+}
+
+/**
+ * [Service] 刪除使用者
+ */
+function deleteUserService(payload) {
+    var targetUser = payload.username;
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+    if (!sheet) return { error: "找不到 Users 資料表" };
+    
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+        if (data[i][1] == targetUser) {
+            sheet.deleteRow(i + 1);
+            return { success: true };
+        }
+    }
+    return { error: "找不到該使用者" };
+}
+
+/**
+ * [Service] 更新使用者狀態 (鎖定/啟用)
+ */
+function updateUserStatusService(payload) {
+    if (!payload.username || !payload.status) return { error: "Missing parameters" };
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+    if (!sheet) return { error: "No Users sheet" };
+    
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+        if (data[i][1] == payload.username) {
+            sheet.getRange(i + 1, 5).setValue(payload.status); // Column E
+            return { success: true };
+        }
+    }
+    return { error: "User not found" };
+}
+
+/**
+ * [Helper] 獲取伺服器隨機 JWT 密鑰
+ */
+function getJwtSecret() {
+    var props = PropertiesService.getScriptProperties();
+    var secret = props.getProperty('JWT_SECRET');
+    if (!secret) {
+        secret = Utilities.getUuid();
+        props.setProperty('JWT_SECRET', secret);
+    }
+    return secret;
+}
+
+/**
+ * [Helper] 建立具有防偽簽章的 JWT Token
+ */
+function createJWT(payload) {
+    var header = { alg: "HS256", typ: "JWT" };
+    var encHeader = Utilities.base64EncodeWebSafe(JSON.stringify(header)).replace(/=+$/, '');
+    
+    // 設定 30 分鐘有效期限
+    if (!payload.exp) {
+        payload.exp = new Date().getTime() + (12 * 60 * 60 * 1000); // 12 小時
+    }
+    var encPayload = Utilities.base64EncodeWebSafe(Utilities.newBlob(JSON.stringify(payload), "UTF-8").getBytes()).replace(/=+$/, '');
+    
+    var signatureInput = encHeader + "." + encPayload;
+    var signature = Utilities.computeHmacSha256Signature(signatureInput, getJwtSecret());
+    var encSignature = Utilities.base64EncodeWebSafe(signature).replace(/=+$/, '');
+    
+    return signatureInput + "." + encSignature;
+}
+
+/**
+ * [Helper] 驗證 Token (包含過期檢查與 HMAC 簽章檢查)
+ */
+function verifyToken(token) {
+    try {
+        var parts = token.split('.');
+        
+        // 舊版 Token 相容性或非 JWT 格式拒絕
+        if (parts.length !== 3) return null; 
+        
+        var signatureInput = parts[0] + "." + parts[1];
+        var signature = Utilities.computeHmacSha256Signature(signatureInput, getJwtSecret());
+        var expectedSignature = Utilities.base64EncodeWebSafe(signature).replace(/=+$/, '');
+        
+        if (expectedSignature !== parts[2]) {
+            return null; // 簽章不符，表示被竄改或偽造
+        }
+        
+        var json = Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[1])).getDataAsString("UTF-8");
+        var user = JSON.parse(json);
+        
+        if (!user.permissions) user.permissions = [];
+        
+        // 嚴格檢查是否過期
+        if (user.exp && new Date().getTime() > user.exp) {
+            return { __expired: true }; 
+        }
+        
+        return user;
+    } catch (e) {
+        return null;
+    }
+}
+// ----------------------------------------
+// 支出管理
+// ----------------------------------------
+function getExpendituresService(payload, user) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Expenditures');
+    if (!sheet) return { error: '找不到名為 Expenditures 的分頁' };
+
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) return [];
+
+    const headers = data[0];
+    const rows = data.slice(1);
+
+    const mapping = {
+        "攤位": "stall",
+        "清潔": "cleaning",
+        "電費": "electricity",
+        "加油": "gas",
+        "停車": "parking",
+        "貨款": "goods",
+        "塑膠袋": "bags",
+        "其他": "others",
+        "Line Pay (收款)": "linePay",
+        "Line Pay": "linePay",
+        "服務費 (扣除)": "serviceFee",
+        "服務費": "serviceFee",
+        "本筆總支出金額": "finalTotal",
+        "結算總額": "finalTotal",
+        "時間": "date",
+        "日期": "date",
+        "時間戳記": "date",
+        "對象": "customer",
+        "業務": "salesRep",
+        "備註": "note",
+        "車輛保養": "vehicleMaintenance",
+        "薪資發放": "salary",
+        "公積金": "reserve",
+        "支付方式": "paymentMethod",
+        "付款日期": "paymentDate",
+        "serverTimestamp": "serverTimestamp"
+    };
+
+    const start = payload.startDate ? new Date(payload.startDate + 'T00:00:00') : null;
+    const end = payload.endDate ? new Date(payload.endDate + 'T23:59:59') : null;
+
+    // 建立使用者名稱映射 (用於業務員、執行人顯示中文)
+    const userMap = {};
+    const uSheet = ss.getSheetByName('Users');
+    if (uSheet) {
+        const uData = uSheet.getDataRange().getValues();
+        for (let i = 1; i < uData.length; i++) {
+            if (uData[i][0]) userMap[uData[i][0]] = uData[i][1]; // ID -> Name
+        }
+    }
+    
+    // [Fix] Get current user's display identity for filtering
+    const currentUserDisplay = user.displayName || user.name || user.username || 'Unknown';
+    const hasFinancePerm = user.role === 'BOSS' || 
+                         (user.permissions && user.permissions.some(p => p === 'finance' || p.startsWith('finance_')));
+
+    // [Optimization] 預先計算欄位索引，避免在 map 迴圈內重複尋找 (O(M) instead of O(N*M))
+    const colMap = {};
+    headers.forEach((h, i) => {
+        const cleanHeader = String(h || '').trim();
+        const key = mapping[cleanHeader] || cleanHeader;
+        colMap[key] = i;
+    });
+
+    const allItems = rows.map(row => {
+        let obj = {
+            saleId: row[0] || '',
+            stall: row[colMap['stall']] || 0,
+            cleaning: row[colMap['cleaning']] || 0,
+            electricity: row[colMap['electricity']] || 0,
+            gas: row[colMap['gas']] || 0,
+            parking: row[colMap['parking']] || 0,
+            goods: row[colMap['goods']] || 0,
+            bags: row[colMap['bags']] || 0,
+            others: row[colMap['others']] || 0,
+            linePay: row[colMap['linePay']] || 0,
+            serviceFee: row[colMap['serviceFee']] || 0,
+            finalTotal: row[11],
+            customer: row[12],
+            salesRep: row[13],
+            date: row[14],
+            vehicleMaintenance: row[colMap['vehicleMaintenance']] || 0,
+            salary: row[colMap['salary']] || 0,
+            reserve: row[colMap['reserve']] || 0,
+            paymentMethod: row[19] || 'CASH',
+            operator: row[20] || '-',
+            paymentDate: row[21] || '',
+            note: row[colMap['note']] || '',
+            serverTimestamp: row[colMap['serverTimestamp']] || ''
+        };
+        
+        // 轉換業務員名稱
+        if (userMap[obj.salesRep]) obj.salesRep = userMap[obj.salesRep];
+        if (userMap[obj.operator]) obj.operator = userMap[obj.operator];
+        
+        return obj;
+    });
+
+    // [Optimization] 把「讀取客戶分類表」的超耗時動作拉到迴圈外面，只跑一次！
+    const category = payload.category;
+    const categoryMap = (category && category !== '全部' && typeof getCustomerCategoryMap_ !== 'undefined') 
+        ? getCustomerCategoryMap_() 
+        : null;
+
+    // Primary list: 記帳日期在範圍內
+    const primaryItems = allItems.filter(item => {
+        if (item.note && String(item.note).includes('[VOID]')) return false;
+        const itemDate = new Date(item.date || item.serverTimestamp);
+        if (isNaN(itemDate.getTime())) return true;
+        if (start && itemDate < start) return false;
+        if (end && itemDate > end) return false;
+        if (!hasFinancePerm) {
+            const itemRep = String(item.salesRep || '').trim();
+            if (itemRep !== currentUserDisplay.trim()) return false;
+        }
+        
+        // [Optimization] 使用預先抓好的分類表進行 $O(1)$ 查詢
+        if (category && category !== '全部' && categoryMap) {
+            const itemCust = String(item.customer || '').trim();
+            const cat = categoryMap[itemCust] || '市場';
+            if (cat !== category) return false;
+        }
+        return true;
+    }).map(item => {
+        // 對於具有 paymentDate 的 CASH 薪資記錄：標記 excludeFromCashFlow
+        if (item.salary > 0 && item.paymentMethod !== 'TRANSFER' && item.paymentDate) {
+            const pd = new Date(item.paymentDate);
+            if ((start && pd < start) || (end && pd > end)) {
+                return { ...item, excludeFromCashFlow: true };
+            }
+        }
+        return item;
+    });
+
+    // Secondary list: CASH 薪資依「付款日期」變進範圍 (cashFlowOnly)
+    // 用於补足「記帳日期在別月、但現金在本期付出」的記錄
+    const cashFlowItems = allItems.filter(item => {
+        if (!item.paymentDate) return false;
+        if (!item.salary || Number(item.salary) <= 0) return false;
+        if (item.note && String(item.note).includes('[VOID]')) return false;
+
+        // 付款日期在範圍內
+        const pd = new Date(item.paymentDate);
+        if (isNaN(pd.getTime())) return false;
+        if (start && pd < start) return false;
+        if (end && pd > end) return false;
+
+        // 但記帳日期不在範圍內 (否則該筆已在 primaryItems 中)
+        const itemDate = new Date(item.date || item.serverTimestamp);
+        if (!isNaN(itemDate.getTime())) {
+            if ((!start || itemDate >= start) && (!end || itemDate <= end)) return false;
+        }
+
+        // [Fix] 權限與類別過濾 (同步 primaryItems 的邏輯)
+        if (!hasFinancePerm) {
+            const itemRep = String(item.salesRep || '').trim();
+            if (itemRep !== currentUserDisplay.trim()) return false;
+        }
+        
+        if (category && category !== '全部' && categoryMap) {
+            const itemCust = String(item.customer || '').trim();
+            const cat = categoryMap[itemCust] || '市場';
+            if (cat !== category) return false;
+        }
+
+        return true;
+    }).map(item => ({ ...item, cashFlowOnly: true }));
+
+    return [...primaryItems, ...cashFlowItems].reverse();
+}
+
+function saveExpenditureService(payload) {
+    try {
+        const ss = SpreadsheetApp.getActiveSpreadsheet();
+        let sheet = ss.getSheetByName('Expenditures');
+        
+        if (!sheet) {
+            sheet = ss.insertSheet('Expenditures');
+            sheet.appendRow([
+                '(空白)', '攤位', '清潔', '電費', '加油', '停車',
+                '貨款', '塑膠袋', '其他', 'Line Pay', '服務費',
+                '結算總額', '對象', '業務', '時間戳記', '車輛保養',
+                '薪資發放', '公積金', '備註', '支付方式', '執行人', '付款日期'
+            ]);
+        }
+        
+        const timestamp = payload.serverTimestamp || new Date();
+        let dateRecord = payload.customDate || timestamp; // Use custom date if provided (for last month archive)
+
+        const row = [
+            '',                                 // A (0) - 空白
+            Number(payload.stall) || 0,         // B (1) - 攤位
+            Number(payload.cleaning) || 0,      // C (2) - 清潔
+            Number(payload.electricity) || 0,   // D (3) - 電費
+            Number(payload.gas) || 0,           // E (4) - 加油
+            Number(payload.parking) || 0,       // F (5) - 停車
+            Number(payload.goods) || 0,         // G (6) - 貨款
+            Number(payload.bags) || 0,          // H (7) - 塑膠袋
+            Number(payload.others) || 0,        // I (8) - 其他
+            Number(payload.linePay) || 0,       // J (9) - Line Pay
+            Number(payload.serviceFee) || 0,    // K (10) - 服務費
+            0,                                  // L (11) - 結算總額 (固定為 0)
+            payload.customer || '',             // M (12) - 對象
+            payload.salesRep || payload.operator || '', // N (13) - 業務
+            dateRecord,                         // O (14) - 時間戳記 (支援自訂日期)
+            Number(payload.vehicleMaintenance) || 0, // P (15) - 車輛保養
+            payload.salary || 0,                // Q (16) - 薪資發放
+            payload.reserve || 0,               // R (17) - 公積金
+            payload.note || '',                 // S (18) - 備註
+            payload.paymentMethod || 'CASH',    // T (19) - 支付方式
+            payload.operator || '',             // U (20) - 執行人
+            payload.paymentDate || ''           // V (21) - 付款日期
+        ];
+        
+        sheet.appendRow(row);
+        return { success: true, timestamp: timestamp };
+    } catch (error) {
+        throw new Error('保存支出資料失敗: ' + error.message);
+    }
+}
+/**
+ * 通用批次寫入工具 (含鎖定，對外使用)
+ */
+function batchAppend_(sheet, rowsData) {
+  if (!rowsData || rowsData.length === 0) return;
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+    batchAppendNoLock_(sheet, rowsData);
+    SpreadsheetApp.flush();
+  } catch (e) {
+    throw new Error('伺服器忙碌中 (Lock)，請稍後再試：' + e.message);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * 內部批次寫入 (不單獨領鎖，適用於已有全局鎖的場景)
+ */
+function batchAppendNoLock_(sheet, rowsData) {
+  if (!rowsData || rowsData.length === 0) return;
+  const lastRow = sheet.getLastRow();
+  const range = sheet.getRange(lastRow + 1, 1, rowsData.length, rowsData[0].length);
+  range.setValues(rowsData);
+}
+
+// 解析日期字串 (YYYY-MM-DD) 為本地時間物件，避免 UTC 偏移
+function parseLocalYMD_(dateStr) {
+  if (!dateStr) return new Date();
+  const parts = dateStr.split('-');
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+  return new Date(y, m, d);
+}
+
+// ── 溫存觸發器 (Warmup / Keep-Warm) ──────────────────────────────
+/**
+ * 溫存函數，定時在背景讀取試算表並重新整理快取，徹底消除冷啟動與試算表讀取延遲
+ */
+function warmup() {
+  console.log('Keep-warm ping: ' + new Date().toISOString());
+  try {
+    // 1. 預熱商品快取
+    if (typeof getProductsService !== 'undefined') {
+      const products = getProductsService();
+      if (products && products.length > 0) {
+        setCachedData('liff_products', products, 21600); // 6 小時
+      }
+    }
+    
+    // 2. 預熱群組對照快取
+    if (typeof getGroupBindingsService !== 'undefined') {
+      const groupBindings = getGroupBindingsService();
+      if (groupBindings) {
+        setCachedData('liff_group_bindings', groupBindings, 21600); // 6 小時
+      }
+    }
+    
+    // 3. 預熱大樓設定快取
+    if (typeof getBuildingSettingsService !== 'undefined') {
+      const buildingSettings = getBuildingSettingsService();
+      if (buildingSettings && buildingSettings.length > 0) {
+        setCachedData('liff_building_settings', buildingSettings, 21600); // 6 小時
+      }
+    }
+    console.log('✅ Background cache pre-warmed successfully.');
+  } catch (e) {
+    console.error('Failed to pre-warm cache in warmup:', e);
+  }
+}
+
+/**
+ * 註冊定時溫存觸發器（每 10 分鐘執行一次）
+ * 請在 Google Apps Script 編輯器中手動執行此函數一次
+ */
+function registerWarmupTrigger() {
+  const triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'warmup') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  ScriptApp.newTrigger('warmup')
+    .timeBased()
+    .everyMinutes(10)
+    .create();
+  console.log('✅ 溫存觸發器註冊成功！每 10 分鐘會執行一次 warmup() 以防容器冷啟動。');
+}
