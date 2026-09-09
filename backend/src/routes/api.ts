@@ -113,10 +113,30 @@ export async function apiRoutes(app: FastifyInstance) {
       // 2. Perform RBAC validation (SUPER_ADMIN, BOSS, and ADMIN bypass all checks)
       if (user.role !== 'SUPER_ADMIN' && user.role !== 'BOSS' && user.role !== 'ADMIN') {
         const requiredPerm = actionPermissions[trimmedAction];
+        const actionPermissionAliases: Record<string, string[]> = {
+          saveStoreSetting: ['system_config', 'store_settings'],
+          saveLiffAnnouncement: ['sales_pending', 'groupbuy_announcement', 'system_config'],
+          admin_getMembers: ['sales_pending', 'groupbuy_member'],
+          admin_adjustWallet: ['sales_pending', 'groupbuy_member'],
+          admin_adjustMemberSpend: ['sales_pending', 'groupbuy_member'],
+          getCommunities: ['sales_pending', 'groupbuy_settings'],
+          saveCommunityArea: ['sales_pending', 'groupbuy_settings'],
+          deleteCommunityArea: ['sales_pending', 'groupbuy_settings'],
+          getCommunityCustomPrices: ['sales_pending', 'groupbuy_settings'],
+          saveCommunityCustomPrice: ['sales_pending', 'groupbuy_settings'],
+          deleteCommunityCustomPrice: ['sales_pending', 'groupbuy_settings'],
+          saveBuildingSettings: ['sales_pending', 'groupbuy_settings'],
+          deleteBuildingSettings: ['sales_pending', 'groupbuy_settings'],
+          renameBuildingSettings: ['sales_pending', 'groupbuy_settings'],
+          reorderBuildings: ['sales_pending', 'groupbuy_settings'],
+          saveGroupBinding: ['sales_pending', 'groupbuy_settings'],
+          createRetailSale: ['sales_entry', 'sales_pos'],
+        };
+
         if (requiredPerm) {
-          const userPerms = user.permissions || [];
-          const category = requiredPerm.split('_')[0];
-          const hasPerm = userPerms.includes(requiredPerm) || userPerms.includes(category);
+          const userPerms: string[] = user.permissions || [];
+          const allowedPerms = actionPermissionAliases[trimmedAction] || [requiredPerm];
+          const hasPerm = allowedPerms.some(p => userPerms.includes(p) || userPerms.includes(p.split('_')[0]));
 
           if (!hasPerm) {
             return reply.status(403).send({

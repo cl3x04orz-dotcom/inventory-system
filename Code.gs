@@ -224,17 +224,37 @@ function apiHandler(request) {
     if (!user || user.role !== 'BOSS') {
         const requiredPerm = actionToPermission[action];
         const userPerms = user ? (user.permissions || []) : [];
+        const actionPermissionAliases = {
+            'saveStoreSetting': ['system_config', 'store_settings'],
+            'saveLiffAnnouncement': ['sales_pending', 'groupbuy_announcement', 'system_config'],
+            'admin_getMembers': ['sales_pending', 'groupbuy_member'],
+            'admin_adjustWallet': ['sales_pending', 'groupbuy_member'],
+            'admin_adjustMemberSpend': ['sales_pending', 'groupbuy_member'],
+            'getCommunities': ['sales_pending', 'groupbuy_settings'],
+            'saveCommunityArea': ['sales_pending', 'groupbuy_settings'],
+            'deleteCommunityArea': ['sales_pending', 'groupbuy_settings'],
+            'getCommunityCustomPrices': ['sales_pending', 'groupbuy_settings'],
+            'saveCommunityCustomPrice': ['sales_pending', 'groupbuy_settings'],
+            'deleteCommunityCustomPrice': ['sales_pending', 'groupbuy_settings'],
+            'saveBuildingSettings': ['sales_pending', 'groupbuy_settings'],
+            'deleteBuildingSettings': ['sales_pending', 'groupbuy_settings'],
+            'renameBuildingSettings': ['sales_pending', 'groupbuy_settings'],
+            'reorderBuildings': ['sales_pending', 'groupbuy_settings'],
+            'saveGroupBinding': ['sales_pending', 'groupbuy_settings'],
+            'createRetailSale': ['sales_entry', 'sales_pos']
+        };
         
-        // 檢查是否具有「細分權限」或是「大類別權限」(相容舊格式)
-        // 例如：若使用者擁有舊的 'sales' 權限，則也能通過 check (sales_entry -> sales)
-        const category = requiredPerm ? requiredPerm.split('_')[0] : null;
-        const hasPerm = (requiredPerm && userPerms.includes(requiredPerm)) || 
-                        (category && userPerms.includes(category));
-        
-        // 如果該 Action 需要權限，且使用者既無細分權限也無大類別權限，則攔截
-        if (requiredPerm && !hasPerm) {
-            console.warn(`User ${user.username} 試圖越權執行 ${action} (Need: ${requiredPerm})`);
-            return { error: `Forbidden: 您目前不具備執行 [${requiredPerm}] 模組操作的權限` };
+        if (requiredPerm) {
+            const allowedPerms = actionPermissionAliases[action] || [requiredPerm];
+            const hasPerm = allowedPerms.some(function(p) {
+                var cat = p.split('_')[0];
+                return userPerms.indexOf(p) !== -1 || userPerms.indexOf(cat) !== -1;
+            });
+            
+            if (!hasPerm) {
+                console.warn(`User ${user.username} 試圖越權執行 ${action} (Need: ${requiredPerm})`);
+                return { error: `Forbidden: 您目前不具備執行 [${requiredPerm}] 模組操作的權限` };
+            }
         }
     }
 

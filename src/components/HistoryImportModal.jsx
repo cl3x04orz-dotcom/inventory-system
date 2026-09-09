@@ -1,5 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ListOrdered, Download, Clock, CreditCard, Package, X, RotateCcw, CheckCircle2, Calendar } from 'lucide-react';
+import { safeLocalStorage } from '../utils/storage';
+
+const RETAIL_NAMES = ['門市散客', '散客', '零售散客', '一般散客', 'POS散客', '一般顧客', 'null', 'undefined', ''];
 
 export default function HistoryImportModal({
     show,
@@ -13,11 +16,12 @@ export default function HistoryImportModal({
     onDateChange,
     onSearch,
     isLoading,
-    defaultCustomer = '' // [New] 預設帶入的客戶名稱
+    defaultCustomer = '', // [New] 預設帶入的客戶名稱
+    systemCustomers = [] // [New] 全系統客戶名單（包含 AI 預測開關等設定）
 }) {
-    const [filterText, setFilterText] = React.useState('');
+    const [filterText, setFilterText] = useState('');
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (show) {
             setFilterText(defaultCustomer || '');
             // Lock body scroll
@@ -31,12 +35,95 @@ export default function HistoryImportModal({
         };
     }, [show, defaultCustomer]);
 
+    // 彙整乾淨的 systemCustomers 清單
+    const cleanSystemCustomers = useMemo(() => {
+        const map = new Map();
+        (systemCustomers || []).forEach(c => {
+            const rawName = typeof c === 'string' ? c : (c && c.name);
+            if (!rawName) return;
+            const cleanName = String(rawName).trim();
+            if (!cleanName) return;
+
+            const currentObj = typeof c === 'string'
+                ? { name: cleanName, isAiEnabled: false, schedule: [0, 1, 2, 3, 4, 5, 6], category: '市場' }
+                : { schedule: [0, 1, 2, 3, 4, 5, 6], category: '市場', ...c, name: cleanName };
+
+            const existing = map.get(cleanName);
+            if (!existing) {
+                map.set(cleanName, currentObj);
+            } else {
+                const isAiEnabled = Boolean(existing.isAiEnabled || currentObj.isAiEnabled);
+                map.set(cleanName, {
+                    ...existing,
+                    ...currentObj,
+                    name: cleanName,
+                    isAiEnabled
+                });
+            }
+        });
+        return Array.from(map.values());
+    }, [systemCustomers]);
+
+    // 取得客戶設定（支援 CUSTOMER_SETTINGS_CACHE 本地獨立備份與 cleanSystemCustomers 比對）
+    const getCustSetting = (custName) => {
+        const rawName = String(custName || '').trim();
+        const cleanName = rawName.replace(/[\.\s…]+$/g, '').toLowerCase();
+
+        // 1. 優先讀取本機獨立持久化備份
+        let backupSetting = null;
+        try {
+            const cacheRaw = safeLocalStorage.getItem('CUSTOMER_SETTINGS_CACHE');
+            if (cacheRaw) {
+                const cacheMap = JSON.parse(cacheRaw);
+                for (const [key, val] of Object.entries(cacheMap)) {
+                    const k = key.trim().replace(/[\.\s…]+$/g, '').toLowerCase();
+                    if (k === cleanName) {
+                        backupSetting = val;
+                        break;
+                    }
+                }
+            }
+        } catch (e) {}
+
+        // 2. 從 cleanSystemCustomers 對照匹配
+        const orig = cleanSystemCustomers.find(c => {
+            const nameStr = (typeof c === 'string' ? c : c?.name || '').trim().replace(/[\.\s…]+$/g, '').toLowerCase();
+            if (!nameStr) return false;
+            return nameStr === cleanName;
+        });
+
+        let origAiEnabled = backupSetting ? backupSetting.isAiEnabled === true : undefined;
+        if (orig && typeof orig === 'object' && origAiEnabled === undefined) {
+            origAiEnabled = orig.isAiEnabled === true;
+        }
+
+        return {
+            customerName: (orig && typeof orig === 'object' && orig.name) ? orig.name : rawName,
+            isAiEnabled: origAiEnabled !== undefined ? origAiEnabled : false
+        };
+    };
+
     if (!show) return null;
 
-    // Filter records by customer name locally
-    const filteredRecords = records.filter(record => {
-        if (!filterText.trim()) return true;
-        return (record.customer || '').toLowerCase().includes(filterText.toLowerCase().trim());
+    const safeRecords = Array.isArray(records) ? records : [];
+
+    // Filter records by AI status and search text (僅保留開通 AI 預測之地點)
+    const filteredRecords = safeRecords.filter(record => {
+        const cust = String(record.customer || '').trim();
+        if (!cust) return false;
+
+        // 排除散客與 AI 預測未開通地點
+        if (RETAIL_NAMES.includes(cust)) return false;
+        const setting = getCustSetting(cust);
+        if (setting && setting.isAiEnabled !== true) {
+            return false;
+        }
+
+        if (filterText.trim()) {
+            return cust.toLowerCase().includes(filterText.toLowerCase().trim());
+        }
+
+        return true;
     });
 
     // Group records by date
@@ -132,13 +219,15 @@ export default function HistoryImportModal({
                             <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mb-3" />
                             <p className="text-gray-400 font-bold text-sm">載入中...</p>
                         </div>
-                    ) : records.length === 0 ? (
+                    ) : filteredRecords.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-10 text-center mx-[15px]">
                             <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm border border-gray-100">
                                 <RotateCcw size={32} className="text-gray-200" />
                             </div>
-                            <h4 className="text-lg font-bold text-gray-800">查無紀錄</h4>
-                            <p className="text-gray-400 mt-1 max-w-xs mx-auto text-xs">請調整日期區間並重新查詢</p>
+                            <h4 className="text-lg font-bold text-gray-800">查無符合紀錄</h4>
+                            <p className="text-gray-400 mt-1 max-w-xs mx-auto text-xs">
+                                請確認日期區間內是否有已開通 AI 預測之地點單據，或嘗試輸入其他關鍵字。
+                            </p>
                         </div>
                     ) : (
                         <div className="space-y-8">

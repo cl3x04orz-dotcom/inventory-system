@@ -18,7 +18,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
     const [loading, setLoading] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [processMessage, setProcessMessage] = useState('');
-    const [newUser, setNewUser] = useState({ username: '', password: '', role: 'VIEWER' });
+    const [newUser, setNewUser] = useState({ username: '', password: '', role: 'EMPLOYEE' });
     const [editingUser, setEditingUser] = useState(null); // The user currently being edited for permissions
     const [passwordModal, setPasswordModal] = useState(null); // { username } when changing password
     const [newPassword, setNewPassword] = useState('');
@@ -29,6 +29,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
         {
             group: '銷售管理',
             items: [
+                { key: 'sales_pos', label: '門市 POS 結帳' },
                 { key: 'sales_entry', label: '商品銷售登錄' },
                 { key: 'sales_report', label: '銷售查詢報表' }
             ]
@@ -36,9 +37,14 @@ export default function PermissionControlPage({ user, apiUrl }) {
         {
             group: '團購管理',
             items: [
-                { key: 'sales_liff', label: '團購一鍵下單' },
                 { key: 'sales_pending', label: '待確認訂單審核' },
-                { key: 'products', label: '商品屬性管理' }
+                { key: 'groupbuy_subscription', label: '定期配管理 (訂閱制)' },
+                { key: 'groupbuy_settings', label: '開團管理 (團購/商城設定)' },
+                { key: 'groupbuy_announcement', label: '首頁公告設定' },
+                { key: 'products', label: '商品屬性管理' },
+                { key: 'groupbuy_member', label: '會員管理 (會員/集點)' },
+                { key: 'driver', label: '司機外送配送' },
+                { key: 'sales_liff', label: '團購商城預覽 / 下單' }
             ]
         },
         {
@@ -88,6 +94,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
             group: '系統管理',
             items: [
                 { key: 'system_config', label: '權限控管表' },
+                { key: 'store_settings', label: '店家基本設定' },
                 { key: 'system_activity_logs', label: '操作紀錄查詢' }
             ]
         }
@@ -189,7 +196,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
         setProcessMessage('資料存檔中 請稍候...');
         try {
             await callGAS(apiUrl, 'addUser', newUser, user.token);
-            setNewUser({ username: '', password: '', role: 'VIEWER' });
+            setNewUser({ username: '', password: '', role: 'EMPLOYEE' });
             await fetchUsers();
             alert('新增成功');
         } catch (error) {
@@ -294,7 +301,16 @@ export default function PermissionControlPage({ user, apiUrl }) {
 
             setEditingUser(null);
             await fetchUsers();
-            alert('權限更新成功');
+
+            // 若修改的是目前登入的帳號，立即同步更新 Session 並重新整理
+            if (user && user.username === editingUser.username) {
+                const updatedUser = { ...user, permissions: editingUser.permissions };
+                safeSessionStorage.setItem('inventory_user', JSON.stringify(updatedUser));
+                window.location.reload();
+                return;
+            }
+
+            alert('權限更新成功（若目標使用者正在登入中，請其重新整理或重新登入即可套用）');
         } catch (error) {
             console.error(error);
             alert('更新失敗: ' + error.message);
@@ -369,7 +385,7 @@ export default function PermissionControlPage({ user, apiUrl }) {
                     {user?.role === 'BOSS' && (
                         <button
                             onClick={() => {
-                                const backupUrl = `${apiUrl.replace(/\/$/, '')}/backup?token=${encodeURIComponent(user.token)}`;
+                                const backupUrl = `/api/backup?token=${encodeURIComponent(user.token)}`;
                                 window.location.href = backupUrl;
                             }}
                             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all"

@@ -479,11 +479,6 @@ function AppContent() {
         // BOSS and SUPER_ADMIN have god mode
         if (user.role === 'BOSS' || user.role === 'SUPER_ADMIN') return true;
 
-        // VIEWER (唯讀檢視者) 具備除了系統權限管理之外的所有頁面檢視權限
-        if (user.role === 'VIEWER') {
-            return targetPage !== 'superAdmin' && targetPage !== 'permissionControl';
-        }
-
         // Ensure permissions is an array, handle undefined/string cases
         let perms = user.permissions;
         if (typeof perms === 'undefined' || perms === null) {
@@ -496,34 +491,40 @@ function AppContent() {
                 perms = [];
             }
         }
-
         if (!Array.isArray(perms)) perms = [];
+
+        // VIEWER (唯讀檢視者)：僅在未設定任何細部權限時預設開放檢視；若已設定細部權限則以勾選為主
+        if (user.role === 'VIEWER' && perms.length === 0) {
+            return targetPage !== 'superAdmin' && targetPage !== 'permissionControl';
+        }
 
         switch (targetPage) {
             case 'liffOrder':
                 return true; // 點餐頁面所有人（包括一般員工或訪客）都可以存取
             case 'pos':
-                return perms.includes('sales_entry') || perms.includes('sales');
+                return perms.includes('sales_pos');
             case 'sales':
-                return perms.includes('sales_entry') || perms.includes('sales');
-            case 'pendingOrders':
-                return perms.includes('sales_pending') || user.role === 'BOSS';
-            case 'groupBuySettings':
-                return perms.includes('sales_pending') || user.role === 'BOSS';
-            case 'liffAnnouncement':
-                return perms.includes('sales_pending') || perms.includes('system_config') || user.role === 'BOSS' || user.role === 'ADMIN';
-            case 'memberManagement':
-                return perms.includes('sales_pending') || user.role === 'BOSS';
-            case 'subscriptionManagement':
-                return perms.includes('sales_pending') || user.role === 'BOSS';
-            case 'products':
-                return perms.includes('products') || user.role === 'BOSS';
+                return perms.includes('sales_entry');
             case 'report':
-                return perms.includes('sales_report') || perms.includes('sales');
+                return perms.includes('sales_report');
+            case 'pendingOrders':
+                return perms.includes('sales_pending');
+            case 'groupBuySettings':
+                return perms.includes('groupbuy_settings');
+            case 'liffAnnouncement':
+                return perms.includes('groupbuy_announcement');
+            case 'memberManagement':
+                return perms.includes('groupbuy_member');
+            case 'subscriptionManagement':
+                return perms.includes('groupbuy_subscription');
+            case 'driver':
+                return perms.includes('driver') || perms.includes('sales_driver');
+            case 'products':
+                return perms.includes('products');
             case 'purchase':
-                return perms.includes('purchase_entry') || perms.includes('purchase');
+                return perms.includes('purchase_entry');
             case 'purchaseHistory':
-                return perms.includes('purchase_history') || perms.includes('purchase');
+                return perms.includes('purchase_history');
             case 'inventory':
                 return perms.includes('inventory_adjust');
             case 'stocktake':
@@ -535,31 +536,33 @@ function AppContent() {
             case 'stocktakeHistory':
                 return perms.includes('inventory_stocktake_history') || perms.includes('inventory_history');
             case 'expenditureManagement':
-                return perms.includes('finance_expenditure') || perms.includes('finance');
+                return perms.includes('finance_expenditure');
             case 'receivable':
-                return perms.includes('finance_receivable') || perms.includes('finance');
+                return perms.includes('finance_receivable');
             case 'payable':
-                return perms.includes('finance_payable') || perms.includes('finance');
+                return perms.includes('finance_payable');
             case 'incomeStatement':
-                return perms.includes('finance_income') || perms.includes('finance');
+                return perms.includes('finance_income');
             case 'costCalculation':
-                return perms.includes('finance_cost') || perms.includes('finance');
+                return perms.includes('finance_cost');
             case 'payroll':
-                return perms.includes('finance_payroll') || perms.includes('finance');
+                return perms.includes('finance_payroll');
             case 'salesRanking':
-                return perms.includes('analytics_sales') || perms.includes('analytics');
+                return perms.includes('analytics_sales');
             case 'customerRanking':
-                return perms.includes('analytics_customer') || perms.includes('analytics');
+                return perms.includes('analytics_customer');
             case 'customerAnalytics':
-                return perms.includes('analytics_customer') || perms.includes('analytics');
+                return perms.includes('analytics_customer_detail');
             case 'profitAnalysis':
-                return perms.includes('analytics_profit') || perms.includes('analytics');
+                return perms.includes('analytics_profit');
             case 'turnoverRate':
-                return perms.includes('analytics_turnover') || perms.includes('analytics');
+                return perms.includes('analytics_turnover');
             case 'permissionControl':
-                return perms.includes('system_config') || perms.includes('system');
+                return perms.includes('system_config');
+            case 'storeSettings':
+                return perms.includes('store_settings');
             case 'activityLog':
-                return perms.includes('system_activity_logs') || perms.includes('system') || user.role === 'BOSS' || user.role === 'ADMIN';
+                return perms.includes('system_activity_logs');
             default:
                 return true;
         }
@@ -702,14 +705,15 @@ function AppContent() {
                                         </MobileNavGroup>
                                     )}
                                     {/* 團購管理 Group */}
-                                    {(user.role === 'BOSS' || checkPermission('pendingOrders') || checkPermission('products')) && (
+                                    {(user.role === 'BOSS' || checkPermission('pendingOrders') || checkPermission('subscriptionManagement') || checkPermission('groupBuySettings') || checkPermission('liffAnnouncement') || checkPermission('products') || checkPermission('memberManagement') || checkPermission('driver')) && (
                                         <MobileNavGroup label="團購" icon={Users}>
                                             {checkPermission('pendingOrders') && <NavItem label="訂單審核" icon={ClipboardList} onClick={() => handlePageChange('pendingOrders')} active={page === 'pendingOrders'} />}
-                                            {checkPermission('pendingOrders') && <NavItem label="定期配管理" icon={Calendar} onClick={() => handlePageChange('subscriptionManagement')} active={page === 'subscriptionManagement'} />}
+                                            {checkPermission('subscriptionManagement') && <NavItem label="定期配管理" icon={Calendar} onClick={() => handlePageChange('subscriptionManagement')} active={page === 'subscriptionManagement'} />}
                                             {checkPermission('groupBuySettings') && <NavItem label="開團管理" icon={Link} onClick={() => handlePageChange('groupBuySettings')} active={page === 'groupBuySettings'} />}
                                             {checkPermission('liffAnnouncement') && <NavItem label="首頁公告設定" icon={Megaphone} onClick={() => handlePageChange('liffAnnouncement')} active={page === 'liffAnnouncement'} />}
                                             {checkPermission('products') && <NavItem label="商品屬性" icon={Edit2} onClick={() => handlePageChange('products')} active={page === 'products'} />}
                                             {checkPermission('memberManagement') && <NavItem label="會員管理" icon={Wallet} onClick={() => handlePageChange('memberManagement')} active={page === 'memberManagement'} />}
+                                            {checkPermission('driver') && <NavItem label="司機配送" icon={PackagePlus} onClick={() => handlePageChange('driver')} active={page === 'driver'} />}
                                             <NavItem label="商城預覽" icon={ShoppingCart} onClick={() => handlePageChange('liffOrder')} active={page === 'liffOrder'} />
                                         </MobileNavGroup>
                                     )}
@@ -751,10 +755,10 @@ function AppContent() {
                                             {checkPermission('turnoverRate') && <NavItem label="庫存周轉率" icon={Activity} onClick={() => handlePageChange('turnoverRate')} active={page === 'turnoverRate'} />}
                                         </MobileNavGroup>
                                     )}
-                                    {(user.role === 'BOSS' || user.role === 'SUPER_ADMIN' || checkPermission('permissionControl') || checkPermission('activityLog')) && (
+                                    {(user.role === 'BOSS' || user.role === 'SUPER_ADMIN' || checkPermission('permissionControl') || checkPermission('storeSettings') || checkPermission('activityLog')) && (
                                         <MobileNavGroup label="系統" icon={Shield}>
                                             {checkPermission('permissionControl') && <NavItem label="權限控管表" icon={Shield} onClick={() => handlePageChange('permissionControl')} active={page === 'permissionControl'} />}
-                                            {checkPermission('permissionControl') && <NavItem label="店家基本設定" icon={Store} onClick={() => handlePageChange('storeSettings')} active={page === 'storeSettings'} />}
+                                            {checkPermission('storeSettings') && <NavItem label="店家基本設定" icon={Store} onClick={() => handlePageChange('storeSettings')} active={page === 'storeSettings'} />}
                                             {checkPermission('activityLog') && <NavItem label="操作紀錄查詢" icon={Activity} onClick={() => handlePageChange('activityLog')} active={page === 'activityLog'} />}
                                             {(user.role === 'SUPER_ADMIN' || user.role === 'BOSS') && <NavItem label="🏢 租戶管理" icon={Building2} onClick={() => handlePageChange('superAdmin')} active={page === 'superAdmin'} />}
                                         </MobileNavGroup>
@@ -787,21 +791,22 @@ function AppContent() {
 
                         {/* Column 2: 團購 */}
                         <div className="flex justify-center">
-                            {(user.role === 'BOSS' || checkPermission('pendingOrders') || checkPermission('products')) && (
+                            {(user.role === 'BOSS' || checkPermission('pendingOrders') || checkPermission('subscriptionManagement') || checkPermission('groupBuySettings') || checkPermission('liffAnnouncement') || checkPermission('products') || checkPermission('memberManagement') || checkPermission('driver')) && (
                                 <NavDropdown
                                      id="groupbuy"
                                      label="團購"
                                      icon={Users}
                                      openDropdown={openDropdown}
                                      setOpenDropdown={setOpenDropdown}
-                                     active={['pendingOrders', 'groupBuySettings', 'liffAnnouncement', 'products', 'memberManagement', 'subscriptionManagement', 'liffOrder'].includes(page)}
+                                     active={['pendingOrders', 'groupBuySettings', 'liffAnnouncement', 'products', 'memberManagement', 'subscriptionManagement', 'driver', 'liffOrder'].includes(page)}
                                  >
                                      {checkPermission('pendingOrders') && <NavItem label="訂單審核" icon={ClipboardList} onClick={() => handlePageChange('pendingOrders')} active={page === 'pendingOrders'} />}
-                                     {checkPermission('pendingOrders') && <NavItem label="定期配管理" icon={Calendar} onClick={() => handlePageChange('subscriptionManagement')} active={page === 'subscriptionManagement'} />}
+                                     {checkPermission('subscriptionManagement') && <NavItem label="定期配管理" icon={Calendar} onClick={() => handlePageChange('subscriptionManagement')} active={page === 'subscriptionManagement'} />}
                                      {checkPermission('groupBuySettings') && <NavItem label="開團管理" icon={Link} onClick={() => handlePageChange('groupBuySettings')} active={page === 'groupBuySettings'} />}
                                      {checkPermission('liffAnnouncement') && <NavItem label="首頁公告設定" icon={Megaphone} onClick={() => handlePageChange('liffAnnouncement')} active={page === 'liffAnnouncement'} />}
                                      {checkPermission('products') && <NavItem label="商品屬性" icon={Edit2} onClick={() => handlePageChange('products')} active={page === 'products'} />}
                                      {checkPermission('memberManagement') && <NavItem label="會員管理" icon={Wallet} onClick={() => handlePageChange('memberManagement')} active={page === 'memberManagement'} />}
+                                     {checkPermission('driver') && <NavItem label="司機配送" icon={PackagePlus} onClick={() => handlePageChange('driver')} active={page === 'driver'} />}
                                      <NavItem label="商城預覽" icon={ShoppingCart} onClick={() => handlePageChange('liffOrder')} active={page === 'liffOrder'} />
                                  </NavDropdown>
                             )}
@@ -904,7 +909,7 @@ function AppContent() {
 
                         {/* Column 7: 系統 */}
                         <div className="flex justify-center">
-                            {(user.role === 'BOSS' || user.role === 'SUPER_ADMIN' || checkPermission('permissionControl') || checkPermission('activityLog')) && (
+                            {(user.role === 'BOSS' || user.role === 'SUPER_ADMIN' || checkPermission('permissionControl') || checkPermission('storeSettings') || checkPermission('activityLog')) && (
                                 <NavDropdown
                                     id="system"
                                     label="系統"
@@ -914,7 +919,7 @@ function AppContent() {
                                     active={['permissionControl', 'storeSettings', 'activityLog', 'superAdmin'].includes(page)}
                                 >
                                     {checkPermission('permissionControl') && <NavItem label="權限控管表" icon={Shield} onClick={() => handlePageChange('permissionControl')} active={page === 'permissionControl'} />}
-                                    {checkPermission('permissionControl') && <NavItem label="店家基本設定" icon={Store} onClick={() => handlePageChange('storeSettings')} active={page === 'storeSettings'} />}
+                                    {checkPermission('storeSettings') && <NavItem label="店家基本設定" icon={Store} onClick={() => handlePageChange('storeSettings')} active={page === 'storeSettings'} />}
                                     {checkPermission('activityLog') && <NavItem label="操作紀錄查詢" icon={Activity} onClick={() => handlePageChange('activityLog')} active={page === 'activityLog'} />}
                                     {(user.role === 'SUPER_ADMIN' || user.role === 'BOSS') && <NavItem label="🏢 租戶管理" icon={Building2} onClick={() => handlePageChange('superAdmin')} active={page === 'superAdmin'} />}
                                 </NavDropdown>

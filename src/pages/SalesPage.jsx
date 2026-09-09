@@ -1,5 +1,5 @@
 import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Save, RefreshCw, Calculator, DollarSign, GripVertical, ListOrdered, Printer, ChevronUp, ChevronDown, FileText, Settings } from 'lucide-react';
 
@@ -1853,12 +1853,46 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 }}
             />
 
-            {/* [New] 銷售對象自動完成清單 (僅在有輸入時顯示建議) */}
+            {/* [New] 銷售對象自動完成清單 (僅在有輸入時顯示建議，且僅顯示 AI 開啟的地點，依然允許自行填入任何文字) */}
             <datalist id="system-customers-list">
-                {location.trim().length > 0 && systemCustomers.map(c => {
-                    const name = typeof c === 'string' ? c : c.name;
-                    return <option key={name} value={name} />;
-                })}
+                {location.trim().length > 0 && (() => {
+                    // 1. 讀取本機設定快取
+                    let cacheMap = {};
+                    try {
+                        const cacheRaw = safeLocalStorage.getItem('CUSTOMER_SETTINGS_CACHE');
+                        if (cacheRaw) cacheMap = JSON.parse(cacheRaw);
+                    } catch (e) {}
+
+                    const seen = new Set();
+                    const aiEnabledList = [];
+
+                    (systemCustomers || []).forEach(c => {
+                        const rawName = typeof c === 'string' ? c : (c && c.name);
+                        if (!rawName) return;
+                        const cleanName = String(rawName).trim();
+                        if (!cleanName) return;
+
+                        const normKey = cleanName.replace(/[\.\s…]+$/g, '').toLowerCase();
+                        if (seen.has(normKey)) return;
+
+                        // 判斷 AI 開關（優先本機快取，其次為物件設定）
+                        let isAi = false;
+                        if (cacheMap[normKey] && cacheMap[normKey].isAiEnabled !== undefined) {
+                            isAi = cacheMap[normKey].isAiEnabled === true;
+                        } else if (typeof c === 'object' && c !== null) {
+                            isAi = c.isAiEnabled === true;
+                        }
+
+                        if (isAi) {
+                            seen.add(normKey);
+                            aiEnabledList.push(cleanName);
+                        }
+                    });
+
+                    return aiEnabledList.map(name => (
+                        <option key={name} value={name} />
+                    ));
+                })()}
             </datalist>
 
             {/* History Import Modal */}
@@ -1884,6 +1918,7 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 }}
                 onSearch={() => loadHistoryRecords(historyImportStartDate, historyImportEndDate)}
                 isLoading={isHistoryLoading}
+                systemCustomers={systemCustomers}
             />
             {/* Expense Remark Modal */}
             {showVendorModal && (
