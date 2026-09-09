@@ -2300,10 +2300,22 @@ export const GroupBuyService = {
       let additionalTotalAmount = 0;
       const mergedOrderIds = secondaryOrders.map(o => o.orderId);
       
-      // 3. 建立主訂單現有商品 Map (優先以 productId 為 Key，若無則以 productName 為 Key)
-      const primaryItemsMap = new Map();
+      // 3. 建立主訂單現有商品 Map (以複合 Key 區分正品與贈品，避免同 productId 碰撞覆蓋)
+      const getDetailKey = (item: any) => {
+        const isGift = Number(item.unitPrice) === 0 || 
+                       Number(item.subtotal) === 0 || 
+                       (item.remark && String(item.remark).includes('贈品')) || 
+                       (item.productName && String(item.productName).includes('贈品'));
+        const baseId = item.productId || item.productName || '';
+        if (isGift) {
+          return `${baseId}__GIFT__${item.remark || ''}`;
+        }
+        return `${baseId}__PAID__${Number(item.unitPrice || 0)}`;
+      };
+
+      const primaryItemsMap = new Map<string, any>();
       primaryOrder.details.forEach(item => {
-        const key = item.productId || item.productName;
+        const key = getDetailKey(item);
         if (key) {
           primaryItemsMap.set(key, item);
         }
@@ -2313,15 +2325,23 @@ export const GroupBuyService = {
       let maxShippingFee = Number(primaryOrder.shippingFee || 0);
 
       // 4. 將副訂單明細轉移至主訂單，或建立新的明細
+      const secondaryLinePayNotes: string[] = [];
       for (const sOrder of secondaryOrders) {
         if (Number(sOrder.shippingFee || 0) > maxShippingFee) {
            maxShippingFee = Number(sOrder.shippingFee || 0);
         }
 
+        if (sOrder.note && sOrder.note.includes('LINE Pay 線上扣款成功')) {
+          const m = sOrder.note.match(/【LINE Pay 線上扣款成功 - 交易單號: [^】]+】/);
+          if (m && !secondaryLinePayNotes.includes(m[0])) {
+            secondaryLinePayNotes.push(m[0]);
+          }
+        }
+
         for (const sItem of sOrder.details) {
-          const key = sItem.productId || sItem.productName;
+          const key = getDetailKey(sItem);
           if (key && primaryItemsMap.has(key)) {
-            // 已有該商品，數量相加
+            // 已有該相同屬性之商品，數量相加
             const pItem = primaryItemsMap.get(key);
             pItem.qty += sItem.qty;
             pItem.remark = pItem.remark ? `${pItem.remark}, ${sItem.remark || ''}`.replace(/,\s*$/, '') : (sItem.remark || null);
@@ -2334,7 +2354,7 @@ export const GroupBuyService = {
               productName: sItem.productName,
               unitPrice: Number(sItem.unitPrice),
               qty: sItem.qty,
-              subtotal: 0,
+              subtotal: Number(sItem.subtotal || 0),
               remark: sItem.remark,
               expiryDate: sItem.expiryDate || null,
               storeCode: primaryOrder.storeCode
@@ -2357,7 +2377,7 @@ export const GroupBuyService = {
         });
       }
 
-      // 5. 重新計算所有商品的最新小計 (套用多件優惠)
+      // 5. 重新計算所有商品的最新小計 (套用多件優惠，贈品除外)
       let newProductTotal = 0;
       const productIdsToFetch = Array.from(primaryItemsMap.values()).map(item => item.productId).filter(id => id);
       const dbProducts = await tx.product.findMany({
@@ -2367,12 +2387,18 @@ export const GroupBuyService = {
 
       // 更新主訂單既有的 detail
       for (const pItem of primaryOrder.details) {
-        const key = pItem.productId || pItem.productName;
+        const key = getDetailKey(pItem);
         const currentItem = primaryItemsMap.get(key);
+        if (!currentItem) continue;
+
+        const isGift = Number(currentItem.unitPrice) === 0 || 
+                       Number(pItem.subtotal) === 0 || 
+                       (currentItem.remark && String(currentItem.remark).includes('贈品')) || 
+                       (currentItem.productName && String(currentItem.productName).includes('贈品'));
         
-        let finalSubtotal = Number(currentItem.unitPrice) * currentItem.qty;
+        let finalSubtotal = isGift ? 0 : Number(currentItem.unitPrice) * currentItem.qty;
         
-        if (currentItem.productId && dbProductMap.has(currentItem.productId)) {
+        if (!isGift && currentItem.productId && dbProductMap.has(currentItem.productId)) {
           const dbProd = dbProductMap.get(currentItem.productId)!;
           let settings: any = null;
           if (dbProd.volumePricingSettings) {
@@ -2411,9 +2437,12 @@ export const GroupBuyService = {
       // 處理建立 newDetailsToCreate
       const finalDetailsToCreate = [];
       for (const nItem of newDetailsToCreate) {
-        let finalSubtotal = Number(nItem.unitPrice) * nItem.qty;
+        const isGift = Number(nItem.unitPrice) === 0 || 
+                       (nItem.remark && String(nItem.remark).includes('贈品')) || 
+                       (nItem.productName && String(nItem.productName).includes('贈品'));
+        let finalSubtotal = isGift ? 0 : Number(nItem.unitPrice) * nItem.qty;
         
-        if (nItem.productId && dbProductMap.has(nItem.productId)) {
+        if (!isGift && nItem.productId && dbProductMap.has(nItem.productId)) {
           const dbProd = dbProductMap.get(nItem.productId)!;
           let settings: any = null;
           if (dbProd.volumePricingSettings) {
@@ -2470,9 +2499,18 @@ export const GroupBuyService = {
          }
       }
 
-      // 7. 更新主訂單金額與備註
+      // 7. 更新主訂單金額與備註 (若副訂單有 LINE Pay 扣款紀錄，一併整合至主訂單備註)
       const newTotalAmount = newProductTotal + finalShippingFee;
-      const newNote = ((primaryOrder.note || '') + `\n(此訂單合併了以下訂單: ${mergedOrderIds.join(', ')})`).trim();
+      let noteLines = [primaryOrder.note || ''];
+      if (secondaryLinePayNotes.length > 0) {
+        for (const sNote of secondaryLinePayNotes) {
+          if (!noteLines[0].includes(sNote)) {
+            noteLines.push(sNote);
+          }
+        }
+      }
+      noteLines.push(`(此訂單合併了以下訂單: ${mergedOrderIds.join(', ')})`);
+      const newNote = noteLines.filter(Boolean).join('\n').trim();
 
       await tx.groupBuyOrder.update({
         where: { orderId: primaryOrder.orderId },
