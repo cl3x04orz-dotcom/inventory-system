@@ -485,6 +485,61 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     );
   };
 
+  // ── 全域彈窗（所有 step 共用）─────────────────────────────────────────────
+  const renderModals = () => (
+    <>
+      {alertModal.show && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[var(--bg-secondary)] w-full max-w-[280px] rounded-2xl p-5 shadow-2xl border border-[var(--border-primary)] flex flex-col items-center gap-4 text-center animate-in zoom-in-95 duration-200">
+            <p className="text-sm font-bold text-[var(--text-primary)] leading-relaxed whitespace-pre-line">
+              {alertModal.message}
+            </p>
+            <button
+              onClick={() => {
+                const cb = alertModal.callback;
+                setAlertModal({ show: false, message: '', callback: null });
+                if (cb) cb();
+              }}
+              className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/15"
+            >
+              確定
+            </button>
+          </div>
+        </div>
+      )}
+      {confirmModal.show && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[var(--bg-secondary)] w-full max-w-[300px] rounded-2xl p-5 shadow-2xl border border-[var(--border-primary)] flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+            <p className="text-sm font-bold text-[var(--text-primary)] leading-relaxed whitespace-pre-line text-center">
+              {confirmModal.message}
+            </p>
+            <div className="flex gap-2.5">
+              <button
+                onClick={() => {
+                  setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null, confirmText: '確定', cancelText: '取消' });
+                  if (confirmModal.onCancel) confirmModal.onCancel();
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs font-bold transition-all active:scale-95"
+              >
+                {confirmModal.cancelText || '取消'}
+              </button>
+              <button
+                onClick={() => {
+                  const fn = confirmModal.onConfirm;
+                  setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null, confirmText: '確定', cancelText: '取消' });
+                  if (fn) fn();
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/15"
+              >
+                {confirmModal.confirmText || '確定'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
   // ── 監聽 LINE Pay 扣款成功重導向參數 ──────────────────────────────────────
   useEffect(() => {
     try {
@@ -4628,6 +4683,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         </div>
         {renderGiftModal()}
         {renderFlavorModal()}
+        {renderModals()}
       </div>
     );
   }
@@ -5477,37 +5533,7 @@ ${freeNote(newFee, newMin)}
           </button>
         </div>
 
-        {/* ⚠️ 配送區域變更確認 Dialog（form step 專用） */}
-        {confirmModal.show && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-[var(--bg-secondary)] w-full max-w-[300px] rounded-2xl p-5 shadow-2xl border border-[var(--border-primary)] flex flex-col gap-4 animate-in zoom-in-95 duration-200">
-              <p className="text-sm font-bold text-[var(--text-primary)] leading-relaxed whitespace-pre-line text-center">
-                {confirmModal.message}
-              </p>
-              <div className="flex gap-2.5">
-                <button
-                  onClick={() => {
-                    setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null });
-                    if (confirmModal.onCancel) confirmModal.onCancel();
-                  }}
-                  className="flex-1 py-2.5 px-4 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs font-bold transition-all active:scale-95"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={() => {
-                    const fn = confirmModal.onConfirm;
-                    setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null });
-                    if (fn) fn();
-                  }}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/15"
-                >
-                  確定變更
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {renderModals()}
       </div>
     );
   }
@@ -5615,6 +5641,7 @@ ${freeNote(newFee, newMin)}
           </div>
         </div>
         {renderBottomNav()}
+        {renderModals()}
       </div>
     );
   }
@@ -5848,6 +5875,7 @@ ${freeNote(newFee, newMin)}
           </div>
         </div>
         {renderBottomNav()}
+        {renderModals()}
       </div>
     );
   }
@@ -5937,6 +5965,7 @@ ${freeNote(newFee, newMin)}
           {renderMobileFooter()}
         </div>
         {renderBottomNav()}
+        {renderModals()}
       </div>
     );
   }
@@ -6687,64 +6716,13 @@ ${freeNote(newFee, newMin)}
       {/* 多規格口味選擇彈窗 */}
       {renderFlavorModal()}
       {renderBottomNav()}
+      {renderModals()}
 
       {/* 📱 Mobile 客服中心與網站政策彈窗 */}
       {renderServiceModal()}
       {renderPolicyModal()}
       {renderPolicyViewerModal()}
 
-      {/* 自訂美化彈窗提示 */}
-      {alertModal.show && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-[var(--bg-secondary)] w-full max-w-[280px] rounded-2xl p-5 shadow-2xl border border-[var(--border-primary)] flex flex-col items-center gap-4 text-center animate-in zoom-in-95 duration-200">
-            <p className="text-sm font-bold text-[var(--text-primary)] leading-relaxed whitespace-pre-line">
-              {alertModal.message}
-            </p>
-            <button
-              onClick={() => {
-                const cb = alertModal.callback;
-                setAlertModal({ show: false, message: '', callback: null });
-                if (cb) cb();
-              }}
-              className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/15"
-            >
-              確定
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 確認 Dialog（有取消/確定雙按鈕）*/}
-      {confirmModal.show && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-[var(--bg-secondary)] w-full max-w-[300px] rounded-2xl p-5 shadow-2xl border border-[var(--border-primary)] flex flex-col gap-4 animate-in zoom-in-95 duration-200">
-            <p className="text-sm font-bold text-[var(--text-primary)] leading-relaxed whitespace-pre-line text-center">
-              {confirmModal.message}
-            </p>
-            <div className="flex gap-2.5">
-              <button
-                onClick={() => {
-                  setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null, confirmText: '確定', cancelText: '取消' });
-                  if (confirmModal.onCancel) confirmModal.onCancel();
-                }}
-                className="flex-1 py-2.5 px-4 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs font-bold transition-all active:scale-95"
-              >
-                {confirmModal.cancelText || '取消'}
-              </button>
-              <button
-                onClick={() => {
-                  const fn = confirmModal.onConfirm;
-                  setConfirmModal({ show: false, message: '', onConfirm: null, onCancel: null, confirmText: '確定', cancelText: '取消' });
-                  if (fn) fn();
-                }}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/15"
-              >
-                {confirmModal.confirmText || '確定'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 👥 新增團員彈窗 (AddRecipientModal) */}
       {showAddRecipientModal && (
