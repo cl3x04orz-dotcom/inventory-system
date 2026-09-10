@@ -1862,12 +1862,17 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
         const orderId = order.orderId;
         const amount = Number(order.totalAmount || order.TotalAmount || 0);
         const customerName = order.customerName || order.CustomerName || '貴賓';
+        const isPaid = order.paymentStatus === '已付款' || order.paymentStatus === '已請款' ||
+            order.paymentStatus === '已入帳' || (order.paymentStatus && order.paymentStatus.includes('部分退款')) ||
+            order.paymentStatus === 'off';
         setLinePayConfigModal({
             order,
             orderId,
             customerName,
-            customAmount: String(amount),
-            remark: ''
+            // 已付款訂單預設空白，讓管理員手動輸入追加差額，避免誤帶原訂單總額
+            customAmount: isPaid ? '' : String(amount),
+            remark: '',
+            isPaid
         });
     };
 
@@ -2983,7 +2988,8 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                                 
                                                                 {/* Dropdown Menu */}
                                                                 <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-20 py-1 overflow-hidden text-left font-sans">
-                                                                    {!(order.paymentStatus === '已付款' || order.paymentStatus === '已請款' || order.paymentStatus === '已入帳' || (order.paymentStatus && order.paymentStatus.includes('部分退款')) || order.paymentStatus === 'off') ? (
+                                                                    {/* 補繳連結：全額退款以外的狀態皆可顯示（包含已付款追加差額） */}
+                                                                    {!(order.paymentStatus === '已全額退款' || (order.paymentStatus && order.paymentStatus.includes('全額退款'))) && (
                                                                         <button
                                                                             type="button"
                                                                             disabled={generatingOrderId === order.orderId}
@@ -3003,11 +3009,13 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                                             ) : (
                                                                                 <>
                                                                                     <span>🔗</span>
-                                                                                    <span>LINE Pay 補繳連結</span>
+                                                                                    <span>{(order.paymentStatus === '已付款' || order.paymentStatus === '已請款' || order.paymentStatus === '已入帳') ? 'LINE Pay 追加補繳連結' : 'LINE Pay 補繳連結'}</span>
                                                                                 </>
                                                                             )}
                                                                         </button>
-                                                                    ) : (
+                                                                    )}
+                                                                    {/* 退款：僅已付款類狀態才顯示 */}
+                                                                    {(order.paymentStatus === '已付款' || order.paymentStatus === '已請款' || order.paymentStatus === '已入帳' || (order.paymentStatus && order.paymentStatus.includes('部分退款')) || order.paymentStatus === 'off') && (
                                                                         <button
                                                                             type="button"
                                                                             onClick={(e) => {
@@ -4292,7 +4300,11 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                     <div className="bg-white border border-slate-200 shadow-2xl rounded-2xl p-6 w-full max-w-md space-y-4 animate-in fade-in zoom-in-95 duration-150">
                         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                             <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                                <span className="text-emerald-500 font-bold">💳</span> 設定 LINE Pay 補繳金額
+                                <span className="text-emerald-500 font-bold">💳</span>
+                                {linePayConfigModal.isPaid ? '追加 LINE Pay 付款連結' : '設定 LINE Pay 補繳金額'}
+                                {linePayConfigModal.isPaid && (
+                                    <span className="text-xs font-bold bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded-md">已付款追加</span>
+                                )}
                             </h3>
                             <button
                                 onClick={() => setLinePayConfigModal(null)}
