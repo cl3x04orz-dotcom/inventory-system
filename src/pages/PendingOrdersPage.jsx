@@ -1532,7 +1532,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
         // 未付款分頁雙重防護過濾
         if (activeTab === 'UNPAID') {
             const ps = String(order.paymentStatus || '').trim();
-            if (ps === '已付款' || ps === '已入帳' || ps.includes('已付款') || ps.includes('已入帳')) {
+            if (ps === '已付款' || ps === '已入帳' || ps.includes('已付款') || ps.includes('已入帳') || ps.includes('退款')) {
                 return false;
             }
         }

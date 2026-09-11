@@ -70,7 +70,8 @@ export const GroupBuyService = {
         {
           AND: [
             { NOT: { paymentStatus: { contains: '已付款' } } },
-            { NOT: { paymentStatus: { contains: '已入帳' } } }
+            { NOT: { paymentStatus: { contains: '已入帳' } } },
+            { NOT: { paymentStatus: { contains: '退款' } } }
           ]
         }
       ];
