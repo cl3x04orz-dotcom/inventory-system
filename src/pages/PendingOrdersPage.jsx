@@ -236,6 +236,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
     const [linePayPayLinkModal, setLinePayPayLinkModal] = useState(null);
     const [linePayConfigModal, setLinePayConfigModal] = useState(null);
     const [linePayRefundModal, setLinePayRefundModal] = useState(null);
+    const [linePayRefundMsgModal, setLinePayRefundMsgModal] = useState(null);
     const [generatingOrderId, setGeneratingOrderId] = useState(null);
     const [refundingOrderId, setRefundingOrderId] = useState(null);
     const [isSyncingOrderId, setIsSyncingOrderId] = useState(null);
@@ -1853,6 +1854,12 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
         return false;
     };
 
+    // 💬 LINE Pay 退款通知顧客罐頭訊息格式化輔助函數
+    const getRefundCannedMessage = (customerName, orderId, refundAmt, reason) => {
+        const reasonText = (reason && String(reason).trim()) ? String(reason).trim() : '訂單品項調整/退款';
+        return `${customerName || '貴賓'} 您好～這裡是『米立微MilkZeroWaste』😊\n\n您的訂單退款作業已為您處理完成，相關退款資訊如下：\n\n📋 訂單編號｜#${orderId}\n💰 退款金額｜$${refundAmt} 元\n💳 退款方式｜LINE Pay\n💡 退款說明｜${reasonText}\n\n⚠️ 貼心提醒：\n款項將依您原 LINE Pay 付款方式（信用卡/簽帳卡/LINE Pay Money）直接退回。各發卡銀行或金融機構入帳約需 3～7 個工作日，敬請留意帳單或 LINE Pay 官方通知。\n\n若有任何疑問，歡迎隨時與我們聯繫，感謝您的體諒與支持！`;
+    };
+
     // ⚡ 產生 LINE Pay 補繳連結與開啟專屬彈窗 Modal (局部加載，全頁不白屏)
     const handleOpenLinePayConfig = (order, e) => {
         if (e) {
@@ -1996,8 +2003,25 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
             const data = await res.json();
 
             if (data.success) {
-                alert(`✅ LINE Pay 退款成功！對帳狀態已更新為：${data.paymentStatus || '已退款'}`);
+                const finalRefundAmt = refundType === 'full' ? (remainingRefundable || linePayRefundModal.totalAmount) : numRefundAmt;
+                const formattedRefundMsg = getRefundCannedMessage(
+                    linePayRefundModal.customerName,
+                    orderId,
+                    finalRefundAmt,
+                    refundReason
+                );
+
+                copyTextSafely(formattedRefundMsg);
+
                 setLinePayRefundModal(null);
+                setLinePayRefundMsgModal({
+                    orderId,
+                    customerName: linePayRefundModal.customerName,
+                    refundAmount: finalRefundAmt,
+                    text: formattedRefundMsg,
+                    isCopied: true
+                });
+
                 if (typeof fetchOrders === 'function') fetchOrders();
                 else window.location.reload();
             } else {
@@ -4264,6 +4288,50 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                     className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500"
                                 />
                             </div>
+
+                            {/* 💬 顧客通知罐頭訊息預覽與即時複製 */}
+                            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                                        💬 傳給顧客的退款通知訊息
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const curAmt = linePayRefundModal.refundType === 'full' 
+                                                ? (linePayRefundModal.remainingRefundable || linePayRefundModal.totalAmount) 
+                                                : (Number(linePayRefundModal.customRefundAmount) || 0);
+                                            const msg = getRefundCannedMessage(
+                                                linePayRefundModal.customerName, 
+                                                linePayRefundModal.orderId, 
+                                                curAmt, 
+                                                linePayRefundModal.refundReason
+                                            );
+                                            copyTextSafely(msg);
+                                            alert('✅ 已複製退款通知罐頭訊息至剪貼簿！');
+                                        }}
+                                        className="text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg border border-rose-200 transition-all flex items-center gap-1 cursor-pointer"
+                                    >
+                                        📋 一鍵複製訊息
+                                    </button>
+                                </div>
+                                <textarea
+                                    rows={4}
+                                    value={getRefundCannedMessage(
+                                        linePayRefundModal.customerName,
+                                        linePayRefundModal.orderId,
+                                        linePayRefundModal.refundType === 'full' 
+                                            ? (linePayRefundModal.remainingRefundable || linePayRefundModal.totalAmount) 
+                                            : (Number(linePayRefundModal.customRefundAmount) || 0),
+                                        linePayRefundModal.refundReason
+                                    )}
+                                    readOnly
+                                    className="w-full p-2.5 bg-white border border-slate-200 rounded-lg text-[11px] font-mono text-slate-700 leading-relaxed resize-none focus:outline-none"
+                                />
+                                <div className="text-[11px] text-slate-400">
+                                    💡 填寫上方「退款原因」與退款金額時，此罐頭訊息會自動即時更新。
+                                </div>
+                            </div>
                         </div>
 
                         <div className="flex gap-2 pt-2">
@@ -4426,6 +4494,56 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                 }`}
                             >
                                 {linePayPayLinkModal.isCopied ? '✅ 已成功複製訊息！(再按可重新複製)' : '📋 點擊一鍵複製付款訊息'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 📱 LINE Pay 退款通知訊息專屬彈窗 Modal */}
+            {linePayRefundMsgModal && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[150] p-4">
+                    <div className="bg-white border border-rose-100 shadow-2xl rounded-2xl p-6 w-full max-w-lg space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                                <span className="text-rose-500 font-bold">📱</span> LINE Pay 退款通知訊息已生成
+                            </h3>
+                            <button
+                                onClick={() => setLinePayRefundMsgModal(null)}
+                                className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="text-xs text-slate-500 font-medium">
+                            退款已成功！已為 <strong className="text-slate-800">{linePayRefundMsgModal.customerName}</strong>（單號 #{linePayRefundMsgModal.orderId}）生成專屬退款通知訊息。您可在下方直接編輯修改，或點擊下方按鈕一鍵複製傳給顧客：
+                        </div>
+
+                        <textarea
+                            value={linePayRefundMsgModal.text}
+                            onChange={(e) => setLinePayRefundMsgModal(prev => prev ? { ...prev, text: e.target.value, isCopied: false } : null)}
+                            className="w-full h-48 p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-800 leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-rose-500"
+                        />
+
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    if (e) {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                    }
+                                    copyTextSafely(linePayRefundMsgModal.text);
+                                    setLinePayRefundMsgModal(prev => prev ? { ...prev, isCopied: true } : null);
+                                }}
+                                className={`flex-1 py-3 rounded-xl font-bold text-sm text-white shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                                    linePayRefundMsgModal.isCopied
+                                        ? 'bg-emerald-600 shadow-emerald-500/20'
+                                        : 'bg-rose-600 hover:bg-rose-700 shadow-rose-500/25 active:scale-95'
+                                }`}
+                            >
+                                {linePayRefundMsgModal.isCopied ? '✅ 已成功複製退款訊息！(再按可重新複製)' : '📋 點擊一鍵複製退款訊息'}
                             </button>
                         </div>
                     </div>
