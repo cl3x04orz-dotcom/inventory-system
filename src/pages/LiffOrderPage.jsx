@@ -1265,6 +1265,20 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         } catch (e) {
           console.error("Failed to save urlBuilding to localStorage:", e);
         }
+      } else {
+        // 當次開啟無專屬大樓參數，重置 urlBuilding
+        setUrlBuilding("");
+        // 若當前 localStorage 殘留過去點擊的特定實體大樓，但本次開啟並非專屬連結，預設為「線上下單」避免跨群組污染
+        try {
+          const savedStr = localStorage.getItem(LS_KEY);
+          if (savedStr) {
+            const savedObj = JSON.parse(savedStr);
+            const isVirtual = ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(savedObj.building);
+            if (!isVirtual) {
+              setSelectedBuilding("線上下單");
+            }
+          }
+        } catch (_) {}
       }
       if (urlGrp) {
         setSourceGroup(urlGrp);
@@ -1313,22 +1327,13 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
   // ── 鎖定與已知大樓邏輯 ──────────────────────────────────────────
   const lockedBuilding = useMemo(() => {
-    if (urlBuilding && urlBuilding !== "一般散客") return urlBuilding;
-    if (sourceGroup && groupBindings[sourceGroup] && groupBindings[sourceGroup] !== "一般散客") {
+    const isVirtual = (b) => ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(String(b || '').trim());
+    if (urlBuilding && !isVirtual(urlBuilding)) return urlBuilding;
+    if (sourceGroup && groupBindings[sourceGroup] && !isVirtual(groupBindings[sourceGroup])) {
       return groupBindings[sourceGroup];
     }
-    // 如果 URL 沒有，但 localStorage 有儲存社區大樓且非一般用戶/散客，也將其視為 lockedBuilding
-    try {
-      const savedStr = localStorage.getItem("inventory_liff_order");
-      if (savedStr) {
-        const savedObj = JSON.parse(savedStr);
-        const b = savedObj.building;
-        const isVirtual = ["線上下單", "一般散客", "一般用戶", "上線下單", "線上下單", "一般常態", "常態零售"].includes(b);
-        if (b && !isVirtual) {
-          return b;
-        }
-      }
-    } catch (_) { }
+    // ⚠️ 修正：嚴格移除 localStorage 對 lockedBuilding 的覆寫！
+    // 歷史本地快取絕不能被當作「強制鎖定大樓」，只有當次專屬 URL 或專屬群組綁定才具備鎖定資格。
     return "";
   }, [urlBuilding, sourceGroup, groupBindings]);
 
@@ -2565,19 +2570,20 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
           setDetailAddress(savedDetail);
           setCompanyName(savedCompany);
         } else {
-          if (knownBuildings.includes(savedBuilding)) {
-            setSelectedBuilding(savedBuilding);
-            setDetailAddress(savedDetail);
-            setCompanyName(savedCompany);
-          } else if (savedBuilding) {
-            setSelectedBuilding("其它");
-            setOtherBuildingText(savedBuilding);
-            setDetailAddress(savedDetail);
-            setCompanyName(savedCompany);
+          // 當前未被強制鎖定大樓時，若有明確 urlBuilding 則使用之，否則若過去存的是非當前專屬的實體大樓，預設回歸為線上下單
+          if (urlBuilding) {
+            setSelectedBuilding(urlBuilding);
           } else {
-            setDetailAddress(savedDetail);
-            setCompanyName(savedCompany);
+            const isVirtual = ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(savedBuilding);
+            if (isVirtual) {
+              setSelectedBuilding(savedBuilding || "線上下單");
+            } else {
+              // 過去曾點過特定實體大樓，但本次開啟並非專屬連結，不被舊大樓綁架
+              setSelectedBuilding("線上下單");
+            }
           }
+          setDetailAddress(savedDetail);
+          setCompanyName(savedCompany);
         }
       } else if (saved.address) {
         let addr = String(saved.address).trim();
