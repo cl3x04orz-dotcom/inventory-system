@@ -174,6 +174,41 @@ const formatTaiwanPhone = (phone) => {
   return { phone: digits, ext };
 };
 
+// ── 專屬限定商品網址參數解析輔助函式 (?products=柳營鮮乳:2,原味手工奶酪:1) ──────────
+const parseProductsUrlParam = (raw) => {
+  if (!raw || typeof raw !== 'string') return null;
+  try {
+    const decoded = decodeURIComponent(raw).trim();
+    if (!decoded) return null;
+    const map = {};
+    decoded.split(',').forEach(item => {
+      const trimmed = item.trim();
+      if (!trimmed) return;
+      const colonIdx = trimmed.lastIndexOf(':');
+      if (colonIdx > 0) {
+        const k = trimmed.slice(0, colonIdx).trim();
+        const limit = parseInt(trimmed.slice(colonIdx + 1).trim(), 10);
+        if (k) map[k] = (!isNaN(limit) && limit > 0) ? limit : Infinity;
+      } else {
+        map[trimmed] = Infinity;
+      }
+    });
+    return Object.keys(map).length > 0 ? map : null;
+  } catch (e) {
+    console.warn('Failed to parse products URL param:', e);
+    return null;
+  }
+};
+
+const getProductLinkLimit = (prod, allowedMap) => {
+  if (!allowedMap || !prod) return null;
+  const pId = String(prod.id ?? '').trim();
+  const pName = String(prod.name ?? '').trim();
+  if (pId && allowedMap[pId] !== undefined) return allowedMap[pId];
+  if (pName && allowedMap[pName] !== undefined) return allowedMap[pName];
+  return null;
+};
+
 // 全域鎖：防止 React 嚴格模式或重複 Render 觸發多次 LIFF 初始化與登入轉址
 let isLiffInitStarted = false;
 let isLiffInitialized = false;
@@ -329,6 +364,29 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
   // ── 新增：網址大樓參數、大樓時段設定與下單資訊 ───────────────
   const [urlBuilding, setUrlBuilding] = useState("");
+  const [urlAllowedProducts, setUrlAllowedProducts] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      let liffStateParams = null;
+      const liffState = params.get('liff.state');
+      if (liffState) {
+        try {
+          const stateStr = liffState.startsWith('?') ? liffState.slice(1) : liffState;
+          liffStateParams = new URLSearchParams(stateStr);
+        } catch (_) {}
+      }
+      const hashStr = window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '';
+      const hashParams = new URLSearchParams(hashStr);
+
+      const raw = liffStateParams?.get('products') || liffStateParams?.get('prods')
+        || params.get('products') || params.get('prods')
+        || hashParams.get('products') || hashParams.get('prods');
+
+      return parseProductsUrlParam(raw);
+    } catch (_) {
+      return null;
+    }
+  });
   const [buildingSettings, setBuildingSettings] = useState([]);
   const [tick, setTick] = useState(0);
   const [successOrderTotal, setSuccessOrderTotal] = useState(0);
@@ -1257,6 +1315,13 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
       const buildingParam = getParam("building");
       const urlGrp = getParam("grp");
+      const urlProductsParam = getParam("products") || getParam("prods");
+      if (urlProductsParam) {
+        const parsed = parseProductsUrlParam(urlProductsParam);
+        if (parsed) {
+          setUrlAllowedProducts(parsed);
+        }
+      }
       if (buildingParam) {
         setUrlBuilding(buildingParam);
         setSelectedBuilding(buildingParam);
@@ -1470,11 +1535,16 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
       return true; // 未設定白名單 (空陣列/null) ➔ 全社區開放
     });
 
-    // 2. 關鍵字搜尋過濾
+    // 2. 專屬指定商品過濾 (若網址包含 ?products=PROD1:1,PROD2:2 參數，僅開放指定商品)
+    if (urlAllowedProducts) {
+      list = list.filter((p) => getProductLinkLimit(p, urlAllowedProducts) !== null);
+    }
+
+    // 3. 關鍵字搜尋過濾
     if (!searchQuery.trim()) return list;
     const query = searchQuery.toLowerCase().trim();
     return list.filter((p) => p.name && p.name.toLowerCase().includes(query));
-  }, [products, searchQuery, selectedCommunityId, selectedBuilding, currentCommunity, allCommunities]);
+  }, [products, searchQuery, selectedCommunityId, selectedBuilding, currentCommunity, allCommunities, urlAllowedProducts]);
 
   // ── 分類邏輯 ─────────────────────────────────────────────────
   const categories = useMemo(() => {
@@ -1622,6 +1692,23 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     }, 150);
 
     const prod = products.find(p => p.id === pid);
+
+    // ★ 專屬指定商品連結限購檢查 (與活動配額形成雙重保護)
+    if (prod && delta > 0) {
+      const linkLimit = getProductLinkLimit(prod, urlAllowedProducts);
+      if (linkLimit !== null && Number.isFinite(linkLimit)) {
+        const totalCartQty = isGroupOrder
+          ? Object.values(groupCart).reduce((sum, itemMap) => sum + (itemMap?.[pid] || 0), 0)
+          : (cart[pid] || 0);
+
+        if (totalCartQty + delta > linkLimit) {
+          const unit = (prod?.isBundle || Number(prod?.bundleSize) > 1) ? '組' : '入';
+          alert(`【${prod.name}】\n⚠️ 此專屬連結限定最多購買 ${linkLimit} ${unit}！\n\n已達限定數量上限，無法再增加數量囉！`);
+          return;
+        }
+      }
+    }
+
     const quotaInfo = getProductQuotaInfo(prod);
     if (prod && quotaInfo.hasQuota && delta > 0) {
       const remaining = quotaInfo.remaining;
@@ -1689,6 +1776,17 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
       handleProductAction(prod, delta > 0);
       return;
     }
+    if (prod && delta > 0) {
+      const linkLimit = getProductLinkLimit(prod, urlAllowedProducts);
+      if (linkLimit !== null && Number.isFinite(linkLimit)) {
+        const totalCartQty = Object.values(groupCart).reduce((sum, itemMap) => sum + (itemMap?.[pid] || 0), 0);
+        if (totalCartQty + delta > linkLimit) {
+          const unit = (prod?.isBundle || Number(prod?.bundleSize) > 1) ? '組' : '入';
+          alert(`【${prod.name}】\n⚠️ 此專屬連結限定最多購買 ${linkLimit} ${unit}！\n\n已達限定數量上限，無法再增加數量囉！`);
+          return;
+        }
+      }
+    }
     setGroupCart((prev) => {
       const recipientItems = prev[memberName] || {};
       const currentQty = recipientItems[pid] || 0;
@@ -1716,9 +1814,17 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
       qty = Math.max(0, Math.min(99, qty));
     }
 
-    // 配額上限限制
+    // 專屬連結限額與配額上限限制 (取最嚴格雙重保護)
     if (qty !== "" && qty > 0) {
       const prod = products.find(p => p.id === pid);
+      if (prod) {
+        const linkLimit = getProductLinkLimit(prod, urlAllowedProducts);
+        if (linkLimit !== null && Number.isFinite(linkLimit) && qty > linkLimit) {
+          const unit = (prod?.isBundle || Number(prod?.bundleSize) > 1) ? '組' : '入';
+          alert(`【${prod.name}】\n⚠️ 此專屬連結限定最多購買 ${linkLimit} ${unit}！\n\n已自動為您調整為上限數量！`);
+          qty = linkLimit;
+        }
+      }
       const quotaInfo = getProductQuotaInfo(prod);
       if (prod && quotaInfo.hasQuota) {
         const remaining = quotaInfo.remaining;
@@ -1905,6 +2011,16 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     });
 
     const total = Object.values(cleanedTempFlavorQty).reduce((a, b) => a + b, 0);
+
+    // ★ 專屬指定商品連結限購檢查
+    if (total > 0 && flavorModalProduct) {
+      const linkLimit = getProductLinkLimit(flavorModalProduct, urlAllowedProducts);
+      if (linkLimit !== null && Number.isFinite(linkLimit) && total > linkLimit) {
+        const unit = (flavorModalProduct?.isBundle || Number(flavorModalProduct?.bundleSize) > 1) ? '組' : '入';
+        alert(`【${flavorModalProduct.name}】\n⚠️ 此專屬連結限定最多購買 ${linkLimit} ${unit}！\n您的選擇數量：${total} ${unit}\n\n選擇數量已超出上限！`);
+        return;
+      }
+    }
 
     // 配額檢查：支援社區專屬與全局限量
     const quotaInfo = getProductQuotaInfo(flavorModalProduct);
@@ -6304,13 +6420,24 @@ ${freeNote(newFee, newMin)}
             onScroll={handleScroll}
             className={`flex-1 overflow-y-auto ${totalQty > 0 ? (isGeneralUser && selectedCommunityId ? 'pb-[116px]' : 'pb-[80px]') : 'pb-3'} relative overscroll-contain`}
           >
+            {urlAllowedProducts && (
+              <div className="mx-4 mt-3 mb-2 p-3 rounded-2xl bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 border border-blue-500/25 flex items-center gap-3 shadow-xs">
+                <span className="text-xl shrink-0">🏷️</span>
+                <div className="text-xs">
+                  <div className="font-extrabold text-blue-600 dark:text-blue-400 text-sm">專屬限定下單品項</div>
+                  <div className="text-[var(--text-secondary)] mt-0.5">本頁面僅開放特定商品下單，如需選購其他商品請聯繫團購主</div>
+                </div>
+              </div>
+            )}
             {products.length === 0 ? (
               <div className="text-center py-16 text-[var(--text-secondary)]">
                 目前沒有商品
               </div>
             ) : filteredProducts.length === 0 ? (
               <div className="text-center py-16 text-[var(--text-secondary)]">
-                找不到符合「{searchQuery}」的商品
+                {urlAllowedProducts
+                  ? "專屬連結指定的商品目前未在此社區上架或已停售"
+                  : (searchQuery ? `找不到符合「${searchQuery}」的商品` : "目前沒有商品")}
               </div>
             ) : (
               groupedProducts.map(({ cat, items }) => (
@@ -6461,6 +6588,16 @@ ${freeNote(newFee, newMin)}
                                     {remaining === 0
                                       ? (isComm ? '🚫 本社區專屬額度已售完' : '🚫 已售完')
                                       : (isComm ? `⚡️ 本社區獨家專屬 剩 ${remaining} ${unit}` : `⚡️ 活動限量 剩 ${remaining} ${unit}`)}
+                                  </span>
+                                );
+                              })()}
+                              {(() => {
+                                const linkLimit = getProductLinkLimit(product, urlAllowedProducts);
+                                if (linkLimit === null || !Number.isFinite(linkLimit)) return null;
+                                const unit = (product?.isBundle || Number(product?.bundleSize) > 1) ? '組' : '入';
+                                return (
+                                  <span className="inline-block text-[10px] px-2 py-0.5 rounded-full mt-1 font-extrabold text-amber-800 bg-amber-500/15 border border-amber-300/60 shadow-2xs">
+                                    🔒 專屬連結限購 {linkLimit} {unit}
                                   </span>
                                 );
                               })()}

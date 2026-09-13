@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Package, Search, RefreshCw, Save, Image, Edit2, ChevronDown, ChevronUp, Check, AlertCircle, Store, Barcode, DollarSign, TrendingUp, Zap, X, ScanLine, AlertTriangle, Clock, ShieldAlert, Trash2 } from 'lucide-react';
+import { Package, Search, RefreshCw, Save, Image, Edit2, ChevronDown, ChevronUp, Check, AlertCircle, Store, Barcode, DollarSign, TrendingUp, Zap, X, ScanLine, AlertTriangle, Clock, ShieldAlert, Trash2, Link2, Copy } from 'lucide-react';
 import { callGAS } from '../utils/api';
+import { copyToClipboard } from '../utils/clipboard';
 
 export default function ProductManagementPage({ user, apiUrl }) {
     const [products, setProducts] = useState([]);
@@ -14,6 +15,13 @@ export default function ProductManagementPage({ user, apiUrl }) {
     const [stockFilter, setStockFilter] = useState('ALL'); // 'ALL' | 'HAS_STOCK' | 'NO_STOCK'
     const [communities, setCommunities] = useState([]); // [{ communityId, communityName }]
     const [activeTabs, setActiveTabs] = useState({}); // { [productId]: 'basic' | 'promo' | 'community' | 'ai' }
+
+    // ── 專屬商品下單連結 State ────────────────────────────────────────
+    const [selectedProductIds, setSelectedProductIds] = useState(new Set());
+    const [showLinkModal, setShowLinkModal] = useState(false);
+    const [linkLimits, setLinkLimits] = useState({}); // { [productId]: number | '' }
+    const [linkSelectedBuilding, setLinkSelectedBuilding] = useState('');
+    const [linkCopied, setLinkCopied] = useState(false);
 
     // ── 效期預警彈窗 (低於 7 天) State ──────────────────────────────
     const [showExpiryModal, setShowExpiryModal] = useState(false);
@@ -287,6 +295,70 @@ export default function ProductManagementPage({ user, apiUrl }) {
         return true;
     });
 
+    // ── 專屬限定商品連結處理函式 ──────────────────────────────────────
+    const toggleSelectProduct = (productId) => {
+        setSelectedProductIds(prev => {
+            const next = new Set(prev);
+            if (next.has(productId)) {
+                next.delete(productId);
+            } else {
+                next.add(productId);
+            }
+            return next;
+        });
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedProductIds.size === filtered.length) {
+            setSelectedProductIds(new Set());
+        } else {
+            setSelectedProductIds(new Set(filtered.map(p => p.id)));
+        }
+    };
+
+    const handleOpenLinkModal = () => {
+        if (selectedProductIds.size === 0) return;
+        setShowLinkModal(true);
+        setLinkCopied(false);
+    };
+
+    // 產生專屬限定下單連結
+    const generatedLiffUrl = useMemo(() => {
+        if (selectedProductIds.size === 0) return '';
+        const LIFF_ID = import.meta.env.VITE_LIFF_ID || '2010308873-ur2zL2cc';
+        const parts = [];
+        selectedProductIds.forEach(id => {
+            const p = products.find(item => item.id === id);
+            if (!p) return;
+            const name = p.name ? p.name.trim() : p.id;
+            const limitVal = linkLimits[id];
+            const limitNum = parseInt(limitVal, 10);
+            if (!isNaN(limitNum) && limitNum > 0) {
+                parts.push(`${name}:${limitNum}`);
+            } else {
+                parts.push(name);
+            }
+        });
+        if (parts.length === 0) return '';
+
+        let url = `https://liff.line.me/${LIFF_ID}?products=${encodeURIComponent(parts.join(','))}`;
+        if (linkSelectedBuilding && linkSelectedBuilding.trim()) {
+            url += `&building=${encodeURIComponent(linkSelectedBuilding.trim())}`;
+        }
+        return url;
+    }, [selectedProductIds, products, linkLimits, linkSelectedBuilding]);
+
+    const handleCopyDedicatedLink = async () => {
+        if (!generatedLiffUrl) return;
+        const ok = await copyToClipboard(generatedLiffUrl);
+        if (ok) {
+            setLinkCopied(true);
+            setTimeout(() => setLinkCopied(false), 2500);
+        } else {
+            alert('複製失敗，請手動選取下方網址複製');
+        }
+    };
+
     return (
         <div className="max-w-6xl mx-auto h-[calc(100vh-6rem)] flex flex-col p-4 gap-4">
             {/* Header Area */}
@@ -334,6 +406,40 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 </div>
             </div>
 
+            {/* 專屬連結選取工具列 */}
+            {selectedProductIds.size > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-gradient-to-r from-blue-500/15 via-indigo-500/10 to-blue-500/5 border border-blue-500/30 rounded-2xl shadow-sm animate-in fade-in duration-150 shrink-0">
+                    <div className="flex items-center gap-2.5">
+                        <span className="text-xs font-bold text-blue-700 dark:text-blue-300">
+                            已選取 <span className="text-sm font-black text-blue-600 dark:text-blue-400 font-mono">{selectedProductIds.size}</span> 項商品
+                        </span>
+                        <span className="text-slate-300 dark:text-slate-700">|</span>
+                        <button
+                            type="button"
+                            onClick={toggleSelectAll}
+                            className="text-xs text-[var(--text-secondary)] hover:text-blue-600 font-medium cursor-pointer"
+                        >
+                            {selectedProductIds.size === filtered.length ? '取消全選' : '全選篩選結果'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setSelectedProductIds(new Set())}
+                            className="text-xs text-rose-500 hover:text-rose-600 font-medium cursor-pointer ml-1"
+                        >
+                            清除
+                        </button>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleOpenLinkModal}
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 text-white text-xs font-extrabold shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+                    >
+                        <Link2 size={15} />
+                        <span>產生指定商品下單連結</span>
+                    </button>
+                </div>
+            )}
+
             {/* Product List */}
             <div className="flex-1 overflow-y-auto pb-6">
                 {loading && products.length === 0 ? (
@@ -363,6 +469,27 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                         onClick={() => toggleExpand(product.id)}
                                         className="flex items-center gap-3 md:gap-4 p-4 md:p-5 hover:bg-[var(--bg-tertiary)]/20 transition-all rounded-t-2xl cursor-pointer select-none"
                                     >
+                                        {/* 勾選方塊 (產生專屬限定連結用) */}
+                                        <button 
+                                            type="button"
+                                            className="flex items-center justify-center p-1 -ml-1 cursor-pointer shrink-0 rounded-lg hover:bg-blue-50/80 dark:hover:bg-slate-800 transition-colors"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleSelectProduct(product.id);
+                                            }}
+                                            title={selectedProductIds.has(product.id) ? "取消選取" : "選取此商品"}
+                                        >
+                                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shadow-2xs ${
+                                                selectedProductIds.has(product.id)
+                                                    ? 'bg-blue-500 border-blue-500 text-white'
+                                                    : 'bg-white border-slate-300 hover:border-blue-400'
+                                            }`}>
+                                                {selectedProductIds.has(product.id) && (
+                                                    <Check size={13} strokeWidth={3.5} className="text-white" />
+                                                )}
+                                            </div>
+                                        </button>
+
                                         {/* 商品大圖 */}
                                         <div 
                                             className="w-14 h-14 md:w-16 md:h-16 rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] overflow-hidden flex items-center justify-center flex-shrink-0 shadow-inner"
@@ -1238,6 +1365,128 @@ export default function ProductManagementPage({ user, apiUrl }) {
                     </div>
                 )}
             </div>
+
+            {/* 🔗 產生指定商品專屬下單連結 Modal */}
+            {showLinkModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+                    <div className="bg-[var(--bg-secondary)] w-full max-w-lg rounded-3xl p-5 md:p-6 shadow-2xl border border-[var(--border-primary)] flex flex-col gap-4 animate-in zoom-in-95 duration-200 max-h-[88vh]">
+                        {/* 標頭 */}
+                        <div className="flex items-center justify-between pb-3 border-b border-[var(--border-primary)]">
+                            <h3 className="text-base font-extrabold text-[var(--text-primary)] flex items-center gap-2">
+                                <Link2 size={18} className="text-blue-600" />
+                                產生指定商品專屬下單連結
+                            </h3>
+                            <button
+                                onClick={() => setShowLinkModal(false)}
+                                className="p-1.5 rounded-xl text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)] transition-all cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* 說明文字 */}
+                        <p className="text-xs text-[var(--text-secondary)] leading-relaxed bg-blue-500/5 p-3 rounded-xl border border-blue-500/15">
+                            💡 顧客點開此專屬連結後，<strong>商城只會顯示您選取的這些商品</strong>（其他商品完全隱藏）。您亦可為各商品設定每人限購數量，避免遭超額下單。
+                        </p>
+
+                        {/* 商品設定清單 */}
+                        <div className="overflow-y-auto max-h-[36vh] space-y-2 pr-1">
+                            {Array.from(selectedProductIds).map(id => {
+                                const p = products.find(item => item.id === id);
+                                if (!p) return null;
+                                const stock = stockMap[p.name] ?? 0;
+                                return (
+                                    <div key={id} className="flex items-center justify-between gap-3 p-2.5 rounded-2xl bg-[var(--bg-tertiary)]/50 border border-[var(--border-primary)] text-xs">
+                                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                            {p.imageUrl ? (
+                                                <img src={p.imageUrl} alt={p.name} className="w-9 h-9 rounded-xl object-cover shrink-0" />
+                                            ) : (
+                                                <div className="w-9 h-9 rounded-xl bg-[var(--bg-tertiary)] flex items-center justify-center shrink-0">
+                                                    <Package size={16} className="text-[var(--text-tertiary)]" />
+                                                </div>
+                                            )}
+                                            <div className="min-w-0 flex-1">
+                                                <div className="font-bold text-[var(--text-primary)] truncate">{p.name}</div>
+                                                <div className="text-[10px] text-[var(--text-tertiary)]">庫存：{stock}</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <span className="text-[11px] text-[var(--text-secondary)]">每人限購：</span>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="999"
+                                                placeholder="不限"
+                                                value={linkLimits[id] ?? ''}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setLinkLimits(prev => ({ ...prev, [id]: val }));
+                                                }}
+                                                className="w-16 px-2 py-1 text-center font-bold text-xs rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500"
+                                            />
+                                            <span className="text-[11px] text-[var(--text-tertiary)]">件</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* 指定社區/大樓 (選填) */}
+                        <div className="flex items-center gap-2 pt-1">
+                            <span className="text-xs font-bold text-[var(--text-secondary)] whitespace-nowrap">綁定社區/大樓：</span>
+                            <select
+                                value={linkSelectedBuilding}
+                                onChange={(e) => setLinkSelectedBuilding(e.target.value)}
+                                className="flex-1 py-1.5 px-3 text-xs rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500"
+                            >
+                                <option value="">一般線上散客 (預設)</option>
+                                {communities.map(c => (
+                                    <option key={c.communityId} value={c.communityName}>
+                                        {c.communityName}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* 連結預覽與操作按鈕 */}
+                        <div className="pt-2 flex flex-col gap-2.5">
+                            <input
+                                type="text"
+                                readOnly
+                                value={generatedLiffUrl}
+                                className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] select-all"
+                                onClick={(e) => e.target.select()}
+                            />
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleCopyDedicatedLink}
+                                    className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                                >
+                                    {linkCopied ? (
+                                        <>
+                                            <Check size={16} className="text-emerald-300" />
+                                            <span>✅ 已複製專屬連結！</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Copy size={16} />
+                                            <span>複製專屬下單連結</span>
+                                        </>
+                                    )}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowLinkModal(false)}
+                                    className="py-2.5 px-4 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-bold cursor-pointer"
+                                >
+                                    關閉
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ⚠️ 商品效期過期預警與即時下架 Modal 彈窗 (高對比明亮主題 + 清除日期功能) */}
             {showExpiryModal && (
