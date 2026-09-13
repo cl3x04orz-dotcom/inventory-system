@@ -6425,7 +6425,7 @@ ${freeNote(newFee, newMin)}
                 <span className="text-xl shrink-0">🏷️</span>
                 <div className="text-xs">
                   <div className="font-extrabold text-blue-600 dark:text-blue-400 text-sm">專屬限定下單品項</div>
-                  <div className="text-[var(--text-secondary)] mt-0.5">本頁面僅開放特定商品下單，如需選購其他商品請聯繫團購主</div>
+                  <div className="text-[var(--text-secondary)] mt-0.5">本頁面僅開放特定商品下單，如需選購其他商品請聯繫小編</div>
                 </div>
               </div>
             )}

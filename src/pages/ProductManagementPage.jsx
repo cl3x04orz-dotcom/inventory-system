@@ -19,11 +19,36 @@ export default function ProductManagementPage({ user, apiUrl }) {
     // ── 專屬商品下單連結 State ────────────────────────────────────────
     const [selectedProductIds, setSelectedProductIds] = useState(new Set());
     const [showLinkModal, setShowLinkModal] = useState(false);
-    const [linkLimits, setLinkLimits] = useState({}); // { [productId]: number | '' } 每人每次限購
-    const [linkMaxTotalLimits, setLinkMaxTotalLimits] = useState({}); // { [productId]: number | '' } 後端活動總限量 (真正鎖死售完)
+    const [linkMaxTotalLimits, setLinkMaxTotalLimits] = useState({}); // { [productId]: number | '' } 活動總釋出量 (後端直接鎖定)
+    const [modalAllowedCommunityIds, setModalAllowedCommunityIds] = useState([]);
+    const [modalCommunityQuotas, setModalCommunityQuotas] = useState({}); // { [communityKey]: maxQty }
     const [linkSelectedBuilding, setLinkSelectedBuilding] = useState('');
     const [linkCopied, setLinkCopied] = useState(false);
     const [isSavingLinkQuota, setIsSavingLinkQuota] = useState(false);
+
+    // 計算可見社區清單 (排除行政區與隱藏社區)
+    const visibleCommunities = useMemo(() => {
+        let hiddenBuildings = [];
+        try {
+            const saved = localStorage.getItem('admin_hidden_buildings');
+            if (saved) hiddenBuildings = JSON.parse(saved);
+        } catch (_) {}
+
+        return communities.filter(c => {
+            const cid = c.communityId || c.CommunityId;
+            const cname = String(c.communityName || c.CommunityName || '').trim();
+            if (c.status && c.status !== 'ACTIVE') return false;
+            if (hiddenBuildings.includes(cname) || hiddenBuildings.includes(cid)) return false;
+
+            if (!['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售'].includes(cname)) {
+                const cleanName = cname.replace(/^(台南市|高雄市|台灣|臺灣)/, '').trim();
+                if (cleanName.endsWith('區') && !cleanName.includes('大樓') && !cleanName.includes('社區') && !cleanName.includes('華廈') && !cleanName.includes('莊園') && !cleanName.includes('山莊') && !cleanName.includes('大廈')) {
+                    return false;
+                }
+            }
+            return true;
+        });
+    }, [communities]);
 
     // ── 效期預警彈窗 (低於 7 天) State ──────────────────────────────
     const [showExpiryModal, setShowExpiryModal] = useState(false);
@@ -320,63 +345,95 @@ export default function ProductManagementPage({ user, apiUrl }) {
 
     const handleOpenLinkModal = () => {
         if (selectedProductIds.size === 0) return;
+        
+        // 1. 初始化各商品活動總釋出量
         const initialMax = {};
-        const initialPerPerson = {};
         selectedProductIds.forEach(id => {
             const p = products.find(item => item.id === id);
             if (p) {
                 initialMax[id] = (p.maxTotalQty !== undefined && p.maxTotalQty !== null && p.maxTotalQty !== '') ? p.maxTotalQty : '';
-                initialPerPerson[id] = linkLimits[id] ?? '';
             }
         });
         setLinkMaxTotalLimits(initialMax);
-        setLinkLimits(initialPerPerson);
+
+        // 2. 從第一個選中的商品初始化開放社區與社區配額設定
+        const firstId = Array.from(selectedProductIds)[0];
+        const firstProduct = products.find(p => p.id === firstId);
+        
+        if (firstProduct) {
+            setModalAllowedCommunityIds(Array.isArray(firstProduct.allowedCommunityIds) ? [...firstProduct.allowedCommunityIds] : []);
+            const initialQuotas = {};
+            const qObj = firstProduct.communityQuotas || {};
+            Object.entries(qObj).forEach(([k, v]) => {
+                if (v && v.maxQty !== undefined && v.maxQty !== null) {
+                    initialQuotas[k] = v.maxQty;
+                }
+            });
+            setModalCommunityQuotas(initialQuotas);
+        } else {
+            setModalAllowedCommunityIds([]);
+            setModalCommunityQuotas({});
+        }
+
         setShowLinkModal(true);
         setLinkCopied(false);
     };
 
-    // 產生專屬限定下單連結
+    // 產生專屬限定下單連結 (僅帶商品名稱，不再設定每人限購 :limit)
     const generatedLiffUrl = useMemo(() => {
         if (selectedProductIds.size === 0) return '';
         const LIFF_ID = import.meta.env.VITE_LIFF_ID || '2010308873-ur2zL2cc';
-        const parts = [];
+        const names = [];
         selectedProductIds.forEach(id => {
             const p = products.find(item => item.id === id);
             if (!p) return;
             const name = p.name ? p.name.trim() : p.id;
-            const limitVal = linkLimits[id];
-            const limitNum = parseInt(limitVal, 10);
-            if (!isNaN(limitNum) && limitNum > 0) {
-                parts.push(`${name}:${limitNum}`);
-            } else {
-                parts.push(name);
-            }
+            names.push(name);
         });
-        if (parts.length === 0) return '';
+        if (names.length === 0) return '';
 
-        let url = `https://liff.line.me/${LIFF_ID}?products=${encodeURIComponent(parts.join(','))}`;
+        let url = `https://liff.line.me/${LIFF_ID}?products=${encodeURIComponent(names.join(','))}`;
         if (linkSelectedBuilding && linkSelectedBuilding.trim()) {
             url += `&building=${encodeURIComponent(linkSelectedBuilding.trim())}`;
         }
         return url;
-    }, [selectedProductIds, products, linkLimits, linkSelectedBuilding]);
+    }, [selectedProductIds, products, linkSelectedBuilding]);
 
     const handleCopyDedicatedLink = async () => {
         if (!generatedLiffUrl) return;
 
         setIsSavingLinkQuota(true);
         try {
-            // 同步更新選定商品的「活動總限量上限 (maxTotalQty)」至後端資料庫，由資料庫進行絕對鎖定！
+            // 同步更新選定商品的「活動總釋出量 (maxTotalQty)」、「開放社區 (allowedCommunityIds)」與「社區獨家搶購配額 (communityQuotas)」至後端資料庫
             const savePromises = [];
             selectedProductIds.forEach(id => {
-                const val = linkMaxTotalLimits[id];
                 const p = products.find(item => item.id === id);
                 if (!p) return;
-                const newMax = (val !== '' && val !== undefined && val !== null) ? Number(val) : null;
-                if (p.maxTotalQty !== newMax) {
-                    handleFieldChange(id, 'maxTotalQty', newMax);
-                    savePromises.push(handleSaveProduct(id, { maxTotalQty: newMax }));
-                }
+
+                const maxVal = linkMaxTotalLimits[id];
+                const newMaxTotal = (maxVal !== '' && maxVal !== undefined && maxVal !== null) ? Number(maxVal) : null;
+
+                const nextQuotas = { ...(p.communityQuotas || {}) };
+                Object.entries(modalCommunityQuotas).forEach(([commKey, val]) => {
+                    if (val !== '' && val !== null && val !== undefined) {
+                        const existingSold = nextQuotas[commKey]?.soldQty || 0;
+                        nextQuotas[commKey] = {
+                            maxQty: Number(val),
+                            soldQty: existingSold
+                        };
+                    } else {
+                        delete nextQuotas[commKey];
+                    }
+                });
+
+                handleFieldChange(id, 'maxTotalQty', newMaxTotal);
+                handleFieldChange(id, 'allowedCommunityIds', modalAllowedCommunityIds);
+                handleFieldChange(id, 'communityQuotas', nextQuotas);
+                savePromises.push(handleSaveProduct(id, {
+                    maxTotalQty: newMaxTotal,
+                    allowedCommunityIds: modalAllowedCommunityIds,
+                    communityQuotas: nextQuotas
+                }));
             });
 
             if (savePromises.length > 0) {
@@ -391,8 +448,8 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 alert('複製失敗，請手動選取下方網址複製');
             }
         } catch (err) {
-            console.error('儲存活動配額失敗:', err);
-            alert('儲存商品活動總配額失敗: ' + err.message);
+            console.error('儲存社區與配額失敗:', err);
+            alert('儲存社區與配額失敗: ' + err.message);
         } finally {
             setIsSavingLinkQuota(false);
         }
@@ -1408,7 +1465,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
             {/* 🔗 產生指定商品專屬下單連結 Modal */}
             {showLinkModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-                    <div className="bg-[var(--bg-secondary)] w-full max-w-lg rounded-3xl p-5 md:p-6 shadow-2xl border border-[var(--border-primary)] flex flex-col gap-4 animate-in zoom-in-95 duration-200 max-h-[88vh]">
+                    <div className="bg-[var(--bg-secondary)] w-full max-w-2xl rounded-3xl p-5 md:p-6 shadow-2xl border border-[var(--border-primary)] flex flex-col gap-4 animate-in zoom-in-95 duration-200 max-h-[90vh]">
                         {/* 標頭 */}
                         <div className="flex items-center justify-between pb-3 border-b border-[var(--border-primary)]">
                             <h3 className="text-base font-extrabold text-[var(--text-primary)] flex items-center gap-2">
@@ -1423,105 +1480,195 @@ export default function ProductManagementPage({ user, apiUrl }) {
                             </button>
                         </div>
 
-                        {/* 說明文字 */}
-                        <div className="text-xs text-[var(--text-secondary)] leading-relaxed bg-blue-500/5 p-3 rounded-2xl border border-blue-500/15 space-y-1">
-                            <p className="font-bold text-blue-700 dark:text-blue-300">💡 專屬連結支援雙重防護設定：</p>
-                            <p>• <strong>活動總釋出量（方案 B）</strong>：設定全店總數量（例：5），系統直接將該商品鎖死在資料庫，所有顧客訂單加總達 5 件後立即售完，任何人都無法再超買！</p>
-                            <p>• <strong>每人限購（選填）</strong>：限制單一顧客/單張訂單最多購買數量（留空代表不限每人件數）。</p>
-                        </div>
-
-                        {/* 商品設定清單 */}
-                        <div className="overflow-y-auto max-h-[36vh] space-y-2.5 pr-1">
-                            {Array.from(selectedProductIds).map(id => {
-                                const p = products.find(item => item.id === id);
-                                if (!p) return null;
-                                const stock = stockMap[p.name] ?? 0;
-                                return (
-                                    <div key={id} className="flex flex-col gap-2.5 p-3 rounded-2xl bg-[var(--bg-tertiary)]/50 border border-[var(--border-primary)] text-xs">
-                                        <div className="flex items-center gap-2.5 min-w-0">
-                                            {p.imageUrl ? (
-                                                <img src={p.imageUrl} alt={p.name} className="w-9 h-9 rounded-xl object-cover shrink-0" />
-                                            ) : (
-                                                <div className="w-9 h-9 rounded-xl bg-[var(--bg-tertiary)] flex items-center justify-center shrink-0">
-                                                    <Package size={16} className="text-[var(--text-tertiary)]" />
-                                                </div>
-                                            )}
-                                            <div className="min-w-0 flex-1">
-                                                <div className="font-bold text-[var(--text-primary)] truncate text-sm">{p.name}</div>
-                                                <div className="text-[11px] text-[var(--text-tertiary)] flex items-center gap-2 mt-0.5">
-                                                    <span>現有庫存：{stock}</span>
-                                                    {p.maxTotalQty !== null && p.maxTotalQty !== undefined && (
-                                                        <span className="text-purple-600 dark:text-purple-400 font-bold">
-                                                            目前已售 {p.soldQty || 0} / 上限 {p.maxTotalQty}
-                                                        </span>
+                        <div className="overflow-y-auto space-y-4 pr-1 max-h-[58vh]">
+                            {/* 1. 已選取的專屬商品與活動總釋出量 */}
+                            <div className="flex flex-col gap-2">
+                                <span className="text-xs font-extrabold text-[var(--text-secondary)]">已選取的專屬商品 ({selectedProductIds.size} 項)</span>
+                                <div className="space-y-2">
+                                    {Array.from(selectedProductIds).map(id => {
+                                        const p = products.find(item => item.id === id);
+                                        if (!p) return null;
+                                        const stock = stockMap[p.name] ?? 0;
+                                        return (
+                                            <div key={id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-[var(--bg-tertiary)]/50 border border-[var(--border-primary)] text-xs">
+                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                    {p.imageUrl ? (
+                                                        <img src={p.imageUrl} alt={p.name} className="w-9 h-9 rounded-xl object-cover shrink-0" />
+                                                    ) : (
+                                                        <div className="w-9 h-9 rounded-xl bg-[var(--bg-tertiary)] flex items-center justify-center shrink-0">
+                                                            <Package size={16} className="text-[var(--text-tertiary)]" />
+                                                        </div>
                                                     )}
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="font-bold text-[var(--text-primary)] truncate text-sm">{p.name}</div>
+                                                        <div className="text-[11px] text-[var(--text-tertiary)] flex items-center gap-2 mt-0.5">
+                                                            <span>現有庫存：{stock}</span>
+                                                            {p.maxTotalQty !== null && p.maxTotalQty !== undefined && (
+                                                                <span className="text-purple-600 dark:text-purple-400 font-bold">
+                                                                    目前已售 {p.soldQty || 0} / 上限 {p.maxTotalQty}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 bg-[var(--bg-secondary)] px-3 py-1.5 rounded-xl border border-[var(--border-primary)]">
+                                                    <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300">🔒 活動總釋出量：</span>
+                                                    <div className="flex items-center gap-1">
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            max="9999"
+                                                            placeholder="不限"
+                                                            value={linkMaxTotalLimits[id] ?? ''}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                setLinkMaxTotalLimits(prev => ({ ...prev, [id]: val }));
+                                                            }}
+                                                            className="w-16 px-1.5 py-0.5 text-center font-bold text-xs rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] focus:outline-none focus:border-purple-500 font-mono"
+                                                        />
+                                                        <span className="text-[10px] text-[var(--text-tertiary)]">件</span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-[var(--border-primary)]/50">
-                                            <div className="flex items-center justify-between bg-[var(--bg-secondary)] px-3 py-1.5 rounded-xl border border-[var(--border-primary)]">
-                                                <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300">🔒 活動總釋出量：</span>
+                            {/* 2. 開放社區（未選擇代表全區開放，勾選「線上下單」代表開放所有行政區與散客） */}
+                            <div className="flex flex-col gap-2 p-3.5 rounded-2xl bg-[var(--bg-tertiary)]/40 border border-[var(--border-primary)]">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[11px] uppercase font-extrabold text-purple-600 dark:text-purple-400 tracking-wider">
+                                        🏠 開放社區（未選擇代表全區開放，勾選「線上下單」代表開放所有行政區與散客）
+                                    </span>
+                                    {modalAllowedCommunityIds.length > 0 && (
+                                        <button
+                                            type="button"
+                                            className="text-[10px] text-red-400 hover:text-red-600 font-bold cursor-pointer"
+                                            onClick={() => setModalAllowedCommunityIds([])}
+                                        >
+                                            清除全部
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                                    {visibleCommunities.map(c => {
+                                        const cid = c.communityId || c.CommunityId;
+                                        const cname = c.communityName || c.CommunityName;
+                                        const checked = modalAllowedCommunityIds.includes(cid) || modalAllowedCommunityIds.includes(cname);
+                                        const isOnlineAll = cname === '線上下單';
+                                        return (
+                                            <label
+                                                key={cid || cname}
+                                                className={`flex items-center gap-2 cursor-pointer group p-1.5 rounded-xl transition-all ${
+                                                    isOnlineAll
+                                                        ? 'bg-purple-500/10 border border-purple-500/30 col-span-full'
+                                                        : 'hover:bg-[var(--bg-secondary)] border border-transparent'
+                                                }`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={checked}
+                                                    onChange={(e) => {
+                                                        const next = new Set(modalAllowedCommunityIds);
+                                                        if (e.target.checked) {
+                                                            if (cid) next.add(cid);
+                                                            if (cname) next.add(cname);
+                                                        } else {
+                                                            if (cid) next.delete(cid);
+                                                            if (cname) next.delete(cname);
+                                                        }
+                                                        setModalAllowedCommunityIds([...next]);
+                                                    }}
+                                                    className="w-3.5 h-3.5 accent-purple-500 cursor-pointer"
+                                                />
+                                                <span className={`text-xs font-bold ${isOnlineAll ? 'text-purple-600 dark:text-purple-400 font-extrabold' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'} truncate`}>
+                                                    {isOnlineAll ? '🛒 線上下單 (自動包含所有行政區與散客)' : cname}
+                                                </span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* 3. 社區獨家搶購配額 (未填寫代表不設上限) */}
+                            <div className="flex flex-col gap-2 p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/5 via-purple-500/5 to-amber-500/5 border border-amber-400/30">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs uppercase font-extrabold text-amber-600 dark:text-amber-400 tracking-wider flex items-center gap-1.5">
+                                        🔥 社區獨家搶購配額 (未填寫代表不設上限)
+                                    </span>
+                                    {Object.keys(modalCommunityQuotas).length > 0 && (
+                                        <button
+                                            type="button"
+                                            className="text-[10px] text-red-400 hover:text-red-600 font-bold cursor-pointer"
+                                            onClick={() => setModalCommunityQuotas({})}
+                                        >
+                                            清除所有社區配額
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto pr-1">
+                                    {visibleCommunities.map(c => {
+                                        const cid = c.communityId || c.CommunityId;
+                                        const cname = c.communityName || c.CommunityName;
+                                        const maxQtyVal = modalCommunityQuotas[cname] !== undefined ? modalCommunityQuotas[cname] : (modalCommunityQuotas[cid] ?? '');
+
+                                        return (
+                                            <div key={cid || cname} className="flex flex-col gap-1 p-2 bg-[var(--bg-secondary)] border border-[var(--border-primary)]/70 rounded-xl shadow-2xs">
+                                                <span className="text-xs font-bold text-[var(--text-primary)] truncate">{cname}</span>
                                                 <div className="flex items-center gap-1">
                                                     <input
                                                         type="number"
                                                         min="1"
-                                                        max="9999"
-                                                        placeholder="不限"
-                                                        value={linkMaxTotalLimits[id] ?? ''}
+                                                        placeholder="無限制"
+                                                        className="input-field text-xs p-1.5 w-full font-mono"
+                                                        value={maxQtyVal}
                                                         onChange={(e) => {
-                                                            const val = e.target.value;
-                                                            setLinkMaxTotalLimits(prev => ({ ...prev, [id]: val }));
+                                                            const val = e.target.value !== '' ? Number(e.target.value) : '';
+                                                            setModalCommunityQuotas(prev => {
+                                                                const next = { ...prev };
+                                                                if (val === '' || val === null) {
+                                                                    delete next[cname];
+                                                                    delete next[cid];
+                                                                } else {
+                                                                    next[cname] = val;
+                                                                }
+                                                                return next;
+                                                            });
                                                         }}
-                                                        className="w-14 px-1.5 py-0.5 text-center font-bold text-xs rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] focus:outline-none focus:border-purple-500"
                                                     />
-                                                    <span className="text-[10px] text-[var(--text-tertiary)]">件</span>
+                                                    <span className="text-[10px] text-[var(--text-tertiary)] shrink-0">件</span>
                                                 </div>
                                             </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
 
-                                            <div className="flex items-center justify-between bg-[var(--bg-secondary)] px-3 py-1.5 rounded-xl border border-[var(--border-primary)]">
-                                                <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300">👤 每人每次限購：</span>
-                                                <div className="flex items-center gap-1">
-                                                    <input
-                                                        type="number"
-                                                        min="1"
-                                                        max="999"
-                                                        placeholder="不限"
-                                                        value={linkLimits[id] ?? ''}
-                                                        onChange={(e) => {
-                                                            const val = e.target.value;
-                                                            setLinkLimits(prev => ({ ...prev, [id]: val }));
-                                                        }}
-                                                        className="w-14 px-1.5 py-0.5 text-center font-bold text-xs rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500"
-                                                    />
-                                                    <span className="text-[10px] text-[var(--text-tertiary)]">件</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {/* 指定社區/大樓 (選填) */}
-                        <div className="flex items-center gap-2 pt-1">
-                            <span className="text-xs font-bold text-[var(--text-secondary)] whitespace-nowrap">綁定社區/大樓：</span>
-                            <select
-                                value={linkSelectedBuilding}
-                                onChange={(e) => setLinkSelectedBuilding(e.target.value)}
-                                className="flex-1 py-1.5 px-3 text-xs rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500"
-                            >
-                                <option value="">一般線上散客 (預設)</option>
-                                {communities.map(c => (
-                                    <option key={c.communityId} value={c.communityName}>
-                                        {c.communityName}
-                                    </option>
-                                ))}
-                            </select>
+                            {/* 4. 指定大樓/社區 (選填，帶入連結網址參數) */}
+                            <div className="flex items-center gap-2 pt-1">
+                                <span className="text-xs font-bold text-[var(--text-secondary)] whitespace-nowrap">綁定專屬連結大樓：</span>
+                                <select
+                                    value={linkSelectedBuilding}
+                                    onChange={(e) => setLinkSelectedBuilding(e.target.value)}
+                                    className="flex-1 py-1.5 px-3 text-xs rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500 cursor-pointer"
+                                >
+                                    <option value="">一般線上散客 (預設)</option>
+                                    {visibleCommunities.map(c => {
+                                        const cname = c.communityName || c.CommunityName;
+                                        return (
+                                            <option key={c.communityId || c.CommunityId} value={cname}>
+                                                {cname}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                            </div>
                         </div>
 
                         {/* 連結預覽與操作按鈕 */}
-                        <div className="pt-2 flex flex-col gap-2.5">
+                        <div className="pt-2 flex flex-col gap-2.5 border-t border-[var(--border-primary)]">
                             <input
                                 type="text"
                                 readOnly
@@ -1539,17 +1686,17 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                     {isSavingLinkQuota ? (
                                         <>
                                             <RefreshCw size={16} className="animate-spin" />
-                                            <span>同步後端配額中...</span>
+                                            <span>儲存配額與設定中...</span>
                                         </>
                                     ) : linkCopied ? (
                                         <>
                                             <Check size={16} className="text-emerald-300" />
-                                            <span>✅ 已同步後端配額並複製連結！</span>
+                                            <span>✅ 已儲存設定並複製專屬連結！</span>
                                         </>
                                     ) : (
                                         <>
                                             <Copy size={16} />
-                                            <span>同步配額並複製專屬連結</span>
+                                            <span>儲存設定並複製專屬連結</span>
                                         </>
                                     )}
                                 </button>
