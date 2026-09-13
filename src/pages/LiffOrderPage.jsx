@@ -317,13 +317,11 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   const [groupBindings, setGroupBindings] = useState({});
   const [selectedBuilding, setSelectedBuilding] = useState(() => {
     try {
-      const savedStr = localStorage.getItem("inventory_liff_order");
-      if (savedStr) {
-        const savedObj = JSON.parse(savedStr);
-        if (savedObj.building) return savedObj.building;
-      }
+      const params = new URLSearchParams(window.location.search);
+      const bParam = params.get("building");
+      if (bParam) return bParam;
     } catch (_) { }
-    return "一般用戶";
+    return "線上下單";
   });
   const [otherBuildingText, setOtherBuildingText] = useState("");
   const [detailAddress, setDetailAddress] = useState("");
@@ -854,7 +852,11 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         // B. 處理 V2 社區與檔期資料
         if (resData.community) {
           setCurrentCommunity(resData.community);
-          setSelectedBuilding(resData.community.CommunityName);
+          if (buildingParam) {
+            setSelectedBuilding(buildingParam);
+          } else {
+            setSelectedBuilding("線上下單");
+          }
 
           const isVirtual = ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(resData.community.CommunityName);
           if (isVirtual) {
@@ -1157,11 +1159,12 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
             if (lockedBuilding) {
               setSelectedBuilding(lockedBuilding);
               savedObj.building = lockedBuilding;
-            } else if (mRes.member.Community) {
-              setSelectedBuilding(mRes.member.Community);
-              savedObj.building = mRes.member.Community;
-            } else if (savedObj.building) {
-              setSelectedBuilding(savedObj.building);
+            } else {
+              if (urlBuilding) {
+                setSelectedBuilding(urlBuilding);
+              } else {
+                setSelectedBuilding("線上下單");
+              }
             }
 
             if (mRes.member.FloorRoom) {
@@ -1268,15 +1271,14 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
       } else {
         // 當次開啟無專屬大樓參數，重置 urlBuilding
         setUrlBuilding("");
-        // 若當前 localStorage 殘留過去點擊的特定實體大樓，但本次開啟並非專屬連結，預設為「線上下單」避免跨群組污染
+        setSelectedBuilding("線上下單");
+        // 清理 localStorage 中殘留的實體大樓，徹底杜絕跨群組污染
         try {
           const savedStr = localStorage.getItem(LS_KEY);
           if (savedStr) {
             const savedObj = JSON.parse(savedStr);
-            const isVirtual = ["線上下單", "一般散客", "一般用戶", "上線下單", "一般常態", "常態零售"].includes(savedObj.building);
-            if (!isVirtual) {
-              setSelectedBuilding("線上下單");
-            }
+            savedObj.building = "線上下單";
+            localStorage.setItem(LS_KEY, JSON.stringify(savedObj));
           }
         } catch (_) {}
       }
@@ -2616,19 +2618,20 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
             }
           }
         } else {
+          if (urlBuilding) {
+            setSelectedBuilding(urlBuilding);
+          } else {
+            setSelectedBuilding("線上下單");
+          }
+          // 地址部分：若歷史舊地址開頭殘留過去的實體大樓前綴，自動剔除前綴保留純門牌，絕不再把大樓推斷為實體大樓
+          let cleanDetail = addr;
           for (const bName of knownBuildings) {
-            if (bName && addr.startsWith(bName)) {
-              setSelectedBuilding(bName);
-              setDetailAddress(addr.slice(bName.length).trim());
-              matched = true;
+            if (bName && cleanDetail.startsWith(bName)) {
+              cleanDetail = cleanDetail.slice(bName.length).replace(/^[\s\-–—]+/, '').trim();
               break;
             }
           }
-          if (!matched) {
-            setSelectedBuilding("其它");
-            setOtherBuildingText(addr);
-            setDetailAddress("");
-          }
+          setDetailAddress(cleanDetail || addr);
         }
       }
 
@@ -2761,7 +2764,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         customerName,
         customerPhone: fullPhone,
         deliveryAddress: getFullAddress(),
-        CommunityId: (isGeneralUser && selectedCommunityId) ? selectedCommunityId : (currentCommunity?.CommunityId || ""),
+        CommunityId: (isGeneralUser && selectedCommunityId) ? selectedCommunityId : (isGeneralUser ? "" : (currentCommunity?.CommunityId || "")),
         CampaignId: activeCampaign?.CampaignId || "",
         sourceGroup: (() => {
           if (isGeneralUser && selectedCommunityId) {
