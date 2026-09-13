@@ -19,9 +19,11 @@ export default function ProductManagementPage({ user, apiUrl }) {
     // ── 專屬商品下單連結 State ────────────────────────────────────────
     const [selectedProductIds, setSelectedProductIds] = useState(new Set());
     const [showLinkModal, setShowLinkModal] = useState(false);
-    const [linkLimits, setLinkLimits] = useState({}); // { [productId]: number | '' }
+    const [linkLimits, setLinkLimits] = useState({}); // { [productId]: number | '' } 每人每次限購
+    const [linkMaxTotalLimits, setLinkMaxTotalLimits] = useState({}); // { [productId]: number | '' } 後端活動總限量 (真正鎖死售完)
     const [linkSelectedBuilding, setLinkSelectedBuilding] = useState('');
     const [linkCopied, setLinkCopied] = useState(false);
+    const [isSavingLinkQuota, setIsSavingLinkQuota] = useState(false);
 
     // ── 效期預警彈窗 (低於 7 天) State ──────────────────────────────
     const [showExpiryModal, setShowExpiryModal] = useState(false);
@@ -318,6 +320,17 @@ export default function ProductManagementPage({ user, apiUrl }) {
 
     const handleOpenLinkModal = () => {
         if (selectedProductIds.size === 0) return;
+        const initialMax = {};
+        const initialPerPerson = {};
+        selectedProductIds.forEach(id => {
+            const p = products.find(item => item.id === id);
+            if (p) {
+                initialMax[id] = (p.maxTotalQty !== undefined && p.maxTotalQty !== null && p.maxTotalQty !== '') ? p.maxTotalQty : '';
+                initialPerPerson[id] = linkLimits[id] ?? '';
+            }
+        });
+        setLinkMaxTotalLimits(initialMax);
+        setLinkLimits(initialPerPerson);
         setShowLinkModal(true);
         setLinkCopied(false);
     };
@@ -350,12 +363,38 @@ export default function ProductManagementPage({ user, apiUrl }) {
 
     const handleCopyDedicatedLink = async () => {
         if (!generatedLiffUrl) return;
-        const ok = await copyToClipboard(generatedLiffUrl);
-        if (ok) {
-            setLinkCopied(true);
-            setTimeout(() => setLinkCopied(false), 2500);
-        } else {
-            alert('複製失敗，請手動選取下方網址複製');
+
+        setIsSavingLinkQuota(true);
+        try {
+            // 同步更新選定商品的「活動總限量上限 (maxTotalQty)」至後端資料庫，由資料庫進行絕對鎖定！
+            const savePromises = [];
+            selectedProductIds.forEach(id => {
+                const val = linkMaxTotalLimits[id];
+                const p = products.find(item => item.id === id);
+                if (!p) return;
+                const newMax = (val !== '' && val !== undefined && val !== null) ? Number(val) : null;
+                if (p.maxTotalQty !== newMax) {
+                    handleFieldChange(id, 'maxTotalQty', newMax);
+                    savePromises.push(handleSaveProduct(id, { maxTotalQty: newMax }));
+                }
+            });
+
+            if (savePromises.length > 0) {
+                await Promise.all(savePromises);
+            }
+
+            const ok = await copyToClipboard(generatedLiffUrl);
+            if (ok) {
+                setLinkCopied(true);
+                setTimeout(() => setLinkCopied(false), 2500);
+            } else {
+                alert('複製失敗，請手動選取下方網址複製');
+            }
+        } catch (err) {
+            console.error('儲存活動配額失敗:', err);
+            alert('儲存商品活動總配額失敗: ' + err.message);
+        } finally {
+            setIsSavingLinkQuota(false);
         }
     };
 
@@ -1385,19 +1424,21 @@ export default function ProductManagementPage({ user, apiUrl }) {
                         </div>
 
                         {/* 說明文字 */}
-                        <p className="text-xs text-[var(--text-secondary)] leading-relaxed bg-blue-500/5 p-3 rounded-xl border border-blue-500/15">
-                            💡 顧客點開此專屬連結後，<strong>商城只會顯示您選取的這些商品</strong>（其他商品完全隱藏）。您亦可為各商品設定每人限購數量，避免遭超額下單。
-                        </p>
+                        <div className="text-xs text-[var(--text-secondary)] leading-relaxed bg-blue-500/5 p-3 rounded-2xl border border-blue-500/15 space-y-1">
+                            <p className="font-bold text-blue-700 dark:text-blue-300">💡 專屬連結支援雙重防護設定：</p>
+                            <p>• <strong>活動總釋出量（方案 B）</strong>：設定全店總數量（例：5），系統直接將該商品鎖死在資料庫，所有顧客訂單加總達 5 件後立即售完，任何人都無法再超買！</p>
+                            <p>• <strong>每人限購（選填）</strong>：限制單一顧客/單張訂單最多購買數量（留空代表不限每人件數）。</p>
+                        </div>
 
                         {/* 商品設定清單 */}
-                        <div className="overflow-y-auto max-h-[36vh] space-y-2 pr-1">
+                        <div className="overflow-y-auto max-h-[36vh] space-y-2.5 pr-1">
                             {Array.from(selectedProductIds).map(id => {
                                 const p = products.find(item => item.id === id);
                                 if (!p) return null;
                                 const stock = stockMap[p.name] ?? 0;
                                 return (
-                                    <div key={id} className="flex items-center justify-between gap-3 p-2.5 rounded-2xl bg-[var(--bg-tertiary)]/50 border border-[var(--border-primary)] text-xs">
-                                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                    <div key={id} className="flex flex-col gap-2.5 p-3 rounded-2xl bg-[var(--bg-tertiary)]/50 border border-[var(--border-primary)] text-xs">
+                                        <div className="flex items-center gap-2.5 min-w-0">
                                             {p.imageUrl ? (
                                                 <img src={p.imageUrl} alt={p.name} className="w-9 h-9 rounded-xl object-cover shrink-0" />
                                             ) : (
@@ -1406,25 +1447,56 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                 </div>
                                             )}
                                             <div className="min-w-0 flex-1">
-                                                <div className="font-bold text-[var(--text-primary)] truncate">{p.name}</div>
-                                                <div className="text-[10px] text-[var(--text-tertiary)]">庫存：{stock}</div>
+                                                <div className="font-bold text-[var(--text-primary)] truncate text-sm">{p.name}</div>
+                                                <div className="text-[11px] text-[var(--text-tertiary)] flex items-center gap-2 mt-0.5">
+                                                    <span>現有庫存：{stock}</span>
+                                                    {p.maxTotalQty !== null && p.maxTotalQty !== undefined && (
+                                                        <span className="text-purple-600 dark:text-purple-400 font-bold">
+                                                            目前已售 {p.soldQty || 0} / 上限 {p.maxTotalQty}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-1.5 shrink-0">
-                                            <span className="text-[11px] text-[var(--text-secondary)]">每人限購：</span>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                max="999"
-                                                placeholder="不限"
-                                                value={linkLimits[id] ?? ''}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setLinkLimits(prev => ({ ...prev, [id]: val }));
-                                                }}
-                                                className="w-16 px-2 py-1 text-center font-bold text-xs rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500"
-                                            />
-                                            <span className="text-[11px] text-[var(--text-tertiary)]">件</span>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-[var(--border-primary)]/50">
+                                            <div className="flex items-center justify-between bg-[var(--bg-secondary)] px-3 py-1.5 rounded-xl border border-[var(--border-primary)]">
+                                                <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300">🔒 活動總釋出量：</span>
+                                                <div className="flex items-center gap-1">
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        max="9999"
+                                                        placeholder="不限"
+                                                        value={linkMaxTotalLimits[id] ?? ''}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            setLinkMaxTotalLimits(prev => ({ ...prev, [id]: val }));
+                                                        }}
+                                                        className="w-14 px-1.5 py-0.5 text-center font-bold text-xs rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] focus:outline-none focus:border-purple-500"
+                                                    />
+                                                    <span className="text-[10px] text-[var(--text-tertiary)]">件</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between bg-[var(--bg-secondary)] px-3 py-1.5 rounded-xl border border-[var(--border-primary)]">
+                                                <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300">👤 每人每次限購：</span>
+                                                <div className="flex items-center gap-1">
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        max="999"
+                                                        placeholder="不限"
+                                                        value={linkLimits[id] ?? ''}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            setLinkLimits(prev => ({ ...prev, [id]: val }));
+                                                        }}
+                                                        className="w-14 px-1.5 py-0.5 text-center font-bold text-xs rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500"
+                                                    />
+                                                    <span className="text-[10px] text-[var(--text-tertiary)]">件</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -1460,18 +1532,24 @@ export default function ProductManagementPage({ user, apiUrl }) {
                             <div className="flex gap-2">
                                 <button
                                     type="button"
+                                    disabled={isSavingLinkQuota}
                                     onClick={handleCopyDedicatedLink}
-                                    className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                                    className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                                 >
-                                    {linkCopied ? (
+                                    {isSavingLinkQuota ? (
+                                        <>
+                                            <RefreshCw size={16} className="animate-spin" />
+                                            <span>同步後端配額中...</span>
+                                        </>
+                                    ) : linkCopied ? (
                                         <>
                                             <Check size={16} className="text-emerald-300" />
-                                            <span>✅ 已複製專屬連結！</span>
+                                            <span>✅ 已同步後端配額並複製連結！</span>
                                         </>
                                     ) : (
                                         <>
                                             <Copy size={16} />
-                                            <span>複製專屬下單連結</span>
+                                            <span>同步配額並複製專屬連結</span>
                                         </>
                                     )}
                                 </button>
