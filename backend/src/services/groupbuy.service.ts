@@ -14,6 +14,72 @@ function generateOrderId(): string {
 
 const importLocks: Record<string, boolean> = {};
 
+// --- 🎨 口味備註解析、累加與品名重構輔助函數 ---
+function cleanBaseProductName(rawName: string | null | undefined): string {
+  if (!rawName) return '';
+  return String(rawName)
+    .replace(/\s*\(\s*【?口味備註[：:].*?】\s*\)/gi, '')
+    .replace(/\s*【口味備註[：:].*?】/gi, '')
+    .replace(/\s*\(【.*?】\)/g, '')
+    .replace(/\s*【.*?】/g, '')
+    .replace(/\s*\(.*口味備註.*\)/gi, '')
+    .replace(/\s*\(贈品\)/g, '')
+    .replace(/\s*\(免費贈品\)/g, '')
+    .replace(/x\d+$/i, '')
+    .trim();
+}
+
+function parseFlavorsFromSegment(segment: string, map: Map<string, number>) {
+  if (!segment) return;
+  const parts = segment.split(/[,，;；]/).map(s => s.trim()).filter(Boolean);
+  for (const part of parts) {
+    const m = part.match(/^(.+?)\s*[*xX×:：]\s*(\d+)$/);
+    if (m) {
+      const flavor = m[1].replace(/【?口味備註[：:]?/g, '').trim();
+      const qty = parseInt(m[2], 10);
+      if (flavor && qty > 0 && !flavor.includes('贈品')) {
+        map.set(flavor, (map.get(flavor) || 0) + qty);
+      }
+    }
+  }
+}
+
+function extractFlavors(...inputs: (string | null | undefined)[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const input of inputs) {
+    if (!input) continue;
+    const str = String(input);
+    const bracketMatches = Array.from(str.matchAll(/【(?:口味備註[：:])?(.*?)】/g));
+    if (bracketMatches.length > 0) {
+      for (const m of bracketMatches) {
+        parseFlavorsFromSegment(m[1], map);
+      }
+    } else if (/[*xX×:：]\s*\d+/.test(str)) {
+      const inner = str.replace(/^\s*\((.*)\)\s*$/, '$1');
+      parseFlavorsFromSegment(inner, map);
+    }
+  }
+  return map;
+}
+
+function formatFlavorMap(map: Map<string, number>): string {
+  const entries = Array.from(map.entries()).filter(([_, qty]) => qty > 0);
+  if (entries.length === 0) return '';
+  return entries.map(([f, q]) => `${f}x${q}`).join(', ');
+}
+
+function getFlavorRemark(map: Map<string, number>): string {
+  const inner = formatFlavorMap(map);
+  return inner ? `【口味備註：${inner}】` : '';
+}
+
+function updateProductNameWithNewFlavor(rawProductName: string, map: Map<string, number>): string {
+  const baseName = cleanBaseProductName(rawProductName) || rawProductName;
+  const inner = formatFlavorMap(map);
+  if (!inner) return baseName;
+  return `${baseName} (【口味備註：${inner}】)`;
+}
+
 export const GroupBuyService = {
 
   // ==========================================
@@ -2268,7 +2334,12 @@ export const GroupBuyService = {
       // 1. 取得所有要合併的訂單，並按照時間排序（最舊的當主訂單）
       const orders = await tx.groupBuyOrder.findMany({
         where: { orderId: { in: orderIds } },
-        include: { details: true },
+        include: { 
+          details: true,
+          recipients: {
+            include: { items: true }
+          }
+        },
         orderBy: { createdAt: 'asc' }
       });
 
@@ -2307,9 +2378,10 @@ export const GroupBuyService = {
                        Number(item.subtotal) === 0 || 
                        (item.remark && String(item.remark).includes('贈品')) || 
                        (item.productName && String(item.productName).includes('贈品'));
-        const baseId = item.productId || item.productName || '';
+        const cleanName = cleanBaseProductName(item.productName);
+        const baseId = item.productId || cleanName || '';
         if (isGift) {
-          return `${baseId}__GIFT__${item.remark || ''}`;
+          return `${baseId}__GIFT`;
         }
         return `${baseId}__PAID__${Number(item.unitPrice || 0)}`;
       };
@@ -2345,7 +2417,15 @@ export const GroupBuyService = {
             // 已有該相同屬性之商品，數量相加
             const pItem = primaryItemsMap.get(key);
             pItem.qty += sItem.qty;
-            pItem.remark = pItem.remark ? `${pItem.remark}, ${sItem.remark || ''}`.replace(/,\s*$/, '') : (sItem.remark || null);
+            const flavorMap = extractFlavors(pItem.remark, sItem.remark);
+            const cleanPName = cleanBaseProductName(pItem.productName);
+            if (flavorMap.size > 0) {
+              pItem.remark = getFlavorRemark(flavorMap);
+              pItem.productName = updateProductNameWithNewFlavor(cleanPName, flavorMap);
+            } else {
+              pItem.remark = pItem.remark ? `${pItem.remark}, ${sItem.remark || ''}`.replace(/,\s*$/, '') : (sItem.remark || null);
+              pItem.productName = cleanPName;
+            }
           } else {
             // 沒有該商品，準備新增
             const newDetail = {
@@ -2429,6 +2509,7 @@ export const GroupBuyService = {
           where: { id: pItem.id },
           data: {
             qty: currentItem.qty,
+            productName: currentItem.productName,
             subtotal: finalSubtotal,
             remark: currentItem.remark
           }
@@ -2521,6 +2602,262 @@ export const GroupBuyService = {
           note: newNote
         }
       });
+
+      // 8. 整合團員代訂明細 (Group Buy Order Recipients)
+      const hasAnyRecipients = orders.some((o: any) => Array.isArray(o.recipients) && o.recipients.length > 0);
+      if (hasAnyRecipients) {
+        // 以團員姓名為 Key 依序合併
+        const mergedRecipientsMap = new Map<string, {
+          recipientName: string;
+          note: string;
+          itemsMap: Map<string, {
+            productId: string;
+            productName: string;
+            qty: number;
+            price: number;
+            subtotal: number;
+            remark: string;
+            expiryDate?: string | null;
+          }>;
+        }>();
+
+        for (const order of orders) {
+          for (const r of (order.recipients || [])) {
+            const rName = (r.recipientName || '').trim();
+            if (!rName) continue;
+
+            if (!mergedRecipientsMap.has(rName)) {
+              mergedRecipientsMap.set(rName, {
+                recipientName: rName,
+                note: r.note || '',
+                itemsMap: new Map()
+              });
+            }
+
+            const targetRecipient = mergedRecipientsMap.get(rName)!;
+            if (r.note && !targetRecipient.note.includes(r.note)) {
+              targetRecipient.note = targetRecipient.note ? `${targetRecipient.note}, ${r.note}` : r.note;
+            }
+
+            for (const item of (r.items || [])) {
+              const isGift = Number(item.price) === 0 || 
+                             Number(item.subtotal) === 0 || 
+                             (item.remark && String(item.remark).includes('贈品')) || 
+                             (item.productName && String(item.productName).includes('贈品'));
+              const cleanName = cleanBaseProductName(item.productName);
+              const baseId = (item.productId || cleanName || '').trim();
+              const itemKey = `${baseId}__${isGift ? 'GIFT' : 'PAID'}`;
+
+              if (targetRecipient.itemsMap.has(itemKey)) {
+                const existing = targetRecipient.itemsMap.get(itemKey)!;
+                existing.qty += Number(item.qty || 0);
+                const fMap = extractFlavors(existing.remark, item.remark);
+                if (fMap.size > 0) {
+                  existing.remark = getFlavorRemark(fMap);
+                  existing.productName = updateProductNameWithNewFlavor(cleanName, fMap);
+                } else {
+                  if (item.remark && !existing.remark?.includes(item.remark)) {
+                    existing.remark = existing.remark ? `${existing.remark}, ${item.remark}` : item.remark;
+                  }
+                  existing.productName = isGift ? `${cleanName} (贈品)` : cleanName;
+                }
+              } else {
+                const fMap = extractFlavors(item.remark);
+                const rem = fMap.size > 0 ? getFlavorRemark(fMap) : (item.remark || '').trim();
+                const pName = fMap.size > 0 ? updateProductNameWithNewFlavor(cleanName, fMap) : (isGift ? `${cleanName} (贈品)` : cleanName);
+                targetRecipient.itemsMap.set(itemKey, {
+                  productId: item.productId || '',
+                  productName: pName,
+                  qty: Number(item.qty || 0),
+                  price: Number(item.price || 0),
+                  subtotal: Number(item.subtotal || 0),
+                  remark: rem,
+                  expiryDate: item.expiryDate || null
+                });
+              }
+            }
+          }
+        }
+
+        // 對各團員商品小計重新精算 (若商品有多件優惠則套用，贈品除外)
+        for (const r of mergedRecipientsMap.values()) {
+          for (const item of r.itemsMap.values()) {
+            const isGift = Number(item.price) === 0 || 
+                           Number(item.subtotal) === 0 || 
+                           (item.remark && String(item.remark).includes('贈品')) || 
+                           (item.productName && String(item.productName).includes('贈品'));
+            let finalSubtotal = isGift ? 0 : Number(item.price) * item.qty;
+            if (!isGift && item.productId && dbProductMap.has(item.productId)) {
+              const dbProd = dbProductMap.get(item.productId)!;
+              let settings: any = null;
+              if (dbProd.volumePricingSettings) {
+                settings = typeof dbProd.volumePricingSettings === 'string'
+                  ? JSON.parse(dbProd.volumePricingSettings as string)
+                  : dbProd.volumePricingSettings;
+              }
+              if (dbProd.hasVolumePricing && settings) {
+                const calcSub = calculateItemSubtotal({
+                  productId: dbProd.productId,
+                  productName: dbProd.productName,
+                  unitPrice: Number(dbProd.singlePrice || dbProd.defaultPrice || item.price || 0),
+                  qty: item.qty,
+                  has_volume_pricing: true,
+                  volume_pricing_settings: settings
+                });
+                if (calcSub > 0) {
+                  finalSubtotal = calcSub;
+                }
+              }
+            }
+            item.price = isGift ? 0 : item.price;
+            item.subtotal = isGift ? 0 : finalSubtotal;
+          }
+        }
+
+        // 僅更新主訂單的團員清單（先清空主單舊團員，再寫入合併後的全新團員；副訂單的歷史紀錄完整保留不刪除）
+        await tx.groupBuyOrderRecipient.deleteMany({
+          where: { orderId: primaryOrder.orderId }
+        });
+
+        for (const r of mergedRecipientsMap.values()) {
+          const itemsList = Array.from(r.itemsMap.values());
+          await tx.groupBuyOrderRecipient.create({
+            data: {
+              orderId: primaryOrder.orderId,
+              recipientName: r.recipientName,
+              note: r.note || '',
+              storeCode: primaryOrder.storeCode || 'MILI001',
+              items: {
+                create: itemsList.map(it => ({
+                  productId: it.productId,
+                  productName: it.productName,
+                  qty: it.qty,
+                  price: it.price,
+                  subtotal: it.subtotal,
+                  remark: it.remark,
+                  expiryDate: it.expiryDate || null,
+                  storeCode: primaryOrder.storeCode || 'MILI001'
+                }))
+              }
+            }
+          });
+        }
+
+        // 9. 依據「怎麼訂就怎麼呈現」原則，以所有團員分配之品項總和校準主訂單明細，確保主訂單與團員分配 100% 完全一致
+        const aggregatedFromRecipients = new Map<string, {
+          productId: string;
+          productName: string;
+          qty: number;
+          unitPrice: number;
+          subtotal: number;
+          remark: string;
+          isGift: boolean;
+          flavorMap: Map<string, number>;
+          expiryDate?: string | null;
+        }>();
+
+        for (const r of mergedRecipientsMap.values()) {
+          for (const it of r.itemsMap.values()) {
+            const isGift = Boolean(
+              Number(it.price) === 0 || 
+              Number(it.subtotal) === 0 || 
+              (it.remark && String(it.remark).includes('贈品')) || 
+              (it.productName && String(it.productName).includes('贈品'))
+            );
+            const cleanName = cleanBaseProductName(it.productName);
+            const baseId = (it.productId || cleanName || '').trim();
+            const aggKey = `${baseId}__${isGift ? 'GIFT' : 'PAID'}`;
+
+            if (aggregatedFromRecipients.has(aggKey)) {
+              const agg = aggregatedFromRecipients.get(aggKey)!;
+              agg.qty += Number(it.qty || 0);
+              const fMap = extractFlavors(agg.remark, it.remark);
+              if (fMap.size > 0) {
+                agg.flavorMap = fMap;
+                agg.remark = getFlavorRemark(fMap);
+                agg.productName = updateProductNameWithNewFlavor(cleanName, fMap);
+              }
+            } else {
+              const fMap = extractFlavors(it.remark);
+              const rem = fMap.size > 0 ? getFlavorRemark(fMap) : (it.remark || (isGift ? '免費贈品' : '')).trim();
+              const pName = fMap.size > 0 ? updateProductNameWithNewFlavor(cleanName, fMap) : (isGift ? `${cleanName} (免費贈品)` : cleanName);
+              aggregatedFromRecipients.set(aggKey, {
+                productId: it.productId || '',
+                productName: pName,
+                qty: Number(it.qty || 0),
+                unitPrice: isGift ? 0 : Number(it.price || 0),
+                subtotal: isGift ? 0 : Number(it.subtotal || 0),
+                remark: rem,
+                isGift,
+                flavorMap: fMap,
+                expiryDate: it.expiryDate || null
+              });
+            }
+          }
+        }
+
+        // 重新精算全體總量與多件優惠小計
+        let calibratedProductTotal = 0;
+        const detailsToSync: any[] = [];
+        for (const agg of aggregatedFromRecipients.values()) {
+          let finalSubtotal = agg.isGift ? 0 : agg.unitPrice * agg.qty;
+          if (!agg.isGift && agg.productId && dbProductMap.has(agg.productId)) {
+            const dbProd = dbProductMap.get(agg.productId)!;
+            let settings: any = null;
+            if (dbProd.volumePricingSettings) {
+              settings = typeof dbProd.volumePricingSettings === 'string'
+                ? JSON.parse(dbProd.volumePricingSettings as string)
+                : dbProd.volumePricingSettings;
+            }
+            if (dbProd.hasVolumePricing && settings) {
+              const calcSub = calculateItemSubtotal({
+                productId: dbProd.productId,
+                productName: dbProd.productName,
+                unitPrice: Number(dbProd.singlePrice || dbProd.defaultPrice || agg.unitPrice || 0),
+                qty: agg.qty,
+                has_volume_pricing: true,
+                volume_pricing_settings: settings
+              });
+              if (calcSub > 0) {
+                finalSubtotal = calcSub;
+              }
+            }
+          }
+
+          agg.subtotal = finalSubtotal;
+          calibratedProductTotal += finalSubtotal;
+
+          detailsToSync.push({
+            orderId: primaryOrder.orderId,
+            productId: agg.productId || '',
+            productName: agg.productName,
+            unitPrice: agg.isGift ? 0 : agg.unitPrice,
+            qty: agg.qty,
+            subtotal: finalSubtotal,
+            remark: agg.remark || (agg.isGift ? '免費贈品' : null),
+            expiryDate: agg.expiryDate || null,
+            storeCode: primaryOrder.storeCode || 'MILI001'
+          });
+        }
+
+        if (detailsToSync.length > 0) {
+          await tx.groupBuyOrderDetail.deleteMany({
+            where: { orderId: primaryOrder.orderId }
+          });
+          await tx.groupBuyOrderDetail.createMany({
+            data: detailsToSync
+          });
+
+          // 同步校準主訂單總額
+          const calibratedTotalAmount = calibratedProductTotal + finalShippingFee;
+          await tx.groupBuyOrder.update({
+            where: { orderId: primaryOrder.orderId },
+            data: {
+              totalAmount: calibratedTotalAmount
+            }
+          });
+        }
+      }
 
       await tx.groupBuyAuditLog.create({
          data: {

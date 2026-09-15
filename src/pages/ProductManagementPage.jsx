@@ -18,13 +18,15 @@ export default function ProductManagementPage({ user, apiUrl }) {
 
     // ── 專屬商品下單連結 State ────────────────────────────────────────
     const [selectedProductIds, setSelectedProductIds] = useState(new Set());
+    const [isSelectMode, setIsSelectMode] = useState(false); // 專屬連結選取模式 (點擊開來才顯示框框)
     const [showLinkModal, setShowLinkModal] = useState(false);
-    const [linkMaxTotalLimits, setLinkMaxTotalLimits] = useState({}); // { [productId]: number | '' } 活動總釋出量 (後端直接鎖定)
-    const [modalAllowedCommunityIds, setModalAllowedCommunityIds] = useState([]);
-    const [modalCommunityQuotas, setModalCommunityQuotas] = useState({}); // { [communityKey]: maxQty }
+    const [activeModalProductId, setActiveModalProductId] = useState(''); // 目前在彈窗中設定的商品 ID
+    const [modalProductConfigs, setModalProductConfigs] = useState({}); // { [productId]: { maxTotalQty, allowedCommunityIds, communityQuotas } }
     const [linkSelectedBuilding, setLinkSelectedBuilding] = useState('');
     const [linkCopied, setLinkCopied] = useState(false);
     const [isSavingLinkQuota, setIsSavingLinkQuota] = useState(false);
+    const [isAllowedCommOpen, setIsAllowedCommOpen] = useState(false); // 開放社區折疊 (預設收合)
+    const [isCommQuotaOpen, setIsCommQuotaOpen] = useState(false); // 社區配額折疊 (預設收合)
 
     // 計算可見社區清單 (排除行政區與隱藏社區)
     const visibleCommunities = useMemo(() => {
@@ -346,37 +348,63 @@ export default function ProductManagementPage({ user, apiUrl }) {
     const handleOpenLinkModal = () => {
         if (selectedProductIds.size === 0) return;
         
-        // 1. 初始化各商品活動總釋出量
-        const initialMax = {};
+        const initialConfigs = {};
         selectedProductIds.forEach(id => {
             const p = products.find(item => item.id === id);
             if (p) {
-                initialMax[id] = (p.maxTotalQty !== undefined && p.maxTotalQty !== null && p.maxTotalQty !== '') ? p.maxTotalQty : '';
+                const quotas = {};
+                const qObj = p.communityQuotas || {};
+                Object.entries(qObj).forEach(([k, v]) => {
+                    if (v && v.maxQty !== undefined && v.maxQty !== null) {
+                        quotas[k] = v.maxQty;
+                    }
+                });
+                initialConfigs[id] = {
+                    maxTotalQty: (p.maxTotalQty !== undefined && p.maxTotalQty !== null && p.maxTotalQty !== '') ? p.maxTotalQty : '',
+                    allowedCommunityIds: Array.isArray(p.allowedCommunityIds) ? [...p.allowedCommunityIds] : [],
+                    communityQuotas: quotas
+                };
             }
         });
-        setLinkMaxTotalLimits(initialMax);
-
-        // 2. 從第一個選中的商品初始化開放社區與社區配額設定
+        setModalProductConfigs(initialConfigs);
         const firstId = Array.from(selectedProductIds)[0];
-        const firstProduct = products.find(p => p.id === firstId);
-        
-        if (firstProduct) {
-            setModalAllowedCommunityIds(Array.isArray(firstProduct.allowedCommunityIds) ? [...firstProduct.allowedCommunityIds] : []);
-            const initialQuotas = {};
-            const qObj = firstProduct.communityQuotas || {};
-            Object.entries(qObj).forEach(([k, v]) => {
-                if (v && v.maxQty !== undefined && v.maxQty !== null) {
-                    initialQuotas[k] = v.maxQty;
-                }
-            });
-            setModalCommunityQuotas(initialQuotas);
-        } else {
-            setModalAllowedCommunityIds([]);
-            setModalCommunityQuotas({});
-        }
+        setActiveModalProductId(firstId);
 
         setShowLinkModal(true);
+        setIsAllowedCommOpen(false);
+        setIsCommQuotaOpen(false);
         setLinkCopied(false);
+    };
+
+    // 更新目前選定商品的設定 (活動總釋出量、開放社區、社區配額)
+    const updateActiveProductConfig = (key, val) => {
+        if (!activeModalProductId) return;
+        setModalProductConfigs(prev => ({
+            ...prev,
+            [activeModalProductId]: {
+                ...(prev[activeModalProductId] || { maxTotalQty: '', allowedCommunityIds: [], communityQuotas: {} }),
+                [key]: val
+            }
+        }));
+    };
+
+    // 一鍵將目前商品的設定套用至所有已選商品
+    const handleApplyConfigToAll = () => {
+        if (!activeModalProductId) return;
+        const cur = modalProductConfigs[activeModalProductId];
+        if (!cur) return;
+        setModalProductConfigs(prev => {
+            const next = { ...prev };
+            selectedProductIds.forEach(id => {
+                next[id] = {
+                    maxTotalQty: cur.maxTotalQty,
+                    allowedCommunityIds: [...(cur.allowedCommunityIds || [])],
+                    communityQuotas: { ...(cur.communityQuotas || {}) }
+                };
+            });
+            return next;
+        });
+        alert('已將目前商品的活動總釋出量、開放社區與社區配額套用至所有已選商品！');
     };
 
     // 產生專屬限定下單連結 (僅帶商品名稱，不再設定每人限購 :limit)
@@ -402,50 +430,52 @@ export default function ProductManagementPage({ user, apiUrl }) {
     const handleCopyDedicatedLink = async () => {
         if (!generatedLiffUrl) return;
 
+        // 1. 在點擊手勢有效期間「第一時間立即執行複製」，避免被非同步請求延遲導致瀏覽器判定 gesture 過期而拒絕剪貼簿存取！
+        const copyOk = await copyToClipboard(generatedLiffUrl);
+        if (copyOk) {
+            setLinkCopied(true);
+            setTimeout(() => setLinkCopied(false), 2500);
+        } else {
+            alert('複製失敗，請手動選取下方網址複製');
+        }
+
+        // 2. 同步將每項商品個別的「活動總釋出量」、「開放社區」與「社區獨家搶購配額」寫入資料庫
         setIsSavingLinkQuota(true);
         try {
-            // 同步更新選定商品的「活動總釋出量 (maxTotalQty)」、「開放社區 (allowedCommunityIds)」與「社區獨家搶購配額 (communityQuotas)」至後端資料庫
             const savePromises = [];
             selectedProductIds.forEach(id => {
                 const p = products.find(item => item.id === id);
                 if (!p) return;
 
-                const maxVal = linkMaxTotalLimits[id];
+                const cfg = modalProductConfigs[id] || {};
+                const maxVal = cfg.maxTotalQty;
                 const newMaxTotal = (maxVal !== '' && maxVal !== undefined && maxVal !== null) ? Number(maxVal) : null;
+                const allowedIds = cfg.allowedCommunityIds || [];
 
-                const nextQuotas = { ...(p.communityQuotas || {}) };
-                Object.entries(modalCommunityQuotas).forEach(([commKey, val]) => {
-                    if (val !== '' && val !== null && val !== undefined) {
-                        const existingSold = nextQuotas[commKey]?.soldQty || 0;
+                const nextQuotas = {};
+                const curQuotas = cfg.communityQuotas || {};
+                Object.entries(curQuotas).forEach(([commKey, val]) => {
+                    if (val !== '' && val !== null && val !== undefined && !isNaN(Number(val))) {
+                        const existingSold = p.communityQuotas?.[commKey]?.soldQty || 0;
                         nextQuotas[commKey] = {
                             maxQty: Number(val),
                             soldQty: existingSold
                         };
-                    } else {
-                        delete nextQuotas[commKey];
                     }
                 });
 
                 handleFieldChange(id, 'maxTotalQty', newMaxTotal);
-                handleFieldChange(id, 'allowedCommunityIds', modalAllowedCommunityIds);
+                handleFieldChange(id, 'allowedCommunityIds', allowedIds);
                 handleFieldChange(id, 'communityQuotas', nextQuotas);
                 savePromises.push(handleSaveProduct(id, {
                     maxTotalQty: newMaxTotal,
-                    allowedCommunityIds: modalAllowedCommunityIds,
+                    allowedCommunityIds: allowedIds,
                     communityQuotas: nextQuotas
                 }));
             });
 
             if (savePromises.length > 0) {
                 await Promise.all(savePromises);
-            }
-
-            const ok = await copyToClipboard(generatedLiffUrl);
-            if (ok) {
-                setLinkCopied(true);
-                setTimeout(() => setLinkCopied(false), 2500);
-            } else {
-                alert('複製失敗，請手動選取下方網址複製');
             }
         } catch (err) {
             console.error('儲存社區與配額失敗:', err);
@@ -454,6 +484,35 @@ export default function ProductManagementPage({ user, apiUrl }) {
             setIsSavingLinkQuota(false);
         }
     };
+
+    const activeModalProduct = useMemo(() => {
+        if (!activeModalProductId) {
+            if (selectedProductIds.size > 0) {
+                const firstId = Array.from(selectedProductIds)[0];
+                return products.find(p => p.id === firstId) || null;
+            }
+            return null;
+        }
+        return products.find(p => p.id === activeModalProductId) || null;
+    }, [activeModalProductId, selectedProductIds, products]);
+
+    const activeModalConfig = useMemo(() => {
+        const pId = activeModalProduct?.id;
+        if (!pId || !modalProductConfigs[pId]) {
+            return { maxTotalQty: '', allowedCommunityIds: [], communityQuotas: {} };
+        }
+        return modalProductConfigs[pId];
+    }, [activeModalProduct, modalProductConfigs]);
+
+    const activeSelectedCommCount = useMemo(() => {
+        const ids = activeModalConfig.allowedCommunityIds || [];
+        if (ids.length === 0) return 0;
+        return visibleCommunities.filter(c => {
+            const cid = c.communityId || c.CommunityId;
+            const cname = c.communityName || c.CommunityName;
+            return ids.includes(cid) || ids.includes(cname);
+        }).length;
+    }, [activeModalConfig.allowedCommunityIds, visibleCommunities]);
 
     return (
         <div className="max-w-6xl mx-auto h-[calc(100vh-6rem)] flex flex-col p-4 gap-4">
@@ -495,6 +554,26 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                 onChange={(e) => setSearch(e.target.value)}
                             />
                         </div>
+                        <button 
+                            type="button"
+                            onClick={() => {
+                                setIsSelectMode(prev => {
+                                    if (prev) {
+                                        setSelectedProductIds(new Set());
+                                    }
+                                    return !prev;
+                                });
+                            }}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer border shadow-2xs ${
+                                isSelectMode
+                                    ? 'bg-blue-600 text-white border-blue-600 shadow-blue-500/25'
+                                    : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-[var(--border-primary)]'
+                            }`}
+                            title={isSelectMode ? "關閉選取模式" : "點擊開來選取專屬商品連結"}
+                        >
+                            <Link2 size={15} className={isSelectMode ? 'text-white' : 'text-blue-600'} />
+                            <span>{isSelectMode ? '結束選取' : '專屬連結選取'}</span>
+                        </button>
                         <button onClick={fetchProducts} className="btn-secondary p-2 rounded-xl shrink-0" title="重新整理">
                             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                         </button>
@@ -503,7 +582,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
             </div>
 
             {/* 專屬連結選取工具列 */}
-            {selectedProductIds.size > 0 && (
+            {(isSelectMode || selectedProductIds.size > 0) && (
                 <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-gradient-to-r from-blue-500/15 via-indigo-500/10 to-blue-500/5 border border-blue-500/30 rounded-2xl shadow-sm animate-in fade-in duration-150 shrink-0">
                     <div className="flex items-center gap-2.5">
                         <span className="text-xs font-bold text-blue-700 dark:text-blue-300">
@@ -525,14 +604,27 @@ export default function ProductManagementPage({ user, apiUrl }) {
                             清除
                         </button>
                     </div>
-                    <button
-                        type="button"
-                        onClick={handleOpenLinkModal}
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 text-white text-xs font-extrabold shadow-md shadow-blue-500/20 transition-all cursor-pointer"
-                    >
-                        <Link2 size={15} />
-                        <span>產生指定商品下單連結</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsSelectMode(false);
+                                setSelectedProductIds(new Set());
+                            }}
+                            className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)] font-bold cursor-pointer px-2.5 py-1.5 rounded-xl hover:bg-[var(--bg-tertiary)] transition-colors"
+                        >
+                            ✕ 結束選取
+                        </button>
+                        <button
+                            type="button"
+                            disabled={selectedProductIds.size === 0}
+                            onClick={handleOpenLinkModal}
+                            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 text-white text-xs font-extrabold shadow-md shadow-blue-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Link2 size={15} />
+                            <span>產生指定商品下單連結</span>
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -565,26 +657,28 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                         onClick={() => toggleExpand(product.id)}
                                         className="flex items-center gap-3 md:gap-4 p-4 md:p-5 hover:bg-[var(--bg-tertiary)]/20 transition-all rounded-t-2xl cursor-pointer select-none"
                                     >
-                                        {/* 勾選方塊 (產生專屬限定連結用) */}
-                                        <button 
-                                            type="button"
-                                            className="flex items-center justify-center p-1 -ml-1 cursor-pointer shrink-0 rounded-lg hover:bg-blue-50/80 dark:hover:bg-slate-800 transition-colors"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                toggleSelectProduct(product.id);
-                                            }}
-                                            title={selectedProductIds.has(product.id) ? "取消選取" : "選取此商品"}
-                                        >
-                                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shadow-2xs ${
-                                                selectedProductIds.has(product.id)
-                                                    ? 'bg-blue-500 border-blue-500 text-white'
-                                                    : 'bg-white border-slate-300 hover:border-blue-400'
-                                            }`}>
-                                                {selectedProductIds.has(product.id) && (
-                                                    <Check size={13} strokeWidth={3.5} className="text-white" />
-                                                )}
-                                            </div>
-                                        </button>
+                                        {/* 勾選方塊 (點開專屬連結選取模式時才顯示) */}
+                                        {(isSelectMode || selectedProductIds.has(product.id)) && (
+                                            <button 
+                                                type="button"
+                                                className="flex items-center justify-center p-1 -ml-1 cursor-pointer shrink-0 rounded-lg hover:bg-blue-50/80 dark:hover:bg-slate-800 transition-all animate-in fade-in zoom-in-95 duration-150"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleSelectProduct(product.id);
+                                                }}
+                                                title={selectedProductIds.has(product.id) ? "取消選取" : "選取此商品"}
+                                            >
+                                                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shadow-2xs ${
+                                                    selectedProductIds.has(product.id)
+                                                        ? 'bg-blue-500 border-blue-500 text-white'
+                                                        : 'bg-white border-slate-300 hover:border-blue-400'
+                                                }`}>
+                                                    {selectedProductIds.has(product.id) && (
+                                                        <Check size={13} strokeWidth={3.5} className="text-white" />
+                                                    )}
+                                                </div>
+                                            </button>
+                                        )}
 
                                         {/* 商品大圖 */}
                                         <div 
@@ -1228,9 +1322,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                                                     };
                                                                                                 }
                                                                                                 handleFieldChange(product.id, 'communityQuotas', nextQuotas);
-                                                                                            }}
-                                                                                            onBlur={() => {
-                                                                                                handleSaveProduct(product.id, { communityQuotas: product.communityQuotas || {} });
+                                                                                                handleSaveProduct(product.id, { communityQuotas: nextQuotas });
                                                                                             }}
                                                                                         />
                                                                                     </div>
@@ -1481,169 +1573,276 @@ export default function ProductManagementPage({ user, apiUrl }) {
                         </div>
 
                         <div className="overflow-y-auto space-y-4 pr-1 max-h-[58vh]">
-                            {/* 1. 已選取的專屬商品與活動總釋出量 */}
-                            <div className="flex flex-col gap-2">
-                                <span className="text-xs font-extrabold text-[var(--text-secondary)]">已選取的專屬商品 ({selectedProductIds.size} 項)</span>
-                                <div className="space-y-2">
-                                    {Array.from(selectedProductIds).map(id => {
-                                        const p = products.find(item => item.id === id);
-                                        if (!p) return null;
-                                        const stock = stockMap[p.name] ?? 0;
-                                        return (
-                                            <div key={id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-[var(--bg-tertiary)]/50 border border-[var(--border-primary)] text-xs">
-                                                <div className="flex items-center gap-2.5 min-w-0">
+                            {/* 商品切換頁籤 (勾選 2 項以上時顯示) */}
+                            {selectedProductIds.size > 1 && (
+                                <div className="flex flex-col gap-2 p-2.5 rounded-2xl bg-[var(--bg-tertiary)]/30 border border-[var(--border-primary)]">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[11px] font-extrabold text-[var(--text-secondary)] flex items-center gap-1.5">
+                                            <span>🎯 切換商品各自設定 ({selectedProductIds.size} 項)</span>
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={handleApplyConfigToAll}
+                                            className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 flex items-center gap-1 cursor-pointer bg-indigo-500/10 hover:bg-indigo-500/15 px-2.5 py-1 rounded-xl border border-indigo-500/20 transition-all active:scale-95"
+                                            title="將目前商品的活動總釋出量、開放社區與配額套用至所有勾選商品"
+                                        >
+                                            <span>📋 同步此設定至其他商品</span>
+                                        </button>
+                                    </div>
+                                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                                        {Array.from(selectedProductIds).map(id => {
+                                            const p = products.find(item => item.id === id);
+                                            if (!p) return null;
+                                            const isCurrent = (activeModalProduct?.id === id);
+                                            const cfg = modalProductConfigs[id] || {};
+                                            const commCount = visibleCommunities.filter(c => {
+                                                const cid = c.communityId || c.CommunityId;
+                                                const cname = c.communityName || c.CommunityName;
+                                                return (cfg.allowedCommunityIds || []).includes(cid) || (cfg.allowedCommunityIds || []).includes(cname);
+                                            }).length;
+                                            const quotaCount = Object.keys(cfg.communityQuotas || {}).length;
+
+                                            return (
+                                                <button
+                                                    key={id}
+                                                    type="button"
+                                                    onClick={() => setActiveModalProductId(id)}
+                                                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer border ${
+                                                        isCurrent
+                                                            ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/25'
+                                                            : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-blue-400/60'
+                                                    }`}
+                                                >
                                                     {p.imageUrl ? (
-                                                        <img src={p.imageUrl} alt={p.name} className="w-9 h-9 rounded-xl object-cover shrink-0" />
+                                                        <img src={p.imageUrl} alt="" className="w-5 h-5 rounded-lg object-cover" />
                                                     ) : (
-                                                        <div className="w-9 h-9 rounded-xl bg-[var(--bg-tertiary)] flex items-center justify-center shrink-0">
-                                                            <Package size={16} className="text-[var(--text-tertiary)]" />
-                                                        </div>
+                                                        <Package size={14} />
                                                     )}
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="font-bold text-[var(--text-primary)] truncate text-sm">{p.name}</div>
-                                                        <div className="text-[11px] text-[var(--text-tertiary)] flex items-center gap-2 mt-0.5">
-                                                            <span>現有庫存：{stock}</span>
-                                                            {p.maxTotalQty !== null && p.maxTotalQty !== undefined && (
-                                                                <span className="text-purple-600 dark:text-purple-400 font-bold">
-                                                                    目前已售 {p.soldQty || 0} / 上限 {p.maxTotalQty}
-                                                                </span>
-                                                            )}
+                                                    <span className="truncate max-w-[130px]">{p.name}</span>
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${
+                                                        isCurrent ? 'bg-white/20 text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'
+                                                    }`}>
+                                                        {commCount > 0 ? `${commCount}區` : '全開'}
+                                                        {quotaCount > 0 ? `·${quotaCount}配額` : ''}
+                                                    </span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 1. 當前商品的活動總釋出量與基本資訊 */}
+                            {activeModalProduct && (
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-extrabold text-[var(--text-primary)] flex items-center gap-1.5">
+                                            <span>📦 設定商品：</span>
+                                            <span className="text-blue-600 dark:text-blue-400 underline underline-offset-2">{activeModalProduct.name}</span>
+                                        </span>
+                                    </div>
+
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-[var(--bg-tertiary)]/50 border border-[var(--border-primary)] text-xs">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                            {activeModalProduct.imageUrl ? (
+                                                <img src={activeModalProduct.imageUrl} alt={activeModalProduct.name} className="w-10 h-10 rounded-xl object-cover shrink-0" />
+                                            ) : (
+                                                <div className="w-10 h-10 rounded-xl bg-[var(--bg-tertiary)] flex items-center justify-center shrink-0">
+                                                    <Package size={18} className="text-[var(--text-tertiary)]" />
+                                                </div>
+                                            )}
+                                            <div className="min-w-0 flex-1">
+                                                <div className="font-bold text-[var(--text-primary)] truncate text-sm">{activeModalProduct.name}</div>
+                                                <div className="text-[11px] text-[var(--text-tertiary)] flex items-center gap-2 mt-0.5">
+                                                    <span>現有庫存：{stockMap[activeModalProduct.name] ?? 0}</span>
+                                                    {activeModalProduct.maxTotalQty !== null && activeModalProduct.maxTotalQty !== undefined && (
+                                                        <span className="text-purple-600 dark:text-purple-400 font-bold">
+                                                            目前已售 {activeModalProduct.soldQty || 0} / 上限 {activeModalProduct.maxTotalQty}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 bg-[var(--bg-secondary)] px-3 py-1.5 rounded-xl border border-[var(--border-primary)]">
+                                            <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300">🔒 活動總釋出量：</span>
+                                            <div className="flex items-center gap-1">
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="9999"
+                                                    placeholder="不限"
+                                                    value={activeModalConfig.maxTotalQty ?? ''}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        updateActiveProductConfig('maxTotalQty', val);
+                                                    }}
+                                                    className="w-16 px-1.5 py-0.5 text-center font-bold text-xs rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] focus:outline-none focus:border-purple-500 font-mono"
+                                                />
+                                                <span className="text-[10px] text-[var(--text-tertiary)]">件</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 2. 開放社區（未選擇代表全區開放，勾選「線上下單」代表開放所有行政區與散客） - 可收合 */}
+                            <div className="rounded-2xl bg-[var(--bg-tertiary)]/40 border border-[var(--border-primary)] overflow-hidden transition-all">
+                                <div 
+                                    className="flex justify-between items-center p-3.5 cursor-pointer hover:bg-[var(--bg-tertiary)]/60 select-none transition-colors"
+                                    onClick={() => setIsAllowedCommOpen(prev => !prev)}
+                                >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <span className="text-[11px] uppercase font-extrabold text-purple-600 dark:text-purple-400 tracking-wider truncate">
+                                            🏠 開放社區（未選擇代表全區開放，勾選「線上下單」代表開放所有行政區與散客）
+                                        </span>
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold shrink-0">
+                                            {activeSelectedCommCount > 0
+                                                ? `已選 ${activeSelectedCommCount} 社區`
+                                                : '全區開放 (預設)'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {isAllowedCommOpen && activeSelectedCommCount > 0 && (
+                                            <button
+                                                type="button"
+                                                className="text-[10px] text-red-400 hover:text-red-600 font-bold cursor-pointer mr-1"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    updateActiveProductConfig('allowedCommunityIds', []);
+                                                }}
+                                            >
+                                                清除全部
+                                            </button>
+                                        )}
+                                        {isAllowedCommOpen ? (
+                                            <ChevronUp size={16} className="text-purple-600 dark:text-purple-400" />
+                                        ) : (
+                                            <ChevronDown size={16} className="text-[var(--text-tertiary)]" />
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                {isAllowedCommOpen && (
+                                    <div className="p-3.5 pt-0 border-t border-[var(--border-primary)]/50 space-y-2 animate-in fade-in duration-150">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1 pt-2">
+                                            {visibleCommunities.map(c => {
+                                                const cid = c.communityId || c.CommunityId;
+                                                const cname = c.communityName || c.CommunityName;
+                                                const checked = (activeModalConfig.allowedCommunityIds || []).includes(cid) || (activeModalConfig.allowedCommunityIds || []).includes(cname);
+                                                const isOnlineAll = cname === '線上下單';
+                                                return (
+                                                    <label
+                                                        key={cid || cname}
+                                                        className={`flex items-center gap-2 cursor-pointer group p-1.5 rounded-xl transition-all ${
+                                                            isOnlineAll
+                                                                ? 'bg-purple-500/10 border border-purple-500/30 col-span-full'
+                                                                : 'hover:bg-[var(--bg-secondary)] border border-transparent'
+                                                        }`}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={checked}
+                                                            onChange={(e) => {
+                                                                const next = new Set(activeModalConfig.allowedCommunityIds || []);
+                                                                if (e.target.checked) {
+                                                                    if (cid) next.add(cid);
+                                                                    if (cname) next.add(cname);
+                                                                } else {
+                                                                    if (cid) next.delete(cid);
+                                                                    if (cname) next.delete(cname);
+                                                                }
+                                                                updateActiveProductConfig('allowedCommunityIds', [...next]);
+                                                            }}
+                                                            className="w-3.5 h-3.5 accent-purple-500 cursor-pointer"
+                                                        />
+                                                        <span className={`text-xs font-bold ${isOnlineAll ? 'text-purple-600 dark:text-purple-400 font-extrabold' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'} truncate`}>
+                                                            {isOnlineAll ? '🛒 線上下單 (自動包含所有行政區與散客)' : cname}
+                                                        </span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 3. 社區獨家搶購配額 (未填寫代表不設上限) - 可收合 */}
+                            <div className="rounded-2xl bg-gradient-to-r from-amber-500/5 via-purple-500/5 to-amber-500/5 border border-amber-400/30 overflow-hidden transition-all">
+                                <div 
+                                    className="flex justify-between items-center p-3.5 cursor-pointer hover:bg-amber-500/10 select-none transition-colors"
+                                    onClick={() => setIsCommQuotaOpen(prev => !prev)}
+                                >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <span className="text-xs uppercase font-extrabold text-amber-600 dark:text-amber-400 tracking-wider flex items-center gap-1.5 truncate">
+                                            🔥 社區獨家搶購配額 (未填寫代表不設上限)
+                                        </span>
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold shrink-0">
+                                            {Object.keys(activeModalConfig.communityQuotas || {}).length > 0
+                                                ? `已設 ${Object.keys(activeModalConfig.communityQuotas).length} 社區配額`
+                                                : '不設限 (預設)'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {isCommQuotaOpen && Object.keys(activeModalConfig.communityQuotas || {}).length > 0 && (
+                                            <button
+                                                type="button"
+                                                className="text-[10px] text-red-400 hover:text-red-600 font-bold cursor-pointer mr-1"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    updateActiveProductConfig('communityQuotas', {});
+                                                }}
+                                            >
+                                                清除所有社區配額
+                                            </button>
+                                        )}
+                                        {isCommQuotaOpen ? (
+                                            <ChevronUp size={16} className="text-amber-600 dark:text-amber-400" />
+                                        ) : (
+                                            <ChevronDown size={16} className="text-amber-600 dark:text-amber-400" />
+                                        )}
+                                    </div>
+                                </div>
+
+                                {isCommQuotaOpen && (
+                                    <div className="p-3.5 pt-0 border-t border-amber-400/20 space-y-2 animate-in fade-in duration-150">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto pr-1 pt-2">
+                                            {visibleCommunities.map(c => {
+                                                const cid = c.communityId || c.CommunityId;
+                                                const cname = c.communityName || c.CommunityName;
+                                                const curQuotas = activeModalConfig.communityQuotas || {};
+                                                const maxQtyVal = curQuotas[cname] !== undefined ? curQuotas[cname] : (curQuotas[cid] ?? '');
+
+                                                return (
+                                                    <div key={cid || cname} className="flex flex-col gap-1 p-2 bg-[var(--bg-secondary)] border border-[var(--border-primary)]/70 rounded-xl shadow-2xs">
+                                                        <span className="text-xs font-bold text-[var(--text-primary)] truncate">{cname}</span>
+                                                        <div className="flex items-center gap-1">
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                placeholder="無限制"
+                                                                className="input-field text-xs p-1.5 w-full font-mono"
+                                                                value={maxQtyVal}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value !== '' ? Number(e.target.value) : '';
+                                                                    const next = { ...(activeModalConfig.communityQuotas || {}) };
+                                                                    if (val === '' || val === null) {
+                                                                        delete next[cname];
+                                                                        delete next[cid];
+                                                                    } else {
+                                                                        next[cname] = val;
+                                                                    }
+                                                                    updateActiveProductConfig('communityQuotas', next);
+                                                                }}
+                                                            />
+                                                            <span className="text-[10px] text-[var(--text-tertiary)] shrink-0">件</span>
                                                         </div>
                                                     </div>
-                                                </div>
-
-                                                <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 bg-[var(--bg-secondary)] px-3 py-1.5 rounded-xl border border-[var(--border-primary)]">
-                                                    <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300">🔒 活動總釋出量：</span>
-                                                    <div className="flex items-center gap-1">
-                                                        <input
-                                                            type="number"
-                                                            min="1"
-                                                            max="9999"
-                                                            placeholder="不限"
-                                                            value={linkMaxTotalLimits[id] ?? ''}
-                                                            onChange={(e) => {
-                                                                const val = e.target.value;
-                                                                setLinkMaxTotalLimits(prev => ({ ...prev, [id]: val }));
-                                                            }}
-                                                            className="w-16 px-1.5 py-0.5 text-center font-bold text-xs rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] focus:outline-none focus:border-purple-500 font-mono"
-                                                        />
-                                                        <span className="text-[10px] text-[var(--text-tertiary)]">件</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* 2. 開放社區（未選擇代表全區開放，勾選「線上下單」代表開放所有行政區與散客） */}
-                            <div className="flex flex-col gap-2 p-3.5 rounded-2xl bg-[var(--bg-tertiary)]/40 border border-[var(--border-primary)]">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-[11px] uppercase font-extrabold text-purple-600 dark:text-purple-400 tracking-wider">
-                                        🏠 開放社區（未選擇代表全區開放，勾選「線上下單」代表開放所有行政區與散客）
-                                    </span>
-                                    {modalAllowedCommunityIds.length > 0 && (
-                                        <button
-                                            type="button"
-                                            className="text-[10px] text-red-400 hover:text-red-600 font-bold cursor-pointer"
-                                            onClick={() => setModalAllowedCommunityIds([])}
-                                        >
-                                            清除全部
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
-                                    {visibleCommunities.map(c => {
-                                        const cid = c.communityId || c.CommunityId;
-                                        const cname = c.communityName || c.CommunityName;
-                                        const checked = modalAllowedCommunityIds.includes(cid) || modalAllowedCommunityIds.includes(cname);
-                                        const isOnlineAll = cname === '線上下單';
-                                        return (
-                                            <label
-                                                key={cid || cname}
-                                                className={`flex items-center gap-2 cursor-pointer group p-1.5 rounded-xl transition-all ${
-                                                    isOnlineAll
-                                                        ? 'bg-purple-500/10 border border-purple-500/30 col-span-full'
-                                                        : 'hover:bg-[var(--bg-secondary)] border border-transparent'
-                                                }`}
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={checked}
-                                                    onChange={(e) => {
-                                                        const next = new Set(modalAllowedCommunityIds);
-                                                        if (e.target.checked) {
-                                                            if (cid) next.add(cid);
-                                                            if (cname) next.add(cname);
-                                                        } else {
-                                                            if (cid) next.delete(cid);
-                                                            if (cname) next.delete(cname);
-                                                        }
-                                                        setModalAllowedCommunityIds([...next]);
-                                                    }}
-                                                    className="w-3.5 h-3.5 accent-purple-500 cursor-pointer"
-                                                />
-                                                <span className={`text-xs font-bold ${isOnlineAll ? 'text-purple-600 dark:text-purple-400 font-extrabold' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'} truncate`}>
-                                                    {isOnlineAll ? '🛒 線上下單 (自動包含所有行政區與散客)' : cname}
-                                                </span>
-                                            </label>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* 3. 社區獨家搶購配額 (未填寫代表不設上限) */}
-                            <div className="flex flex-col gap-2 p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/5 via-purple-500/5 to-amber-500/5 border border-amber-400/30">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs uppercase font-extrabold text-amber-600 dark:text-amber-400 tracking-wider flex items-center gap-1.5">
-                                        🔥 社區獨家搶購配額 (未填寫代表不設上限)
-                                    </span>
-                                    {Object.keys(modalCommunityQuotas).length > 0 && (
-                                        <button
-                                            type="button"
-                                            className="text-[10px] text-red-400 hover:text-red-600 font-bold cursor-pointer"
-                                            onClick={() => setModalCommunityQuotas({})}
-                                        >
-                                            清除所有社區配額
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto pr-1">
-                                    {visibleCommunities.map(c => {
-                                        const cid = c.communityId || c.CommunityId;
-                                        const cname = c.communityName || c.CommunityName;
-                                        const maxQtyVal = modalCommunityQuotas[cname] !== undefined ? modalCommunityQuotas[cname] : (modalCommunityQuotas[cid] ?? '');
-
-                                        return (
-                                            <div key={cid || cname} className="flex flex-col gap-1 p-2 bg-[var(--bg-secondary)] border border-[var(--border-primary)]/70 rounded-xl shadow-2xs">
-                                                <span className="text-xs font-bold text-[var(--text-primary)] truncate">{cname}</span>
-                                                <div className="flex items-center gap-1">
-                                                    <input
-                                                        type="number"
-                                                        min="1"
-                                                        placeholder="無限制"
-                                                        className="input-field text-xs p-1.5 w-full font-mono"
-                                                        value={maxQtyVal}
-                                                        onChange={(e) => {
-                                                            const val = e.target.value !== '' ? Number(e.target.value) : '';
-                                                            setModalCommunityQuotas(prev => {
-                                                                const next = { ...prev };
-                                                                if (val === '' || val === null) {
-                                                                    delete next[cname];
-                                                                    delete next[cid];
-                                                                } else {
-                                                                    next[cname] = val;
-                                                                }
-                                                                return next;
-                                                            });
-                                                        }}
-                                                    />
-                                                    <span className="text-[10px] text-[var(--text-tertiary)] shrink-0">件</span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* 4. 指定大樓/社區 (選填，帶入連結網址參數) */}

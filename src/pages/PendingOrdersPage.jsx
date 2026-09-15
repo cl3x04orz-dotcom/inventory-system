@@ -5,6 +5,20 @@ import { copyToClipboard } from '../utils/clipboard';
 import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 
 // --- 🎨 口味備註解析與格式化輔助函數 ---
+const cleanBaseProductName = (rawName) => {
+    if (!rawName) return '';
+    return String(rawName)
+        .replace(/\s*\(\s*【?口味備註[：:].*?】\s*\)/gi, '')
+        .replace(/\s*【口味備註[：:].*?】/gi, '')
+        .replace(/\s*\(【.*?】\)/g, '')
+        .replace(/\s*【.*?】/g, '')
+        .replace(/\s*\(.*口味備註.*\)/gi, '')
+        .replace(/\s*\(贈品\)/g, '')
+        .replace(/\s*\(免費贈品\)/g, '')
+        .replace(/x\d+$/i, '')
+        .trim();
+};
+
 const parseRemarkToFlavorMap = (remarkStr, flavorChoices = [], currentTotalQty = 0) => {
     const map = {};
     if (!remarkStr) {
@@ -13,26 +27,41 @@ const parseRemarkToFlavorMap = (remarkStr, flavorChoices = [], currentTotalQty =
         }
         return map;
     }
-    const clean = String(remarkStr).replace(/【口味備註：(.*?)】/, '$1').trim();
-    if (!clean) {
+    const str = String(remarkStr).trim();
+    if (!str || str === '贈品' || str === '免費贈品') return map;
+
+    const bracketMatches = Array.from(str.matchAll(/【(?:口味備註[：:])?(.*?)】/g));
+    let segments = [];
+    if (bracketMatches.length > 0) {
+        segments = bracketMatches.map(m => m[1]);
+    } else if (/[*xX×:：]\s*\d+/.test(str)) {
+        segments = [str];
+    } else {
+        // 沒有任何口味格式標記
         if (flavorChoices.length > 0 && currentTotalQty > 0) {
             map[flavorChoices[0]] = currentTotalQty;
         }
         return map;
     }
-    const parts = clean.split(/[,，;；]/).map(s => s.trim()).filter(Boolean);
-    parts.forEach(part => {
-        const m = part.match(/^(.+?)[xX*](\d+)$/);
-        if (m) {
-            const f = m[1].trim();
-            const q = parseInt(m[2], 10) || 0;
-            if (f && q > 0) {
-                map[f] = (map[f] || 0) + q;
+
+    segments.forEach(seg => {
+        const clean = seg.replace(/【?口味備註[：:]?/g, '').replace(/】/g, '').trim();
+        if (!clean || clean === '贈品' || clean === '免費贈品') return;
+        const parts = clean.split(/[,，;；]/).map(s => s.trim()).filter(Boolean);
+        parts.forEach(part => {
+            const m = part.match(/^(.+?)\s*[*xX×:：]\s*(\d+)$/);
+            if (m) {
+                const f = m[1].replace(/【?口味備註[：:]?/g, '').trim();
+                const q = parseInt(m[2], 10) || 0;
+                if (f && q > 0 && !f.includes('贈品')) {
+                    map[f] = (map[f] || 0) + q;
+                }
+            } else if (flavorChoices.includes(part)) {
+                map[part] = (map[part] || 0) + 1;
             }
-        } else if (flavorChoices.includes(part)) {
-            map[part] = (map[part] || 0) + 1;
-        }
+        });
     });
+
     if (Object.keys(map).length === 0 && flavorChoices.length > 0 && currentTotalQty > 0) {
         map[flavorChoices[0]] = currentTotalQty;
     }
@@ -145,17 +174,14 @@ const formatCleanProductNameAndFlavor = (rawProductName, rawRemark, qty) => {
     let pName = String(rawProductName || '').trim();
     let rem = String(rawRemark || '').trim();
 
-    // 先全區尋找是否有 【口味備註：...】 或 【...】
+    // 優先從 rem 抽取出規格口味，若 rem 為空才從 pName 抽取，絕不重複拼接導致數量翻倍！
+    const flavorStr = (rem && rem !== '贈品' && rem !== '免費贈品') ? rem : pName;
     let innerFlavor = '';
-    const combinedStr = `${pName} ${rem}`;
 
-    if (combinedStr.includes('【口味備註：')) {
-        const match = combinedStr.match(/【口味備註：(.*?)】/);
-        if (match && match[1]) innerFlavor = match[1].trim();
-    } else if (combinedStr.includes('【') && combinedStr.includes('】')) {
-        const match = combinedStr.match(/【(.*?)】/);
-        if (match && match[1]) innerFlavor = match[1].trim();
-    } else if (rem && rem !== '贈品') {
+    const fMap = parseRemarkToFlavorMap(flavorStr);
+    if (Object.keys(fMap).length > 0) {
+        innerFlavor = Object.entries(fMap).map(([f, q]) => `${f}x${q}`).join(', ');
+    } else if (rem && rem !== '贈品' && rem !== '免費贈品') {
         innerFlavor = rem;
     }
 
@@ -165,12 +191,7 @@ const formatCleanProductNameAndFlavor = (rawProductName, rawRemark, qty) => {
     }
 
     // 乾淨的主要商品名稱 (剔除括號與【...】及隨後的冗餘文字)
-    let cleanBaseName = pName
-        .split('【')[0]
-        .split('(')[0]
-        .replace(/x\d+$/i, '')
-        .trim();
-
+    let cleanBaseName = cleanBaseProductName(pName);
     if (!cleanBaseName) cleanBaseName = pName;
 
     const flavorBracket = innerFlavor ? `【${innerFlavor}】` : '';
@@ -462,27 +483,27 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
             }
 
             let finalRemark = item.remark || '';
-            if (hasRecipients && prod && prod.has_flavor_attributes) {
+            const prodHasFlavors = prod && (prod.has_flavor_attributes || prod.hasFlavorAttributes);
+            if (hasRecipients && prodHasFlavors) {
                 const flavorMap = {};
                 const rawRemarks = [];
+                const cleanItemName = cleanBaseProductName(item.productName);
+
                 normalizedRecipients.forEach(r => {
                     (r.items || []).forEach(ri => {
-                        if (ri.productId === item.productId || ri.productName === item.productName) {
-                            const remStr = ri.remark || '';
-                            if (remStr) {
-                                const cleanRemark = remStr.replace(/【口味備註：(.*?)】/, '$1');
-                                cleanRemark.split(/[,，\s+]/).forEach(part => {
-                                    const match = part.trim().match(/^\(?([^\s*x:：)]+)\)?\s*[*xX:：]\s*(\d+)$/);
-                                    if (match) {
-                                        const fName = match[1];
-                                        const fQty = Number(match[2]);
-                                        if (fName && fQty > 0) {
-                                            flavorMap[fName] = (flavorMap[fName] || 0) + fQty;
-                                        }
-                                    } else if (part.trim() && !part.trim().includes('口味備註')) {
-                                        if (!rawRemarks.includes(part.trim())) rawRemarks.push(part.trim());
-                                    }
+                        const cleanRiName = cleanBaseProductName(ri.productName);
+                        const isMatch = (ri.productId && item.productId && ri.productId === item.productId) ||
+                                        (cleanItemName && cleanItemName === cleanRiName);
+                        if (isMatch) {
+                            const remStr = ri.remark || ri.productName || '';
+                            const riFMap = parseRemarkToFlavorMap(remStr);
+                            if (Object.keys(riFMap).length > 0) {
+                                Object.entries(riFMap).forEach(([f, q]) => {
+                                    flavorMap[f] = (flavorMap[f] || 0) + q;
                                 });
+                            } else if (ri.remark && !ri.remark.includes('贈品')) {
+                                const clean = ri.remark.trim();
+                                if (clean && !rawRemarks.includes(clean)) rawRemarks.push(clean);
                             }
                         }
                     });
@@ -491,6 +512,12 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                     const fParts = Object.entries(flavorMap).map(([k, v]) => `${k}x${v}`);
                     if (rawRemarks.length > 0) fParts.push(...rawRemarks);
                     finalRemark = `【口味備註：${fParts.join(', ')}】`;
+                }
+            } else if (finalRemark) {
+                // 若無團員或主項目自身有口味備註（例如歷史合併資料），亦進行口味加總聚合
+                const fMap = parseRemarkToFlavorMap(finalRemark);
+                if (Object.keys(fMap).length > 0) {
+                    finalRemark = formatFlavorMapToRemark(fMap);
                 }
             }
 
@@ -3320,11 +3347,21 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                                         );
                                                                     })()}
                                                                     {item.remark && (() => {
-                                                                        const rawTag = String(item.remark || '')
-                                                                            .replace(/【?口味備註：?/g, '')
-                                                                            .replace(/】/g, '')
-                                                                            .trim();
-                                                                        const flavorTag = stripTrailingQty(rawTag);
+                                                                        const remStr = String(item.remark || '').trim();
+                                                                        if (!remStr || remStr === '贈品' || remStr === '免費贈品') return null;
+                                                                        const fMap = parseRemarkToFlavorMap(remStr);
+                                                                        let flavorTag = '';
+                                                                        if (Object.keys(fMap).length > 0) {
+                                                                            flavorTag = Object.entries(fMap).map(([f, q]) => `${f}x${q}`).join(', ');
+                                                                        } else if (remStr.includes('【口味備註：') || remStr.includes('【')) {
+                                                                            const rawTag = remStr
+                                                                                .replace(/【?口味備註[：:]?/g, '')
+                                                                                .replace(/】/g, '')
+                                                                                .trim();
+                                                                            if (rawTag && rawTag !== '贈品' && rawTag !== '免費贈品' && !rawTag.includes('六甲') && !rawTag.includes('燕麥')) {
+                                                                                flavorTag = stripTrailingQty(rawTag);
+                                                                            }
+                                                                        }
                                                                         if (!flavorTag) return null;
                                                                         return (
                                                                             <div className="text-xs text-blue-600 dark:text-blue-400 font-bold mt-1 ml-1">
@@ -3372,7 +3409,21 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                             <div className="text-xs uppercase font-extrabold text-[var(--text-tertiary)] tracking-wider">👤 團員代訂分配明細</div>
                                                             <div className="space-y-2">
                                                                 {order.recipients.map((r, rIdx) => {
-                                                                    const recipientTotal = r.items.reduce((sum, ri) => sum + (ri.subtotal != null && ri.subtotal !== undefined ? Number(ri.subtotal) : calculateItemSubtotal(ri.productId, ri.qty, ri.price)), 0);
+                                                                    const recipientTotal = r.items.reduce((sum, ri) => {
+                                                                        const isGift = Boolean(
+                                                                            ri.isGift ||
+                                                                            Number(ri.price) === 0 ||
+                                                                            Number(ri.unitPrice) === 0 ||
+                                                                            Number(ri.subtotal) === 0 ||
+                                                                            (ri.remark && String(ri.remark).includes('贈品')) ||
+                                                                            (ri.productName && String(ri.productName).includes('贈品'))
+                                                                        );
+                                                                        if (isGift) return sum;
+                                                                        const itemSub = ri.subtotal != null && ri.subtotal !== undefined && !isNaN(Number(ri.subtotal))
+                                                                            ? Number(ri.subtotal)
+                                                                            : calculateItemSubtotal(ri.productId || ri.productName, ri.qty, ri.price ?? ri.unitPrice);
+                                                                        return sum + Number(itemSub || 0);
+                                                                    }, 0);
                                                                     return (
                                                                         <div key={rIdx} className="bg-[var(--bg-secondary)] p-3 rounded-lg border border-[var(--border-primary)]">
                                                                             <div className="flex justify-between items-center text-base font-extrabold text-[var(--text-primary)] border-b border-dashed border-[var(--border-primary)] pb-1 mb-1.5">
@@ -3381,17 +3432,38 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                                             </div>
                                                                             <div className="pl-2 space-y-1 text-sm md:text-base text-[var(--text-secondary)]">
                                                                                 {r.items.map((ri, riIdx) => {
-                                                                                    const sub = calculateItemSubtotal(ri.productId || ri.productName, ri.qty, ri.price ?? ri.unitPrice);
+                                                                                    const isGift = Boolean(
+                                                                                        ri.isGift ||
+                                                                                        Number(ri.price) === 0 ||
+                                                                                        Number(ri.unitPrice) === 0 ||
+                                                                                        Number(ri.subtotal) === 0 ||
+                                                                                        (ri.remark && String(ri.remark).includes('贈品')) ||
+                                                                                        (ri.productName && String(ri.productName).includes('贈品'))
+                                                                                    );
+                                                                                    const sub = isGift ? 0 : (ri.subtotal != null && ri.subtotal !== undefined && !isNaN(Number(ri.subtotal))
+                                                                                        ? Number(ri.subtotal)
+                                                                                        : calculateItemSubtotal(ri.productId || ri.productName, ri.qty, ri.price ?? ri.unitPrice));
                                                                                     const formatted = formatCleanProductNameAndFlavor(ri.productName, ri.remark, ri.qty);
-                                                                                    const freeQty = calculateFreeQtyFromTotal(ri.productId, ri.qty);
-                                                                                    const paidQty = ri.qty - freeQty;
-                                                                                    const qtyDisplay = freeQty > 0 ? `x${ri.qty} (付費:${paidQty},送:${freeQty})` : `x${ri.qty}`;
+                                                                                    const freeQty = isGift ? ri.qty : calculateFreeQtyFromTotal(ri.productId, ri.qty);
+                                                                                    const paidQty = isGift ? 0 : (ri.qty - freeQty);
+                                                                                    const qtyDisplay = isGift
+                                                                                        ? `x${ri.qty} (贈品)`
+                                                                                        : (freeQty > 0 ? `x${ri.qty} (付費:${paidQty},送:${freeQty})` : `x${ri.qty}`);
                                                                                     return (
                                                                                         <div key={riIdx} className="flex justify-between items-start font-mono">
                                                                                             <span className="pr-2 text-[var(--text-secondary)] break-words leading-snug">
-                                                                                                <span className="text-[var(--text-primary)] font-normal text-sm md:text-base">{formatted.pNameDisplay}</span> <span className="font-normal text-blue-600 dark:text-blue-400">{qtyDisplay}</span>
+                                                                                                <span className="text-[var(--text-primary)] font-normal text-sm md:text-base">
+                                                                                                    {formatted.pNameDisplay}
+                                                                                                    {isGift && (
+                                                                                                        <span className="text-[10px] md:text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded-md ml-1.5 border border-emerald-500/20">
+                                                                                                            免費贈品
+                                                                                                        </span>
+                                                                                                    )}
+                                                                                                </span> <span className={`font-normal ${isGift ? 'text-emerald-600 font-bold' : 'text-blue-600 dark:text-blue-400'}`}>{qtyDisplay}</span>
                                                                                             </span>
-                                                                                            <span className="flex-shrink-0 font-normal text-[var(--text-primary)] mt-0.5 text-sm md:text-base">${sub}</span>
+                                                                                            <span className="flex-shrink-0 font-normal text-[var(--text-primary)] mt-0.5 text-sm md:text-base">
+                                                                                                {isGift ? <span className="text-emerald-600 font-bold">$0</span> : `$${sub}`}
+                                                                                            </span>
                                                                                         </div>
                                                                                     );
                                                                                 })}

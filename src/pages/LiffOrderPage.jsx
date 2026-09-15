@@ -1664,11 +1664,31 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   const getProductQuotaInfo = useCallback((prod) => {
     if (!prod) return { hasQuota: false, remaining: null, isCommunityQuota: false };
 
-    const commId = currentCommunity?.CommunityId;
-    const commName = currentCommunity?.CommunityName;
-    const cQuotas = prod.communityQuotas || {};
+    const activeKeys = new Set();
+    if (selectedBuilding && !["一般用戶", "一般散客", "上線下單", "線上下單", "一般常態", "常態零售", "其它"].includes(selectedBuilding)) {
+      activeKeys.add(String(selectedBuilding).trim());
+    }
+    if (selectedCommunityId) activeKeys.add(String(selectedCommunityId).trim());
+    if (currentCommunity) {
+      const cid = currentCommunity.CommunityId || currentCommunity.communityId;
+      const cname = currentCommunity.CommunityName || currentCommunity.communityName;
+      if (cid) activeKeys.add(String(cid).trim());
+      if (cname && !["一般用戶", "一般散客", "上線下單", "線上下單", "一般常態", "常態零售", "其它"].includes(cname)) {
+        activeKeys.add(String(cname).trim());
+      }
+    }
+    if (Array.isArray(allCommunities) && selectedCommunityId) {
+      const match = allCommunities.find(c => (c.CommunityId || c.communityId) === selectedCommunityId);
+      if (match) {
+        const mname = match.CommunityName || match.communityName;
+        const mid = match.CommunityId || match.communityId;
+        if (mname) activeKeys.add(String(mname).trim());
+        if (mid) activeKeys.add(String(mid).trim());
+      }
+    }
 
-    const matchedKey = [commId, commName].find(k => k && cQuotas[k] && typeof cQuotas[k].maxQty === 'number');
+    const cQuotas = prod.communityQuotas || {};
+    const matchedKey = Array.from(activeKeys).find(k => k && cQuotas[k] && typeof cQuotas[k].maxQty === 'number');
     if (matchedKey) {
       const qObj = cQuotas[matchedKey];
       const maxQty = Number(qObj.maxQty || 0);
@@ -1683,7 +1703,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     }
 
     return { hasQuota: false, remaining: null, isCommunityQuota: false };
-  }, [currentCommunity]);
+  }, [currentCommunity, selectedBuilding, selectedCommunityId, allCommunities]);
 
   const handleUpdateQty = (pid, delta) => {
     setAnimatingProductId(pid);
