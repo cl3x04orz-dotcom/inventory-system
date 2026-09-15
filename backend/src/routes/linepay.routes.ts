@@ -126,14 +126,25 @@ function startAutoConfirmPolling(
         if (['0000', '1198', '1150', '1165'].includes(confirmRes.returnCode)) {
           const targetDbOrderId = orderId.split('-P')[0];
 
-          if (isExistingOrder) {
+          if (targetDbOrderId && (isExistingOrder || !orderPayload)) {
+            // 🛡️ 既有訂單線上補繳
             try {
+              const existing = await prisma.groupBuyOrder.findUnique({
+                where: { orderId: String(targetDbOrderId) },
+                select: { note: true }
+              });
+              const linePayNote = `【LINE Pay 線上補繳成功 - 交易單號: ${transactionId}】`;
+              const currentNote = existing?.note || '';
+              const newNote = currentNote.includes(linePayNote)
+                ? currentNote
+                : (currentNote ? `${currentNote}\n${linePayNote}` : linePayNote);
+
               await prisma.groupBuyOrder.updateMany({
                 where: { orderId: String(targetDbOrderId) },
                 data: {
                   paymentMethod: 'LINE Pay',
                   paymentStatus: '已付款',
-                  note: `【LINE Pay 線上補繳成功 - 交易單號: ${transactionId}】`
+                  note: newNote
                 }
               });
               console.log(`[LINE Pay Poll] ✅ Updated DB order #${targetDbOrderId} to 已付款 (existing)`);
@@ -145,11 +156,22 @@ function startAutoConfirmPolling(
               const userContext = { token: token || '' };
               const createdRes = await GroupBuyService.v2_createOrder(orderPayload, userContext);
               const finalId = createdRes?.orderId || targetDbOrderId;
+
+              const existing = await prisma.groupBuyOrder.findUnique({
+                where: { orderId: String(finalId) },
+                select: { note: true }
+              });
+              const linePayNote = `【LINE Pay 線上扣款成功 - 交易單號: ${transactionId}】`;
+              const currentNote = existing?.note || '';
+              const newNote = currentNote.includes(linePayNote)
+                ? currentNote
+                : (currentNote ? `${currentNote}\n${linePayNote}` : linePayNote);
+
               await prisma.groupBuyOrder.updateMany({
                 where: { orderId: String(finalId) },
                 data: {
                   paymentStatus: '已付款',
-                  note: `【LINE Pay 線上扣款成功 - 交易單號: ${transactionId}】`
+                  note: newNote
                 }
               });
               console.log(`[LINE Pay Poll] ✅ Created + updated DB order #${finalId} to 已付款 (new)`);
@@ -159,11 +181,21 @@ function startAutoConfirmPolling(
           } else {
             // 備援：直接更新 DB 訂單狀態
             try {
+              const existing = await prisma.groupBuyOrder.findUnique({
+                where: { orderId: String(targetDbOrderId) },
+                select: { note: true }
+              });
+              const linePayNote = `【LINE Pay 線上扣款成功 - 交易單號: ${transactionId}】`;
+              const currentNote = existing?.note || '';
+              const newNote = currentNote.includes(linePayNote)
+                ? currentNote
+                : (currentNote ? `${currentNote}\n${linePayNote}` : linePayNote);
+
               await prisma.groupBuyOrder.updateMany({
                 where: { orderId: String(targetDbOrderId) },
                 data: {
                   paymentStatus: '已付款',
-                  note: `【LINE Pay 線上扣款成功 - 交易單號: ${transactionId}】`
+                  note: newNote
                 }
               });
               console.log(`[LINE Pay Poll] ✅ Fallback updated DB order #${targetDbOrderId} to 已付款`);
@@ -553,12 +585,25 @@ export async function linePayRoutes(app: FastifyInstance) {
         if (pending?.isExistingOrder) {
           // 🛡️ 既有訂單補繳：更新狀態為已付款
           try {
+            const existing = await prisma.groupBuyOrder.findUnique({
+              where: { orderId: String(targetDbOrderId) },
+              select: { note: true }
+            });
+            const linePayNote = `【LINE Pay 線上補繳成功 - 交易單號: ${transactionId}】`;
+            const currentNote = existing?.note || '';
+            let newNote = currentNote;
+            if (newNote.includes(`【交易單號: ${transactionId}】`)) {
+              newNote = newNote.replace(`【交易單號: ${transactionId}】`, linePayNote);
+            } else if (!newNote.includes(linePayNote)) {
+              newNote = newNote ? `${newNote}\n${linePayNote}` : linePayNote;
+            }
+
             await prisma.groupBuyOrder.updateMany({
               where: { orderId: String(targetDbOrderId) },
               data: {
                 paymentMethod: 'LINE Pay',
                 paymentStatus: '已付款',
-                note: `【LINE Pay 線上補繳成功 - 交易單號: ${transactionId}】`
+                note: newNote
               }
             });
             console.log(`[LINE Pay Confirm Route] Successfully updated DB order #${targetDbOrderId} to 已付款`);
@@ -574,12 +619,25 @@ export async function linePayRoutes(app: FastifyInstance) {
               finalCreatedOrderId = createdRes.orderId;
             }
 
-            // 更新備註與交易單號
+            // 更新備註與交易單號 (保留原客人留言)
+            const existing = await prisma.groupBuyOrder.findUnique({
+              where: { orderId: String(finalCreatedOrderId) },
+              select: { note: true }
+            });
+            const linePayNote = `【LINE Pay 線上扣款成功 - 交易單號: ${transactionId}】`;
+            const currentNote = existing?.note || '';
+            let newNote = currentNote;
+            if (newNote.includes(`【交易單號: ${transactionId}】`)) {
+              newNote = newNote.replace(`【交易單號: ${transactionId}】`, linePayNote);
+            } else if (!newNote.includes(linePayNote)) {
+              newNote = newNote ? `${newNote}\n${linePayNote}` : linePayNote;
+            }
+
             await prisma.groupBuyOrder.updateMany({
               where: { orderId: String(finalCreatedOrderId) },
               data: {
                 paymentStatus: '已付款',
-                note: `【LINE Pay 線上扣款成功 - 交易單號: ${transactionId}】`
+                note: newNote
               }
             });
             console.log(`[LINE Pay Confirm Route] Successfully created and updated DB order #${finalCreatedOrderId} to 已付款`);
@@ -589,11 +647,24 @@ export async function linePayRoutes(app: FastifyInstance) {
         } else {
           // 🛡️ 備援：若 pending 已經丟失但此時為扣款確認，嘗試直接將 DB 該訂單設為已付款
           try {
+            const existing = await prisma.groupBuyOrder.findUnique({
+              where: { orderId: String(targetDbOrderId) },
+              select: { note: true }
+            });
+            const linePayNote = `【LINE Pay 線上扣款成功 - 交易單號: ${transactionId}】`;
+            const currentNote = existing?.note || '';
+            let newNote = currentNote;
+            if (newNote.includes(`【交易單號: ${transactionId}】`)) {
+              newNote = newNote.replace(`【交易單號: ${transactionId}】`, linePayNote);
+            } else if (!newNote.includes(linePayNote)) {
+              newNote = newNote ? `${newNote}\n${linePayNote}` : linePayNote;
+            }
+
             await prisma.groupBuyOrder.updateMany({
               where: { orderId: String(targetDbOrderId) },
               data: {
                 paymentStatus: '已付款',
-                note: `【LINE Pay 線上扣款成功 - 交易單號: ${transactionId}】`
+                note: newNote
               }
             });
           } catch (_) {}

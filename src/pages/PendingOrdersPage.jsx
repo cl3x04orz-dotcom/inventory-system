@@ -88,6 +88,43 @@ const stripTrailingQty = (str) => {
     return trimmed.replace(/x1$/i, '').trim();
 };
 
+// --- 📝 訂單備註解析輔助函數：區分「顧客留言」與「系統/金流紀錄」 ---
+const parseOrderNotes = (rawNote) => {
+    if (!rawNote || typeof rawNote !== 'string') {
+        return { customerNote: '', systemNotes: [] };
+    }
+
+    const systemPatterns = [
+        /【(?:LINE Pay )?(?:線上扣款成功|線上補繳成功|手動對帳補繳成功|交易單號)[^】]*】/g,
+        /\[LINE Pay 退款紀錄[^\]]*\](?:[^\n]*)/g,
+        /\(此訂單已合併至 [^)]+\)/g,
+        /\(此訂單合併了以下訂單: [^)]+\)/g
+    ];
+
+    const systemNotes = [];
+    let remaining = rawNote;
+
+    for (const pattern of systemPatterns) {
+        const matches = Array.from(remaining.matchAll(pattern));
+        for (const m of matches) {
+            const text = m[0].trim();
+            if (text && !systemNotes.includes(text)) {
+                systemNotes.push(text);
+            }
+        }
+        remaining = remaining.replace(pattern, '');
+    }
+
+    const customerNote = remaining
+        .split('\n')
+        .map(line => line.trim())
+        .filter(Boolean)
+        .join('\n')
+        .trim();
+
+    return { customerNote, systemNotes };
+};
+
 const SearchableProductSelect = ({ products = [], onSelect, placeholder = "-- 新增商品 --", className = "" }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
@@ -186,7 +223,7 @@ const formatCleanProductNameAndFlavor = (rawProductName, rawRemark, qty) => {
     }
 
     if (innerFlavor) {
-        innerFlavor = stripTrailingQty(innerFlavor);
+        innerFlavor = stripTrailingQty(innerFlavor) || '';
         innerFlavor = innerFlavor.replace(/【?口味備註：?/g, '').replace(/】/g, '').trim();
     }
 
@@ -3276,13 +3313,43 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                     {isExpanded && (
                                         <div className="p-5 border-t border-[var(--border-primary)] bg-[var(--bg-tertiary)]/50 flex flex-col justify-between flex-1 animate-in fade-in duration-150 space-y-4">
                                             <div>
-                                                {/* 訂單備註 (若有) */}
-                                                {order.note && (
-                                                    <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/40 p-3 mb-4 rounded-xl border border-amber-200 dark:border-amber-800 text-sm text-amber-900 dark:text-amber-200">
-                                                        <FileText size={16} className="text-amber-600 mt-0.5 shrink-0" />
-                                                        <span className="font-semibold">訂單備註："{order.note}"</span>
-                                                    </div>
-                                                )}
+                                                {/* 訂單備註與系統紀錄 (獨立雙框分流展示) */}
+                                                {(() => {
+                                                    const { customerNote, systemNotes } = parseOrderNotes(order.note);
+                                                    return (
+                                                        <>
+                                                            {/* 框框 1：顧客留言專用框 (樣式：原琥珀色框，有客人留言才顯示) */}
+                                                            {customerNote && (
+                                                                <div className={`flex items-start gap-2 bg-amber-50 dark:bg-amber-950/40 p-3 ${systemNotes.length > 0 ? 'mb-2.5' : 'mb-4'} rounded-xl border border-amber-200 dark:border-amber-800 text-sm text-amber-900 dark:text-amber-200 shadow-2xs`}>
+                                                                    <FileText size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                                                                    <div className="flex-1">
+                                                                        <span className="font-bold text-amber-800 dark:text-amber-300">訂單備註：</span>
+                                                                        <span className="font-semibold whitespace-pre-line">"{customerNote}"</span>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {/* 框框 2：系統/金流紀錄獨立框 (樣式：淡淡淺灰色框，有系統紀錄才顯示) */}
+                                                            {systemNotes.length > 0 && (
+                                                                <div className="flex items-start gap-2 bg-slate-50/90 dark:bg-zinc-800/60 p-3 mb-4 rounded-xl border border-slate-200/90 dark:border-zinc-700/80 text-sm text-slate-700 dark:text-zinc-300 shadow-2xs">
+                                                                    <CreditCard size={16} className="text-slate-500 dark:text-zinc-400 mt-0.5 shrink-0" />
+                                                                    <div className="flex-1 space-y-1">
+                                                                        <div className="font-bold text-slate-700 dark:text-zinc-200 text-xs">
+                                                                            系統與金流紀錄：
+                                                                        </div>
+                                                                        <div className="space-y-1 text-xs text-slate-600 dark:text-zinc-300">
+                                                                            {systemNotes.map((sn, idx) => (
+                                                                                <div key={idx} className="break-all font-mono leading-relaxed">
+                                                                                    {sn}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    );
+                                                })()}
 
                                                 {/* 商品明細卡片 */}
                                                 <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border-primary)] shadow-sm">
