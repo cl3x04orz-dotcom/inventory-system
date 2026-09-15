@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Package, ClipboardList, Eye, Edit, Trash2, CheckCircle, RefreshCw, X, User, Users, Phone, MapPin, FileText, Plus, Minus, Save, Calendar, Clock, Check, Search, Copy, PackageSearch, ChevronDown, ChevronUp, Building2, CreditCard, Menu } from 'lucide-react';
 import { callGAS, getBackendUrl } from '../utils/api';
 import { copyToClipboard } from '../utils/clipboard';
@@ -306,6 +306,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
     const [linePayConfigModal, setLinePayConfigModal] = useState(null);
     const [linePayRefundModal, setLinePayRefundModal] = useState(null);
     const [linePayRefundMsgModal, setLinePayRefundMsgModal] = useState(null);
+    const refundCopyTimeoutRef = useRef(null);
     const [generatingOrderId, setGeneratingOrderId] = useState(null);
     const [refundingOrderId, setRefundingOrderId] = useState(null);
     const [isSyncingOrderId, setIsSyncingOrderId] = useState(null);
@@ -2094,7 +2095,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                     customerName: linePayRefundModal.customerName,
                     refundAmount: finalRefundAmt,
                     text: formattedRefundMsg,
-                    isCopied: true
+                    isCopied: false
                 });
 
                 if (typeof fetchOrders === 'function') fetchOrders();
@@ -4659,7 +4660,10 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                 <span className="text-rose-500 font-bold">📱</span> LINE Pay 退款通知訊息已生成
                             </h3>
                             <button
-                                onClick={() => setLinePayRefundMsgModal(null)}
+                                onClick={() => {
+                                    if (refundCopyTimeoutRef.current) clearTimeout(refundCopyTimeoutRef.current);
+                                    setLinePayRefundMsgModal(null);
+                                }}
                                 className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 cursor-pointer"
                             >
                                 <X size={18} />
@@ -4676,25 +4680,36 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                             className="w-full h-48 p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-800 leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-rose-500"
                         />
 
-                        <div className="flex gap-2">
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                    if (e) {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                    }
-                                    copyTextSafely(linePayRefundMsgModal.text);
-                                    setLinePayRefundMsgModal(prev => prev ? { ...prev, isCopied: true } : null);
-                                }}
-                                className={`flex-1 py-3 rounded-xl font-bold text-sm text-white shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                                    linePayRefundMsgModal.isCopied
-                                        ? 'bg-emerald-600 shadow-emerald-500/20'
-                                        : 'bg-rose-600 hover:bg-rose-700 shadow-rose-500/25 active:scale-95'
-                                }`}
-                            >
-                                {linePayRefundMsgModal.isCopied ? '✅ 已成功複製退款訊息！(再按可重新複製)' : '📋 點擊一鍵複製退款訊息'}
-                            </button>
+                        <div className="space-y-2">
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        if (e) {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                        }
+                                        copyTextSafely(linePayRefundMsgModal.text);
+                                        setLinePayRefundMsgModal(prev => prev ? { ...prev, isCopied: true } : null);
+                                        if (refundCopyTimeoutRef.current) clearTimeout(refundCopyTimeoutRef.current);
+                                        refundCopyTimeoutRef.current = setTimeout(() => {
+                                            setLinePayRefundMsgModal(prev => prev ? { ...prev, isCopied: false } : null);
+                                        }, 2000);
+                                    }}
+                                    className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm text-white shadow-md transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-95 ${
+                                        linePayRefundMsgModal.isCopied
+                                            ? 'bg-emerald-700 ring-4 ring-emerald-300/60 shadow-emerald-500/30 scale-[1.01]'
+                                            : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20'
+                                    }`}
+                                >
+                                    {linePayRefundMsgModal.isCopied ? '🎉 已成功複製退款訊息！' : '✅點選複製退款訊息'}
+                                </button>
+                            </div>
+                            {linePayRefundMsgModal.isCopied && (
+                                <p className="text-center text-xs font-semibold text-emerald-600 animate-in fade-in slide-in-from-top-1 duration-200">
+                                    ✨ 已成功複製至剪貼簿，可直接至 LINE 貼上傳送！
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
