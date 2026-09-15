@@ -2405,7 +2405,7 @@ export const GroupBuyService = {
         }
 
         if (sOrder.note && sOrder.note.includes('LINE Pay 線上扣款成功')) {
-          const m = sOrder.note.match(/【LINE Pay 線上扣款成功 - 交易單號: [^】]+】/);
+          const m = sOrder.note.match(/[【\[]LINE Pay 線上扣款成功 - 交易單號: [^】\]]+[】\]]/);
           if (m && !secondaryLinePayNotes.includes(m[0])) {
             secondaryLinePayNotes.push(m[0]);
           }

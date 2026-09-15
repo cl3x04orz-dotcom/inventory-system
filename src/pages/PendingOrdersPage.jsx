@@ -125,6 +125,17 @@ const parseOrderNotes = (rawNote) => {
     return { customerNote, systemNotes };
 };
 
+// --- 統一金流/系統紀錄之括號為半形 [ ]，確保等寬字體下「LINE Pay」各行英數字元絕對垂直對齊 ---
+const formatSystemNote = (str) => {
+    if (!str) return '';
+    let s = str.trim();
+    if (s.startsWith('【')) {
+        s = '[' + s.slice(1);
+    }
+    s = s.replace(/】/g, ']');
+    return s;
+};
+
 const SearchableProductSelect = ({ products = [], onSelect, placeholder = "-- 新增商品 --", className = "" }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
@@ -3340,7 +3351,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                                         <div className="space-y-1 text-xs text-slate-600 dark:text-zinc-300">
                                                                             {systemNotes.map((sn, idx) => (
                                                                                 <div key={idx} className="break-all font-mono leading-relaxed">
-                                                                                    {sn}
+                                                                                    {formatSystemNote(sn)}
                                                                                 </div>
                                                                             ))}
                                                                         </div>
