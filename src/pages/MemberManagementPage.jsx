@@ -47,19 +47,24 @@ export default function MemberManagementPage({ user, apiUrl }) {
   const [adjustType, setAdjustType] = useState("add"); // "add" or "sub"
   const [adjustNote, setAdjustNote] = useState("");
   const [adjustSubmitting, setAdjustSubmitting] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
+  const [fetchError, setFetchError] = useState("");
 
   const fetchMembers = async () => {
     setLoading(true);
+    setFetchError("");
     try {
-      const res = await callGAS(apiUrl, "admin_getMembers", {}, user.token);
+      const res = await callGAS(apiUrl, "admin_getMembers", {}, user?.token);
       if (Array.isArray(res)) {
         setMembers(res);
       } else if (res?.error) {
         console.error("Failed to load members:", res.error);
+        setFetchError(res.error);
+      } else {
+        setFetchError("無法取得會員資料，請確認登入狀態或權限");
       }
     } catch (err) {
       console.error("Failed to fetch members:", err);
+      setFetchError(err.message || "系統連線異常");
     } finally {
       setLoading(false);
     }
@@ -210,6 +215,13 @@ export default function MemberManagementPage({ user, apiUrl }) {
           重新整理列表
         </button>
       </div>
+
+      {fetchError && (
+        <div className="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center justify-between animate-in fade-in">
+          <span>⚠️ {fetchError}</span>
+          <button onClick={fetchMembers} className="underline text-xs hover:opacity-80">重試</button>
+        </div>
+      )}
 
       {/* 關鍵數據指標看板 */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 flex-shrink-0">
