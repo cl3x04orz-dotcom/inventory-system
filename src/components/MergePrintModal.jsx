@@ -26,8 +26,12 @@ export default function MergePrintModal({
 
     const [aiCustomer, setAiCustomer] = useState('');
     const [aiWeather, setAiWeather] = useState('SUNNY');
-    const [aiDayOfWeek, setAiDayOfWeek] = useState(new Date(endDate).getDay());
-    const [printDate, setPrintDate] = useState(new Date().toISOString().split('T')[0]);
+    const [aiDayOfWeek, setAiDayOfWeek] = useState(() => {
+        if (!endDate) return new Date().getDay();
+        const d = new Date(endDate);
+        return isNaN(d.getTime()) ? new Date().getDay() : d.getDay();
+    });
+    const [printDate, setPrintDate] = useState(() => new Date().toISOString().split('T')[0]);
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [aiMessage, setAiMessage] = useState(null);
     const [showAllLocations, setShowAllLocations] = useState(false); // [New] 是否顯示全部地點
@@ -49,7 +53,8 @@ export default function MergePrintModal({
     const getDOWString = (dateStr) => {
         if (!dateStr) return '';
         const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-        return days[new Date(dateStr).getDay()];
+        const d = new Date(dateStr);
+        return isNaN(d.getTime()) ? '' : days[d.getDay()];
     };
 
     const setQuickPrintDate = (offset) => {
@@ -66,10 +71,12 @@ export default function MergePrintModal({
         setAiDayOfWeek(idx);
         if (printDate) {
             const d = new Date(printDate);
-            const currentDOW = d.getDay();
-            const diff = idx - currentDOW;
-            d.setDate(d.getDate() + diff);
-            setPrintDate(d.toISOString().split('T')[0]);
+            if (!isNaN(d.getTime())) {
+                const currentDOW = d.getDay();
+                const diff = idx - currentDOW;
+                d.setDate(d.getDate() + diff);
+                setPrintDate(d.toISOString().split('T')[0]);
+            }
         }
     };
 
@@ -86,18 +93,25 @@ export default function MergePrintModal({
 
     const targetDOW = getDOWString(endDate);
 
-    // [New] 自動從選中的單據中抓取客戶名稱作為預設
+    // [New] 自動從選中的單據中抓取客戶名稱作為預設 (防止無效/空字串/null 觸發無限死迴圈)
+    const firstSelectedId = selectedIds && selectedIds.length > 0 ? selectedIds[0] : null;
     useEffect(() => {
-        if (show && selectedIds.length > 0 && !aiCustomer) {
-            const firstRecord = safeRecords.find(r => r.saleId === selectedIds[0]);
-            if (firstRecord) setAiCustomer(firstRecord.customer);
+        if (show && firstSelectedId && !aiCustomer) {
+            const firstRecord = safeRecords.find(r => r.saleId === firstSelectedId);
+            const targetCust = firstRecord?.customer ? String(firstRecord.customer).trim() : '';
+            if (targetCust) {
+                setAiCustomer(targetCust);
+            }
         }
-    }, [show, selectedIds, records, aiCustomer]);
+    }, [show, firstSelectedId, aiCustomer]);
 
     // [New] 當結束日期改變時，同步更新 AI 預測的星期 (除非使用者手動改過，這邊簡化處理為直接同步)
     useEffect(() => {
         if (endDate) {
-            setAiDayOfWeek(new Date(endDate).getDay());
+            const d = new Date(endDate);
+            if (!isNaN(d.getTime())) {
+                setAiDayOfWeek(d.getDay());
+            }
         }
     }, [endDate]);
 
