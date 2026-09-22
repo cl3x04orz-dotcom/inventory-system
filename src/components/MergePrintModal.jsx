@@ -454,31 +454,42 @@ export default function MergePrintModal({
         return str;
     };
 
-    // Filter out retail walk-in customer records AND filter out OFF state customers (isAiEnabled !== true)
-    const RETAIL_NAMES = ['門市散客', '散客', '零售散客', '一般散客', 'POS散客', '一般顧客', 'null', 'undefined', ''];
-    const filteredRecords = safeRecords.filter(record => {
-        const cust = String(record.customer || '').trim();
-        if (!cust) return false;
-        if (RETAIL_NAMES.includes(cust)) return false;
+    // 使用 useMemo 記憶過濾紀錄，防止每次元件重新渲染 (如選擇地點時) 無限呼叫 getCustSetting 及重複計算 Call Stack
+    const filteredRecords = React.useMemo(() => {
+        const RETAIL_NAMES = ['門市散客', '散客', '零售散客', '一般散客', 'POS散客', '一般顧客', 'null', 'undefined', ''];
+        return safeRecords.filter(record => {
+            const cust = String(record.customer || '').trim();
+            if (!cust) return false;
+            if (RETAIL_NAMES.includes(cust)) return false;
 
-        // 依據「地點送貨排程管理後台」的 AI 預測開關是否有啟用 (isAiEnabled === true)，有啟用才會有單據
-        const setting = getCustSetting(cust);
-        if (setting && setting.isAiEnabled !== true) {
-            return false;
-        }
+            const setting = getCustSetting(cust);
+            if (setting && setting.isAiEnabled !== true) {
+                return false;
+            }
 
-        return true;
-    });
+            return true;
+        });
+    }, [safeRecords, cleanSystemCustomers, editingCustomers]);
 
-    const groupedRecords = filteredRecords.reduce((groups, record) => {
-        const dateKey = formatDateKey(record.date);
-        if (!dateKey) return groups;
-        if (!groups[dateKey]) groups[dateKey] = [];
-        groups[dateKey].push(record);
-        return groups;
-    }, {});
+    const groupedRecords = React.useMemo(() => {
+        return filteredRecords.reduce((groups, record) => {
+            const dateKey = formatDateKey(record.date);
+            if (!dateKey) return groups;
+            if (!groups[dateKey]) groups[dateKey] = [];
+            groups[dateKey].push(record);
+            return groups;
+        }, {});
+    }, [filteredRecords]);
 
-    const sortedDates = Object.keys(groupedRecords).sort((a, b) => new Date(b.replace(/\//g, '-')) - new Date(a.replace(/\//g, '-')));
+    const sortedDates = React.useMemo(() => {
+        return Object.keys(groupedRecords).sort((a, b) => {
+            const da = new Date(a.replace(/\//g, '-'));
+            const db = new Date(b.replace(/\//g, '-'));
+            const ta = isNaN(da.getTime()) ? 0 : da.getTime();
+            const tb = isNaN(db.getTime()) ? 0 : db.getTime();
+            return tb - ta;
+        });
+    }, [groupedRecords]);
 
     // [New] 執行 AI 補貨建議
     const handleAIReplenish = async () => {
