@@ -103,17 +103,19 @@ export default function MergePrintModal({
                 setAiCustomer(targetCust);
             }
         }
-    }, [show, firstSelectedId, aiCustomer]);
+    }, [show, firstSelectedId]);
 
-    // [New] 當結束日期改變時，同步更新 AI 預測的星期 (除非使用者手動改過，這邊簡化處理為直接同步)
+    // [New] 當 Modal 開啟時僅初始化一次預設日期與星期，避免切換「明日」時與 endDate 產生連鎖爭跑死迴圈
     useEffect(() => {
-        if (endDate) {
-            const d = new Date(endDate);
+        if (show) {
+            const baseDate = printDate || endDate || new Date().toISOString().split('T')[0];
+            const d = new Date(baseDate);
             if (!isNaN(d.getTime())) {
-                setAiDayOfWeek(d.getDay());
+                const nextDow = d.getDay();
+                setAiDayOfWeek(prev => (prev === nextDow ? prev : nextDow));
             }
         }
-    }, [endDate]);
+    }, [show]);
 
     const cleanSystemCustomers = React.useMemo(() => {
         const map = new Map();
@@ -636,18 +638,21 @@ export default function MergePrintModal({
                                                 onChange={(e) => setAiCustomer(e.target.value)}
                                             >
                                                 <option value="">請點擊選取地點...</option>
-                                                {cleanSystemCustomers
-                                                    .filter(c => {
+                                                {(() => {
+                                                    const filtered = cleanSystemCustomers.filter(c => {
                                                         if (typeof c === 'object' && c.isAiEnabled === false) return false;
                                                         if (showAllLocations) return true;
                                                         if (typeof c === 'string') return true;
                                                         return c.schedule && c.schedule.includes(aiDayOfWeek);
-                                                    })
-                                                    .map(c => {
-                                                        const name = typeof c === 'string' ? c : c.name;
-                                                        return <option key={name} value={name}>{name}</option>;
-                                                    })
-                                                }
+                                                    });
+                                                    const names = filtered.map(c => (typeof c === 'string' ? c : c.name));
+                                                    if (aiCustomer && !names.includes(aiCustomer)) {
+                                                        names.unshift(aiCustomer);
+                                                    }
+                                                    return names.map(name => (
+                                                        <option key={name} value={name}>{name}</option>
+                                                    ));
+                                                })()}
                                             </select>
                                             <div className="absolute right-3 pointer-events-none text-blue-300">
                                                 <ChevronDown size={16} />
@@ -763,23 +768,24 @@ export default function MergePrintModal({
                                         <span className="text-[10px] sm:text-xs font-black text-gray-600 uppercase tracking-widest">{dateKey} (星期{['日', '一', '二', '三', '四', '五', '六'][new Date(dateKey).getDay()]})</span>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mx-[15px]">
-                                        {groupedRecords[dateKey].map(record => {
-                                            const isSelected = selectedIds.includes(record.saleId);
+                                        {groupedRecords[dateKey].map((record, recIdx) => {
+                                            const itemSaleId = record.saleId || record.id || record._id || `rec_${dateKey}_${recIdx}`;
+                                            const isSelected = selectedIds.includes(itemSaleId);
                                             return (
                                                 <div
-                                                    key={record.saleId}
-                                                    onClick={() => onToggleSelect(record.saleId)}
+                                                    key={itemSaleId}
+                                                    onClick={() => onToggleSelect(itemSaleId)}
                                                     className={`group relative p-3 sm:p-4 rounded-xl sm:rounded-2xl border transition-all cursor-pointer ${isSelected ? 'bg-blue-600 border-blue-600 shadow-lg text-white scale-[1.02]' : 'bg-white border-gray-100 hover:border-blue-200 shadow-sm'}`}
                                                 >
                                                     <div className="flex justify-between items-start mb-2">
                                                         <h4 className="font-black truncate text-sm sm:text-base max-w-[180px]" title={record.customer}>{record.customer}</h4>
                                                         <div className={`px-1.5 py-0.5 rounded text-[9px] font-black ${isSelected ? 'bg-white/20' : 'bg-gray-100 text-gray-400'}`}>
-                                                            {new Date(record.date).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
+                                                            {record.date ? new Date(record.date).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : ''}
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-3 text-[9px] sm:text-[10px] opacity-80 font-bold">
                                                         <span className="flex items-center gap-1"><CreditCard size={10} /> {record.paymentMethod === 'CASH' ? '現金' : '賒銷'}</span>
-                                                        <span className="flex items-center gap-1"><Package size={10} /> {record.salesData.length} 品項</span>
+                                                        <span className="flex items-center gap-1"><Package size={10} /> {Array.isArray(record.salesData) ? record.salesData.length : 0} 品項</span>
                                                     </div>
                                                     <div className="mt-2 sm:mt-3 pt-2 border-t border-current/10 flex justify-between items-baseline">
                                                         <span className="text-[9px] sm:text-[10px] uppercase tracking-widest opacity-60">Total</span>

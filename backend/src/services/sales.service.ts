@@ -10,7 +10,7 @@ function snapToDispatchSteps(target: number, steps: number[]): number {
 
   const sortedSteps = [...steps]
     .map(Number)
-    .filter(n => !isNaN(n))
+    .filter(n => !isNaN(n) && n > 0)  // 防禦：過濾掉 0 或 NaN，避免無限遞迴
     .sort((a, b) => a - b);
   if (sortedSteps.length === 0) return target;
 
@@ -20,9 +20,11 @@ function snapToDispatchSteps(target: number, steps: number[]): number {
 
   if (target <= maxStep) {
     const matched = sortedSteps.find(s => s >= target);
-    return matched || maxStep;
+    return matched ?? maxStep;
   } else {
-    return maxStep + snapToDispatchSteps(target - maxStep, sortedSteps);
+    // 改用整數乘法取代遞迴，徹底消滅 Stack Overflow
+    const multiplier = Math.ceil(target / maxStep);
+    return maxStep * multiplier;
   }
 }
 
@@ -600,60 +602,66 @@ export const SalesService = {
     const { customer, dayOfWeek, weather, currentOriginals = {}, storeCode } = payload;
     const PICK_ROUND_THRESHOLD = 99; // 預設進位門檻
 
-    // 1. 查倉庫庫存 (STOCK 類型加總)
-    const stockAgg = await prisma.inventory.groupBy({
-      by: ['productId'],
-      where: { type: 'STOCK', storeCode },
-      _sum: { quantity: true }
-    });
+    const since = new Date();
+    since.setDate(since.getDate() - 60);
+
+    // 1~3. 三個獨立查詢平行打出，減少佔用連線池時間
+    const [stockAgg, dbProducts, historySales] = await Promise.all([
+      prisma.inventory.groupBy({
+        by: ['productId'],
+        where: { type: 'STOCK', storeCode },
+        _sum: { quantity: true }
+      }),
+      prisma.product.findMany({
+        select: {
+          productId: true,
+          productName: true,
+          packSize: true,
+          dispatchSteps: true,
+          roundThreshold: true,
+          autoSuppress: true,
+          maxSuggestion: true,
+          stopPickupThreshold: true
+        }
+      }),
+      prisma.sales.findMany({
+        where: {
+          customer: customer,
+          status: { not: 'VOID' },
+          date: { gte: since },
+          storeCode
+        },
+        select: { saleId: true, date: true },
+        orderBy: { date: 'desc' }
+      })
+    ]);
+
     const warehouseStockMap: Record<string, number> = {};
     stockAgg.forEach(item => {
       warehouseStockMap[item.productId] = item._sum.quantity || 0;
     });
 
-    // 2. 查所有產品設定 (箱數、發貨階梯、抑制等)
-    const dbProducts = await prisma.product.findMany({
-      select: {
-        productId: true,
-        productName: true,
-        packSize: true,
-        dispatchSteps: true,
-        roundThreshold: true,
-        autoSuppress: true,
-        maxSuggestion: true,
-        stopPickupThreshold: true
-      }
-    });
     const productSettingsMap: Record<string, typeof dbProducts[0]> = {};
     dbProducts.forEach(p => {
       productSettingsMap[p.productId] = p;
     });
 
-    // 3. 查近 60 天的銷售記錄（同客戶、不是 VOID）
-    const since = new Date();
-    since.setDate(since.getDate() - 60);
-
-    const historySales = await prisma.sales.findMany({
-      where: {
-        customer: customer,
-        status: { not: 'VOID' },
-        date: { gte: since },
-        storeCode
-      },
-      select: { saleId: true, date: true },
-      orderBy: { date: 'desc' }
-    });
-
-    // 4. 篩選：同星期的（DOW only）
+    // 4. 篩選：同星期的（DOW only），若當天星期無歷史紀錄則自動降級退求其次採用該地點近 60 天任意星期的最近銷貨紀錄
     const dowMatches = historySales.filter(s => new Date(s.date).getDay() === dayOfWeek);
-    const sampleIds = dowMatches.slice(0, 3).map(s => s.saleId);
+    let sampleIds = dowMatches.slice(0, 3).map(s => s.saleId);
+    let isFallbackToAllDays = false;
+
+    if (sampleIds.length === 0) {
+      sampleIds = historySales.slice(0, 3).map(s => s.saleId);
+      isFallbackToAllDays = true;
+    }
 
     if (sampleIds.length === 0) {
       return {
         success: true,
         suggestions: {},
         fallbackLevel: 'NO_DATA',
-        message: '此星期尚無歷史數據可供分析'
+        message: '此地點近 60 天內尚無任何歷史銷售數據可供分析'
       };
     }
 
@@ -785,8 +793,10 @@ export const SalesService = {
       }
     }
 
-    const fallbackLevel = 'DOW_ONLY';
-    const message = `已根據過去同一星期的平均銷售量為您預估${hasStockShortage ? ' (⚠️ 部分品項庫存不足)' : ''}。`;
+    const fallbackLevel = isFallbackToAllDays ? 'ALL_DAYS_FALLBACK' : 'DOW_ONLY';
+    const message = isFallbackToAllDays
+      ? `該地點於目標星期無歷史銷貨紀錄，已自動參考該地點近期平均銷量為您預估${hasStockShortage ? ' (⚠️ 部分品項庫存不足)' : ''}。`
+      : `已根據過去同一星期的平均銷售量為您預估${hasStockShortage ? ' (⚠️ 部分品項庫存不足)' : ''}。`;
 
     return { success: true, suggestions, fallbackLevel, message };
   },

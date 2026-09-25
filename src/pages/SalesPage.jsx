@@ -1099,8 +1099,9 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
 
     // Merge Print Handler
     const handleMergePrint = async (aiSuggestions = null, aiLocation = null, customPrintDate = null) => {
-        if (selectedSaleIds.length === 0 && !aiSuggestions) {
-            alert('請至少選擇一筆單據');
+        const hasValidAiSuggestions = aiSuggestions && typeof aiSuggestions === 'object' && Object.keys(aiSuggestions).length > 0;
+        if (selectedSaleIds.length === 0 && !hasValidAiSuggestions) {
+            alert('請至少選擇一筆單據或生成有效的 AI 補貨建議');
             return;
         }
 
