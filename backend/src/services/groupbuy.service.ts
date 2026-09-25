@@ -1706,12 +1706,26 @@ export const GroupBuyService = {
       }
     });
 
-    const list = await Promise.all(members.map(async (m) => {
-      const orderStats = await prisma.groupBuyOrder.aggregate({
-        where: { customerLineId: m.memberId, storeCode: storeCode || 'MILI001' },
-        _count: { orderId: true },
-        _sum: { totalAmount: true }
-      });
+    // 一次性單一 groupBy 查詢，避免 N+1 併發造成 Prisma 連線池 (Connection Pool Limit = 5) 溢位逾時
+    const orderStatsGroup = await prisma.groupBuyOrder.groupBy({
+      by: ['customerLineId'],
+      where: { storeCode: storeCode || 'MILI001' },
+      _count: { orderId: true },
+      _sum: { totalAmount: true }
+    });
+
+    const statsMap = new Map<string, { totalOrders: number; totalAmount: number }>();
+    orderStatsGroup.forEach((stat) => {
+      if (stat.customerLineId) {
+        statsMap.set(stat.customerLineId, {
+          totalOrders: stat._count.orderId || 0,
+          totalAmount: Number(stat._sum.totalAmount || 0)
+        });
+      }
+    });
+
+    const list = members.map((m) => {
+      const stats = statsMap.get(m.memberId) || { totalOrders: 0, totalAmount: 0 };
 
       return {
         memberId: m.memberId,
@@ -1724,8 +1738,8 @@ export const GroupBuyService = {
         totalLifetimeSpend: Number(m.totalLifetimeSpend || 0),
         memberLevel: m.memberLevel,
         createdAt: m.createdAt.toISOString(),
-        totalOrders: orderStats._count.orderId || 0,
-        totalAmount: Number(orderStats._sum.totalAmount || 0),
+        totalOrders: stats.totalOrders,
+        totalAmount: stats.totalAmount,
         transactions: m.transactions.map((t) => ({
           transactionId: t.transactionId,
           amount: Number(t.amount),
@@ -1734,7 +1748,7 @@ export const GroupBuyService = {
           createdAt: t.createdAt.toISOString()
         }))
       };
-    }));
+    });
 
     return list;
   },
