@@ -182,7 +182,7 @@ export default function MemberManagementPage({ user, apiUrl }) {
     })
     .sort((a, b) => {
       if (sortBy === "balance_desc") return (b.walletBalance || 0) - (a.walletBalance || 0);
-      if (sortBy === "spend_desc") return (b.totalLifetimeSpend || b.totalAmount || 0) - (a.totalLifetimeSpend || a.totalAmount || 0);
+      if (sortBy === "spend_desc") return (b.totalAmount || b.totalLifetimeSpend || 0) - (a.totalAmount || a.totalLifetimeSpend || 0);
       if (sortBy === "newest") return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
       return 0;
     });
@@ -416,7 +416,7 @@ export default function MemberManagementPage({ user, apiUrl }) {
                         ${(m.redeemableSpendBalance || 0).toLocaleString()}
                       </div>
                       <div className="text-[10px] text-[var(--text-tertiary)] font-bold mt-0.5">
-                        歷史總額: ${(m.totalLifetimeSpend || m.totalAmount || 0).toLocaleString()}
+                        歷史總額: ${(m.totalAmount || m.totalLifetimeSpend || 0).toLocaleString()}
                       </div>
                     </div>
                   </div>
@@ -560,7 +560,7 @@ export default function MemberManagementPage({ user, apiUrl }) {
                     {/* 累計消費 */}
                     <td className="py-3 px-3 text-right font-mono whitespace-nowrap">
                       <div className="font-bold text-sm text-[var(--text-primary)]">
-                        ${(m.totalLifetimeSpend || m.totalAmount || 0).toLocaleString()}
+                        ${(m.totalAmount || m.totalLifetimeSpend || 0).toLocaleString()}
                       </div>
                       <div className="text-[10px] text-[var(--text-tertiary)] mt-0.5">
                         可折抵 ${(m.redeemableSpendBalance || 0).toLocaleString()}
@@ -579,7 +579,7 @@ export default function MemberManagementPage({ user, apiUrl }) {
                           onClick={() => {
                             setSelectedMember(m);
                             setTargetRedeemableBalance(m.redeemableSpendBalance || 0);
-                            setTargetTotalSpend(m.totalLifetimeSpend || m.totalAmount || 0);
+                            setTargetTotalSpend(m.totalAmount || m.totalLifetimeSpend || 0);
                             setShowSpendModal(true);
                           }}
                           className="px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-lg text-[11px] font-extrabold border border-blue-500/30 flex items-center gap-1 transition-colors cursor-pointer"

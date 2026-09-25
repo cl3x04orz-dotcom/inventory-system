@@ -156,9 +156,18 @@ export const GroupBuyService = {
     }
 
     if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) where.createdAt.gte = new Date(startDate + 'T00:00:00.000+08:00');
-      if (endDate) where.createdAt.lte = new Date(endDate + 'T23:59:59.999+08:00');
+      const createdAtCond: any = {};
+      if (startDate) createdAtCond.gte = new Date(startDate + 'T00:00:00.000+08:00');
+      if (endDate) createdAtCond.lte = new Date(endDate + 'T23:59:59.999+08:00');
+
+      const deliveryCond: any = {};
+      if (startDate) deliveryCond.gte = startDate;
+      if (endDate) deliveryCond.lte = endDate;
+
+      where.OR = [
+        { createdAt: createdAtCond },
+        { expectedDeliveryDate: deliveryCond }
+      ];
     } else {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -182,6 +191,28 @@ export const GroupBuyService = {
       orderBy: { createdAt: 'desc' }
     });
 
+    // 取得這些訂單的會員資訊，以備不時之需（當 lineDisplayName 遺失時回補）
+    const lineIds = orders.map((o: any) => o.customerLineId).filter(Boolean);
+    const phones = orders.map((o: any) => o.customerPhone).filter(Boolean);
+
+    const members = await prisma.member.findMany({
+      where: {
+        storeCode: storeCode || 'MILI001',
+        OR: [
+          { memberId: { in: lineIds } },
+          { phone: { in: phones } }
+        ]
+      },
+      select: { memberId: true, phone: true, displayName: true }
+    });
+
+    const memberIdMap = new Map();
+    const phoneMap = new Map();
+    members.forEach((m: any) => {
+      if (m.memberId) memberIdMap.set(m.memberId, m.displayName);
+      if (m.phone) phoneMap.set(m.phone, m.displayName);
+    });
+
     return orders.map((o: any) => ({
       orderId: o.orderId,
       status: o.status,
@@ -196,7 +227,7 @@ export const GroupBuyService = {
       paymentMethod: o.paymentMethod || '',
       transferLastFive: o.transferLastFive || '',
       paymentStatus: o.paymentStatus || '',
-      lineDisplayName: o.lineDisplayName || '',
+      lineDisplayName: o.lineDisplayName || memberIdMap.get(o.customerLineId) || phoneMap.get(o.customerPhone) || '',
       createdAt: o.createdAt?.toISOString() || '',
       updatedAt: o.updatedAt?.toISOString() || '',
       confirmedAt: o.confirmedAt?.toISOString() || '',
@@ -1706,26 +1737,51 @@ export const GroupBuyService = {
       }
     });
 
-    // 一次性單一 groupBy 查詢，避免 N+1 併發造成 Prisma 連線池 (Connection Pool Limit = 5) 溢位逾時
-    const orderStatsGroup = await prisma.groupBuyOrder.groupBy({
-      by: ['customerLineId'],
-      where: { storeCode: storeCode || 'MILI001' },
-      _count: { orderId: true },
-      _sum: { totalAmount: true }
+    // 取得所有有效訂單，避免 groupBy 遺漏沒有 customerLineId 但有手機號碼的訂單，並排除作廢與未出貨訂單
+    const validOrders = await prisma.groupBuyOrder.findMany({
+      where: {
+        storeCode: storeCode || 'MILI001',
+        status: 'CONFIRMED' // 歷史消費只計算「已確認/已出貨」的訂單
+      },
+      select: {
+        customerLineId: true,
+        customerPhone: true,
+        totalAmount: true
+      }
     });
 
     const statsMap = new Map<string, { totalOrders: number; totalAmount: number }>();
-    orderStatsGroup.forEach((stat) => {
-      if (stat.customerLineId) {
-        statsMap.set(stat.customerLineId, {
-          totalOrders: stat._count.orderId || 0,
-          totalAmount: Number(stat._sum.totalAmount || 0)
-        });
+    const phoneToMemberIdMap = new Map<string, string>();
+
+    // 初始化會員統計與電話對應
+    members.forEach((m) => {
+      statsMap.set(m.memberId, { totalOrders: 0, totalAmount: 0 });
+      if (m.phone) {
+        // 如果多個會員綁定同一個電話，這會覆蓋，但通常我們假設電話是唯一的聯絡方式綁定
+        phoneToMemberIdMap.set(m.phone, m.memberId);
+      }
+    });
+
+    // 計算每位會員的有效訂單總額
+    validOrders.forEach((o) => {
+      let targetMemberId = o.customerLineId;
+
+      // 如果訂單沒有 lineId 或者 lineId 不在會員庫裡，嘗試透過手機號碼反查
+      if (!targetMemberId || !statsMap.has(targetMemberId)) {
+        if (o.customerPhone && phoneToMemberIdMap.has(o.customerPhone)) {
+          targetMemberId = phoneToMemberIdMap.get(o.customerPhone);
+        }
+      }
+
+      if (targetMemberId && statsMap.has(targetMemberId)) {
+        const stat = statsMap.get(targetMemberId)!;
+        stat.totalOrders += 1;
+        stat.totalAmount += Number(o.totalAmount || 0);
       }
     });
 
     const list = members.map((m) => {
-      const stats = statsMap.get(m.memberId) || { totalOrders: 0, totalAmount: 0 };
+      const stats = statsMap.get(m.memberId)!;
 
       return {
         memberId: m.memberId,

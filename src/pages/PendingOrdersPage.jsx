@@ -589,7 +589,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
     const fetchOrders = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await callGAS(apiUrl, 'getPendingOrders', { status: activeTab }, user.token);
+            const data = await callGAS(apiUrl, 'getPendingOrders', { status: activeTab, startDate, endDate }, user.token);
             if (Array.isArray(data)) {
                 const normalized = data.map(order => normalizeOrder(order));
                 setOrders(normalized);
@@ -614,7 +614,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
         } finally {
             setLoading(false);
         }
-    }, [apiUrl, user.token, activeTab]);
+    }, [apiUrl, user.token, activeTab, startDate, endDate, normalizeOrder]);
 
     const fetchProducts = useCallback(async () => {
         try {
@@ -659,7 +659,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
             fetchGroupBindings();
             fetchBuildings();
         }
-    }, [user.token, activeTab, fetchOrders, fetchProducts, fetchGroupBindings, fetchBuildings]);
+    }, [user.token, activeTab, startDate, endDate, fetchOrders, fetchProducts, fetchGroupBindings, fetchBuildings]);
 
     // 進到訂單審核或切換大樓時，自動在背景掃描並導入全站全大樓本週定期配，實現「100% 全自動無感零點擊體驗」
     useEffect(() => {
@@ -1640,17 +1640,18 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
             return false;
         }
 
-        // 起迄日期區間篩選 (100% 嚴格僅比對已確認配送日 expectedDeliveryDate)
-        // 當設定了日期區間篩選時，未確認/未指定配送日的訂單一律不呈現，確保 8/13 的搜尋結果中 100% 只有 8/13 配送日的訂單
+        // 起迄日期區間篩選 (優先比對已確認配送日 expectedDeliveryDate，未填時比對訂單建立日 createdAt)
         if (startDate || endDate) {
             const expDate = String(order.expectedDeliveryDate || '').trim();
-            if (!expDate) {
-                return false; // 未指定/未確認配送日，在日期搜尋時直接隱藏！
-            }
-            if (startDate && expDate < startDate) {
+            const createdDate = String(order.createdAt || '').slice(0, 10);
+            const targetDate = expDate || createdDate;
+            if (!targetDate) {
                 return false;
             }
-            if (endDate && expDate > endDate) {
+            if (startDate && targetDate < startDate) {
+                return false;
+            }
+            if (endDate && targetDate > endDate) {
                 return false;
             }
         }
