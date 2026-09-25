@@ -182,7 +182,7 @@ export default function MemberManagementPage({ user, apiUrl }) {
     })
     .sort((a, b) => {
       if (sortBy === "balance_desc") return (b.walletBalance || 0) - (a.walletBalance || 0);
-      if (sortBy === "spend_desc") return (b.totalAmount || 0) - (a.totalAmount || 0);
+      if (sortBy === "spend_desc") return (b.totalLifetimeSpend || b.totalAmount || 0) - (a.totalLifetimeSpend || a.totalAmount || 0);
       if (sortBy === "newest") return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
       return 0;
     });
@@ -451,6 +451,18 @@ export default function MemberManagementPage({ user, apiUrl }) {
                         <span className="text-[var(--text-tertiary)] font-normal italic">未填寫</span>
                       )}
                     </div>
+
+                    <div className="flex items-center justify-between text-[var(--text-secondary)]">
+                      <span className="font-bold flex items-center gap-1 text-[var(--text-tertiary)]">
+                        <Calendar size={13} /> 註冊時間：
+                      </span>
+                      <span className="font-extrabold text-[var(--text-primary)]">
+                        {m.createdAt
+                          ? new Date(m.createdAt).toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' })
+                          : <span className="text-[var(--text-tertiary)] font-normal italic">未知</span>
+                        }
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -487,69 +499,82 @@ export default function MemberManagementPage({ user, apiUrl }) {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs font-extrabold uppercase tracking-wider border-b border-[var(--border-primary)]">
-                  <th className="py-4 px-5">會員 LINE 資訊</th>
-                  <th className="py-4 px-5">收件姓名與電話</th>
-                  <th className="py-4 px-5">會員等級</th>
-                  <th className="py-4 px-5 text-right">奶包金餘額</th>
-                  <th className="py-4 px-5 text-right">累計消費金額</th>
-                  <th className="py-4 px-5 text-center">儲值與歷史操作</th>
+                <tr className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-[11px] font-extrabold uppercase tracking-wider border-b border-[var(--border-primary)]">
+                  <th className="py-3 px-4 whitespace-nowrap">會員 LINE 資訊</th>
+                  <th className="py-3 px-4 whitespace-nowrap">收件姓名 / 電話</th>
+                  <th className="py-3 px-3 whitespace-nowrap text-center">等級</th>
+                  <th className="py-3 px-3 whitespace-nowrap text-right">奶包金餘額</th>
+                  <th className="py-3 px-3 whitespace-nowrap text-right">累計消費</th>
+                  <th className="py-3 px-3 whitespace-nowrap text-center">註冊時間</th>
+                  <th className="py-3 px-4 whitespace-nowrap text-center">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-primary)]/40 text-sm">
                 {filteredMembers.map((m) => (
                   <tr key={m.memberId} className="hover:bg-[var(--bg-tertiary)]/30 transition-colors">
-                    <td className="py-3.5 px-5">
-                      <div className="flex items-center gap-3.5">
-                        <div className="w-11 h-11 rounded-2xl overflow-hidden bg-[var(--bg-tertiary)] border border-[var(--border-primary)] shrink-0 flex items-center justify-center shadow-inner">
+                    {/* 頭像 + 暱稱 */}
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-3 min-w-[160px]">
+                        <div className="w-9 h-9 rounded-xl overflow-hidden bg-[var(--bg-tertiary)] border border-[var(--border-primary)] shrink-0 flex items-center justify-center">
                           {m.pictureUrl ? (
                             <img src={m.pictureUrl} alt="" className="w-full h-full object-cover" />
                           ) : (
-                            <User size={20} className="text-[var(--text-tertiary)]" />
+                            <User size={18} className="text-[var(--text-tertiary)]" />
                           )}
                         </div>
                         <div className="min-w-0">
-                          <div className="font-extrabold text-base text-[var(--text-primary)] truncate">
+                          <div className="font-extrabold text-sm text-[var(--text-primary)] truncate max-w-[140px]">
                             {m.displayName || "LINE 用戶"}
                           </div>
-                          <div className="text-[11px] text-[var(--text-tertiary)] font-mono truncate max-w-[160px]">
-                            ID: {m.memberId}
+                          <div className="text-[10px] text-[var(--text-tertiary)] font-mono truncate max-w-[140px]">
+                            {m.memberId}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="py-3.5 px-5">
+                    {/* 收件姓名 / 電話 */}
+                    <td className="py-3 px-4">
                       {m.receiverName || m.phone ? (
                         <div>
-                          <div className="font-extrabold text-sm text-[var(--text-primary)]">{m.receiverName || "未填姓名"}</div>
-                          <div className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 mt-0.5">{m.phone}</div>
+                          <div className="font-bold text-sm text-[var(--text-primary)] whitespace-nowrap">{m.receiverName || "未填姓名"}</div>
+                          <div className="text-xs font-mono text-blue-600 dark:text-blue-400 mt-0.5 whitespace-nowrap">{m.phone}</div>
                         </div>
                       ) : (
-                        <span className="text-xs text-[var(--text-tertiary)] italic">未填寫聯絡資料</span>
+                        <span className="text-xs text-[var(--text-tertiary)] italic whitespace-nowrap">未填寫</span>
                       )}
                     </td>
-                    <td className="py-3.5 px-5">
-                      <span className={`text-xs px-2.5 py-1 rounded-xl font-bold uppercase tracking-wider ${
-                        m.memberLevel?.toUpperCase() === 'VIP' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30' :
-                        m.memberLevel?.toUpperCase() === 'VVIP' ? 'bg-rose-500/10 text-rose-600 dark:text-rose-450 border border-rose-500/30' :
+                    {/* 等級 */}
+                    <td className="py-3 px-3 text-center">
+                      <span className={`whitespace-nowrap text-[11px] px-2 py-0.5 rounded-lg font-bold ${
+                        m.memberLevel?.toUpperCase() === 'VVIP' ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30' :
+                        m.memberLevel?.toUpperCase() === 'VIP'  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30' :
                         'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-primary)]'
                       }`}>
-                        {m.memberLevel === 'General' || !m.memberLevel ? '一般會員' : m.memberLevel}
+                        {m.memberLevel === 'General' || !m.memberLevel ? '一般' : m.memberLevel}
                       </span>
                     </td>
-                    <td className="py-3.5 px-5 text-right font-mono font-black text-emerald-600 dark:text-emerald-400 text-lg">
+                    {/* 奶包金 */}
+                    <td className="py-3 px-3 text-right font-mono font-black text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                       ${m.walletBalance.toLocaleString()}
                     </td>
-                    <td className="py-3.5 px-5 text-right font-mono">
-                      <div className="font-extrabold text-base text-blue-600 dark:text-blue-400">
-                        ${(m.redeemableSpendBalance || 0).toLocaleString()}
+                    {/* 累計消費 */}
+                    <td className="py-3 px-3 text-right font-mono whitespace-nowrap">
+                      <div className="font-bold text-sm text-[var(--text-primary)]">
+                        ${(m.totalLifetimeSpend || m.totalAmount || 0).toLocaleString()}
                       </div>
-                      <div className="text-[11px] text-[var(--text-tertiary)] font-bold mt-0.5">
-                        歷史總額: ${(m.totalLifetimeSpend || m.totalAmount || 0).toLocaleString()}
+                      <div className="text-[10px] text-[var(--text-tertiary)] mt-0.5">
+                        可折抵 ${(m.redeemableSpendBalance || 0).toLocaleString()}
                       </div>
                     </td>
-                    <td className="py-3.5 px-5">
-                      <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                    {/* 註冊時間 */}
+                    <td className="py-3 px-3 text-center whitespace-nowrap text-xs text-[var(--text-secondary)] font-bold">
+                      {m.createdAt
+                        ? new Date(m.createdAt).toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' })
+                        : '—'}
+                    </td>
+                    {/* 操作按鈕 */}
+                    <td className="py-3 px-4">
+                      <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
                         <button
                           onClick={() => {
                             setSelectedMember(m);
@@ -557,9 +582,9 @@ export default function MemberManagementPage({ user, apiUrl }) {
                             setTargetTotalSpend(m.totalLifetimeSpend || m.totalAmount || 0);
                             setShowSpendModal(true);
                           }}
-                          className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-xl text-xs font-extrabold border border-blue-500/30 flex items-center gap-1 transition-colors cursor-pointer"
+                          className="px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-lg text-[11px] font-extrabold border border-blue-500/30 flex items-center gap-1 transition-colors cursor-pointer"
                         >
-                          <TrendingUp size={13} /> 測試改累積額度
+                          <TrendingUp size={12} /> 累積額
                         </button>
                         <button
                           onClick={() => {
@@ -567,18 +592,18 @@ export default function MemberManagementPage({ user, apiUrl }) {
                             setAdjustType("add");
                             setShowAdjustModal(true);
                           }}
-                          className="px-2.5 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-xs font-extrabold flex items-center gap-1 transition-colors cursor-pointer"
+                          className="px-2 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-[11px] font-extrabold flex items-center gap-1 transition-colors cursor-pointer"
                         >
-                          <Plus size={13} /> 儲值/調整
+                          <Plus size={12} /> 儲值
                         </button>
                         <button
                           onClick={() => {
                             setSelectedMember(m);
                             setShowHistoryModal(true);
                           }}
-                          className="px-2.5 py-1 bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-xl text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                          className="px-2 py-1 bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
                         >
-                          <History size={13} /> 交易歷史
+                          <History size={12} /> 歷史
                         </button>
                       </div>
                     </td>
