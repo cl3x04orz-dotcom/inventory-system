@@ -149,63 +149,68 @@ export default function MergePrintModal({
         return Array.from(map.values());
     }, [systemCustomers]);
 
-    // ==========================================
-    // 地點排程管理後台相關輔助函式
-    // ==========================================
-    const getCustSetting = (custName) => {
-        const rawName = String(custName || '').trim();
-        // 清除尾端點號與省略符號 (例如: "임순정 kobayashi ..." -> "임순정 kobayashi")
-        const cleanName = rawName.replace(/[\.\s…]+$/g, '').toLowerCase();
-
-        // 1. 檢查編輯中的設定
-        for (const [key, val] of Object.entries(editingCustomers)) {
-            const k = key.trim().replace(/[\.\s…]+$/g, '').toLowerCase();
-            if (k === cleanName) {
-                return val;
-            }
-        }
-
-        // 2. 優先讀取本機獨立持久化備份 (避免 SWR 重整頁面時舊資料覆蓋)
-        let backupSetting = null;
+    // 用 useMemo 預先建立精確配對 Map，避免在單據迴圈中重複執行 Regex 取代、JSON.parse 與讀取 LocalStorage 導致 Call Stack 爆掉
+    const customerSettingsMap = React.useMemo(() => {
+        let cacheMap = {};
         try {
             const cacheRaw = safeLocalStorage.getItem('CUSTOMER_SETTINGS_CACHE');
-            if (cacheRaw) {
-                const cacheMap = JSON.parse(cacheRaw);
-                for (const [key, val] of Object.entries(cacheMap)) {
-                    const k = key.trim().replace(/[\.\s…]+$/g, '').toLowerCase();
-                    if (k === cleanName) {
-                        backupSetting = val;
-                        break;
-                    }
-                }
-            }
+            if (cacheRaw) cacheMap = JSON.parse(cacheRaw);
         } catch (e) {}
 
-        // 3. 從 cleanSystemCustomers 對照匹配 (必須 100% 精確對應)
-        const orig = cleanSystemCustomers.find(c => {
-            const nameStr = (typeof c === 'string' ? c : c?.name || '').trim().replace(/[\.\s…]+$/g, '').toLowerCase();
-            if (!nameStr) return false;
-            return nameStr === cleanName;
+        const resultMap = new Map();
+
+        // 1. 填入 cleanSystemCustomers
+        (cleanSystemCustomers || []).forEach(c => {
+            const nameStr = (typeof c === 'string' ? c : c?.name || '').trim();
+            if (!nameStr) return;
+            const cleanKey = nameStr.replace(/[\.\s…]+$/g, '').toLowerCase();
+
+            resultMap.set(cleanKey, {
+                customerName: nameStr,
+                isAiEnabled: c.isAiEnabled === true,
+                schedule: Array.isArray(c.schedule) ? c.schedule : [0, 1, 2, 3, 4, 5, 6],
+                category: c.category || '市場',
+                isSaving: false
+            });
         });
 
-        let origSchedule = backupSetting?.schedule;
-        let origAiEnabled = backupSetting ? backupSetting.isAiEnabled === true : undefined;
-        let origCategory = backupSetting?.category;
+        // 2. 覆蓋本機獨立備份
+        Object.entries(cacheMap).forEach(([key, val]) => {
+            const cleanKey = key.trim().replace(/[\.\s…]+$/g, '').toLowerCase();
+            const existing = resultMap.get(cleanKey);
+            resultMap.set(cleanKey, {
+                customerName: val?.customerName || existing?.customerName || key,
+                isAiEnabled: val?.isAiEnabled === true,
+                schedule: Array.isArray(val?.schedule) ? val.schedule : (existing?.schedule || [0, 1, 2, 3, 4, 5, 6]),
+                category: val?.category || existing?.category || '市場',
+                isSaving: false
+            });
+        });
 
-        if (orig && typeof orig === 'object') {
-            if (origSchedule === undefined) origSchedule = orig.schedule;
-            if (origAiEnabled === undefined) origAiEnabled = orig.isAiEnabled === true;
-            if (origCategory === undefined) origCategory = orig.category;
-        }
+        // 3. 覆蓋暫存編輯中的設定
+        Object.entries(editingCustomers).forEach(([key, val]) => {
+            const cleanKey = key.trim().replace(/[\.\s…]+$/g, '').toLowerCase();
+            resultMap.set(cleanKey, val);
+        });
+
+        return resultMap;
+    }, [cleanSystemCustomers, editingCustomers]);
+
+    // O(1) 極速取得地點設定，防止極端迴圈造成的 Maximum Call Stack Size Exceeded
+    const getCustSetting = React.useCallback((custName) => {
+        const rawName = String(custName || '').trim();
+        const cleanKey = rawName.replace(/[\.\s…]+$/g, '').toLowerCase();
+        const found = customerSettingsMap.get(cleanKey);
+        if (found) return found;
 
         return {
-            customerName: (orig && typeof orig === 'object' && orig.name) ? orig.name : rawName,
-            isAiEnabled: origAiEnabled !== undefined ? origAiEnabled : false,
-            schedule: origSchedule || [0,1,2,3,4,5,6],
-            category: origCategory || '市場',
+            customerName: rawName,
+            isAiEnabled: false,
+            schedule: [0, 1, 2, 3, 4, 5, 6],
+            category: '市場',
             isSaving: false
         };
-    };
+    }, [customerSettingsMap]);
 
     const handleEditCust = (custName, field, value) => {
         const cleanName = String(custName || '').trim();
@@ -430,8 +435,6 @@ export default function MergePrintModal({
         alert(`一鍵儲存完成！\n成功儲存：${successCount} 項` + (failCount > 0 ? `\n失敗：${failCount} 項` : ''));
     };
 
-    if (!show) return null;
-
     // [Fix] 日期格式正規化：支援 YYYY-MM-DD、YYYY/MM/DD 及 ISO 時間字串，避免時區位移與跨格式忽視
     const formatDateKey = (rawDate) => {
         if (!rawDate) return '';
@@ -490,6 +493,8 @@ export default function MergePrintModal({
             return tb - ta;
         });
     }, [groupedRecords]);
+
+    if (!show) return null;
 
     // [New] 執行 AI 補貨建議
     const handleAIReplenish = async () => {
