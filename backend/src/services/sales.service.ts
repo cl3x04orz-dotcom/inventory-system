@@ -646,22 +646,16 @@ export const SalesService = {
       productSettingsMap[p.productId] = p;
     });
 
-    // 4. 篩選：同星期的（DOW only），若當天星期無歷史紀錄則自動降級退求其次採用該地點近 60 天任意星期的最近銷貨紀錄
+    // 4. 篩選：同星期的（DOW only）
     const dowMatches = historySales.filter(s => new Date(s.date).getDay() === dayOfWeek);
-    let sampleIds = dowMatches.slice(0, 3).map(s => s.saleId);
-    let isFallbackToAllDays = false;
-
-    if (sampleIds.length === 0) {
-      sampleIds = historySales.slice(0, 3).map(s => s.saleId);
-      isFallbackToAllDays = true;
-    }
+    const sampleIds = dowMatches.slice(0, 3).map(s => s.saleId);
 
     if (sampleIds.length === 0) {
       return {
         success: true,
         suggestions: {},
         fallbackLevel: 'NO_DATA',
-        message: '此地點近 60 天內尚無任何歷史銷售數據可供分析'
+        message: '此星期尚無歷史數據可供分析'
       };
     }
 
@@ -793,10 +787,8 @@ export const SalesService = {
       }
     }
 
-    const fallbackLevel = isFallbackToAllDays ? 'ALL_DAYS_FALLBACK' : 'DOW_ONLY';
-    const message = isFallbackToAllDays
-      ? `該地點於目標星期無歷史銷貨紀錄，已自動參考該地點近期平均銷量為您預估${hasStockShortage ? ' (⚠️ 部分品項庫存不足)' : ''}。`
-      : `已根據過去同一星期的平均銷售量為您預估${hasStockShortage ? ' (⚠️ 部分品項庫存不足)' : ''}。`;
+    const fallbackLevel = 'DOW_ONLY';
+    const message = `已根據過去同一星期的平均銷售量為您預估${hasStockShortage ? ' (⚠️ 部分品項庫存不足)' : ''}。`;
 
     return { success: true, suggestions, fallbackLevel, message };
   },
