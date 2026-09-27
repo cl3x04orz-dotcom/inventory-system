@@ -487,8 +487,14 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
         return singlePrice * qty;
     }, [products]);
 
+    const productsRef = useRef(products);
+    useEffect(() => {
+        productsRef.current = products;
+    }, [products]);
+
     const normalizeOrder = useCallback((order) => {
         if (!order || !order.items) return order;
+        const currentProducts = productsRef.current || [];
         const hasRecipients = order.recipients && Array.isArray(order.recipients) && order.recipients.length > 0;
 
         const normalizedRecipients = hasRecipients ? order.recipients.map(r => ({
@@ -501,7 +507,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                     (ri.remark && String(ri.remark).includes('贈品')) ||
                     (ri.productName && String(ri.productName).includes('贈品'))
                 );
-                const prod = products.find(p => p.id === ri.productId || p.name === ri.productName || p.name === ri.productId);
+                const prod = currentProducts.find(p => p.id === ri.productId || p.name === ri.productName || p.name === ri.productId);
                 // 🛡️ 歷史快照保護：若有原始小計則保留，避免隨新促銷活動變動歷史訂單金額
                 const hasOriginalSubtotal = ri.subtotal !== undefined && ri.subtotal !== null && !isNaN(Number(ri.subtotal));
                 const sub = isGift ? 0 : (hasOriginalSubtotal ? Number(ri.subtotal) : calculateItemSubtotal(ri.productId || ri.productName, ri.qty, ri.price ?? ri.unitPrice));
@@ -522,7 +528,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                 (item.remark && String(item.remark).includes('贈品')) ||
                 (item.productName && String(item.productName).includes('贈品'))
             );
-            const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
+            const prod = currentProducts.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
             let sub = isGift ? 0 : item.subtotal;
             if (!isGift) {
                 // 🛡️ 歷史快照保護：若歷史訂單已有寫入的小計 (item.subtotal)，優先保留快照，避免受日後新活動影響！
@@ -584,7 +590,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
             items: normalizedItems,
             totalAmount: normalizedItems.reduce((s, it) => s + (Number(it.subtotal) || 0), 0) + Number(order.shippingFee || 0)
         };
-    }, [products, calculateItemSubtotal]);
+    }, [calculateItemSubtotal]);
 
     const fetchOrders = useCallback(async () => {
         setLoading(true);
@@ -652,14 +658,23 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
         }
     }, [apiUrl, user.token]);
 
+    // 1. 頁面開啓時僅初始化一次靜態中繼資料 (商品、大樓綁定、大樓清單)
     useEffect(() => {
         if (user?.token) {
-            fetchOrders();
             fetchProducts();
             fetchGroupBindings();
             fetchBuildings();
         }
-    }, [user.token, activeTab, startDate, endDate, fetchOrders, fetchProducts, fetchGroupBindings, fetchBuildings]);
+    }, [user.token, fetchProducts, fetchGroupBindings, fetchBuildings]);
+
+    // 2. 動態訂單數據查詢 (含 300ms Debounce 避免切換日期與頁籤時重複死迴圈加載)
+    useEffect(() => {
+        if (!user?.token) return;
+        const timer = setTimeout(() => {
+            fetchOrders();
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [user.token, activeTab, startDate, endDate, fetchOrders]);
 
     // 進到訂單審核或切換大樓時，自動在背景掃描並導入全站全大樓本週定期配，實現「100% 全自動無感零點擊體驗」
     useEffect(() => {
