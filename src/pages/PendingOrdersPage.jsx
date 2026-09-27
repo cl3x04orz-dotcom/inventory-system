@@ -435,8 +435,14 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
     const [buildings, setBuildings] = useState([]);
     const [buildingSettingsList, setBuildingSettingsList] = useState([]);
 
+    const productsRef = useRef(products);
+    useEffect(() => {
+        productsRef.current = products;
+    }, [products]);
+
     const calculateItemSubtotal = useCallback((productId, qty, fallbackPrice = 0) => {
-        const prod = products.find(p => p.id === productId || p.name === productId);
+        const currentProducts = productsRef.current || [];
+        const prod = currentProducts.find(p => p.id === productId || p.name === productId);
         if (!prod) {
             return (Number(fallbackPrice) || 0) * (Number(qty) || 0);
         }
@@ -485,12 +491,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
             }
         }
         return singlePrice * qty;
-    }, [products]);
-
-    const productsRef = useRef(products);
-    useEffect(() => {
-        productsRef.current = products;
-    }, [products]);
+    }, []);
 
     const normalizeOrder = useCallback((order) => {
         if (!order || !order.items) return order;
@@ -667,13 +668,11 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
         }
     }, [user.token, fetchProducts, fetchGroupBindings, fetchBuildings]);
 
-    // 2. 動態訂單數據查詢 (含 300ms Debounce 避免切換日期與頁籤時重複死迴圈加載)
+    // 2. 動態訂單數據查詢 (切換頁籤或日期時立即載入)
     useEffect(() => {
-        if (!user?.token) return;
-        const timer = setTimeout(() => {
+        if (user?.token) {
             fetchOrders();
-        }, 300);
-        return () => clearTimeout(timer);
+        }
     }, [user.token, activeTab, startDate, endDate, fetchOrders]);
 
     // 進到訂單審核或切換大樓時，自動在背景掃描並導入全站全大樓本週定期配，實現「100% 全自動無感零點擊體驗」
