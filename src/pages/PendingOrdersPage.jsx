@@ -1654,20 +1654,15 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
             return false;
         }
 
-        // 起迄日期區間篩選 (優先比對已確認配送日 expectedDeliveryDate，未填時比對訂單建立日 createdAt)
+        // 起迄日期區間篩選 (選擇什麼日期就精確顯示該配送日/建檔日標的之訂單；未選擇時呈現全部)
         if (startDate || endDate) {
             const expDate = String(order.expectedDeliveryDate || '').trim();
             const createdDate = String(order.createdAt || '').slice(0, 10);
             const targetDate = expDate || createdDate;
-            if (!targetDate) {
-                return false;
-            }
-            if (startDate && targetDate < startDate) {
-                return false;
-            }
-            if (endDate && targetDate > endDate) {
-                return false;
-            }
+
+            if (!targetDate) return false;
+            if (startDate && targetDate < startDate) return false;
+            if (endDate && targetDate > endDate) return false;
         }
 
         // 一般文字與金額搜尋（編號、姓名、電話、地址、群組、轉帳金額、對帳後五碼）

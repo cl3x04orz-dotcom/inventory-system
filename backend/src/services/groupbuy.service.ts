@@ -125,34 +125,41 @@ export const GroupBuyService = {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') throw new Error('權限不足');
     const { status, storeCode, startDate, endDate, page, pageSize } = payload || {};
 
-    const where: any = { storeCode };
+    const andConditions: any[] = [{ storeCode: storeCode || 'MILI001' }];
+
     if (status === 'UNPAID') {
-      where.status = {
-        notIn: ['MERGED_CANCELLED', 'CANCELLED', 'VOID']
-      };
-      where.OR = [
-        { paymentStatus: null },
-        { paymentStatus: '' },
-        {
-          AND: [
-            { NOT: { paymentStatus: { contains: '已付款' } } },
-            { NOT: { paymentStatus: { contains: '已入帳' } } },
-            { NOT: { paymentStatus: { contains: '退款' } } }
-          ]
-        }
-      ];
+      andConditions.push({
+        status: {
+          notIn: ['MERGED_CANCELLED', 'CANCELLED', 'VOID']
+        },
+        OR: [
+          { paymentStatus: null },
+          { paymentStatus: '' },
+          {
+            AND: [
+              { NOT: { paymentStatus: { contains: '已付款' } } },
+              { NOT: { paymentStatus: { contains: '已入帳' } } },
+              { NOT: { paymentStatus: { contains: '退款' } } }
+            ]
+          }
+        ]
+      });
     } else if (status === 'LINEPAY_ABNORMAL') {
-      where.status = 'PENDING';
-      where.paymentMethod = 'LINE Pay';
-      where.paymentStatus = '未付款';
-    } else if (status === 'PENDING') {
-      where.status = 'PENDING';
-      where.NOT = {
+      andConditions.push({
+        status: 'PENDING',
         paymentMethod: 'LINE Pay',
         paymentStatus: '未付款'
-      };
+      });
+    } else if (status === 'PENDING') {
+      andConditions.push({
+        status: 'PENDING',
+        NOT: {
+          paymentMethod: 'LINE Pay',
+          paymentStatus: '未付款'
+        }
+      });
     } else if (status) {
-      where.status = status;
+      andConditions.push({ status });
     }
 
     if (startDate || endDate) {
@@ -164,22 +171,24 @@ export const GroupBuyService = {
       if (startDate) deliveryCond.gte = startDate;
       if (endDate) deliveryCond.lte = endDate;
 
-      where.OR = [
-        { createdAt: createdAtCond },
-        { expectedDeliveryDate: deliveryCond }
-      ];
-    } else {
+      andConditions.push({
+        OR: [
+          { createdAt: createdAtCond },
+          { expectedDeliveryDate: deliveryCond }
+        ]
+      });
+    } else if (status === 'CONFIRMED') {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       thirtyDaysAgo.setHours(0, 0, 0, 0);
-      where.createdAt = { gte: thirtyDaysAgo };
+      andConditions.push({ createdAt: { gte: thirtyDaysAgo } });
     }
 
     const take = pageSize ? parseInt(pageSize, 10) : undefined;
     const skip = page && pageSize && take ? (parseInt(page, 10) - 1) * take : undefined;
 
     const orders = await prisma.groupBuyOrder.findMany({
-      where,
+      where: { AND: andConditions },
       take,
       skip,
       include: {
