@@ -1778,7 +1778,7 @@ export const GroupBuyService = {
       // 如果訂單沒有 lineId 或者 lineId 不在會員庫裡，嘗試透過手機號碼反查
       if (!targetMemberId || !statsMap.has(targetMemberId)) {
         if (o.customerPhone && phoneToMemberIdMap.has(o.customerPhone)) {
-          targetMemberId = phoneToMemberIdMap.get(o.customerPhone);
+          targetMemberId = phoneToMemberIdMap.get(o.customerPhone) || null;
         }
       }
 
