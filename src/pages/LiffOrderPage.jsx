@@ -30,7 +30,6 @@ import {
   Mail,
   X,
   Megaphone,
-  Minimize2,
 } from "lucide-react";
 import { callGAS, memberApi, getBackendUrl } from "../utils/api";
 import { copyToClipboard } from '../utils/clipboard';
@@ -2116,58 +2115,6 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   };
 
   const totalQty = Object.values(cart).reduce((s, q) => s + q, 0);
-
-  // ── 縮小為可拖曳懸浮球 State & Handlers ──
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [ballPos, setBallPos] = useState(() => ({
-    x: typeof window !== 'undefined' ? Math.max(10, window.innerWidth - 76) : 300,
-    y: typeof window !== 'undefined' ? Math.max(10, window.innerHeight - 160) : 500,
-  }));
-  const dragInfoRef = useRef({
-    startX: 0,
-    startY: 0,
-    initialBallX: 0,
-    initialBallY: 0,
-    isDragging: false,
-    moved: false,
-  });
-
-  const handlePointerDown = (e) => {
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch (_) {}
-    dragInfoRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      initialBallX: ballPos.x,
-      initialBallY: ballPos.y,
-      isDragging: true,
-      moved: false,
-    };
-  };
-
-  const handlePointerMove = (e) => {
-    if (!dragInfoRef.current.isDragging) return;
-    const dx = e.clientX - dragInfoRef.current.startX;
-    const dy = e.clientY - dragInfoRef.current.startY;
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
-      dragInfoRef.current.moved = true;
-    }
-    const newX = Math.max(10, Math.min(window.innerWidth - 66, dragInfoRef.current.initialBallX + dx));
-    const newY = Math.max(10, Math.min(window.innerHeight - 66, dragInfoRef.current.initialBallY + dy));
-    setBallPos({ x: newX, y: newY });
-  };
-
-  const handlePointerUp = (e) => {
-    if (!dragInfoRef.current.isDragging) return;
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch (_) {}
-    dragInfoRef.current.isDragging = false;
-    if (!dragInfoRef.current.moved) {
-      setIsMinimized(false);
-    }
-  };
 
   // 🛒 當購物車從 0 件變為 >0 件時，若使用者停留在最底部，自動平滑調校捲軸，讓頁尾順暢上推浮於購物車條上方
   useEffect(() => {
@@ -6169,11 +6116,7 @@ ${freeNote(newFee, newMin)}
   }
 
   return (
-    <>
-      <div
-        className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]"
-        style={isMinimized ? { display: 'none' } : {}}
-      >
+    <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
       {/* 頂部固定導覽列 */}
 
       <div
@@ -6254,16 +6197,8 @@ ${freeNote(newFee, newMin)}
             <button
               onClick={() => loadAllData()}
               className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              title="重新載入"
             >
               <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-            </button>
-            <button
-              onClick={() => setIsMinimized(true)}
-              className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] active:scale-95 transition-all"
-              title="縮小為懸浮球"
-            >
-              <Minimize2 size={16} />
             </button>
           </div>
         </div>
@@ -7257,38 +7192,5 @@ ${freeNote(newFee, newMin)}
       )}
 
     </div>
-
-      {/* 可自由拖曳之懸浮球 */}
-      {isMinimized && (
-        <div
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          style={{
-            position: "fixed",
-            left: `${ballPos.x}px`,
-            top: `${ballPos.y}px`,
-            zIndex: 9999,
-            touchAction: "none",
-          }}
-          className="w-14 h-14 rounded-full bg-white dark:bg-slate-800 shadow-2xl border-2 border-emerald-500 flex items-center justify-center cursor-move select-none active:scale-95 transition-transform duration-75 relative group"
-        >
-          <img
-            src={setting?.logoUrl || logoLiff}
-            alt="Store Logo"
-            className="w-10 h-10 object-contain rounded-full pointer-events-none"
-          />
-          {totalQty > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800 shadow pointer-events-none">
-              {totalQty > 99 ? '99+' : totalQty}
-            </span>
-          )}
-          <div className="absolute -bottom-5 text-[9px] font-bold bg-slate-900/80 text-white px-1.5 py-0.5 rounded shadow whitespace-nowrap pointer-events-none opacity-90">
-            點擊還原
-          </div>
-        </div>
-      )}
-    </>
   );
 }
