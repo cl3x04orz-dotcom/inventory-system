@@ -2116,6 +2116,16 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
   const totalQty = Object.values(cart).reduce((s, q) => s + q, 0);
 
+  // ── 縮小為懸浮球 state ──────────────────────────────────────────
+  const [isMinimized, setIsMinimized] = useState(false);
+  const handleMinimize = () => {
+    document.activeElement?.blur(); // 收起手機虛擬鍵盤
+    setIsMinimized(true);
+  };
+  const handleRestore = () => {
+    setIsMinimized(false);
+  };
+
   // 🛒 當購物車從 0 件變為 >0 件時，若使用者停留在最底部，自動平滑調校捲軸，讓頁尾順暢上推浮於購物車條上方
   useEffect(() => {
     const prev = prevTotalQtyRef.current;
@@ -6116,7 +6126,35 @@ ${freeNote(newFee, newMin)}
   }
 
   return (
-    <div className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]">
+    <>
+    {/* 縮小懸浮球 ── 商城縮小時顯示，點擊還原 */}
+    {isMinimized && (
+      <button
+        onClick={handleRestore}
+        title="點擊展開商城"
+        className="fixed bottom-24 right-4 z-[9999] w-[60px] h-[60px] rounded-full shadow-2xl flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-transform active:scale-90"
+        style={{
+          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          boxShadow: '0 8px 32px rgba(16,185,129,0.45), 0 2px 8px rgba(0,0,0,0.18)'
+        }}
+      >
+        <span className="text-2xl leading-none">🛒</span>
+        {totalQty > 0 && (
+          <span
+            className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full text-[11px] font-black text-white flex items-center justify-center"
+            style={{ background: '#ef4444' }}
+          >
+            {totalQty > 99 ? '99+' : totalQty}
+          </span>
+        )}
+        <span className="text-[9px] font-bold text-white/90 leading-none">商城</span>
+      </button>
+    )}
+    {/* 商城主體 ── 縮小時用 display:none 隱藏，保留所有 state */}
+    <div
+      className="max-w-md mx-auto flex flex-col h-[100dvh] relative overflow-hidden bg-[var(--bg-primary)]"
+      style={isMinimized ? { display: 'none' } : {}}
+    >
       {/* 頂部固定導覽列 */}
 
       <div
@@ -6199,6 +6237,16 @@ ${freeNote(newFee, newMin)}
               className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             >
               <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            </button>
+            {/* 縮小按鈕 */}
+            <button
+              onClick={handleMinimize}
+              title="縮小商城"
+              className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors duration-100"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
             </button>
           </div>
         </div>
@@ -7192,5 +7240,6 @@ ${freeNote(newFee, newMin)}
       )}
 
     </div>
+    </>
   );
 }
