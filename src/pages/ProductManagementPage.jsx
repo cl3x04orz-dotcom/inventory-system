@@ -694,7 +694,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                         <div className="min-w-0 flex-1">
                                              {/* 名稱 + 按鈕群（手機可換行） */}
                                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                                                <div className="font-extrabold text-base md:text-lg text-[var(--text-primary)] break-words min-w-0 flex-1 leading-tight">
+                                                <div className="font-extrabold text-base md:text-lg text-[var(--text-primary)] truncate min-w-0 flex-1">
                                                     {product.name}
                                                 </div>
                                                 
@@ -765,9 +765,9 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                     </button>
                                                 </div>
                                             </div>
-                                            <div className="text-[11px] text-[var(--text-tertiary)] font-mono mt-1 flex items-center gap-1.5">
+                                            <div className="hidden md:flex text-[11px] text-[var(--text-tertiary)] font-mono mt-1 items-center gap-1.5">
                                                 <span className="bg-[var(--bg-tertiary)] px-1.5 py-0.2 rounded border border-[var(--border-primary)] text-[10px]">ID</span> 
-                                                <span className="truncate max-w-[140px] md:max-w-none">{product.id}</span>
+                                                <span className="truncate max-w-none">{product.id}</span>
                                             </div>
                                             {/* 價格、庫存、有效日期、儲存狀態（手機版換行清晰顯示） */}
                                             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold">
