@@ -8,7 +8,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
     const [tempFlavorChoices, setTempFlavorChoices] = useState({}); // { [productId]: string }
-    const [expandedIds, setExpandedIds] = useState(new Set()); // 撅閖������ ID
+    const [expandedIds, setExpandedIds] = useState(new Set()); // 展開的商品 ID
     const [savingStatus, setSavingStatus] = useState({}); // { [productId]: 'saving' | 'saved' | 'error' }
     const [lastError, setLastError] = useState({}); // { [productId]: string }
     const [stockMap, setStockMap] = useState({}); // { [productName]: number }
@@ -16,19 +16,19 @@ export default function ProductManagementPage({ user, apiUrl }) {
     const [communities, setCommunities] = useState([]); // [{ communityId, communityName }]
     const [activeTabs, setActiveTabs] = useState({}); // { [productId]: 'basic' | 'promo' | 'community' | 'ai' }
 
-    // ���� 撠�惇���銝见鱓��� State ��������������������������������������������������������������������������������
+    // ── 專屬商品下單連結 State ────────────────────────────────────────
     const [selectedProductIds, setSelectedProductIds] = useState(new Set());
-    const [isSelectMode, setIsSelectMode] = useState(false); // 撠�惇����詨�璅∪� (暺墧��衤��漤＊蝷箸�獢�)
+    const [isSelectMode, setIsSelectMode] = useState(false); // 專屬連結選取模式 (點擊開來才顯示框框)
     const [showLinkModal, setShowLinkModal] = useState(false);
-    const [activeModalProductId, setActiveModalProductId] = useState(''); // �桀��典�蝒𦯀葉閮剖������ ID
+    const [activeModalProductId, setActiveModalProductId] = useState(''); // 目前在彈窗中設定的商品 ID
     const [modalProductConfigs, setModalProductConfigs] = useState({}); // { [productId]: { maxTotalQty, allowedCommunityIds, communityQuotas } }
     const [linkSelectedBuilding, setLinkSelectedBuilding] = useState('');
     const [linkCopied, setLinkCopied] = useState(false);
     const [isSavingLinkQuota, setIsSavingLinkQuota] = useState(false);
-    const [isAllowedCommOpen, setIsAllowedCommOpen] = useState(false); // �𧢲𦆮蝷曉��条� (�鞱身�嗅�)
-    const [isCommQuotaOpen, setIsCommQuotaOpen] = useState(false); // 蝷曉��漤��条� (�鞱身�嗅�)
+    const [isAllowedCommOpen, setIsAllowedCommOpen] = useState(false); // 開放社區折疊 (預設收合)
+    const [isCommQuotaOpen, setIsCommQuotaOpen] = useState(false); // 社區配額折疊 (預設收合)
 
-    // 閮���航�蝷曉�皜�鱓 (�㘾膄銵峕錇����黸�讐冗��)
+    // 計算可見社區清單 (排除行政區與隱藏社區)
     const visibleCommunities = useMemo(() => {
         let hiddenBuildings = [];
         try {
@@ -42,9 +42,9 @@ export default function ProductManagementPage({ user, apiUrl }) {
             if (c.status && c.status !== 'ACTIVE') return false;
             if (hiddenBuildings.includes(cname) || hiddenBuildings.includes(cid)) return false;
 
-            if (!['蝺帋�銝见鱓', '銝��祆袇摰�', '銝��祉鍂��', '銝羓�銝见鱓', '銝��砍虜��', '撣豢��嗅睸'].includes(cname)) {
-                const cleanName = cname.replace(/^(�啣�撣�擃㗛�撣��啁�|�箇�)/, '').trim();
-                if (cleanName.endsWith('��') && !cleanName.includes('憭扳�') && !cleanName.includes('蝷曉�') && !cleanName.includes('�臬�') && !cleanName.includes('�𠰴�') && !cleanName.includes('撅梯�') && !cleanName.includes('憭批�')) {
+            if (!['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售'].includes(cname)) {
+                const cleanName = cname.replace(/^(台南市|高雄市|台灣|臺灣)/, '').trim();
+                if (cleanName.endsWith('區') && !cleanName.includes('大樓') && !cleanName.includes('社區') && !cleanName.includes('華廈') && !cleanName.includes('莊園') && !cleanName.includes('山莊') && !cleanName.includes('大廈')) {
                     return false;
                 }
             }
@@ -52,11 +52,11 @@ export default function ProductManagementPage({ user, apiUrl }) {
         });
     }, [communities]);
 
-    // ���� ����鞱郎敶�� (雿擧䲰 7 憭�) State ������������������������������������������������������������
+    // ── 效期預警彈窗 (低於 7 天) State ──────────────────────────────
     const [showExpiryModal, setShowExpiryModal] = useState(false);
     const [dontRemindToday, setDontRemindToday] = useState(false);
 
-    // 閮��頝嗪𣪧����拚�憭拇彍
+    // 計算距離效期剩餘天數
     const getDaysLeft = useCallback((expiryDateStr) => {
         if (!expiryDateStr) return null;
         const parts = String(expiryDateStr).trim().split(/[-/]/);
@@ -69,7 +69,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
         return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     }, []);
 
-    // 蝭拚��箸��㗇��煺��潛��� 7 憭拍����
+    // 篩選出所有效期低於等於 7 天的商品
     const expiringProducts = useMemo(() => {
         return products.filter(p => {
             if (!p.expiryDate) return false;
@@ -92,7 +92,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
             if (Array.isArray(productsData)) {
                 setProducts(productsData);
                 
-                // �嘥��硋藁�唾撓�交���麱摮睃�銝�
+                // 初始化口味輸入框的暫存字串
                 const initialTemp = {};
                 productsData.forEach(p => {
                     initialTemp[p.id] = Array.isArray(p.flavor_choices) ? p.flavor_choices.join(', ') : '';
@@ -100,7 +100,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 setTempFlavorChoices(initialTemp);
             }
 
-            // 閮��摨怠�撠滨�銵�
+            // 計算庫存對照表
             const tempStockMap = {};
             if (Array.isArray(inventoryData)) {
                 inventoryData.forEach(item => {
@@ -112,7 +112,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
             setStockMap(tempStockMap);
 
         } catch (error) {
-            alert('頛匧����憭望�: ' + error.message);
+            alert('載入商品失敗: ' + error.message);
         } finally {
             setLoading(false);
         }
@@ -121,7 +121,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
     useEffect(() => {
         if (user?.token) {
             fetchProducts();
-            // �峕��匧��见�憭扳� (getBuildingSettings) ��冗��皜�鱓 (getCommunities)嚗𣬚Ⅱ靽肽��屸��条恣����100% �峕郊
+            // 同時拉取開團大樓 (getBuildingSettings) 與社區清單 (getCommunities)，確保與「開團管理」100% 同步
             Promise.all([
                 callGAS(apiUrl, 'getBuildingSettings', {}, user.token).catch(() => []),
                 callGAS(apiUrl, 'getCommunities', {}, user.token).catch(() => [])
@@ -163,7 +163,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
         }
     }, [user.token, fetchProducts, apiUrl]);
 
-    // �嗅�����亙��𣂷��劐��� 7 憭拇��笔����嚗諹䌊�閗歲�粹�霅血�蝒� (�亦訜�交𧊋鋡恍�����齿���)
+    // 當商品載入完成且有低於 7 天效期商品時，自動跳出預警彈窗 (若當日未被選擇不再提醒)
     useEffect(() => {
         if (!loading && products.length > 0) {
             const todayStr = new Date().toISOString().split('T')[0];
@@ -195,7 +195,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
         setProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: value, _dirty: true } : p));
     };
 
-    // 撅閖������
+    // 展開與折疊
     const toggleExpand = (id) => {
         setExpandedIds(prev => {
             const next = new Set(prev);
@@ -208,12 +208,12 @@ export default function ProductManagementPage({ user, apiUrl }) {
         });
     };
 
-    // �芸��峕艶摮䀹�嚗䔶�敶�枂 Alert 敶梢𣳽擃娪�
+    // 自動背景存檔，不彈出 Alert 影響體驗
     const handleSaveProduct = async (id, updatedProductFields = {}) => {
         const currentProduct = products.find(p => p.id === id);
         if (!currentProduct) return;
 
-        // 蝡见朖憟㛖鍂靽格㺿�單𧋦�� state嚗䔶蒂璅躰��脣�銝�
+        // 立即套用修改至本地 state，並標記儲存中
         const mergedProduct = { ...currentProduct, ...updatedProductFields };
         setSavingStatus(prev => ({ ...prev, [id]: 'saving' }));
         setLastError(prev => {
@@ -223,14 +223,14 @@ export default function ProductManagementPage({ user, apiUrl }) {
         });
 
         try {
-            // 敺墧麱摮睃�銝脖葉閫����㭠���
+            // 從暫存字串中解析口味陣列
             const rawStr = tempFlavorChoices[id] || '';
-            const parsedFlavors = rawStr.split(/[,嚗䀉/).map(s => s.trim()).filter(Boolean);
+            const parsedFlavors = rawStr.split(/[,，]/).map(s => s.trim()).filter(Boolean);
 
-            // 閫���潸疏�擧０
+            // 解析發貨階梯
             let parsedSteps = [];
             if (typeof mergedProduct.dispatchSteps === 'string') {
-                parsedSteps = mergedProduct.dispatchSteps.split(/[,嚗䀉/).map(s => Number(s.trim())).filter(n => !isNaN(n));
+                parsedSteps = mergedProduct.dispatchSteps.split(/[,，]/).map(s => Number(s.trim())).filter(n => !isNaN(n));
             } else if (Array.isArray(mergedProduct.dispatchSteps)) {
                 parsedSteps = mergedProduct.dispatchSteps.map(Number);
             }
@@ -270,7 +270,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 throw new Error(res.error);
             }
             
-            // �脣��𣂼�嚗峕��� _dirty
+            // 儲存成功，清除 _dirty
             setProducts(prev => prev.map(p => p.id === id ? { 
                 ...p, 
                 ...updatedProductFields,
@@ -281,7 +281,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
             
             setSavingStatus(prev => ({ ...prev, [id]: 'saved' }));
             
-            // 2.5 蝘鍦�瘛∪枂��歇�脣��滚���
+            // 2.5 秒後淡出「已儲存」字眼
             setTimeout(() => {
                 setSavingStatus(prev => {
                     const next = { ...prev };
@@ -324,7 +324,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
         return true;
     });
 
-    // ���� 撠�惇�𣂼��������閧��賢� ����������������������������������������������������������������������������
+    // ── 專屬限定商品連結處理函式 ──────────────────────────────────────
     const toggleSelectProduct = (productId) => {
         setSelectedProductIds(prev => {
             const next = new Set(prev);
@@ -376,7 +376,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
         setLinkCopied(false);
     };
 
-    // �湔鰵�桀��詨������身摰� (瘣餃�蝮賡��粹�����曄冗����冗���漤�)
+    // 更新目前選定商品的設定 (活動總釋出量、開放社區、社區配額)
     const updateActiveProductConfig = (key, val) => {
         if (!activeModalProductId) return;
         setModalProductConfigs(prev => ({
@@ -388,7 +388,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
         }));
     };
 
-    // 銝��萄��桀������身摰𡁜��刻秐���匧歇�詨���
+    // 一鍵將目前商品的設定套用至所有已選商品
     const handleApplyConfigToAll = () => {
         if (!activeModalProductId) return;
         const cur = modalProductConfigs[activeModalProductId];
@@ -404,10 +404,10 @@ export default function ProductManagementPage({ user, apiUrl }) {
             });
             return next;
         });
-        alert('撌脣��桀������暑�閧蜇�见枂�譌����曄冗����冗���漤�憟㛖鍂�單��匧歇�詨����');
+        alert('已將目前商品的活動總釋出量、開放社區與社區配額套用至所有已選商品！');
     };
 
-    // �Ｙ�撠�惇�𣂼�銝见鱓��� (��葆����滨迂嚗䔶��滩身摰𡁏�鈭粹�鞈� :limit)
+    // 產生專屬限定下單連結 (僅帶商品名稱，不再設定每人限購 :limit)
     const generatedLiffUrl = useMemo(() => {
         if (selectedProductIds.size === 0) return '';
         const LIFF_ID = import.meta.env.VITE_LIFF_ID || '2010308873-ur2zL2cc';
@@ -430,16 +430,16 @@ export default function ProductManagementPage({ user, apiUrl }) {
     const handleCopyDedicatedLink = async () => {
         if (!generatedLiffUrl) return;
 
-        // 1. �券��𦠜��Ｘ�����瓐�𣬚洵銝����蝡见朖�瑁�銴�ˊ�㵪��踹�鋡恍��峕郊隢𧢲�撱園�撠舘稲�讛汗�典ế摰� gesture �擧��峕�蝯訫�鞎潛倏摮睃�嚗�
+        // 1. 在點擊手勢有效期間「第一時間立即執行複製」，避免被非同步請求延遲導致瀏覽器判定 gesture 過期而拒絕剪貼簿存取！
         const copyOk = await copyToClipboard(generatedLiffUrl);
         if (copyOk) {
             setLinkCopied(true);
             setTimeout(() => setLinkCopied(false), 2500);
         } else {
-            alert('銴�ˊ憭望�嚗諹��见��詨�銝𧢲䲮蝬脣�銴�ˊ');
+            alert('複製失敗，請手動選取下方網址複製');
         }
 
-        // 2. �峕郊撠��������见ê̌���峕暑�閧蜇�见枂�譌�溻���屸��曄冗���滩��𣬚冗���典振�嗉頃�漤��滚神�亥��坔澈
+        // 2. 同步將每項商品個別的「活動總釋出量」、「開放社區」與「社區獨家搶購配額」寫入資料庫
         setIsSavingLinkQuota(true);
         try {
             const savePromises = [];
@@ -478,8 +478,8 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 await Promise.all(savePromises);
             }
         } catch (err) {
-            console.error('�脣�蝷曉����憿滚仃��:', err);
-            alert('�脣�蝷曉����憿滚仃��: ' + err.message);
+            console.error('儲存社區與配額失敗:', err);
+            alert('儲存社區與配額失敗: ' + err.message);
         } finally {
             setIsSavingLinkQuota(false);
         }
@@ -520,7 +520,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
             <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shadow-sm gap-3">
                 <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
                     <Package className="text-blue-600" />
-                    ���撅祆��
+                    商品屬性
                 </h2>
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
@@ -532,13 +532,13 @@ export default function ProductManagementPage({ user, apiUrl }) {
                             onChange={(e) => setStockFilter(e.target.value)}
                             className="w-full appearance-none pl-9 pr-8 py-2 text-xs font-bold rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500 hover:border-blue-300 transition-all cursor-pointer shadow-sm"
                         >
-                            <option value="ALL">�𣑐 鞎拙睸銝剖��� (�鞱身)</option>
-                            <option value="ONLINE">�叚 撌脩雯鞈潔���</option>
-                            <option value="OFFLINE">�𣞁 撌脩雯鞈潔���</option>
-                            <option value="HAS_STOCK">�叚 �芰��匧澈摮�</option>
-                            <option value="NO_STOCK">�𣞁 �芰��∪澈摮�</option>
-                            <option value="DISCONTINUED">�麱 撌脣���/�𦦵𤩎���</option>
-                            <option value="ALL_WITH_DISCONTINUED">��儭� �券���� (�怠���)</option>
+                            <option value="ALL">📦 販售中商品 (預設)</option>
+                            <option value="ONLINE">🟢 已網購上架</option>
+                            <option value="OFFLINE">🔴 已網購下架</option>
+                            <option value="HAS_STOCK">🟢 只看有庫存</option>
+                            <option value="NO_STOCK">🔴 只看無庫存</option>
+                            <option value="DISCONTINUED">🚫 已停售/停產商品</option>
+                            <option value="ALL_WITH_DISCONTINUED">👁️ 全部商品 (含停售)</option>
                         </select>
                         <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
@@ -548,7 +548,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} />
                             <input
                                 type="text"
-                                placeholder="�𨅯�����滨迂�𦎾D..."
+                                placeholder="搜尋商品名稱或ID..."
                                 className="input-field pl-9 py-2 text-xs w-full"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
@@ -569,24 +569,24 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                     ? 'bg-blue-600 text-white border-blue-600 shadow-blue-500/25'
                                     : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-[var(--border-primary)]'
                             }`}
-                            title={isSelectMode ? "�𣈯��詨�璅∪�" : "暺墧��衤��詨�撠�惇������"}
+                            title={isSelectMode ? "關閉選取模式" : "點擊開來選取專屬商品連結"}
                         >
                             <Link2 size={15} className={isSelectMode ? 'text-white' : 'text-blue-600'} />
-                            <span>{isSelectMode ? '蝯鞉��詨�' : '撠�惇����詨�'}</span>
+                            <span>{isSelectMode ? '結束選取' : '專屬連結選取'}</span>
                         </button>
-                        <button onClick={fetchProducts} className="btn-secondary p-2 rounded-xl shrink-0" title="�齿鰵�渡�">
+                        <button onClick={fetchProducts} className="btn-secondary p-2 rounded-xl shrink-0" title="重新整理">
                             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                         </button>
                     </div>
                 </div>
             </div>
 
-            {/* 撠�惇����詨�撌亙��� */}
+            {/* 專屬連結選取工具列 */}
             {(isSelectMode || selectedProductIds.size > 0) && (
                 <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-gradient-to-r from-blue-500/15 via-indigo-500/10 to-blue-500/5 border border-blue-500/30 rounded-2xl shadow-sm animate-in fade-in duration-150 shrink-0">
                     <div className="flex items-center gap-2.5">
                         <span className="text-xs font-bold text-blue-700 dark:text-blue-300">
-                            撌脤��� <span className="text-sm font-black text-blue-600 dark:text-blue-400 font-mono">{selectedProductIds.size}</span> �����
+                            已選取 <span className="text-sm font-black text-blue-600 dark:text-blue-400 font-mono">{selectedProductIds.size}</span> 項商品
                         </span>
                         <span className="text-slate-300 dark:text-slate-700">|</span>
                         <button
@@ -594,14 +594,14 @@ export default function ProductManagementPage({ user, apiUrl }) {
                             onClick={toggleSelectAll}
                             className="text-xs text-[var(--text-secondary)] hover:text-blue-600 font-medium cursor-pointer"
                         >
-                            {selectedProductIds.size === filtered.length ? '�𡝗��券�' : '�券�蝭拚�蝯鞉�'}
+                            {selectedProductIds.size === filtered.length ? '取消全選' : '全選篩選結果'}
                         </button>
                         <button
                             type="button"
                             onClick={() => setSelectedProductIds(new Set())}
                             className="text-xs text-rose-500 hover:text-rose-600 font-medium cursor-pointer ml-1"
                         >
-                            皜�膄
+                            清除
                         </button>
                     </div>
                     <div className="flex items-center gap-2">
@@ -613,7 +613,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                             }}
                             className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)] font-bold cursor-pointer px-2.5 py-1.5 rounded-xl hover:bg-[var(--bg-tertiary)] transition-colors"
                         >
-                            �� 蝯鞉��詨�
+                            ✕ 結束選取
                         </button>
                         <button
                             type="button"
@@ -622,7 +622,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 text-white text-xs font-extrabold shadow-md shadow-blue-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <Link2 size={15} />
-                            <span>�Ｙ�������銝见鱓���</span>
+                            <span>產生指定商品下單連結</span>
                         </button>
                     </div>
                 </div>
@@ -633,11 +633,11 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 {loading && products.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-3 text-[var(--text-secondary)]">
                         <RefreshCw className="animate-spin text-blue-500" size={36} />
-                        <span>頛匧�銝哨�隢讠���...</span>
+                        <span>載入中，請稍候...</span>
                     </div>
                 ) : filtered.length === 0 ? (
                     <div className="text-center py-20 text-[var(--text-secondary)] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)] shadow-sm">
-                        �∪������
+                        無商品資料
                     </div>
                 ) : (
                     <div className="space-y-4">
@@ -652,12 +652,12 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                         ? 'border-[var(--border-primary)] shadow-md' 
                                         : 'border-[var(--border-primary)] hover:border-[var(--border-primary)]/80 hover:shadow-md'
                                 }`}>
-                                    {/* 1. ���璅䠷�嚗帋蜓�𤥁��箸𧋦鞈��嚗���𦠜㟲撘萄㨃����𥕦���/�条�嚗� */}
+                                    {/* 1. 商品標頭：主圖與基本資訊（點擊整張卡片切換展開/折疊） */}
                                     <div 
                                         onClick={() => toggleExpand(product.id)}
                                         className="flex items-center gap-3 md:gap-4 p-4 md:p-5 hover:bg-[var(--bg-tertiary)]/20 transition-all rounded-t-2xl cursor-pointer select-none"
                                     >
-                                        {/* �暸��孵� (暺鮋�撠�惇����詨�璅∪����憿舐內) */}
+                                        {/* 勾選方塊 (點開專屬連結選取模式時才顯示) */}
                                         {(isSelectMode || selectedProductIds.has(product.id)) && (
                                             <button 
                                                 type="button"
@@ -666,88 +666,91 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                     e.stopPropagation();
                                                     toggleSelectProduct(product.id);
                                                 }}
-                                                title={selectedProductIds.has(product.id) ? "�𡝗��詨�" : "�詨�甇文���"}
+                                                title={selectedProductIds.has(product.id) ? "取消選取" : "選取此商品"}
                                             >
-                                                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transiti                                         {/* �滨迂�䳢D */}
-                                        <div className="flex flex-col min-w-0 flex-1">
-                                            {/* 蝚砌�銵䕘�����滨迂嚗���湧＊蝷綽� */}
-                                            <div className="font-extrabold text-base md:text-lg text-[var(--text-primary)] leading-snug break-words">
-                                                {product.name}
-                                            </div>
-
-                                            {/* 蝚砌�銵䕘��滢��厰�蝢� */}
-                                            <div className="flex flex-wrap items-center gap-1.5 mt-1" onClick={(e) => e.stopPropagation()}>
-                                                {/* �𨅯睸���𧢲��� */}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const newDiscontinued = !product.isDiscontinued;
-                                                        handleFieldChange(product.id, 'isDiscontinued', newDiscontinued);
-                                                        if (newDiscontinued) {
-                                                            handleFieldChange(product.id, 'isActive', false);
-                                                            handleFieldChange(product.id, 'isPurchasable', false);
-                                                            handleSaveProduct(product.id, { isDiscontinued: true, isActive: false, isPurchasable: false });
-                                                        } else {
-                                                            handleSaveProduct(product.id, { isDiscontinued: false });
-                                                        }
-                                                    }}
-                                                    className={`px-1.5 py-0.5 rounded-lg border text-[10px] font-bold transition-all flex items-center gap-0.5 whitespace-nowrap ${
-                                                        product.isDiscontinued
-                                                            ? 'bg-rose-500/10 text-rose-600 border-rose-200 dark:border-rose-800'
-                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-amber-300'
-                                                    }`}
-                                                >
-                                                    {product.isDiscontinued ? '�麱 撌脣���' : '�麱 �𨅯睸'}
-                                                </button>
-
-                                                {/* 蝬脰頃銝𦠜沲�钅� */}
-                                                <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded-lg border border-[var(--border-primary)] shadow-2xs">
-                                                    <span className={`text-[10px] font-bold whitespace-nowrap ${product.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
-                                                        {product.isActive ? '�� 銝𦠜沲' : '�� 銝𧢲沲'}
-                                                    </span>
-                                                    <label className="relative inline-flex items-center cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            className="sr-only peer"
-                                                            checked={!!product.isActive}
-                                                            onChange={(e) => {
-                                                                handleFieldChange(product.id, 'isActive', e.target.checked);
-                                                                handleSaveProduct(product.id, { isActive: e.target.checked });
-                                                            }}
-                                                        />
-                                                        <div className="w-7 h-4 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
-                                                    </label>
+                                                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shadow-2xs ${
+                                                    selectedProductIds.has(product.id)
+                                                        ? 'bg-blue-500 border-blue-500 text-white'
+                                                        : 'bg-white border-slate-300 hover:border-blue-400'
+                                                }`}>
+                                                    {selectedProductIds.has(product.id) && (
+                                                        <Check size={13} strokeWidth={3.5} className="text-white" />
+                                                    )}
                                                 </div>
+                                            </button>
+                                        )}
 
-                                                {/* 摰匧��芷膄�厰� */}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const qty = stockMap[product.name] || 0;
-                                                        if (qty > 0) {
-                                                            alert(`�𣂼��冽��鉝�穃�����${product.name}�滨𤌍�滢��匧澈摮� ${qty} 隞嗚��n�箇Ⅱ靽嗪�敺�鞎∪����脤啹摮睃董�桀�朣𠺪�隢见��園��𨳍�𦩒�� 璅躰��𨅯睸�誩朖�臬�蝟餌絞摰匧��梯�嚗𣬚����芷膄�豢�嚗�);
-                                                        } else {
-                                                            if (confirm(`�鞟Ⅱ隤漤黸��/�𨅯睸�烐糓�衣Ⅱ摰𡁜������${product.name}�齿�閮条��𨅯睸�梯�嚗鬮)) {
-                                                                handleFieldChange(product.id, 'isDiscontinued', true);
+                                        {/* 商品大圖 */}
+                                        <div 
+                                            className="w-14 h-14 md:w-16 md:h-16 rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] overflow-hidden flex items-center justify-center flex-shrink-0 shadow-inner"
+                                        >
+                                            {product.imageUrl ? (
+                                                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; }} />
+                                            ) : (
+                                                <Image size={22} className="text-[var(--text-tertiary)]" />
+                                            )}
+                                        </div>
+                                         {/* 名稱與ID */}
+                                        <div className="min-w-0 flex-1">
+                                             {/* 名稱 + 按鈕群（手機可換行） */}
+                                            <div className="flex flex-col gap-y-1">
+                                                <div className="font-extrabold text-base md:text-lg text-[var(--text-primary)] break-words">
+                                                    {product.name}
+                                                </div>
+                                                
+                                                {/* 上架與停售開關 */}
+                                                <div className="flex items-center gap-1.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                                                    {/* 停售狀態按鈕 */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newDiscontinued = !product.isDiscontinued;
+                                                            handleFieldChange(product.id, 'isDiscontinued', newDiscontinued);
+                                                            if (newDiscontinued) {
                                                                 handleFieldChange(product.id, 'isActive', false);
                                                                 handleFieldChange(product.id, 'isPurchasable', false);
                                                                 handleSaveProduct(product.id, { isDiscontinued: true, isActive: false, isPurchasable: false });
-                                                            }
-                                                        }
-                                                    }}
-                                                    className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-md transition-all"
-                                                    title="�芷膄 / �𨅯睸�梯�"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </div>
-
-                                            {/* ID嚗��璈��憿舐內嚗� */}
-                                            <div className="hidden md:flex text-[11px] text-[var(--text-tertiary)] font-mono mt-1 items-center gap-1.5">
-                                                <span className="bg-[var(--bg-tertiary)] px-1.5 py-0.2 rounded border border-[var(--border-primary)] text-[10px]">ID</span>
-                                                <span className="truncate">{product.id}</span>啹摮睃董�桀�朣𠺪�隢见��園��𨳍�𦩒�� 璅躰��𨅯睸�誩朖�臬�蝟餌絞摰匧��梯�嚗𣬚����芷膄�豢�嚗�);
                                                             } else {
-                                                                if (confirm(`�鞟Ⅱ隤漤黸��/�𨅯睸�烐糓�衣Ⅱ摰𡁜������${product.name}�齿�閮条��𨅯睸�梯�嚗鬮)) {
+                                                                handleSaveProduct(product.id, { isDiscontinued: false });
+                                                            }
+                                                        }}
+                                                        className={`px-1.5 py-0.5 rounded-lg border text-[10px] font-bold transition-all flex items-center gap-0.5 whitespace-nowrap ${
+                                                            product.isDiscontinued
+                                                                ? 'bg-rose-500/10 text-rose-600 border-rose-200 dark:border-rose-800'
+                                                                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-amber-300'
+                                                        }`}
+                                                    >
+                                                        {product.isDiscontinued ? '🚫 已停售' : '🚫 停售'}
+                                                    </button>
+
+                                                    {/* 網購上架開關 */}
+                                                    <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded-lg border border-[var(--border-primary)] shadow-2xs">
+                                                        <span className={`text-[10px] font-bold whitespace-nowrap ${product.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                                                            {product.isActive ? '🌐 上架' : '❌ 下架'}
+                                                        </span>
+                                                        <label className="relative inline-flex items-center cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="sr-only peer"
+                                                                checked={!!product.isActive}
+                                                                onChange={(e) => {
+                                                                    handleFieldChange(product.id, 'isActive', e.target.checked);
+                                                                    handleSaveProduct(product.id, { isActive: e.target.checked });
+                                                                }}
+                                                            />
+                                                            <div className="w-7 h-4 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                                                        </label>
+                                                    </div>
+
+                                                    {/* 安全刪除按鈕 */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const qty = stockMap[product.name] || 0;
+                                                            if (qty > 0) {
+                                                                alert(`【安全提醒】商品「${product.name}」目前仍有庫存 ${qty} 件。\n為確保過往財務與進銷存帳目對齊，請將其點擊『🚫 標記停售』即可全系統安全隱藏，無需刪除數據！`);
+                                                            } else {
+                                                                if (confirm(`【確認隱藏/停售】是否確定將商品「${product.name}」標記為停售隱藏？`)) {
                                                                     handleFieldChange(product.id, 'isDiscontinued', true);
                                                                     handleFieldChange(product.id, 'isActive', false);
                                                                     handleFieldChange(product.id, 'isPurchasable', false);
@@ -756,7 +759,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                             }
                                                         }}
                                                         className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-md transition-all"
-                                                        title="�芷膄 / �𨅯睸�梯�"
+                                                        title="刪除 / 停售隱藏"
                                                     >
                                                         <Trash2 size={14} />
                                                     </button>
@@ -766,17 +769,17 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                 <span className="bg-[var(--bg-tertiary)] px-1.5 py-0.2 rounded border border-[var(--border-primary)] text-[10px]">ID</span> 
                                                 <span className="truncate max-w-none">{product.id}</span>
                                             </div>
-                                            {/* �寞聢��澈摮塩�����𠯫�麄���摮条��页��𧢲����銵峕��圈＊蝷綽� */}
+                                            {/* 價格、庫存、有效日期、儲存狀態（手機版換行清晰顯示） */}
                                             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold">
-                                                <span className="text-blue-600">�瑕睸嚗�<span className="font-mono text-[var(--text-primary)]">${product.single_price || '-'}</span></span>
-                                                <span className="text-amber-600">�脣�嚗�<span className="font-mono">${product.price || '-'}</span></span>
-                                                <span className="text-[var(--text-secondary)]">摨怠�嚗�<span className={`font-mono ${ (stockMap[product.name] || 0) > 0 ? 'text-emerald-600 font-extrabold' : 'text-slate-400' }`}>{stockMap[product.name] || 0}</span></span>
+                                                <span className="text-blue-600">銷售：<span className="font-mono text-[var(--text-primary)]">${product.single_price || '-'}</span></span>
+                                                <span className="text-amber-600">進價：<span className="font-mono">${product.price || '-'}</span></span>
+                                                <span className="text-[var(--text-secondary)]">庫存：<span className={`font-mono ${ (stockMap[product.name] || 0) > 0 ? 'text-emerald-600 font-extrabold' : 'text-slate-400' }`}>{stockMap[product.name] || 0}</span></span>
                                                 {product.maxTotalQty !== null && product.maxTotalQty !== undefined && (
-                                                    <span className="text-purple-600 dark:text-purple-400 font-extrabold">�鞾�嚗�<span className="font-mono">{product.soldQty || 0}/{product.maxTotalQty}</span></span>
+                                                    <span className="text-purple-600 dark:text-purple-400 font-extrabold">限額：<span className="font-mono">{product.soldQty || 0}/{product.maxTotalQty}</span></span>
                                                 )}
-                                                {/* �㗇��交� */}
+                                                {/* 有效日期 */}
                                                 <span className="inline-flex flex-wrap items-center gap-1 text-[var(--text-secondary)] font-medium" onClick={(e) => e.stopPropagation()}>
-                                                    <span className="whitespace-nowrap shrink-0">�㗇��交�嚗�</span>
+                                                    <span className="whitespace-nowrap shrink-0">有效日期：</span>
                                                     <input
                                                         type="date"
                                                         className="input-field text-[11px] sm:text-xs px-1.5 py-0.5 w-[125px] sm:w-[132px] font-semibold bg-[var(--bg-primary)] border-[var(--border-primary)] rounded-lg text-[var(--text-primary)] shrink-0"
@@ -795,22 +798,22 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 handleSaveProduct(product.id, { expiryDate: '' });
                                                             }}
                                                             className="text-[10px] text-rose-500 hover:text-rose-700 font-bold px-1 rounded hover:bg-rose-50 cursor-pointer whitespace-nowrap shrink-0"
-                                                            title="皜�膄�交�"
-                                                        >��</button>
+                                                            title="清除日期"
+                                                        >✕</button>
                                                     )}
                                                     {status === 'saving' && (
                                                         <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-bold text-[10px] bg-blue-500/10 px-2 py-0.5 rounded-full">
-                                                            <RefreshCw size={10} className="animate-spin" /> �脣�銝�
+                                                            <RefreshCw size={10} className="animate-spin" /> 儲存中
                                                         </span>
                                                     )}
                                                     {status === 'saved' && (
                                                         <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded-full animate-fade-in">
-                                                            <Check size={10} /> 撌脣�摮�
+                                                            <Check size={10} /> 已儲存
                                                         </span>
                                                     )}
                                                     {status === 'error' && (
                                                         <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400 font-bold text-[10px] bg-rose-500/10 px-2 py-0.5 rounded-full" title={lastError[product.id]}>
-                                                            <AlertCircle size={10} /> 憭望�
+                                                            <AlertCircle size={10} /> 失敗
                                                         </span>
                                                     )}
                                                 </span>
@@ -818,14 +821,14 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                         </div>
                                     </div>
 
-                                    {/* 撅閖���底蝝唳�雿� (��惜������) */}
+                                    {/* 展開的詳細欄位 (頁籤分類分流) */}
                                     {isExpanded && (() => {
                                         const currentTab = activeTabs[product.id] || 'basic';
                                         const setTab = (tabName) => setActiveTabs(prev => ({ ...prev, [product.id]: tabName }));
 
                                         return (
                                             <div className="p-4 sm:p-5 border-t border-[var(--border-primary)]/40 flex flex-col gap-4 animate-slide-down bg-[var(--bg-secondary)]/30" onClick={(e) => e.stopPropagation()}>
-                                                {/* �� ��惜����� (Tab Bar) */}
+                                                {/* 📍 頁籤分類列 (Tab Bar) */}
                                                 <div className="flex items-center gap-1.5 p-1 bg-[var(--bg-tertiary)] rounded-xl border border-[var(--border-primary)] overflow-x-auto no-scrollbar">
                                                     <button
                                                         type="button"
@@ -836,7 +839,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                                         }`}
                                                     >
-                                                        �� �箸𧋦閬𤩺聢�����
+                                                        📌 基本規格與價格
                                                     </button>
 
                                                     <button
@@ -848,7 +851,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                                         }`}
                                                     >
-                                                        �� 瘣餃����閬𤩺聢
+                                                        🎁 活動與多規格
                                                     </button>
 
                                                     <button
@@ -860,7 +863,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                                         }`}
                                                     >
-                                                        �� �𧢲𦆮蝷曉����憿�
+                                                        🏠 開放社區與配額
                                                     </button>
 
                                                     <button
@@ -872,7 +875,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                                         }`}
                                                     >
-                                                        �蘨 ��撣� POS 閮剖�
+                                                        🏪 門市 POS 設定
                                                     </button>
 
                                                     <button
@@ -884,63 +887,63 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                                         }`}
                                                     >
-                                                        �� AI 鋆𡏭疏��彍
+                                                        🤖 AI 補貨參數
                                                     </button>
                                                 </div>
 
                                                 {/* ------------------------------------------------------------- */}
-                                                {/* �� TAB 1嚗𡁜抅�祈��潸��寞聢 */}
+                                                {/* 📌 TAB 1：基本規格與價格 */}
                                                 {/* ------------------------------------------------------------- */}
                                                 {currentTab === 'basic' && (
                                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs animate-fade-in">
-                                                        {/* �𣇉�蝬脣� */}
+                                                        {/* 圖片網址 */}
                                                         <div className="flex flex-col gap-1.5 bg-[var(--bg-tertiary)]/30 p-3 rounded-xl border border-[var(--border-primary)]/50">
-                                                            <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">�𣇉�蝬脣�</span>
+                                                            <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">圖片網址</span>
                                                             <input
                                                                 type="text"
                                                                 className="input-field text-xs p-2"
-                                                                placeholder="頛詨��𣇉�蝬脣� https://..."
+                                                                placeholder="輸入圖片網址 https://..."
                                                                 value={product.imageUrl || ''}
                                                                 onChange={(e) => handleFieldChange(product.id, 'imageUrl', e.target.value)}
                                                                 onBlur={(e) => handleSaveProduct(product.id, { imageUrl: e.target.value })}
                                                             />
                                                         </div>
 
-                                                        {/* ���摰寥� / 閬𤩺聢 */}
+                                                        {/* 商品容量 / 規格 */}
                                                         <div className="flex flex-col gap-1.5 bg-[var(--bg-tertiary)]/30 p-3 rounded-xl border border-[var(--border-primary)]/50">
-                                                            <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">摰寥� / 閬𤩺聢</span>
+                                                            <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">容量 / 規格</span>
                                                             <input
                                                                 type="text"
                                                                 className="input-field text-xs p-2 font-bold"
-                                                                placeholder="靘页�936ml��360g��6��/��"
+                                                                placeholder="例：936ml、360g、6入/盒"
                                                                 value={product.capacity || ''}
                                                                 onChange={(e) => handleFieldChange(product.id, 'capacity', e.target.value)}
                                                                 onBlur={(e) => handleSaveProduct(product.id, { capacity: e.target.value })}
                                                             />
                                                         </div>
 
-                                                        {/* ������ */}
+                                                        {/* 商品分類 */}
                                                         <div className="flex flex-col gap-1.5 bg-[var(--bg-tertiary)]/30 p-3 rounded-xl border border-[var(--border-primary)]/50">
-                                                            <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">������</span>
+                                                            <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">商品分類</span>
                                                             <input
                                                                 type="text"
                                                                 className="input-field text-xs p-2"
-                                                                placeholder="靘页�銋喲ㄡ�����暻亦頂��"
+                                                                placeholder="例：乳飲品、燕麥系列"
                                                                 value={product.category || ''}
                                                                 onChange={(e) => handleFieldChange(product.id, 'category', e.target.value)}
                                                                 onBlur={(e) => handleSaveProduct(product.id, { category: e.target.value })}
                                                             />
                                                         </div>
 
-                                                        {/* 摨怠��鞉𧋦 (�脣�) */}
+                                                        {/* 庫存成本 (進價) */}
                                                         <div className="flex flex-col gap-1.5 bg-[var(--bg-tertiary)]/30 p-3 rounded-xl border border-[var(--border-primary)]/50">
-                                                            <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">摨怠��鞉𧋦 (�脣�)</span>
+                                                            <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">庫存成本 (進價)</span>
                                                             <div className="relative">
                                                                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-bold font-mono text-xs">$</span>
                                                                 <input
                                                                     type="number"
                                                                     className="input-field text-xs pl-6 p-2 w-full font-mono font-bold"
-                                                                    placeholder="�脣��鞉𧋦"
+                                                                    placeholder="進價成本"
                                                                     value={product.price || ''}
                                                                     onChange={(e) => handleFieldChange(product.id, 'price', e.target.value !== '' ? Number(e.target.value) : '')}
                                                                     onBlur={(e) => handleSaveProduct(product.id, { price: e.target.value !== '' ? Number(e.target.value) : '' })}
@@ -948,15 +951,15 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                             </div>
                                                         </div>
 
-                                                        {/* �瑕睸�笔� */}
+                                                        {/* 銷售原價 */}
                                                         <div className="flex flex-col gap-1.5 bg-[var(--bg-tertiary)]/30 p-3 rounded-xl border border-[var(--border-primary)]/50">
-                                                            <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">�瑕睸�笔�</span>
+                                                            <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">銷售原價</span>
                                                             <div className="relative">
                                                                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-bold font-mono text-xs">$</span>
                                                                 <input
                                                                     type="number"
                                                                     className="input-field text-xs pl-6 p-2 w-full font-mono font-bold"
-                                                                    placeholder="�瑕睸�笔�"
+                                                                    placeholder="銷售原價"
                                                                     value={product.single_price || ''}
                                                                     onChange={(e) => handleFieldChange(product.id, 'single_price', e.target.value !== '' ? Number(e.target.value) : '')}
                                                                     onBlur={(e) => handleSaveProduct(product.id, { single_price: e.target.value !== '' ? Number(e.target.value) : '' })}
@@ -967,14 +970,14 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                 )}
 
                                                 {/* ------------------------------------------------------------- */}
-                                                {/* �� TAB 2嚗𡁏暑�閗�憭朞��� */}
+                                                {/* 🎁 TAB 2：活動與多規格 */}
                                                 {/* ------------------------------------------------------------- */}
                                                 {currentTab === 'promo' && (
                                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs animate-fade-in">
-                                                        {/* 憭朞��澆藁�� */}
+                                                        {/* 多規格口味 */}
                                                         <div className="flex flex-col gap-2 bg-[var(--bg-tertiary)]/30 p-3 rounded-xl border border-[var(--border-primary)]/50">
                                                             <div className="flex justify-between items-center">
-                                                                <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">憭朞��澆藁��</span>
+                                                                <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">多規格口味</span>
                                                                 <label className="relative inline-flex items-center cursor-pointer">
                                                                     <input
                                                                         type="checkbox"
@@ -991,7 +994,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                             <input
                                                                 type="text"
                                                                 className="input-field text-xs p-2"
-                                                                placeholder="��㭠�賊�嚗䔶誑�𡑒����嚗䔶�嚗𡁜���, 撌批���"
+                                                                placeholder="口味選項，以逗號分隔，例：原味, 巧克力"
                                                                 disabled={!product.has_flavor_attributes}
                                                                 value={tempFlavorChoices[product.id] || ''}
                                                                 onChange={(e) => {
@@ -1003,10 +1006,10 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                             />
                                                         </div>
 
-                                                        {/* ���閬𤩺聢閮剖� */}
+                                                        {/* 捆裝規格設定 */}
                                                         <div className="flex flex-col gap-2 bg-[var(--bg-tertiary)]/30 p-3 rounded-xl border border-[var(--border-primary)]/50">
                                                             <div className="flex justify-between items-center">
-                                                                <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">���閬𤩺聢</span>
+                                                                <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">捆裝規格</span>
                                                                 <label className="relative inline-flex items-center cursor-pointer">
                                                                     <input
                                                                         type="checkbox"
@@ -1023,7 +1026,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                             <input
                                                                 type="number"
                                                                 className="input-field text-xs p-2 mt-auto font-mono"
-                                                                placeholder="����賊�嚗䔶�嚗�4 (�𥕦�銝�蝯�)"
+                                                                placeholder="捆裝數量，例：4 (四入一組)"
                                                                 disabled={!product.isBundle}
                                                                 value={product.bundleSize === '' || product.bundleSize === undefined || product.bundleSize === null ? '' : product.bundleSize}
                                                                 onChange={(e) => handleFieldChange(product.id, 'bundleSize', e.target.value !== '' ? Number(e.target.value) : '')}
@@ -1031,14 +1034,14 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                             />
                                                         </div>
 
-                                                        {/* ��憭扯痔�桐��� (瘣餃�蝮賡���) */}
+                                                        {/* 最大販售上限 (活動總限量) */}
                                                         <div className="flex flex-col gap-2 bg-[var(--bg-tertiary)]/30 p-3 rounded-xl border border-[var(--border-primary)]/50">
-                                                            <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">瘣餃�蝮賡��譍���</span>
+                                                            <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">活動總限量上限</span>
                                                             <input
                                                                 type="number"
                                                                 min="1"
                                                                 className="input-field text-xs p-2 mt-auto font-mono"
-                                                                placeholder="靘页�100 (�嗵征隞�”�∩���)"
+                                                                placeholder="例：100 (留空代表無上限)"
                                                                 value={product.maxTotalQty === '' || product.maxTotalQty === undefined || product.maxTotalQty === null ? '' : product.maxTotalQty}
                                                                 onChange={(e) => handleFieldChange(product.id, 'maxTotalQty', e.target.value !== '' ? Number(e.target.value) : '')}
                                                                 onBlur={(e) => {
@@ -1054,10 +1057,10 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                             />
                                                         </div>
 
-                                                        {/* 皛蹂辣�寞� (�擧０蝯����) */}
+                                                        {/* 滿件特惠 (階梯組合價) */}
                                                         <div className="lg:col-span-4 flex flex-col gap-2.5 bg-[var(--bg-tertiary)]/30 p-3 rounded-xl border border-[var(--border-primary)]/50">
                                                             <div className="flex justify-between items-center">
-                                                                <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">皛蹂辣�寞�閮剖�</span>
+                                                                <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">滿件特惠設定</span>
                                                                 <label className="relative inline-flex items-center cursor-pointer">
                                                                     <input
                                                                         type="checkbox"
@@ -1102,11 +1105,11 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                     <div className={`flex flex-col gap-2 ${!product.has_volume_pricing ? 'opacity-40 pointer-events-none select-none' : ''}`}>
                                                                         {rawTiers.map((tier, idx) => (
                                                                             <div key={idx} className="flex items-center gap-2">
-                                                                                <span className="text-xs text-[var(--text-secondary)] whitespace-nowrap font-bold">皛�</span>
+                                                                                <span className="text-xs text-[var(--text-secondary)] whitespace-nowrap font-bold">滿</span>
                                                                                 <input
                                                                                     type="number"
                                                                                     className="input-field text-xs p-2 w-20 text-center font-mono font-bold"
-                                                                                    placeholder="隞�"
+                                                                                    placeholder="件"
                                                                                     disabled={!product.has_volume_pricing}
                                                                                     value={tier.target_quantity ?? ''}
                                                                                     onChange={(e) => {
@@ -1116,12 +1119,12 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                                     }}
                                                                                     onBlur={() => updateTiers(rawTiers)}
                                                                                 />
-                                                                                <span className="text-xs text-[var(--text-secondary)] whitespace-nowrap font-bold">隞塚��芣�蝮賢� �� $</span>
+                                                                                <span className="text-xs text-[var(--text-secondary)] whitespace-nowrap font-bold">件，優惠總價 共 $</span>
                                                                                 <div className="relative flex-1 max-w-[140px]">
                                                                                     <input
                                                                                         type="number"
                                                                                         className="input-field text-xs p-2 w-full font-mono font-bold"
-                                                                                        placeholder="蝯���孵�"
+                                                                                        placeholder="組合特價"
                                                                                         disabled={!product.has_volume_pricing}
                                                                                         value={tier.package_price ?? ''}
                                                                                         onChange={(e) => {
@@ -1140,7 +1143,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                                             updateTiers(next);
                                                                                         }}
                                                                                         className="p-1 rounded-md text-rose-500 hover:bg-rose-500/10 transition-colors"
-                                                                                        title="�芷膄甇日�璇�"
+                                                                                        title="刪除此階梯"
                                                                                     >
                                                                                         <Trash2 size={14} />
                                                                                     </button>
@@ -1155,7 +1158,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                             }}
                                                                             className="self-start text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 mt-1"
                                                                         >
-                                                                            �� �啣��湧��芣��擧０ (靘�: 皛�24隞� $400)
+                                                                            ➕ 新增更高優惠階梯 (例: 滿24件 $400)
                                                                         </button>
                                                                     </div>
                                                                 );
@@ -1165,11 +1168,11 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                 )}
 
                                                 {/* ------------------------------------------------------------- */}
-                                                {/* �� TAB 3嚗𡁻��曄冗�����憿� */}
+                                                {/* 🏠 TAB 3：開放社區與配額 */}
                                                 {/* ------------------------------------------------------------- */}
                                                 {currentTab === 'community' && (
                                                     <div className="flex flex-col gap-4 text-xs animate-fade-in">
-                                                        {/* �𧢲𦆮蝷曉��賢��� */}
+                                                        {/* 開放社區白名單 */}
                                                         {communities.length > 0 && (() => {
                                                             const hiddenBuildings = (() => {
                                                                 try {
@@ -1186,26 +1189,26 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 if (c.status && c.status !== 'ACTIVE') return false;
                                                                 if (hiddenBuildings.includes(cname) || hiddenBuildings.includes(cid)) return false;
 
-                                                                // ��噶�𢠃��曄冗��鋆∠�蝝磰��踹��梯�韏瑚� (憒�蝱�堒�隞�噸����蝱�堒�摰𡁜�)嚗��靽萘�撖阡�蝷曉�憭扳����𣬚�銝𠹺��柴��
-                                                                if (!['蝺帋�銝见鱓', '銝��祆袇摰�', '銝��祉鍂��', '銝羓�銝见鱓', '銝��砍虜��', '撣豢��嗅睸'].includes(cname)) {
-                                                                    const cleanName = cname.replace(/^(�啣�撣�擃㗛�撣��啁�|�箇�)/, '').trim();
-                                                                    if (cleanName.endsWith('��') && !cleanName.includes('憭扳�') && !cleanName.includes('蝷曉�') && !cleanName.includes('�臬�') && !cleanName.includes('�𠰴�') && !cleanName.includes('撅梯�') && !cleanName.includes('憭批�')) {
+                                                                // 順便把開放社區裡的純行政區隱藏起來 (如台南市仁德區、台南安定區)，僅保留實體社區大樓與「線上下單」
+                                                                if (!['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售'].includes(cname)) {
+                                                                    const cleanName = cname.replace(/^(台南市|高雄市|台灣|臺灣)/, '').trim();
+                                                                    if (cleanName.endsWith('區') && !cleanName.includes('大樓') && !cleanName.includes('社區') && !cleanName.includes('華廈') && !cleanName.includes('莊園') && !cleanName.includes('山莊') && !cleanName.includes('大廈')) {
                                                                         return false;
                                                                     }
                                                                 }
                                                                 return true;
                                                             });
 
-                                                            if (visibleCommunities.length === 0) return <div className="text-[var(--text-tertiary)] py-4 text-center">�∪虾�函冗��皜�鱓</div>;
+                                                            if (visibleCommunities.length === 0) return <div className="text-[var(--text-tertiary)] py-4 text-center">無可用社區清單</div>;
 
                                                             const quotas = product.communityQuotas || {};
 
                                                             return (
                                                                 <>
-                                                                    {/* �𧢲𦆮蝷曉��賢��� */}
+                                                                    {/* 開放社區白名單 */}
                                                                     <div className="flex flex-col gap-2 bg-[var(--bg-tertiary)]/30 p-3.5 rounded-xl border border-purple-400/30">
                                                                         <div className="flex justify-between items-center">
-                                                                            <span className="text-[10px] uppercase font-extrabold text-purple-500 tracking-wider">�� �𧢲𦆮蝷曉�嚗�𧊋�豢�隞�”�典��𧢲𦆮嚗�㗲�詻�𣬚�銝𠹺��柴�滢誨銵券��暹��㕑��踹���袇摰ｇ�</span>
+                                                                            <span className="text-[10px] uppercase font-extrabold text-purple-500 tracking-wider">🏠 開放社區（未選擇代表全區開放，勾選「線上下單」代表開放所有行政區與散客）</span>
                                                                             {(product.allowedCommunityIds || []).length > 0 && (
                                                                                 <button
                                                                                     className="text-[10px] text-red-400 hover:text-red-600 font-bold cursor-pointer"
@@ -1214,7 +1217,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                                         handleSaveProduct(product.id, { allowedCommunityIds: [] });
                                                                                     }}
                                                                                 >
-                                                                                    皜�膄�券�
+                                                                                    清除全部
                                                                                 </button>
                                                                             )}
                                                                         </div>
@@ -1224,7 +1227,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                                 const cid = c.communityId || c.CommunityId;
                                                                                 const cname = c.communityName || c.CommunityName;
                                                                                 const checked = ids.includes(cid) || ids.includes(cname);
-                                                                                const isOnlineAll = cname === '蝺帋�銝见鱓';
+                                                                                const isOnlineAll = cname === '線上下單';
                                                                                 return (
                                                                                     <label key={cid || cname} className={`flex items-center gap-2 cursor-pointer group p-1.5 rounded transition-all ${isOnlineAll ? 'bg-purple-500/10 border border-purple-500/30 col-span-full' : 'hover:bg-[var(--bg-tertiary)]'}`}>
                                                                                         <input
@@ -1246,7 +1249,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                                             }}
                                                                                         />
                                                                                         <span className={`text-xs font-bold ${isOnlineAll ? 'text-purple-600 dark:text-purple-400 font-extrabold' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'} truncate`}>
-                                                                                            {isOnlineAll ? '�� 蝺帋�銝见鱓 (�芸���鉄���㕑��踹���袇摰�)' : cname}
+                                                                                            {isOnlineAll ? '🛒 線上下單 (自動包含所有行政區與散客)' : cname}
                                                                                         </span>
                                                                                     </label>
                                                                                 );
@@ -1254,11 +1257,11 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                         </div>
                                                                     </div>
 
-                                                                    {/* 蝷曉��典振�鞾��漤� */}
+                                                                    {/* 社區獨家限量配額 */}
                                                                     <div className="flex flex-col gap-2.5 bg-gradient-to-r from-amber-500/5 via-purple-500/5 to-amber-500/5 p-3.5 rounded-xl border border-amber-400/30">
                                                                         <div className="flex justify-between items-center">
                                                                             <span className="text-xs uppercase font-extrabold text-amber-600 dark:text-amber-400 tracking-wider flex items-center gap-1.5">
-                                                                                �𤣳 蝷曉��典振�嗉頃�漤� (�芸‵撖思誨銵其�閮凋���)
+                                                                                🔥 社區獨家搶購配額 (未填寫代表不設上限)
                                                                             </span>
                                                                             {Object.keys(quotas).length > 0 && (
                                                                                 <button
@@ -1268,7 +1271,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                                         handleSaveProduct(product.id, { communityQuotas: {} });
                                                                                     }}
                                                                                 >
-                                                                                    皜�膄���厩冗���漤�
+                                                                                    清除所有社區配額
                                                                                 </button>
                                                                             )}
                                                                         </div>
@@ -1286,14 +1289,14 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                                             <span className="text-xs font-bold text-[var(--text-primary)] truncate">{cname}</span>
                                                                                             {maxQtyVal !== '' && (
                                                                                                 <span className="text-[10px] text-purple-600 dark:text-purple-400 font-bold shrink-0">
-                                                                                                    撌脣睸 {soldQtyVal}
+                                                                                                    已售 {soldQtyVal}
                                                                                                 </span>
                                                                                             )}
                                                                                         </div>
                                                                                         <input
                                                                                             type="number"
                                                                                             min="1"
-                                                                                            placeholder="�⊿���"
+                                                                                            placeholder="無限制"
                                                                                             className="input-field text-xs p-1.5 w-full font-mono mt-0.5"
                                                                                             value={maxQtyVal}
                                                                                             onChange={(e) => {
@@ -1324,7 +1327,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                 )}
 
                                                 {/* ------------------------------------------------------------- */}
-                                                {/* �蘨 TAB 5嚗𡁻�撣� POS 閮剖� */}
+                                                {/* 🏪 TAB 5：門市 POS 設定 */}
                                                 {/* ------------------------------------------------------------- */}
                                                 {currentTab === 'pos' && (
                                                     <div className="bg-[var(--bg-primary)] rounded-2xl p-4 md:p-5 border border-[var(--border-primary)] text-xs flex flex-col gap-5 animate-fade-in shadow-inner">
@@ -1332,11 +1335,11 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                             <div className="p-1.5 bg-indigo-500/10 rounded-lg text-indigo-600 dark:text-indigo-400">
                                                                 <Store size={18} />
                                                             </div>
-                                                            <span className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400 tracking-wider">��撣� POS �函�閮剖�</span>
+                                                            <span className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400 tracking-wider">門市 POS 獨立設定</span>
                                                             <div className="flex-1"></div>
                                                             <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] px-3 py-1.5 rounded-lg border border-[var(--border-primary)]">
                                                                 <span className={`text-xs font-bold whitespace-nowrap ${product.posSettings?.isActive !== false ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`}>
-                                                                    {product.posSettings?.isActive !== false ? '�� POS 撌脣���' : '�� POS 撌脣���'}
+                                                                    {product.posSettings?.isActive !== false ? '✅ POS 已啟用' : '❌ POS 已停用'}
                                                                 </span>
                                                                 <label className="relative inline-flex items-center cursor-pointer">
                                                                     <input
@@ -1358,16 +1361,16 @@ export default function ProductManagementPage({ user, apiUrl }) {
 
                                                         {product.posSettings?.isActive !== false && (
                                                             <>
-                                                                {/* 璇萘Ⅳ蝞∠���憛� */}
+                                                                {/* 條碼管理區塊 */}
                                                                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] p-4 rounded-xl shadow-xs">
                                                                     <div className="flex items-center justify-between mb-3">
                                                                         <div className="flex items-center gap-1.5">
                                                                             <Barcode size={16} className="text-slate-600 dark:text-slate-400" />
-                                                                            <span className="font-bold text-sm text-[var(--text-primary)]">�钅�璇萘Ⅳ蝞∠� (�舀螱憭𡁶�)</span>
+                                                                            <span className="font-bold text-sm text-[var(--text-primary)]">國際條碼管理 (支援多組)</span>
                                                                         </div>
                                                                         <div className="text-[10px] font-bold px-2 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-md flex items-center gap-1">
                                                                             <Zap size={10} />
-                                                                            皜豢�暺墧�銝𧢲䲮頛詨�獢���喳虾雿輻鍂��Ⅳ瑽漤������
+                                                                            游標點擊下方輸入框，即可使用掃碼槍連續掃入
                                                                         </div>
                                                                     </div>
                                                                     
@@ -1383,7 +1386,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                                         handleSaveProduct(product.id, { barcodes: newBarcodes });
                                                                                     }}
                                                                                     className="p-1 rounded hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition-colors"
-                                                                                    title="蝘駁膄甇斗�蝣�"
+                                                                                    title="移除此條碼"
                                                                                 >
                                                                                     <X size={12} />
                                                                                 </button>
@@ -1396,7 +1399,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                             <input
                                                                                 type="text"
                                                                                 className="input-field w-full pl-9 font-mono font-bold text-sm"
-                                                                                placeholder="�冽迨�瑕��唳�蝣潘��𡝗��閗撓�亙��� Enter"
+                                                                                placeholder="在此刷入新條碼，或手動輸入後按 Enter"
                                                                                 onKeyDown={(e) => {
                                                                                     if (e.key === 'Enter') {
                                                                                         const val = e.target.value.trim();
@@ -1423,37 +1426,37 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                 )}
 
                                                 {/* ------------------------------------------------------------- */}
-                                                {/* �� TAB 6嚗鋫I 鋆𡏭疏��彍 */}
+                                                {/* 🤖 TAB 6：AI 補貨參數 */}
                                                 {/* ------------------------------------------------------------- */}
                                                 {currentTab === 'ai' && (
                                                     <div className="bg-[var(--bg-primary)] rounded-2xl p-4 border border-[var(--border-primary)] text-xs flex flex-col gap-4 animate-fade-in shadow-inner">
                                                         <div className="flex items-center gap-1.5 pb-2 border-b border-[var(--border-primary)]">
                                                             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                                                            <span className="text-xs uppercase font-extrabold text-amber-600 dark:text-amber-400 tracking-wider">�� AI �䁅疏鋆𡏭疏�脤��滨蔭��彍</span>
+                                                            <span className="text-xs uppercase font-extrabold text-amber-600 dark:text-amber-400 tracking-wider">🤖 AI 領貨補貨進階配置參數</span>
                                                         </div>
 
                                                         <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-                                                            {/* AI �����䔄鞎券�璇� */}
+                                                            {/* AI 包裝與發貨階梯 */}
                                                             <div className="flex flex-col gap-2">
-                                                                <span className="text-xs font-bold text-[var(--text-primary)]">�𣑐 �潸疏������璇�</span>
+                                                                <span className="text-xs font-bold text-[var(--text-primary)]">📦 發貨包裝與階梯</span>
                                                                 <div className="grid grid-cols-2 gap-2">
                                                                     <div className="flex flex-col gap-1">
-                                                                        <span className="text-[11px] text-[var(--text-secondary)] font-medium">�渡拳�����</span>
+                                                                        <span className="text-[11px] text-[var(--text-secondary)] font-medium">整箱包裝數</span>
                                                                         <input
                                                                             type="number"
                                                                             className="input-field text-xs p-2 font-mono"
-                                                                            placeholder="靘页�24"
+                                                                            placeholder="例：24"
                                                                             value={product.packSize === '' || product.packSize === undefined || product.packSize === null ? '' : product.packSize}
                                                                             onChange={(e) => handleFieldChange(product.id, 'packSize', e.target.value !== '' ? Number(e.target.value) : '')}
                                                                             onBlur={(e) => handleSaveProduct(product.id, { packSize: e.target.value !== '' ? Number(e.target.value) : 1 })}
                                                                         />
                                                                     </div>
                                                                     <div className="flex flex-col gap-1">
-                                                                        <span className="text-[11px] text-[var(--text-secondary)] font-medium">�潸疏�擧０ (�𡑒����)</span>
+                                                                        <span className="text-[11px] text-[var(--text-secondary)] font-medium">發貨階梯 (逗號分隔)</span>
                                                                         <input
                                                                             type="text"
                                                                             className="input-field text-xs p-2 font-mono"
-                                                                            placeholder="靘页�24, 48"
+                                                                            placeholder="例：24, 48"
                                                                             value={Array.isArray(product.dispatchSteps) ? product.dispatchSteps.join(', ') : product.dispatchSteps || ''}
                                                                             onChange={(e) => handleFieldChange(product.id, 'dispatchSteps', e.target.value)}
                                                                             onBlur={(e) => handleSaveProduct(product.id, { dispatchSteps: e.target.value })}
@@ -1462,15 +1465,15 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 </div>
                                                             </div>
 
-                                                            {/* �渲死�𣈯���瑼� (擃睃�瘥𥪯漁�脖蜓憿�) */}
+                                                            {/* 直覺停領門檻 (高對比亮色主題) */}
                                                             <div className="flex flex-col gap-2">
-                                                                <span className="text-xs font-extrabold text-rose-700 flex items-center gap-1">�� �渲死�𣈯���瑼�</span>
+                                                                <span className="text-xs font-extrabold text-rose-700 flex items-center gap-1">🛑 直覺停領門檻</span>
                                                                 <div className="flex flex-col gap-1">
-                                                                    <span className="text-[11px] text-slate-600 font-bold">頨思��㗇迨�賊��喃��� (靘�: 5)</span>
+                                                                    <span className="text-[11px] text-slate-600 font-bold">身上有此數量即不領 (例: 5)</span>
                                                                     <input
                                                                         type="number"
                                                                         className="w-full bg-white text-slate-900 border-2 border-rose-400 focus:border-rose-600 focus:ring-2 focus:ring-rose-200 text-xs p-2 text-center font-mono font-black shadow-sm rounded-lg"
-                                                                        placeholder="靘页�5 (頨思���5�喃���)"
+                                                                        placeholder="例：5 (身上有5即不領)"
                                                                         value={product.stopPickupThreshold === '' || product.stopPickupThreshold === undefined || product.stopPickupThreshold === null ? '' : product.stopPickupThreshold}
                                                                         onChange={(e) => handleFieldChange(product.id, 'stopPickupThreshold', e.target.value !== '' ? Number(e.target.value) : '')}
                                                                         onBlur={(e) => handleSaveProduct(product.id, { stopPickupThreshold: e.target.value !== '' ? Number(e.target.value) : null })}
@@ -1478,27 +1481,27 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 </div>
                                                             </div>
 
-                                                            {/* �脖���瑼餉�銝𢠃� */}
+                                                            {/* 進位門檻與上限 */}
                                                             <div className="flex flex-col gap-2">
-                                                                <span className="text-xs font-bold text-[var(--text-primary)]">�吔� �脖���瑼餉��賊�銝𢠃�</span>
+                                                                <span className="text-xs font-bold text-[var(--text-primary)]">⚖️ 進位門檻與數量上限</span>
                                                                 <div className="grid grid-cols-2 gap-2">
                                                                     <div className="flex flex-col gap-1">
-                                                                        <span className="text-[11px] text-[var(--text-secondary)] font-medium">��瑼� (撠暹彍憭𡁏䲰甇文朖�脩拳)</span>
+                                                                        <span className="text-[11px] text-[var(--text-secondary)] font-medium">門檻 (尾數多於此即進箱)</span>
                                                                         <input
                                                                             type="number"
                                                                             className="input-field text-xs p-2 text-center font-mono"
-                                                                            placeholder="靘页�5"
+                                                                            placeholder="例：5"
                                                                             value={product.roundThreshold === '' || product.roundThreshold === undefined || product.roundThreshold === null ? '' : product.roundThreshold}
                                                                             onChange={(e) => handleFieldChange(product.id, 'roundThreshold', e.target.value !== '' ? Number(e.target.value) : '')}
                                                                             onBlur={(e) => handleSaveProduct(product.id, { roundThreshold: e.target.value !== '' ? Number(e.target.value) : null })}
                                                                         />
                                                                     </div>
                                                                     <div className="flex flex-col gap-1">
-                                                                        <span className="text-[11px] text-[var(--text-secondary)] font-medium">��憭批遣霅圈� (0�箇��𣂼�)</span>
+                                                                        <span className="text-[11px] text-[var(--text-secondary)] font-medium">最大建議量 (0為無限制)</span>
                                                                         <input
                                                                             type="number"
                                                                             className="input-field text-xs p-2 text-center font-mono"
-                                                                            placeholder="��"
+                                                                            placeholder="無"
                                                                             value={product.maxSuggestion === '' || product.maxSuggestion === undefined || product.maxSuggestion === null || product.maxSuggestion === 0 ? '' : product.maxSuggestion}
                                                                             onChange={(e) => handleFieldChange(product.id, 'maxSuggestion', e.target.value !== '' ? Number(e.target.value) : '')}
                                                                             onBlur={(e) => handleSaveProduct(product.id, { maxSuggestion: e.target.value !== '' ? Number(e.target.value) : 0 })}
@@ -1507,10 +1510,10 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 </div>
                                                             </div>
 
-                                                            {/* �箸��䁅疏�穃� */}
+                                                            {/* 智慧領貨抑制 */}
                                                             <div className="flex flex-col gap-2 md:pl-4 md:border-l border-[var(--border-primary)]/50">
                                                                 <div className="flex justify-between items-center">
-                                                                    <span className="text-xs font-bold text-[var(--text-primary)]">�� �箸���疏�穃�</span>
+                                                                    <span className="text-xs font-bold text-[var(--text-primary)]">🧠 智慧散貨抑制</span>
                                                                     <label className="relative inline-flex items-center cursor-pointer">
                                                                         <input
                                                                             type="checkbox"
@@ -1525,7 +1528,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                     </label>
                                                                 </div>
                                                                 <p className="text-[11px] text-[var(--text-secondary)] font-medium leading-relaxed mt-1">
-                                                                    �毺鍂敺䕘��仿�隡圈�瘙��雿𠬍�AI ��䌊�訫��䁅疏�𤩺飛�塚��踹��箄��芰��睃��𤩺袇鞎具��
+                                                                    啟用後，若預估需求過低，AI 會自動將領貨量歸零，避免出車只為領少量散貨。
                                                                 </p>
                                                             </div>
                                                         </div>
@@ -1541,15 +1544,15 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 )}
             </div>
 
-            {/* �� �Ｙ�������撠�惇銝见鱓��� Modal */}
+            {/* 🔗 產生指定商品專屬下單連結 Modal */}
             {showLinkModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
                     <div className="bg-[var(--bg-secondary)] w-full max-w-2xl rounded-3xl p-5 md:p-6 shadow-2xl border border-[var(--border-primary)] flex flex-col gap-4 animate-in zoom-in-95 duration-200 max-h-[90vh]">
-                        {/* 璅䠷� */}
+                        {/* 標頭 */}
                         <div className="flex items-center justify-between pb-3 border-b border-[var(--border-primary)]">
                             <h3 className="text-base font-extrabold text-[var(--text-primary)] flex items-center gap-2">
                                 <Link2 size={18} className="text-blue-600" />
-                                �Ｙ�������撠�惇銝见鱓���
+                                產生指定商品專屬下單連結
                             </h3>
                             <button
                                 onClick={() => setShowLinkModal(false)}
@@ -1560,20 +1563,20 @@ export default function ProductManagementPage({ user, apiUrl }) {
                         </div>
 
                         <div className="overflow-y-auto space-y-4 pr-1 max-h-[58vh]">
-                            {/* ��������惜 (�暸� 2 ��誑銝𦠜�憿舐內) */}
+                            {/* 商品切換頁籤 (勾選 2 項以上時顯示) */}
                             {selectedProductIds.size > 1 && (
                                 <div className="flex flex-col gap-2 p-2.5 rounded-2xl bg-[var(--bg-tertiary)]/30 border border-[var(--border-primary)]">
                                     <div className="flex items-center justify-between">
                                         <span className="text-[11px] font-extrabold text-[var(--text-secondary)] flex items-center gap-1.5">
-                                            <span>�㴓 ��������䌊閮剖� ({selectedProductIds.size} ��)</span>
+                                            <span>🎯 切換商品各自設定 ({selectedProductIds.size} 項)</span>
                                         </span>
                                         <button
                                             type="button"
                                             onClick={handleApplyConfigToAll}
                                             className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 flex items-center gap-1 cursor-pointer bg-indigo-500/10 hover:bg-indigo-500/15 px-2.5 py-1 rounded-xl border border-indigo-500/20 transition-all active:scale-95"
-                                            title="撠�𤌍�滚����瘣餃�蝮賡��粹�����曄冗�����憿滚��刻秐���匧㗲�詨���"
+                                            title="將目前商品的活動總釋出量、開放社區與配額套用至所有勾選商品"
                                         >
-                                            <span>�� �峕郊甇方身摰朞秐�嗡����</span>
+                                            <span>📋 同步此設定至其他商品</span>
                                         </button>
                                     </div>
                                     <div className="flex items-center gap-2 overflow-x-auto pb-1">
@@ -1609,8 +1612,8 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                     <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${
                                                         isCurrent ? 'bg-white/20 text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'
                                                     }`}>
-                                                        {commCount > 0 ? `${commCount}��` : '�券�'}
-                                                        {quotaCount > 0 ? `繚${quotaCount}�漤�` : ''}
+                                                        {commCount > 0 ? `${commCount}區` : '全開'}
+                                                        {quotaCount > 0 ? `·${quotaCount}配額` : ''}
                                                     </span>
                                                 </button>
                                             );
@@ -1619,12 +1622,12 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                 </div>
                             )}
 
-                            {/* 1. �嗅������暑�閧蜇�见枂�讛��箸𧋦鞈�� */}
+                            {/* 1. 當前商品的活動總釋出量與基本資訊 */}
                             {activeModalProduct && (
                                 <div className="flex flex-col gap-2">
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs font-extrabold text-[var(--text-primary)] flex items-center gap-1.5">
-                                            <span>�𣑐 閮剖����嚗�</span>
+                                            <span>📦 設定商品：</span>
                                             <span className="text-blue-600 dark:text-blue-400 underline underline-offset-2">{activeModalProduct.name}</span>
                                         </span>
                                     </div>
@@ -1641,10 +1644,10 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                             <div className="min-w-0 flex-1">
                                                 <div className="font-bold text-[var(--text-primary)] truncate text-sm">{activeModalProduct.name}</div>
                                                 <div className="text-[11px] text-[var(--text-tertiary)] flex items-center gap-2 mt-0.5">
-                                                    <span>�暹�摨怠�嚗㝯stockMap[activeModalProduct.name] ?? 0}</span>
+                                                    <span>現有庫存：{stockMap[activeModalProduct.name] ?? 0}</span>
                                                     {activeModalProduct.maxTotalQty !== null && activeModalProduct.maxTotalQty !== undefined && (
                                                         <span className="text-purple-600 dark:text-purple-400 font-bold">
-                                                            �桀�撌脣睸 {activeModalProduct.soldQty || 0} / 銝𢠃� {activeModalProduct.maxTotalQty}
+                                                            目前已售 {activeModalProduct.soldQty || 0} / 上限 {activeModalProduct.maxTotalQty}
                                                         </span>
                                                     )}
                                                 </div>
@@ -1652,13 +1655,13 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                         </div>
 
                                         <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 bg-[var(--bg-secondary)] px-3 py-1.5 rounded-xl border border-[var(--border-primary)]">
-                                            <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300">�� 瘣餃�蝮賡��粹�嚗�</span>
+                                            <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300">🔒 活動總釋出量：</span>
                                             <div className="flex items-center gap-1">
                                                 <input
                                                     type="number"
                                                     min="1"
                                                     max="9999"
-                                                    placeholder="銝漤�"
+                                                    placeholder="不限"
                                                     value={activeModalConfig.maxTotalQty ?? ''}
                                                     onChange={(e) => {
                                                         const val = e.target.value;
@@ -1666,14 +1669,14 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                     }}
                                                     className="w-16 px-1.5 py-0.5 text-center font-bold text-xs rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] focus:outline-none focus:border-purple-500 font-mono"
                                                 />
-                                                <span className="text-[10px] text-[var(--text-tertiary)]">隞�</span>
+                                                <span className="text-[10px] text-[var(--text-tertiary)]">件</span>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             )}
 
-                            {/* 2. �𧢲𦆮蝷曉�嚗�𧊋�豢�隞�”�典��𧢲𦆮嚗�㗲�詻�𣬚�銝𠹺��柴�滢誨銵券��暹��㕑��踹���袇摰ｇ� - �舀𤣰�� */}
+                            {/* 2. 開放社區（未選擇代表全區開放，勾選「線上下單」代表開放所有行政區與散客） - 可收合 */}
                             <div className="rounded-2xl bg-[var(--bg-tertiary)]/40 border border-[var(--border-primary)] overflow-hidden transition-all">
                                 <div 
                                     className="flex justify-between items-center p-3.5 cursor-pointer hover:bg-[var(--bg-tertiary)]/60 select-none transition-colors"
@@ -1681,12 +1684,12 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                 >
                                     <div className="flex items-center gap-2 min-w-0">
                                         <span className="text-[11px] uppercase font-extrabold text-purple-600 dark:text-purple-400 tracking-wider truncate">
-                                            �� �𧢲𦆮蝷曉�嚗�𧊋�豢�隞�”�典��𧢲𦆮嚗�㗲�詻�𣬚�銝𠹺��柴�滢誨銵券��暹��㕑��踹���袇摰ｇ�
+                                            🏠 開放社區（未選擇代表全區開放，勾選「線上下單」代表開放所有行政區與散客）
                                         </span>
                                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold shrink-0">
                                             {activeSelectedCommCount > 0
-                                                ? `撌脤� ${activeSelectedCommCount} 蝷曉�`
-                                                : '�典��𧢲𦆮 (�鞱身)'}
+                                                ? `已選 ${activeSelectedCommCount} 社區`
+                                                : '全區開放 (預設)'}
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0">
@@ -1699,7 +1702,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                     updateActiveProductConfig('allowedCommunityIds', []);
                                                 }}
                                             >
-                                                皜�膄�券�
+                                                清除全部
                                             </button>
                                         )}
                                         {isAllowedCommOpen ? (
@@ -1717,7 +1720,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                 const cid = c.communityId || c.CommunityId;
                                                 const cname = c.communityName || c.CommunityName;
                                                 const checked = (activeModalConfig.allowedCommunityIds || []).includes(cid) || (activeModalConfig.allowedCommunityIds || []).includes(cname);
-                                                const isOnlineAll = cname === '蝺帋�銝见鱓';
+                                                const isOnlineAll = cname === '線上下單';
                                                 return (
                                                     <label
                                                         key={cid || cname}
@@ -1744,7 +1747,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                             className="w-3.5 h-3.5 accent-purple-500 cursor-pointer"
                                                         />
                                                         <span className={`text-xs font-bold ${isOnlineAll ? 'text-purple-600 dark:text-purple-400 font-extrabold' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'} truncate`}>
-                                                            {isOnlineAll ? '�� 蝺帋�銝见鱓 (�芸���鉄���㕑��踹���袇摰�)' : cname}
+                                                            {isOnlineAll ? '🛒 線上下單 (自動包含所有行政區與散客)' : cname}
                                                         </span>
                                                     </label>
                                                 );
@@ -1754,7 +1757,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                 )}
                             </div>
 
-                            {/* 3. 蝷曉��典振�嗉頃�漤� (�芸‵撖思誨銵其�閮凋���) - �舀𤣰�� */}
+                            {/* 3. 社區獨家搶購配額 (未填寫代表不設上限) - 可收合 */}
                             <div className="rounded-2xl bg-gradient-to-r from-amber-500/5 via-purple-500/5 to-amber-500/5 border border-amber-400/30 overflow-hidden transition-all">
                                 <div 
                                     className="flex justify-between items-center p-3.5 cursor-pointer hover:bg-amber-500/10 select-none transition-colors"
@@ -1762,12 +1765,12 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                 >
                                     <div className="flex items-center gap-2 min-w-0">
                                         <span className="text-xs uppercase font-extrabold text-amber-600 dark:text-amber-400 tracking-wider flex items-center gap-1.5 truncate">
-                                            �𤣳 蝷曉��典振�嗉頃�漤� (�芸‵撖思誨銵其�閮凋���)
+                                            🔥 社區獨家搶購配額 (未填寫代表不設上限)
                                         </span>
                                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold shrink-0">
                                             {Object.keys(activeModalConfig.communityQuotas || {}).length > 0
-                                                ? `撌脰身 ${Object.keys(activeModalConfig.communityQuotas).length} 蝷曉��漤�`
-                                                : '銝滩身�� (�鞱身)'}
+                                                ? `已設 ${Object.keys(activeModalConfig.communityQuotas).length} 社區配額`
+                                                : '不設限 (預設)'}
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0">
@@ -1780,7 +1783,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                     updateActiveProductConfig('communityQuotas', {});
                                                 }}
                                             >
-                                                皜�膄���厩冗���漤�
+                                                清除所有社區配額
                                             </button>
                                         )}
                                         {isCommQuotaOpen ? (
@@ -1807,7 +1810,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                             <input
                                                                 type="number"
                                                                 min="1"
-                                                                placeholder="�⊿���"
+                                                                placeholder="無限制"
                                                                 className="input-field text-xs p-1.5 w-full font-mono"
                                                                 value={maxQtyVal}
                                                                 onChange={(e) => {
@@ -1822,7 +1825,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                     updateActiveProductConfig('communityQuotas', next);
                                                                 }}
                                                             />
-                                                            <span className="text-[10px] text-[var(--text-tertiary)] shrink-0">隞�</span>
+                                                            <span className="text-[10px] text-[var(--text-tertiary)] shrink-0">件</span>
                                                         </div>
                                                     </div>
                                                 );
@@ -1832,15 +1835,15 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                 )}
                             </div>
 
-                            {/* 4. ���憭扳�/蝷曉� (�詨‵嚗�葆�仿���蝬脣���彍) */}
+                            {/* 4. 指定大樓/社區 (選填，帶入連結網址參數) */}
                             <div className="flex items-center gap-2 pt-1">
-                                <span className="text-xs font-bold text-[var(--text-secondary)] whitespace-nowrap">蝬��撠�惇���憭扳�嚗�</span>
+                                <span className="text-xs font-bold text-[var(--text-secondary)] whitespace-nowrap">綁定專屬連結大樓：</span>
                                 <select
                                     value={linkSelectedBuilding}
                                     onChange={(e) => setLinkSelectedBuilding(e.target.value)}
                                     className="flex-1 py-1.5 px-3 text-xs rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500 cursor-pointer"
                                 >
-                                    <option value="">銝��祉�銝𦠜袇摰� (�鞱身)</option>
+                                    <option value="">一般線上散客 (預設)</option>
                                     {visibleCommunities.map(c => {
                                         const cname = c.communityName || c.CommunityName;
                                         return (
@@ -1853,7 +1856,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                             </div>
                         </div>
 
-                        {/* ����鞱汗���雿𨀣��� */}
+                        {/* 連結預覽與操作按鈕 */}
                         <div className="pt-2 flex flex-col gap-2.5 border-t border-[var(--border-primary)]">
                             <input
                                 type="text"
@@ -1872,17 +1875,17 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                     {isSavingLinkQuota ? (
                                         <>
                                             <RefreshCw size={16} className="animate-spin" />
-                                            <span>�脣��漤���身摰帋葉...</span>
+                                            <span>儲存配額與設定中...</span>
                                         </>
                                     ) : linkCopied ? (
                                         <>
                                             <Check size={16} className="text-emerald-300" />
-                                            <span>�� 撌脣�摮䁅身摰帋蒂銴�ˊ撠�惇���嚗�</span>
+                                            <span>✅ 已儲存設定並複製專屬連結！</span>
                                         </>
                                     ) : (
                                         <>
                                             <Copy size={16} />
-                                            <span>�脣�閮剖�銝西�鋆賢�撅祇���</span>
+                                            <span>儲存設定並複製專屬連結</span>
                                         </>
                                     )}
                                 </button>
@@ -1891,7 +1894,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                     onClick={() => setShowLinkModal(false)}
                                     className="py-2.5 px-4 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-bold cursor-pointer"
                                 >
-                                    �𣈯�
+                                    關閉
                                 </button>
                             </div>
                         </div>
@@ -1899,7 +1902,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 </div>
             )}
 
-            {/* �𩤃� �������擧��鞱郎��朖����� Modal 敶�� (擃睃�瘥娍�鈭桐蜓憿� + 皜�膄�交��蠘�) */}
+            {/* ⚠️ 商品效期過期預警與即時下架 Modal 彈窗 (高對比明亮主題 + 清除日期功能) */}
             {showExpiryModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
                     <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full border border-slate-200 overflow-hidden flex flex-col max-h-[85vh]">
@@ -1911,13 +1914,13 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                 </div>
                                 <div>
                                     <h3 className="text-lg font-black tracking-wide flex items-center gap-2">
-                                        �������鞱郎�𡁶䰻
+                                        商品效期預警通知
                                         <span className="text-xs bg-white text-rose-600 px-2.5 py-0.5 rounded-full font-black shadow-2xs">
-                                            {expiringProducts.length} ����� 7 憭�
+                                            {expiringProducts.length} 項低於 7 天
                                         </span>
                                     </h3>
                                     <p className="text-xs text-rose-100 font-medium mt-0.5">
-                                        隞乩�����喳��唳��硋歇�擧�嚗諹��𦠜�閰蓥摯靽�啹���蝛箸𠯫������蝬脰頃銝𧢲沲��
+                                        以下商品即將到期或已過期，請及時評估促銷、清空日期或切換網購下架。
                                     </p>
                                 </div>
                             </div>
@@ -1957,8 +1960,8 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-3 text-xs text-slate-500 font-medium mt-1">
-                                                    <span>�桀�: <strong className="text-slate-800">${product.price || product.single_price || 0}</strong></span>
-                                                    <span>�嗅�摨怠�: <strong className="text-slate-800">{currentStock}</strong></span>
+                                                    <span>售價: <strong className="text-slate-800">${product.price || product.single_price || 0}</strong></span>
+                                                    <span>當前庫存: <strong className="text-slate-800">{currentStock}</strong></span>
                                                 </div>
                                             </div>
                                         </div>
@@ -1973,11 +1976,11 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                         ? 'bg-rose-100 text-rose-700 border-rose-300'
                                                         : 'bg-amber-100 text-amber-800 border-amber-300'
                                                 }`}>
-                                                    {daysLeft < 0 ? `撌脤��� ${Math.abs(daysLeft)} 憭奈 : daysLeft === 0 ? '隞𦠜𠯫�唳�' : `�� ${daysLeft} 憭拙��鬮}
+                                                    {daysLeft < 0 ? `已過期 ${Math.abs(daysLeft)} 天` : daysLeft === 0 ? '今日到期' : `剩 ${daysLeft} 天到期`}
                                                 </span>
                                             </div>
 
-                                            {/* 皜�膄�交��厰� */}
+                                            {/* 清除日期按鈕 */}
                                             <button
                                                 type="button"
                                                 onClick={() => {
@@ -1985,10 +1988,10 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                     handleSaveProduct(product.id, { expiryDate: '' });
                                                 }}
                                                 className="px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:text-rose-600 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-xl transition-all cursor-pointer flex items-center gap-1 shrink-0 shadow-2xs group"
-                                                title="皜�膄甇文�����㗇��交�"
+                                                title="清除此商品的有效日期"
                                             >
                                                 <Trash2 size={13} className="text-slate-400 group-hover:text-rose-500" />
-                                                皜�膄�交�
+                                                清除日期
                                             </button>
 
                                             {/* Off Shelf Toggle */}
@@ -2007,7 +2010,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                     <div className="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
                                                 </label>
                                                 <span className={`text-xs font-bold ${product.isActive ? 'text-emerald-600' : 'text-slate-400'}`}>
-                                                    {product.isActive ? '�� 蝬脰頃銝𦠜沲' : '�麱 撌脖���'}
+                                                    {product.isActive ? '🌐 網購上架' : '🚫 已下架'}
                                                 </span>
                                             </div>
                                         </div>
@@ -2025,14 +2028,14 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                     onChange={(e) => setDontRemindToday(e.target.checked)}
                                     className="w-4 h-4 rounded-md border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
                                 />
-                                �� �嗆𠯫銝滚��鞾�
+                                📅 當日不再提醒
                             </label>
                             <button
                                 type="button"
                                 onClick={handleCloseExpiryModal}
                                 className="w-full sm:w-auto px-6 py-2 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer"
                             >
-                                �𤑳䰻�㮖� / �𣈯��𡁶䰻
+                                我知道了 / 關閉通知
                             </button>
                         </div>
                     </div>
