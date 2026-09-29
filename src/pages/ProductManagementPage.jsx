@@ -692,13 +692,14 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                         </div>
                                          {/* 名稱與ID */}
                                         <div className="min-w-0 flex-1">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <div className="font-extrabold text-base md:text-lg text-[var(--text-primary)] truncate">
+                                             {/* 名稱 + 按鈕群（手機可換行） */}
+                                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                                                <div className="font-extrabold text-base md:text-lg text-[var(--text-primary)] break-words min-w-0 flex-1 leading-tight">
                                                     {product.name}
                                                 </div>
                                                 
                                                 {/* 上架與停售開關 */}
-                                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                <div className="flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                                                     {/* 停售狀態按鈕 */}
                                                     <button
                                                         type="button"
@@ -713,19 +714,19 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 handleSaveProduct(product.id, { isDiscontinued: false });
                                                             }
                                                         }}
-                                                        className={`px-2 py-0.5 rounded-lg border text-[11px] font-bold transition-all flex items-center gap-1 ${
+                                                        className={`px-1.5 py-0.5 rounded-lg border text-[10px] font-bold transition-all flex items-center gap-0.5 whitespace-nowrap ${
                                                             product.isDiscontinued
                                                                 ? 'bg-rose-500/10 text-rose-600 border-rose-200 dark:border-rose-800'
                                                                 : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-amber-300'
                                                         }`}
                                                     >
-                                                        {product.isDiscontinued ? '🚫 已標記停售' : '🚫 標記停售'}
+                                                        {product.isDiscontinued ? '🚫 已停售' : '🚫 停售'}
                                                     </button>
 
                                                     {/* 網購上架開關 */}
-                                                    <div className="flex items-center gap-1.5 bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-lg border border-[var(--border-primary)] shadow-2xs">
-                                                        <span className={`text-[11px] font-bold whitespace-nowrap ${product.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
-                                                            {product.isActive ? '🌐 網購上架' : '❌ 網購下架'}
+                                                    <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded-lg border border-[var(--border-primary)] shadow-2xs">
+                                                        <span className={`text-[10px] font-bold whitespace-nowrap ${product.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                                                            {product.isActive ? '🌐 上架' : '❌ 下架'}
                                                         </span>
                                                         <label className="relative inline-flex items-center cursor-pointer">
                                                             <input
@@ -760,24 +761,24 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                         className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-md transition-all"
                                                         title="刪除 / 停售隱藏"
                                                     >
-                                                        <Trash2 size={15} />
+                                                        <Trash2 size={14} />
                                                     </button>
                                                 </div>
                                             </div>
-                                            <div className="text-[11px] text-[var(--text-tertiary)] font-mono mt-0.5 flex items-center gap-1.5">
+                                            <div className="text-[11px] text-[var(--text-tertiary)] font-mono mt-1 flex items-center gap-1.5">
                                                 <span className="bg-[var(--bg-tertiary)] px-1.5 py-0.2 rounded border border-[var(--border-primary)] text-[10px]">ID</span> 
-                                                <span className="truncate max-w-[120px] md:max-w-none">{product.id}</span>
+                                                <span className="truncate max-w-[140px] md:max-w-none">{product.id}</span>
                                             </div>
-                                            <div className="text-xs font-bold text-blue-600 mt-1 flex flex-wrap items-center gap-2 md:gap-3">
-                                                <span>銷售原價：<span className="font-mono text-sm text-[var(--text-primary)] font-bold">${product.single_price || '-'}</span></span>
-                                                <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700 hidden sm:inline" />
-                                                <span>庫存成本(進價)：<span className="font-mono text-sm text-amber-600">${product.price || '-'}</span></span>
-                                                <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700 hidden sm:inline" />
-                                                <span>當前庫存：<span className={`font-mono text-sm ${ (stockMap[product.name] || 0) > 0 ? 'text-emerald-600 font-extrabold' : 'text-slate-400' }`}>{stockMap[product.name] || 0}</span></span>
-                                                
-                                                {/* 📅 有效日期 + 儲存狀態 */}
-                                                <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700 hidden sm:inline" />
-                                                <span className="inline-flex flex-wrap items-center gap-1.5 text-[var(--text-secondary)] font-medium max-w-full" onClick={(e) => e.stopPropagation()}>
+                                            {/* 價格、庫存、有效日期、儲存狀態（手機版換行清晰顯示） */}
+                                            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold">
+                                                <span className="text-blue-600">銷售：<span className="font-mono text-[var(--text-primary)]">${product.single_price || '-'}</span></span>
+                                                <span className="text-amber-600">進價：<span className="font-mono">${product.price || '-'}</span></span>
+                                                <span className="text-[var(--text-secondary)]">庫存：<span className={`font-mono ${ (stockMap[product.name] || 0) > 0 ? 'text-emerald-600 font-extrabold' : 'text-slate-400' }`}>{stockMap[product.name] || 0}</span></span>
+                                                {product.maxTotalQty !== null && product.maxTotalQty !== undefined && (
+                                                    <span className="text-purple-600 dark:text-purple-400 font-extrabold">限額：<span className="font-mono">{product.soldQty || 0}/{product.maxTotalQty}</span></span>
+                                                )}
+                                                {/* 有效日期 */}
+                                                <span className="inline-flex flex-wrap items-center gap-1 text-[var(--text-secondary)] font-medium" onClick={(e) => e.stopPropagation()}>
                                                     <span className="whitespace-nowrap shrink-0">有效日期：</span>
                                                     <input
                                                         type="date"
@@ -797,13 +798,9 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                 handleSaveProduct(product.id, { expiryDate: '' });
                                                             }}
                                                             className="text-[10px] text-rose-500 hover:text-rose-700 font-bold px-1 rounded hover:bg-rose-50 cursor-pointer whitespace-nowrap shrink-0"
-                                                            title="清除日期 (設為無日期)"
-                                                        >
-                                                            ✕ 清除
-                                                        </button>
+                                                            title="清除日期"
+                                                        >✕</button>
                                                     )}
-
-                                                    {/* 自動儲存狀態 */}
                                                     {status === 'saving' && (
                                                         <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-bold text-[10px] bg-blue-500/10 px-2 py-0.5 rounded-full">
                                                             <RefreshCw size={10} className="animate-spin" /> 儲存中
@@ -820,13 +817,6 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                         </span>
                                                     )}
                                                 </span>
-
-                                                {product.maxTotalQty !== null && product.maxTotalQty !== undefined && (
-                                                    <>
-                                                        <span className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700 hidden sm:inline" />
-                                                        <span className="text-purple-600 dark:text-purple-400 font-extrabold">活動限額：<span className="font-mono text-sm">{product.soldQty || 0} / {product.maxTotalQty}</span> (剩餘 {Math.max(0, Number(product.maxTotalQty) - Number(product.soldQty || 0))})</span>
-                                                    </>
-                                                )}
                                             </div>
                                         </div>
                                     </div>
