@@ -5,6 +5,10 @@ import { deductInventory } from './sales.service.js';
 import { calculateItemSubtotal } from './pricing.service.js';
 import { NotificationService } from './notification.service.js';
 import { WebPushService } from './webpush.service.js';
+import NodeCache from 'node-cache';
+
+// ── LIFF 商城快取（降低 Supabase egress）──
+export const liffCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
 
 function generateOrderId(): string {
   const now = new Date();
@@ -1012,15 +1016,22 @@ export const GroupBuyService = {
               orderingMode: 'OPEN'
             }
           });
+          // 新建社區 → 清除社區快取
+          liffCache.del('liff:communities');
         }
       }
     }
 
-    // 找社區：優先 communityId 精確匹配(c參數)，其次 communityName 匹配(building參數)，最後 fallback 第一筆 ACTIVE
-    const communities = await prisma.groupBuyCommunity.findMany({
-      where: { status: 'ACTIVE' }
-    });
+    // ── 快取 1：社區清單（10 分鐘）──
+    let communities = liffCache.get<any[]>('liff:communities');
+    if (!communities) {
+      communities = await prisma.groupBuyCommunity.findMany({
+        where: { status: 'ACTIVE' }
+      });
+      liffCache.set('liff:communities', communities, 600);
+    }
 
+    // 找社區：優先 communityId 精確匹配(c參數)，其次 communityName 匹配(building參數)，最後 fallback 第一筆 ACTIVE
     let targetComm: any = null;
     if (commCode) {
       targetComm = communities.find((c: any) => c.communityId === commCode);
@@ -1055,11 +1066,16 @@ export const GroupBuyService = {
 
     const now = new Date();
 
-    // 找活躍檔期
-    const campaigns = await prisma.groupBuyCampaign.findMany({
-      where: { communityId: targetComm.communityId },
-      orderBy: { createdAt: 'desc' }
-    });
+    // ── 快取 2：活躍檔期（2 分鐘，per community）──
+    const campaignKey = `liff:campaigns:${targetComm.communityId}`;
+    let campaigns = liffCache.get<any[]>(campaignKey);
+    if (!campaigns) {
+      campaigns = await prisma.groupBuyCampaign.findMany({
+        where: { communityId: targetComm.communityId },
+        orderBy: { createdAt: 'desc' }
+      });
+      liffCache.set(campaignKey, campaigns, 120);
+    }
 
     let activeCampaign: any = campaigns.find((c: any) => c.campaignStatus === 'OPEN') || null;
     let nextCampaign: any = null;
@@ -1070,14 +1086,26 @@ export const GroupBuyService = {
       if (upcoming.length > 0) nextCampaign = upcoming[0];
     }
 
-    // 商品列表
-    const rawProducts = await ProductService.getProducts({});
-    const customPrices = await prisma.communityProductPrice.findMany({
-      where: { communityId: targetComm.communityId },
-      include: { promotion: true }
-    });
+    // ── 快取 3：商品清單（5 分鐘，最大流量節省）──
+    let rawProducts = liffCache.get<any[]>('liff:products');
+    if (!rawProducts) {
+      rawProducts = await ProductService.getProducts({});
+      liffCache.set('liff:products', rawProducts);
+    }
+
+    // ── 快取 4：社區自訂價格（5 分鐘，per community）──
+    const cpKey = `liff:customprice:${targetComm.communityId}`;
+    let customPrices = liffCache.get<any[]>(cpKey);
+    if (!customPrices) {
+      customPrices = await prisma.communityProductPrice.findMany({
+        where: { communityId: targetComm.communityId },
+        include: { promotion: true }
+      });
+      liffCache.set(cpKey, customPrices);
+    }
+
     const customPriceMap = new Map(customPrices.map((cp: any) => [
-      cp.productId, 
+      cp.productId,
       {
         customPrice: Number(cp.customPrice),
         promotions: Array.isArray(cp.promotions) ? cp.promotions : (cp.promotions ? cp.promotions : []),
@@ -1114,21 +1142,30 @@ export const GroupBuyService = {
       ShippingFee: Number(targetComm.shippingFee) || 0,
     };
 
-    // 取得大樓時段設定
-    const bSettings = await prisma.buildingSetting.findMany({
-      orderBy: [
-        { sortOrder: 'asc' },
-        { building: 'asc' }
-      ]
-    });
+    // ── 快取 5：大樓時段設定（10 分鐘）──
+    let bSettings = liffCache.get<any[]>('liff:buildings');
+    if (!bSettings) {
+      bSettings = await prisma.buildingSetting.findMany({
+        orderBy: [
+          { sortOrder: 'asc' },
+          { building: 'asc' }
+        ]
+      });
+      liffCache.set('liff:buildings', bSettings, 600);
+    }
     const buildingSettings = bSettings.map((s: any) => ({
       building: s.building,
       start_time: s.startTime || '',
       end_time: s.endTime || ''
     }));
 
-    // 取得群組綁定對照表
-    const gBindings = await prisma.groupBinding.findMany({ where: { storeCode: payload.storeCode } });
+    // ── 快取 6：群組綁定（10 分鐘）──
+    const bindingsKey = `liff:groupbindings:${payload.storeCode}`;
+    let gBindings = liffCache.get<any[]>(bindingsKey);
+    if (!gBindings) {
+      gBindings = await prisma.groupBinding.findMany({ where: { storeCode: payload.storeCode } });
+      liffCache.set(bindingsKey, gBindings, 600);
+    }
     const groupBindings: Record<string, string> = {};
     gBindings.forEach((b: any) => {
       groupBindings[b.groupId] = b.groupName;

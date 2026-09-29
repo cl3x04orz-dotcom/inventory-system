@@ -1,4 +1,5 @@
 import { prisma } from '../database/context.js';
+import { liffCache } from './groupbuy.service.js';
 
 function formatExpiryDate(val: string | null | undefined): string {
   if (!val) return '';
@@ -178,6 +179,8 @@ export const ProductService = {
       WHERE p."productId" = temp.id AND p."storeCode" = '${String(payload.storeCode).replace(/'/g, "''")}'
     `);
 
+    // 清除商品快取
+    liffCache.del('liff:products');
     return { success: true, updateCount: productIds.length };
   },
 
@@ -303,6 +306,8 @@ export const ProductService = {
       }
     }
 
+    // 清除商品快取（自訂價格也一並清，因為價格可能變動）
+    liffCache.del('liff:products');
     return { success: true };
   },
 
@@ -318,6 +323,8 @@ export const ProductService = {
       data: { isPurchasable: Boolean(isPurchasable) }
     });
 
+    // 清除商品快取
+    liffCache.del('liff:products');
     return { success: true };
   }
 };
