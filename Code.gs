@@ -427,6 +427,7 @@ function apiHandler(request) {
             // Sales & Analytics
             case 'saveSales': return typeof saveSalesService !== 'undefined' ? saveSalesService(payload, user) : {error: 'Service missing'}; 
             case 'getSalesHistory': return typeof getSalesHistory !== 'undefined' ? getSalesHistory(payload) : {error: 'Service missing'}; 
+            case 'updateSaleDate': return typeof updateSaleDateService !== 'undefined' ? updateSaleDateService(payload, user) : {error: 'Service missing'}; 
             case 'getReportDataBatch':
                 {
                     const safeCall = (fn, arg1, arg2) => {

@@ -456,3 +456,21 @@ function getSalesByDateRange(payload) {
   
   return results.sort((a, b) => new Date(b.date) - new Date(a.date));
 }
+
+function updateSaleDateService(payload, user) {
+  const { saleId, newDate } = payload;
+  if (!saleId || !newDate) return { error: '缺少必要參數' };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Sales');
+  if (!sheet) return { error: '找不到 Sales 表格' };
+  const values = sheet.getDataRange().getValues();
+  const targetId = String(saleId).trim();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0] || '').trim() === targetId) {
+      sheet.getRange(i + 1, 2).setValue(new Date(newDate));
+      return { success: true, saleId, newDate };
+    }
+  }
+  return { error: '未找到銷貨單據' };
+}
+

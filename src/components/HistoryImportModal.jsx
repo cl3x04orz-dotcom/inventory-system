@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ListOrdered, Download, Clock, CreditCard, Package, X, RotateCcw, CheckCircle2, Calendar } from 'lucide-react';
+import { ListOrdered, Download, Clock, CreditCard, Package, X, RotateCcw, CheckCircle2, Calendar, Pencil } from 'lucide-react';
 import { safeLocalStorage } from '../utils/storage';
+import EditSaleDateModal from './EditSaleDateModal';
 
 const RETAIL_NAMES = ['門市散客', '散客', '零售散客', '一般散客', 'POS散客', '一般顧客', 'null', 'undefined', ''];
 
@@ -17,9 +18,13 @@ export default function HistoryImportModal({
     onSearch,
     isLoading,
     defaultCustomer = '', // [New] 預設帶入的客戶名稱
-    systemCustomers = [] // [New] 全系統客戶名單（包含 AI 預測開關等設定）
+    systemCustomers = [], // [New] 全系統客戶名單（包含 AI 預測開關等設定）
+    user = null,
+    apiUrl = '',
+    onUpdateRecordDate = null
 }) {
     const [filterText, setFilterText] = useState('');
+    const [editingSale, setEditingSale] = useState(null);
 
     useEffect(() => {
         if (show) {

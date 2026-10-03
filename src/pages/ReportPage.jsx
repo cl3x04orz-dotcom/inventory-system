@@ -1,7 +1,8 @@
 import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 import React, { useState, useCallback } from 'react';
-import { Search, Calendar, MapPin, User, FileText, TrendingUp, Package, DollarSign, RotateCcw, ChevronDown, ChevronRight } from 'lucide-react';
+import { Search, Calendar, MapPin, User, FileText, TrendingUp, Package, DollarSign, RotateCcw, ChevronDown, ChevronRight, Pencil } from 'lucide-react';
 import { callGAS } from '../utils/api';
+import EditSaleDateModal from '../components/EditSaleDateModal';
 import { getLocalDateString, getFirstDayOfMonthString } from '../utils/constants';
 
 // 格式化數字：四捨五入到小數點第 1 位
@@ -18,7 +19,17 @@ const getDynamicFontSize = (num) => {
     const len = str.length;
     if (len <= 6) return 'text-xs md:text-xl';      // 短數字：正常大小
     if (len <= 9) return 'text-[10px] md:text-lg';  // 中等數字：稍小
-    return 'text-[8px] md:text-base';               // 長數字：很小
+    return 'text-[9px] md:text-base';
+};
+
+// 格式化原日期標籤 (例如: (原 10/01))
+const formatDateFixedFrom = (isoStr) => {
+    if (!isoStr) return '';
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return '';
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return ` (原 ${m}/${day})`;
 };
 
 export default function ReportPage({ user, apiUrl, setPage }) {
@@ -47,6 +58,8 @@ export default function ReportPage({ user, apiUrl, setPage }) {
     const [isSummaryExpanded, setIsSummaryExpanded] = useState(false); // 預設折疊
     const [hasLoadedPivot, setHasLoadedPivot] = useState(false); // [New] 是否已載入對照表資料
     const [loadingPivot, setLoadingPivot] = useState(false); // [New] 是否正在載入對照表資料
+    const [editingSale, setEditingSale] = useState(null); // 管理員修復日期
+    const canEditDate = ['BOSS', 'ADMIN', 'SUPER_ADMIN'].includes(user?.role) || (Array.isArray(user?.permissions) && user.permissions.includes('sales_edit_date'));
     const [visibleCount, setVisibleCount] = useState(50); // [New] 限制單次渲染筆數，避免 DOM 節點過多造成瀏覽器卡死
 
     // 1. Fetch Data from Server (Only on Date Change)
@@ -409,8 +422,13 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                 totalLinePay: 0,
                 collectionNote: item.collectionNote,
                 workHours: item.workHours,
-                weather: item.weather
+                weather: item.weather,
+                dateFixedBy: item.dateFixedBy || '',
+                dateFixedFrom: item.dateFixedFrom || ''
             };
+        } else if (item.dateFixedBy) {
+            acc[key].dateFixedBy = item.dateFixedBy;
+            acc[key].dateFixedFrom = item.dateFixedFrom;
         }
         acc[key].items.push(item);
         const amount = Number(item.totalAmount) || 0;
@@ -1200,6 +1218,16 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                             <div className="text-[10px] md:text-xs font-mono text-[var(--text-tertiary)] flex items-center gap-1.5 flex-wrap">
                                                                 {isExpanded ? <ChevronDown size={14} className="shrink-0" /> : <ChevronRight size={14} className="shrink-0" />}
                                                                 <span className="leading-none whitespace-nowrap">{group.dateDisplay}</span>
+                                                                {canEditDate && group.saleId && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => { e.stopPropagation(); setEditingSale({ saleId: group.saleId, date: group.dateObj, customer: group.location }); }}
+                                                                        className="p-1 rounded text-blue-500 hover:bg-blue-50 hover:text-blue-700 transition-colors shrink-0"
+                                                                        title="修正單據日期"
+                                                                    >
+                                                                        <Pencil size={12} />
+                                                                    </button>
+                                                                )}
                                                                 <span className={`px-1.5 py-0.5 rounded text-[9px] font-black shrink-0 ${group.weather === 'SUNNY' ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'}`}>
                                                                     {group.weather === 'SUNNY' ? '☀️ 晴' : '☔ 雨'}
                                                                 </span>
@@ -1219,6 +1247,11 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                                         <span className="ml-1 text-amber-700 bg-amber-100 px-1 rounded-sm">{group.workHours}h</span>
                                                                     )}
                                                                 </div>
+                                                                {group.dateFixedBy && (
+                                                                    <div className="text-[10px] text-amber-600 font-normal w-full mt-0.5 pl-0.5">
+                                                                        日期修正：{group.dateFixedBy}{formatDateFixedFrom(group.dateFixedFrom)}
+                                                                    </div>
+                                                                )}
                                                                 {group.collectionNote && (
                                                                     <div className="text-[10px] text-amber-600 font-bold w-full mt-0.5">{group.collectionNote}</div>
                                                                 )}
@@ -1347,6 +1380,16 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                         <td className="p-3 text-[var(--text-tertiary)] font-mono text-xs">
                                                             <div className="flex items-center gap-2">
                                                                 {group.dateDisplay}
+                                                                {canEditDate && group.saleId && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => { e.stopPropagation(); setEditingSale({ saleId: group.saleId, date: group.dateObj, customer: group.location }); }}
+                                                                        className="p-1 rounded text-blue-500 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                                                        title="修正單據日期"
+                                                                    >
+                                                                        <Pencil size={13} />
+                                                                    </button>
+                                                                )}
                                                                 <span title={group.weather === 'SUNNY' ? '晴天' : '雨天'} className="text-base cursor-help">
                                                                     {group.weather === 'SUNNY' ? '☀️' : '☔'}
                                                                 </span>
@@ -1370,6 +1413,11 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                                                             </div>
                                                             {group.operator && group.operator !== group.salesRep && (
                                                                 <div className="text-[10px] text-amber-600 font-normal mt-0.5">修正：{group.operator}</div>
+                                                            )}
+                                                            {group.dateFixedBy && (
+                                                                <div className="text-[10px] text-amber-600 font-normal mt-0.5">
+                                                                    日期修正：{group.dateFixedBy}{formatDateFixedFrom(group.dateFixedFrom)}
+                                                                </div>
                                                             )}
                                                         </td>
                                                         <td className="p-3 text-xs text-[var(--text-tertiary)]">
@@ -1480,6 +1528,21 @@ export default function ReportPage({ user, apiUrl, setPage }) {
                     </div>
                 )}
             </div>
+            <EditSaleDateModal
+                isOpen={!!editingSale}
+                onClose={() => setEditingSale(null)}
+                sale={editingSale}
+                user={user}
+                apiUrl={apiUrl}
+                onSuccess={(updated) => {
+                    setRawSales(prev => prev.map(r => r?.saleId === updated.saleId ? {
+                        ...r,
+                        date: updated.date,
+                        dateFixedBy: updated.dateFixedBy,
+                        dateFixedFrom: updated.dateFixedFrom
+                    } : r));
+                }}
+            />
         </div>
     );
 }

@@ -29,6 +29,80 @@ function snapToDispatchSteps(target: number, steps: number[]): number {
 }
 
 export const SalesService = {
+  // 管理員修復銷貨日期
+  async updateSaleDate(payload: any, user: any = null) {
+    const { saleId, newDate } = payload;
+    if (!saleId || !newDate) {
+      return { success: false, error: '缺少必要參數 saleId 或 newDate' };
+    }
+
+    const isAdmin = user && ['BOSS', 'ADMIN', 'SUPER_ADMIN'].includes(user.role);
+    const hasPerm = user && Array.isArray(user.permissions) && user.permissions.includes('sales_edit_date');
+    if (!isAdmin && !hasPerm) {
+      return { success: false, error: '權限不足：僅限管理員修改銷貨日期' };
+    }
+
+    const parsedDate = new Date(newDate);
+    if (isNaN(parsedDate.getTime())) {
+      return { success: false, error: '無效的日期格式' };
+    }
+
+    const sale = await prisma.sales.findUnique({
+      where: { saleId }
+    });
+
+    if (!sale || (payload.storeCode && sale.storeCode !== payload.storeCode)) {
+      return { success: false, error: '查無該筆銷貨單據' };
+    }
+
+    await prisma.sales.update({
+      where: { saleId },
+      data: { date: parsedDate }
+    });
+
+    // 同步更新關聯的 Expenditure (支出/結算分錄) 時間
+    try {
+      await prisma.expenditure.updateMany({
+        where: { saleId },
+        data: {
+          timestamp: parsedDate,
+          paymentDate: parsedDate
+        }
+      });
+    } catch (expErr) {
+      console.error('[updateSaleDate] expenditure update failed:', expErr);
+    }
+
+    // 稽核紀錄（專用類型，供報表顯示「日期修正：誰」，不進操作紀錄查詢）
+    try {
+      await prisma.activityLog.create({
+        data: {
+          username: user?.displayName || user?.name || user?.username || payload.operator || 'Unknown',
+          actionType: 'SALE_DATE_FIX',
+          page: 'report',
+          details: JSON.stringify({
+            saleId,
+            fromDate: sale.date.toISOString(),
+            toDate: parsedDate.toISOString()
+          }),
+          storeCode: sale.storeCode
+        }
+      });
+    } catch (e) {
+      console.error('[updateSaleDate] activity log failed:', e);
+    }
+
+    const fixedBy = user?.displayName || user?.name || user?.username || payload.operator || 'Unknown';
+
+    return {
+      success: true,
+      saleId,
+      oldDate: sale.date,
+      newDate: parsedDate,
+      dateFixedBy: fixedBy,
+      dateFixedFrom: sale.date.toISOString()
+    };
+  },
   async saveSales(payload: any, user: any) {
     const {
       salesData,
@@ -488,6 +562,24 @@ export const SalesService = {
 
     const list: any[] = await prisma.$queryRawUnsafe(query, ...params);
 
+    // 日期修正紀錄（罕見事件，整店一次抓回，取每張單最後一次）
+    const dateFixMap = new Map<string, { by: string; from: string }>();
+    try {
+      const fixLogs = await prisma.activityLog.findMany({
+        where: { actionType: 'SALE_DATE_FIX', storeCode },
+        orderBy: { timestamp: 'asc' },
+        select: { username: true, details: true }
+      });
+      for (const log of fixLogs) {
+        try {
+          const d = JSON.parse(log.details || '{}');
+          if (d.saleId) dateFixMap.set(d.saleId, { by: log.username, from: d.fromDate || '' });
+        } catch (_) { /* ignore malformed */ }
+      }
+    } catch (e) {
+      console.error('[getSalesHistory] load date fix logs failed:', e);
+    }
+
     return list.map((item: any) => {
       const sDate = new Date(item.date);
       const pDate = item.paymentDate ? new Date(item.paymentDate) : null;
@@ -522,7 +614,9 @@ export const SalesService = {
         collectionNote,
         isCollectionReportMode,
         workHours: item.workHours > 0 ? item.workHours : "",
-        weather: 'SUNNY'
+        weather: 'SUNNY',
+        dateFixedBy: dateFixMap.get(item.saleId)?.by || '',
+        dateFixedFrom: dateFixMap.get(item.saleId)?.from || ''
       };
     });
   },

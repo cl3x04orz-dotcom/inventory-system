@@ -121,6 +121,8 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       return SalesService.getSmartPickSuggestion(payload);
     case 'updateCustomerSettings':
       return SalesService.updateCustomerSettings(payload);
+    case 'updateSaleDate':
+      return SalesService.updateSaleDate(payload, user);
     case 'generatePdf': {
       const gasUrl = process.env.GAS_API_URL;
       if (!gasUrl) {

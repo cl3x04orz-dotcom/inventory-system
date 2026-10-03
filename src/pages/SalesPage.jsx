@@ -1920,6 +1920,15 @@ export default function SalesPage({ user, apiUrl, logActivity }) {
                 onSearch={() => loadHistoryRecords(historyImportStartDate, historyImportEndDate)}
                 isLoading={isHistoryLoading}
                 systemCustomers={systemCustomers}
+                user={user}
+                apiUrl={apiUrl}
+                onUpdateRecordDate={(updatedSale) => {
+                    setHistoryImportRecords(prev => prev.map(r => 
+                        (r.saleId === updatedSale.saleId || r.id === updatedSale.saleId)
+                            ? { ...r, date: updatedSale.date }
+                            : r
+                    ));
+                }}
             />
             {/* Expense Remark Modal */}
             {showVendorModal && (
