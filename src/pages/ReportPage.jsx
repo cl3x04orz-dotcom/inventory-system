@@ -600,7 +600,7 @@ export default function ReportPage({ user, apiUrl, setPage }) {
         }));
     };
 
-    // [新增] 權限與時間檢查：員工只能修改 2 天內的單據
+    // [新增] 權限與時間檢查：員工可於當天及隔天修改單據 (例：10/4 單據，10/4 與 10/5 可改，10/6 起鎖定)
     const canEdit = (group) => {
         if (user.role === 'BOSS' || user.role === 'ADMIN') return true;
         if (!group.items || group.items.length === 0) return false;
@@ -608,11 +608,13 @@ export default function ReportPage({ user, apiUrl, setPage }) {
         const recordDate = new Date(group.items[0].date);
         if (isNaN(recordDate.getTime())) return false;
 
+        const saleDay = new Date(recordDate.getFullYear(), recordDate.getMonth(), recordDate.getDate());
         const now = new Date();
-        const diffMs = now.getTime() - recordDate.getTime();
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-        return diffDays <= 2;
+        const diffDays = Math.floor((today.getTime() - saleDay.getTime()) / (1000 * 60 * 60 * 24));
+
+        return diffDays < 2;
     };
 
     return (

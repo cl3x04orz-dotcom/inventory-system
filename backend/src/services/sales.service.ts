@@ -401,12 +401,16 @@ export const SalesService = {
       if (!sale) throw new Error('找不到該筆銷售紀錄');
       if (sale.status === 'VOID') throw new Error('此單據已經作廢，不可重複操作。');
 
-      // 員工只能在 2 天內作廢
+      // 員工只能在當天與隔天作廢/修改 (例：10/4 單據於 10/4、10/5 可改，10/6 鎖定)
       if (!isAdmin) {
-        const diffMs = new Date().getTime() - new Date(sale.date).getTime();
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
-        if (diffDays > 2) {
-          throw new Error('權限限制：此單據已超過 2 天，員工無法自行修改。請聯繫管理員。');
+        const saleD = new Date(sale.date);
+        const saleDay = new Date(saleD.getFullYear(), saleD.getMonth(), saleD.getDate());
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        const diffDays = Math.floor((today.getTime() - saleDay.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays >= 2) {
+          throw new Error('權限限制：此單據已跨越 2 天以上（隔天之後鎖定），員工無法自行修改。請聯繫管理員。');
         }
       }
 
