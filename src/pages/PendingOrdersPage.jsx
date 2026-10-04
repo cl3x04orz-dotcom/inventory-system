@@ -28,7 +28,7 @@ const parseRemarkToFlavorMap = (remarkStr, flavorChoices = [], currentTotalQty =
         return map;
     }
     const str = String(remarkStr).trim();
-    if (!str || str === '贈品' || str === '免費贈品') return map;
+    if (!str || str === '贈品' || str === '免費贈品' || str.includes('【組合內含')) return map;
 
     const bracketMatches = Array.from(str.matchAll(/【(?:口味備註[：:])?(.*?)】/g));
     let segments = [];
@@ -222,6 +222,9 @@ const formatCleanProductNameAndFlavor = (rawProductName, rawRemark, qty) => {
     let pName = String(rawProductName || '').trim();
     let rem = String(rawRemark || '').trim();
 
+    if (rem.includes('【組合內含')) rem = rem.replace(/【組合內含：[^】]+】/g, '').trim();
+    if (pName.includes('【組合內含')) pName = pName.replace(/【組合內含：[^】]+】/g, '').trim();
+
     // 優先從 rem 抽取出規格口味，若 rem 為空才從 pName 抽取，絕不重複拼接導致數量翻倍！
     const flavorStr = (rem && rem !== '贈品' && rem !== '免費贈品') ? rem : pName;
     let innerFlavor = '';
@@ -229,7 +232,7 @@ const formatCleanProductNameAndFlavor = (rawProductName, rawRemark, qty) => {
     const fMap = parseRemarkToFlavorMap(flavorStr);
     if (Object.keys(fMap).length > 0) {
         innerFlavor = Object.entries(fMap).map(([f, q]) => `${f}x${q}`).join(', ');
-    } else if (rem && rem !== '贈品' && rem !== '免費贈品') {
+    } else if (rem && rem !== '贈品' && rem !== '免費贈品' && !rem.includes('【組合內含')) {
         innerFlavor = rem;
     }
 
@@ -3425,20 +3428,20 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                                                          let comboText = '';
                                                                                          if (remarkStr.includes('【組合內含')) {
                                                                                              const m = remarkStr.match(/【組合內含：[^】]+】/);
-                                                                                             if (m) comboText = m[0];
+                                                                                             if (m) comboText = m[0].replace(/🎁\s*/g, '').replace(/ x/g, 'x').replace(/、/g, ', ');
                                                                                          }
                                                                                          if (!comboText && prod && prod.isCombo && Array.isArray(prod.comboItems) && prod.comboItems.length > 0) {
                                                                                              const parts = prod.comboItems.map(ci => {
                                                                                                  const child = products.find(p => String(p.id) === String(ci.productId) || String(p.productId) === String(ci.productId));
                                                                                                  const cName = child ? (child.name || child.productName) : (ci.productName || ci.name || '商品');
-                                                                                                 return `${cName} x${ci.qty || 1}`;
-                                                                                             }).join('、');
+                                                                                                 return `${cName}x${ci.qty || 1}`;
+                                                                                             }).join(', ');
                                                                                              if (parts) comboText = `【組合內含：${parts}】`;
                                                                                          }
                                                                                          if (comboText) {
                                                                                              return (
-                                                                                                 <div className="text-xs font-black text-amber-800 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md mt-0.5 self-start">
-                                                                                                     🎁 {comboText}
+                                                                                                 <div className="text-xs font-bold text-blue-600 dark:text-blue-400 mt-1">
+                                                                                                     {comboText}
                                                                                                  </div>
                                                                                              );
                                                                                          }
@@ -3456,7 +3459,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                                     })()}
                                                                     {item.remark && (() => {
                                                                         const remStr = String(item.remark || '').trim();
-                                                                        if (!remStr || remStr === '贈品' || remStr === '免費贈品') return null;
+                                                                        if (!remStr || remStr === '贈品' || remStr === '免費贈品' || remStr.includes('【組合內含')) return null;
                                                                         const fMap = parseRemarkToFlavorMap(remStr);
                                                                         let flavorTag = '';
                                                                         if (Object.keys(fMap).length > 0) {

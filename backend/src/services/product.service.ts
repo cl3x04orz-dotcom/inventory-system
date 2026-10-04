@@ -241,6 +241,8 @@ export const ProductService = {
       }
     }
 
+    const isPosOnly = Boolean(payload.isPosOnlyUpdate);
+
     const oldProduct = await prisma.product.findFirst({
       where: { productId: String(productId).trim(), storeCode: payload.storeCode },
       select: { maxTotalQty: true }
@@ -254,11 +256,27 @@ export const ProductService = {
       }
     }
 
-    const isPosOnly = Boolean(payload.isPosOnlyUpdate);
+    if (!oldProduct) {
+      await prisma.product.create({
+        data: {
+          productId: String(productId).trim(),
+          productName: String(payload.name || payload.productName || '新商品/禮包').trim(),
+          defaultPrice: !isPosOnly && price !== undefined && price !== '' && price !== null ? Number(price) : 0,
+          storeCode: payload.storeCode || 'MILI001',
+          isActive: isActive !== undefined ? Boolean(isActive) : false,
+          category: category !== undefined ? String(category) : 'General',
+          isCombo: payload.isCombo !== undefined ? Boolean(payload.isCombo) : false,
+          comboItems: payload.comboItems !== undefined ? payload.comboItems : [],
+          imageUrl: imageUrl !== undefined ? String(imageUrl) : '',
+          capacity: payload.capacity !== undefined ? String(payload.capacity).trim() : ''
+        }
+      });
+    }
 
     await prisma.product.updateMany({
       where: { productId: String(productId).trim(), storeCode: payload.storeCode },
       data: {
+        productName: (payload.name || payload.productName) ? String(payload.name || payload.productName).trim() : undefined,
         isActive: isActive !== undefined ? Boolean(isActive) : undefined,
         imageUrl: imageUrl !== undefined ? String(imageUrl) : undefined,
         category: category !== undefined ? String(category) : undefined,

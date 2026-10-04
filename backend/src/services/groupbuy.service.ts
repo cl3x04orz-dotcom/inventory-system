@@ -604,22 +604,59 @@ export const GroupBuyService = {
           totalCash: (order.paymentMethod === '現金' || !order.paymentMethod) ? order.totalAmount : 0,
           finalTotal: order.totalAmount,
           details: {
-            create: (order.details as any[]).map((d: any) => {
-              const prod = orderProdMap.get(d.productId);
-              const multiplier = (prod && prod.isBundle) ? Number(prod.bundleSize || 1) : 1;
-              const finalSold = Number(d.qty) * multiplier;
+            create: (() => {
+              const salesDetailsToCreate: any[] = [];
+              for (const d of order.details as any[]) {
+                const prod = orderProdMap.get(d.productId);
+                if (prod && prod.isCombo && Array.isArray(prod.comboItems) && (prod.comboItems as any[]).length > 0) {
+                  const comboItems = prod.comboItems as any[];
+                  const comboPacksSold = Number(d.qty || 0);
+                  const totalComboAmount = Number(d.subtotal || 0);
 
-              const effectiveUnitPrice = finalSold > 0 ? Number((Number(d.subtotal) / finalSold).toFixed(4)) : Number(d.unitPrice);
+                  const totalChildUnits = comboItems.reduce((sum: number, ci: any) => sum + Math.max(1, Number(ci.qty) || 1), 0);
 
-              return {
-                productId: d.productId || 'UNKNOWN',
-                sold: finalSold,
-                picked: finalSold,
-                original: 0,
-                subtotal: Number(d.subtotal),
-                unitPrice: effectiveUnitPrice
-              };
-            })
+                  let allocatedTotal = 0;
+                  comboItems.forEach((ci: any, idx: number) => {
+                    if (!ci.productId) return;
+                    const subQty = Math.max(1, Number(ci.qty) || 1);
+                    const childSold = comboPacksSold * subQty;
+
+                    let childSubtotal = 0;
+                    if (idx === comboItems.length - 1) {
+                      childSubtotal = Math.round((totalComboAmount - allocatedTotal) * 100) / 100;
+                    } else {
+                      childSubtotal = Math.round((totalComboAmount * (subQty / totalChildUnits)) * 100) / 100;
+                      allocatedTotal += childSubtotal;
+                    }
+
+                    const childUnitPrice = childSold > 0 ? Math.round((childSubtotal / childSold) * 10000) / 10000 : 0;
+
+                    salesDetailsToCreate.push({
+                      productId: String(ci.productId),
+                      sold: childSold,
+                      picked: childSold,
+                      original: 0,
+                      subtotal: childSubtotal,
+                      unitPrice: childUnitPrice
+                    });
+                  });
+                } else {
+                  const multiplier = (prod && prod.isBundle) ? Number(prod.bundleSize || 1) : 1;
+                  const finalSold = Number(d.qty) * multiplier;
+                  const effectiveUnitPrice = finalSold > 0 ? Number((Number(d.subtotal) / finalSold).toFixed(4)) : Number(d.unitPrice);
+
+                  salesDetailsToCreate.push({
+                    productId: d.productId || 'UNKNOWN',
+                    sold: finalSold,
+                    picked: finalSold,
+                    original: 0,
+                    subtotal: Number(d.subtotal),
+                    unitPrice: effectiveUnitPrice
+                  });
+                }
+              }
+              return salesDetailsToCreate;
+            })()
           }
         }
       });
@@ -632,12 +669,23 @@ export const GroupBuyService = {
       const qty = Number(d.qty || 0);
       if (qty > 0) {
         const prod = orderProdMap.get(d.productId);
-        const multiplier = (prod && prod.isBundle) ? Number(prod.bundleSize || 1) : 1;
-        const totalDeduct = qty * multiplier;
+        if (prod && prod.isCombo && Array.isArray(prod.comboItems) && (prod.comboItems as any[]).length > 0) {
+          const comboItems = prod.comboItems as any[];
+          for (const ci of comboItems) {
+            if (!ci.productId) continue;
+            const subQty = Math.max(1, Number(ci.qty) || 1);
+            await deductInventory(String(ci.productId), qty * subQty, 'STOCK').catch(err => {
+              console.warn('[ConfirmPendingOrder] 扣減庫存失敗備退:', err?.message);
+            });
+          }
+        } else {
+          const multiplier = (prod && prod.isBundle) ? Number(prod.bundleSize || 1) : 1;
+          const totalDeduct = qty * multiplier;
 
-        await deductInventory(d.productId, totalDeduct, 'STOCK').catch(err => {
-          console.warn('[ConfirmPendingOrder] 扣減庫存失敗備退:', err?.message);
-        });
+          await deductInventory(d.productId, totalDeduct, 'STOCK').catch(err => {
+            console.warn('[ConfirmPendingOrder] 扣減庫存失敗備退:', err?.message);
+          });
+        }
       }
     }
 

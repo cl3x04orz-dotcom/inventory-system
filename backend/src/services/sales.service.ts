@@ -197,7 +197,66 @@ export const SalesService = {
       });
 
       // 3.3 處理銷售細項與庫存扣減 (FIFO)
-      for (const item of salesData) {
+      // 🔑 若銷售項目為跨商品組合包 (isCombo)，自動將金額按子商品比例/平分分散，確保總和與原禮包價格 100% 一致
+      const allProductIds = (salesData as any[]).map(i => i.productId).filter(Boolean);
+      const dbProducts = await prisma.product.findMany({
+        where: { productId: { in: allProductIds } }
+      });
+      const prodMap = new Map(dbProducts.map(p => [p.productId, p]));
+
+      const finalSalesData: any[] = [];
+      for (const item of salesData as any[]) {
+        const prod = prodMap.get(item.productId);
+        if (prod && prod.isCombo && Array.isArray(prod.comboItems) && (prod.comboItems as any[]).length > 0) {
+          const comboItems = prod.comboItems as any[];
+          const comboPacksSold = Number(item.sold || 0);
+          const comboPacksPicked = Number(item.picked || 0);
+          const comboPacksOriginal = Number(item.original || 0);
+          const comboPacksReturns = Number(item.returns || 0);
+          const comboUnitPrice = Number(item.unitPrice || 0);
+          const totalComboAmount = comboPacksSold * comboUnitPrice;
+
+          // 計算這個組合包內的總子商品單位數
+          const totalChildUnits = comboItems.reduce((sum, ci) => sum + Math.max(1, Number(ci.qty) || 1), 0);
+
+          let allocatedTotal = 0;
+          comboItems.forEach((ci, idx) => {
+            if (!ci.productId) return;
+            const subQty = Math.max(1, Number(ci.qty) || 1);
+            const childSold = comboPacksSold * subQty;
+            const childPicked = comboPacksPicked * subQty;
+            const childOriginal = comboPacksOriginal * subQty;
+            const childReturns = comboPacksReturns * subQty;
+
+            // 計算平分後的小計
+            let childSubtotal = 0;
+            if (idx === comboItems.length - 1) {
+              // 最後一個項目補足餘數差距
+              childSubtotal = Math.round((totalComboAmount - allocatedTotal) * 100) / 100;
+            } else {
+              childSubtotal = Math.round((totalComboAmount * (subQty / totalChildUnits)) * 100) / 100;
+              allocatedTotal += childSubtotal;
+            }
+
+            const childUnitPrice = childSold > 0 ? Math.round((childSubtotal / childSold) * 10000) / 10000 : 0;
+
+            finalSalesData.push({
+              productId: String(ci.productId),
+              productName: ci.productName || '',
+              picked: childPicked,
+              original: childOriginal,
+              returns: childReturns,
+              sold: childSold,
+              unitPrice: childUnitPrice,
+              subtotal: childSubtotal
+            });
+          });
+        } else {
+          finalSalesData.push(item);
+        }
+      }
+
+      for (const item of finalSalesData) {
         const sold = Number(item.sold || 0);
         const picked = Number(item.picked || 0);
         const original = Number(item.original || 0);

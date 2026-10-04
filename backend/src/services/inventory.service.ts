@@ -32,22 +32,28 @@ export const InventoryService = {
         }
       });
 
-      // 2. 更新或新增庫存快照
-      await prisma.inventorySnapshot.upsert({
-        where: {
-          productId_storeCode: { productId, storeCode }
-        },
-        create: {
-          productId,
-          storeCode,
-          onHandQty: qty,
-          availableQty: qty
-        },
-        update: {
-          onHandQty: { increment: qty },
-          availableQty: { increment: qty }
-        }
-      });
+      // 2. 檢查目標商品是否為跨商品組合包 (isCombo)
+      const prod = await prisma.product.findFirst({ where: { productId, storeCode } });
+      const isCombo = prod && prod.isCombo;
+
+      if (!isCombo) {
+        // 更新或新增庫存快照 (虛擬組合包不維護獨立快照庫存)
+        await prisma.inventorySnapshot.upsert({
+          where: {
+            productId_storeCode: { productId, storeCode }
+          },
+          create: {
+            productId,
+            storeCode,
+            onHandQty: qty,
+            availableQty: qty
+          },
+          update: {
+            onHandQty: { increment: qty },
+            availableQty: { increment: qty }
+          }
+        });
+      }
 
       // 3. 🔑 同步扣除舊系統的批次庫存 (prisma.inventory)，確保舊版庫存檢視與作廢邏輯一致
       if (type === 'SALE' && qty < 0) {

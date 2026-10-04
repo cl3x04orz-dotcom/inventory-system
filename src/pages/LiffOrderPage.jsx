@@ -3741,23 +3741,26 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                               </span>
                               {(() => {
                                 const prod = products.find(p => p.id === (item.productId || item.id) || p.name === displayName);
-                                let comboSubtext = '';
-                                if (displayRemark && displayRemark.includes('【組合內含')) {
-                                  comboSubtext = displayRemark;
-                                } else if (prod && prod.isCombo && Array.isArray(prod.comboItems) && prod.comboItems.length > 0) {
-                                  const parts = prod.comboItems.map(ci => {
+                                if (prod && prod.isCombo && Array.isArray(prod.comboItems) && prod.comboItems.length > 0) {
+                                  const comboList = prod.comboItems.map(ci => {
                                     const child = products.find(p => String(p.id) === String(ci.productId) || String(p.productId) === String(ci.productId));
                                     const cName = child ? (child.name || child.productName) : (ci.productName || ci.name || '商品');
                                     return `${cName} x${ci.qty || 1}`;
-                                  }).join('、');
-                                  if (parts) comboSubtext = `【組合內含：${parts}】`;
-                                }
-                                if (comboSubtext) {
-                                  return (
-                                    <span className="text-xs text-amber-700 dark:text-amber-300 font-bold block mt-0.5">
-                                      🎁 {comboSubtext}
-                                    </span>
-                                  );
+                                  });
+                                  if (comboList.length > 0) {
+                                    return (
+                                      <div className="text-[11px] text-amber-700 dark:text-amber-300 font-bold block mt-1 leading-snug">
+                                        <span className="block">🎁 【組合內含：</span>
+                                        <div className="pl-3 flex flex-col gap-0.5 mt-0.5">
+                                          {comboList.map((cText, cIdx) => (
+                                            <span key={cIdx} className="block whitespace-normal break-words">
+                                              • {cText}{cIdx === comboList.length - 1 ? '】' : '、'}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    );
+                                  }
                                 }
                                 if (displayRemark) {
                                   return (
@@ -4509,16 +4512,23 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                       {(() => {
                         const prod = products.find(p => p.id === (item.productId || item.id) || p.name === item.name);
                         if (prod && prod.isCombo && Array.isArray(prod.comboItems) && prod.comboItems.length > 0) {
-                          const parts = prod.comboItems.map(ci => {
+                          const comboList = prod.comboItems.map(ci => {
                             const child = products.find(p => String(p.id) === String(ci.productId) || String(p.productId) === String(ci.productId));
                             const cName = child ? (child.name || child.productName) : (ci.productName || ci.name || '商品');
                             return `${cName} x${ci.qty || 1}`;
-                          }).join('、');
-                          if (parts) {
+                          });
+                          if (comboList.length > 0) {
                             return (
-                              <span className="text-[11px] text-amber-700 dark:text-amber-300 font-bold block mt-0.5">
-                                🎁 【組合內含：{parts}】
-                              </span>
+                              <div className="text-[11px] text-amber-700 dark:text-amber-300 font-bold block mt-1 leading-snug">
+                                <span className="block">🎁 【組合內含：</span>
+                                <div className="pl-3 flex flex-col gap-0.5 mt-0.5">
+                                  {comboList.map((cText, cIdx) => (
+                                    <span key={cIdx} className="block whitespace-normal break-words">
+                                      • {cText}{cIdx === comboList.length - 1 ? '】' : '、'}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
                             );
                           }
                         }
@@ -6575,7 +6585,7 @@ ${freeNote(newFee, newMin)}
                                   </span>
                                 )}
                                 {product.isCombo && Array.isArray(product.comboItems) && product.comboItems.length > 0 && (
-                                  <div className="text-[11px] text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg mt-1 w-full flex items-center gap-1 font-bold">
+                                  <div className="inline-flex items-center gap-1 text-[10px] text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-300/50 px-1.5 py-0.5 rounded mt-1 font-bold shrink-0">
                                     <span>🎁</span>
                                     <span>
                                       組合內含：{product.comboItems.map(ci => {
