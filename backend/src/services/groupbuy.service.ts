@@ -1276,7 +1276,7 @@ export const GroupBuyService = {
           });
           const childMap = new Map(childProducts.map((p: any) => [p.productId, p.productName]));
           const comboParts = (dbProd.comboItems as any[]).map((ci: any) => {
-            const cName = childMap.get(String(ci.productId)) || '子商品';
+            const cName = childMap.get(String(ci.productId)) || ci.productName || ci.name || '子商品';
             return `${cName} x${ci.qty || 1}`;
           });
           if (comboParts.length > 0) {
@@ -1489,7 +1489,7 @@ export const GroupBuyService = {
           details: {
             create: items.map((item: any) => ({
               productId: item.productId || '',
-              productName: item.productName + (item.remark ? ` (${item.remark})` : ''),
+              productName: item.productName || '',
               unitPrice: Number(item.unitPrice) || 0,
               qty: Number(item.qty) || 0,
               subtotal: Math.round(Number(item.subtotal !== undefined && item.subtotal !== null ? item.subtotal : (Number(item.unitPrice) * Number(item.qty)))) || 0,

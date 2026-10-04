@@ -1093,7 +1093,9 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                                 value={item.productId || ''}
                                                                                 onChange={(e) => {
                                                                                     const newItems = [...(product.comboItems || [])];
-                                                                                    newItems[idx] = { ...newItems[idx], productId: e.target.value };
+                                                                                    const selId = e.target.value;
+                                                                                    const selP = products.find(p => String(p.id) === String(selId));
+                                                                                    newItems[idx] = { ...newItems[idx], productId: selId, productName: selP ? selP.name : '' };
                                                                                     handleFieldChange(product.id, 'comboItems', newItems);
                                                                                     handleSaveProduct(product.id, { comboItems: newItems });
                                                                                 }}

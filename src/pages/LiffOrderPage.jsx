@@ -3746,8 +3746,9 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                                   comboSubtext = displayRemark;
                                 } else if (prod && prod.isCombo && Array.isArray(prod.comboItems) && prod.comboItems.length > 0) {
                                   const parts = prod.comboItems.map(ci => {
-                                    const child = products.find(p => p.id === ci.productId || p.productId === ci.productId);
-                                    return `${child ? (child.name || child.productName) : '商品'} x${ci.qty || 1}`;
+                                    const child = products.find(p => String(p.id) === String(ci.productId) || String(p.productId) === String(ci.productId));
+                                    const cName = child ? (child.name || child.productName) : (ci.productName || ci.name || '商品');
+                                    return `${cName} x${ci.qty || 1}`;
                                   }).join('、');
                                   if (parts) comboSubtext = `【組合內含：${parts}】`;
                                 }
@@ -4509,13 +4510,14 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                         const prod = products.find(p => p.id === (item.productId || item.id) || p.name === item.name);
                         if (prod && prod.isCombo && Array.isArray(prod.comboItems) && prod.comboItems.length > 0) {
                           const parts = prod.comboItems.map(ci => {
-                            const child = products.find(p => p.id === ci.productId || p.productId === ci.productId);
-                            return `${child ? (child.name || child.productName) : '商品'} x${ci.qty || 1}`;
+                            const child = products.find(p => String(p.id) === String(ci.productId) || String(p.productId) === String(ci.productId));
+                            const cName = child ? (child.name || child.productName) : (ci.productName || ci.name || '商品');
+                            return `${cName} x${ci.qty || 1}`;
                           }).join('、');
                           if (parts) {
                             return (
                               <span className="text-[11px] text-amber-700 dark:text-amber-300 font-bold block mt-0.5">
-                                🎁 內含：{parts}
+                                🎁 【組合內含：{parts}】
                               </span>
                             );
                           }
@@ -6577,8 +6579,9 @@ ${freeNote(newFee, newMin)}
                                     <span>🎁</span>
                                     <span>
                                       組合內含：{product.comboItems.map(ci => {
-                                        const child = products.find(p => p.id === ci.productId || p.productId === ci.productId);
-                                        return `${child ? (child.name || child.productName) : '商品'} x${ci.qty || 1}`;
+                                        const child = products.find(p => String(p.id) === String(ci.productId) || String(p.productId) === String(ci.productId));
+                                        const cName = child ? (child.name || child.productName) : (ci.productName || ci.name || '商品');
+                                        return `${cName} x${ci.qty || 1}`;
                                       }).join('、')}
                                     </span>
                                   </div>

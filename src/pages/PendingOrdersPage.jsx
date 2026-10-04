@@ -3406,12 +3406,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                                         const freeQty = prod ? calculateFreeQtyFromTotal(prod.id, item.qty) : 0;
                                                                         const paidQty = item.qty - freeQty;
 
-                                                                        const cleanName = String(item.productName || '')
-                                                                            .replace(/\s*\(\s*【?口味備註：.*$/gi, '')
-                                                                            .replace(/\s*【口味備註：.*$/gi, '')
-                                                                            .replace(/\s*\([^)]*口味備註.*$/gi, '')
-                                                                            .replace(/[)】\s]+$/g, '')
-                                                                            .trim();
+                                                                        const cleanName = cleanBaseProductName(item.productName);
 
                                                                         return (
                                                                             <div className="flex justify-between items-start text-sm md:text-base">
@@ -3434,8 +3429,9 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                                                          }
                                                                                          if (!comboText && prod && prod.isCombo && Array.isArray(prod.comboItems) && prod.comboItems.length > 0) {
                                                                                              const parts = prod.comboItems.map(ci => {
-                                                                                                 const child = products.find(p => p.id === ci.productId || p.productId === ci.productId);
-                                                                                                 return `${child ? (child.name || child.productName) : '商品'} x${ci.qty || 1}`;
+                                                                                                 const child = products.find(p => String(p.id) === String(ci.productId) || String(p.productId) === String(ci.productId));
+                                                                                                 const cName = child ? (child.name || child.productName) : (ci.productName || ci.name || '商品');
+                                                                                                 return `${cName} x${ci.qty || 1}`;
                                                                                              }).join('、');
                                                                                              if (parts) comboText = `【組合內含：${parts}】`;
                                                                                          }
