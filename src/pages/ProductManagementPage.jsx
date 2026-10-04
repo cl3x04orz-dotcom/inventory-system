@@ -667,19 +667,19 @@ export default function ProductManagementPage({ user, apiUrl }) {
         <div className="max-w-6xl mx-auto h-[calc(100vh-6rem)] flex flex-col p-4 gap-4">
             {/* Header Area */}
             <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center bg-[var(--bg-secondary)] p-3.5 sm:p-4 rounded-2xl border border-[var(--border-primary)] shadow-sm gap-3">
-                <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
+                <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)] shrink-0">
                     <Package className="text-blue-600 shrink-0" />
                     <span>商品屬性</span>
                 </h2>
 
-                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                <div className="grid grid-cols-2 md:flex md:items-center gap-2 w-full md:w-auto">
                     {/* Style A Custom Dropdown Selector */}
-                    <div className="relative flex-1 min-w-[140px] sm:w-48 sm:flex-none">
+                    <div className="relative col-span-1 md:w-48">
                         <Package size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                         <select
                             value={stockFilter}
                             onChange={(e) => setStockFilter(e.target.value)}
-                            className="w-full appearance-none pl-9 pr-8 py-2 text-xs font-bold rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500 hover:border-blue-300 transition-all cursor-pointer shadow-sm truncate"
+                            className="w-full appearance-none pl-8 pr-7 py-2 text-xs font-bold rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500 hover:border-blue-300 transition-all cursor-pointer shadow-xs truncate h-9"
                         >
                             <option value="ALL">📦 販售中商品 (預設)</option>
                             <option value="ONLINE">🟢 已網購上架</option>
@@ -689,30 +689,31 @@ export default function ProductManagementPage({ user, apiUrl }) {
                             <option value="DISCONTINUED">🚫 已停售/停產商品</option>
                             <option value="ALL_WITH_DISCONTINUED">👁️ 全部商品 (含停售)</option>
                         </select>
-                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
 
-                    <div className="relative flex-1 min-w-[140px] sm:w-48 sm:flex-none">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} />
+                    <div className="relative col-span-1 md:w-48">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={15} />
                         <input
                             type="text"
                             placeholder="搜尋商品名稱或ID..."
-                            className="input-field pl-9 py-2 text-xs w-full"
+                            className="input-field pl-8 pr-3 py-2 text-xs w-full rounded-xl h-9"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0 ml-auto sm:ml-0">
-                        <button
-                            type="button"
-                            onClick={handleAddNewProduct}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-primary)] shadow-2xs active:scale-95 transition-all cursor-pointer shrink-0"
-                            title="快速建立一個全新商品或禮包名稱"
-                        >
-                            <Plus size={16} className="text-blue-600 dark:text-blue-400" />
-                            <span>新增商品/禮包</span>
-                        </button>
+                    <button
+                        type="button"
+                        onClick={handleAddNewProduct}
+                        className="col-span-1 md:w-auto flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-primary)] shadow-2xs active:scale-95 transition-all cursor-pointer h-9 shrink-0 truncate"
+                        title="快速建立一個全新商品或禮包名稱"
+                    >
+                        <Plus size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                        <span className="truncate">新增商品/禮包</span>
+                    </button>
+
+                    <div className="col-span-1 md:w-auto flex items-center gap-1.5 h-9">
                         <button
                             type="button"
                             onClick={() => {
@@ -723,7 +724,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                     return !prev;
                                 });
                             }}
-                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer border shadow-2xs ${
+                            className={`flex-1 md:flex-none flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border shadow-2xs h-9 truncate ${
                                 isSelectMode
                                     ? 'bg-blue-600 text-white border-blue-600 shadow-blue-500/25'
                                     : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-[var(--border-primary)]'
@@ -731,10 +732,10 @@ export default function ProductManagementPage({ user, apiUrl }) {
                             title={isSelectMode ? "關閉選取模式" : "點擊開來選取專屬商品連結"}
                         >
                             <Link2 size={15} className={isSelectMode ? 'text-white' : 'text-blue-600'} />
-                            <span>{isSelectMode ? '結束選取' : '專屬連結'}</span>
+                            <span className="truncate">{isSelectMode ? '結束選取' : '專屬連結'}</span>
                         </button>
-                        <button onClick={() => fetchProducts(false)} className="btn-secondary p-2 rounded-xl shrink-0" title="重新整理">
-                            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                        <button onClick={() => fetchProducts(false)} className="btn-secondary p-2 rounded-xl shrink-0 h-9 w-9 flex items-center justify-center" title="重新整理">
+                            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
                         </button>
                     </div>
                 </div>
