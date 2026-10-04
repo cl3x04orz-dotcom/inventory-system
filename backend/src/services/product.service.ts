@@ -266,7 +266,7 @@ export const ProductService = {
           isActive: isActive !== undefined ? Boolean(isActive) : false,
           category: category !== undefined ? String(category) : 'General',
           isCombo: payload.isCombo !== undefined ? Boolean(payload.isCombo) : false,
-          comboItems: payload.comboItems !== undefined ? payload.comboItems : [],
+          comboItems: Array.isArray(payload.comboItems) ? (payload.comboItems as any[]).filter((ci: any) => ci && ci.productId && String(ci.productId).trim() !== '') : [],
           imageUrl: imageUrl !== undefined ? String(imageUrl) : '',
           capacity: payload.capacity !== undefined ? String(payload.capacity).trim() : ''
         }
@@ -301,7 +301,7 @@ export const ProductService = {
         isBundle: !isPosOnly && isBundle !== undefined ? Boolean(isBundle) : undefined,
         bundleSize: !isPosOnly && bundleSize !== undefined ? Number(bundleSize) : undefined,
         isCombo: payload.isCombo !== undefined ? Boolean(payload.isCombo) : undefined,
-        comboItems: payload.comboItems !== undefined ? payload.comboItems : undefined,
+        comboItems: Array.isArray(payload.comboItems) ? (payload.comboItems as any[]).filter((ci: any) => ci && ci.productId && String(ci.productId).trim() !== '') : undefined,
         maxTotalQty: parsedMaxTotalQty,
         // 僅在活動上限實際變更（新值或清除）時，soldQty 才同步重設
         soldQty: shouldResetSoldQty ? 0 : undefined,

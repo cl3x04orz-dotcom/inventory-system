@@ -385,7 +385,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 isBundle: mergedProduct.isBundle,
                 bundleSize: mergedProduct.bundleSize !== undefined ? Number(mergedProduct.bundleSize) : 1,
                 isCombo: mergedProduct.isCombo,
-                comboItems: Array.isArray(mergedProduct.comboItems) ? mergedProduct.comboItems : [],
+                comboItems: Array.isArray(mergedProduct.comboItems) ? mergedProduct.comboItems.filter(ci => ci && ci.productId && String(ci.productId).trim() !== '') : [],
                 maxTotalQty: (mergedProduct.maxTotalQty !== undefined && mergedProduct.maxTotalQty !== '' && mergedProduct.maxTotalQty !== null) ? Number(mergedProduct.maxTotalQty) : null,
                 allowedCommunityIds: Array.isArray(mergedProduct.allowedCommunityIds) ? mergedProduct.allowedCommunityIds : [],
                 communityQuotas: mergedProduct.communityQuotas || {},

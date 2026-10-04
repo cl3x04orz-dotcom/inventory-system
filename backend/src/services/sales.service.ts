@@ -207,8 +207,9 @@ export const SalesService = {
       const finalSalesData: any[] = [];
       for (const item of salesData as any[]) {
         const prod = prodMap.get(item.productId);
-        if (prod && prod.isCombo && Array.isArray(prod.comboItems) && (prod.comboItems as any[]).length > 0) {
-          const comboItems = prod.comboItems as any[];
+        if (prod && prod.isCombo && Array.isArray(prod.comboItems)) {
+          const comboItems = (prod.comboItems as any[]).filter((ci: any) => ci && ci.productId && String(ci.productId).trim() !== '');
+          if (comboItems.length > 0) {
           const comboPacksSold = Number(item.sold || 0);
           const comboPacksPicked = Number(item.picked || 0);
           const comboPacksOriginal = Number(item.original || 0);
@@ -250,7 +251,7 @@ export const SalesService = {
               unitPrice: childUnitPrice,
               subtotal: childSubtotal
             });
-          });
+          }
         } else {
           finalSalesData.push(item);
         }
