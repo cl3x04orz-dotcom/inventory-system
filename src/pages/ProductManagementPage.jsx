@@ -191,41 +191,38 @@ export default function ProductManagementPage({ user, apiUrl }) {
         });
     }, [products, getDaysLeft]);
 
-    const fetchProducts = useCallback(async () => {
-        setLoading(true);
+    const fetchProducts = useCallback(async (isSilent = false) => {
+        if (!isSilent) setLoading(true);
         try {
-            const [productsData, inventoryData] = await Promise.all([
-                callGAS(apiUrl, 'getProducts', {}, user.token),
-                callGAS(apiUrl, 'getInventory', {}, user.token).catch(err => {
-                    console.error('Fetch inventory in Product Page failed, fallback to empty:', err);
-                    return [];
-                })
-            ]);
+            const productsData = await callGAS(apiUrl, 'getProducts', {}, user.token);
 
             if (Array.isArray(productsData)) {
                 setProducts(productsData);
                 
-                // 初始化口味輸入框的暫存字串
+                // 初始化口味輸入框的暫存字串與庫存對照表
                 const initialTemp = {};
+                const tempStockMap = {};
                 productsData.forEach(p => {
                     initialTemp[p.id] = Array.isArray(p.flavor_choices) ? p.flavor_choices.join(', ') : '';
+                    const name = p.name || p.productName || p.id;
+                    tempStockMap[name] = Number(p.stock) || 0;
                 });
                 setTempFlavorChoices(initialTemp);
-            }
+                setStockMap(tempStockMap);
 
-            // 計算庫存對照表
-            const tempStockMap = {};
-            if (Array.isArray(inventoryData)) {
-                inventoryData.forEach(item => {
-                    const name = item.productName;
-                    const qty = Number(item.quantity) || 0;
-                    tempStockMap[name] = (tempStockMap[name] || 0) + qty;
-                });
+                // 寫入快取，供下次秒開使用
+                try {
+                    sessionStorage.setItem('pm_cache_data', JSON.stringify({
+                        products: productsData,
+                        stockMap: tempStockMap,
+                        tempFlavor: initialTemp,
+                        timestamp: Date.now()
+                    }));
+                } catch (_) {}
             }
-            setStockMap(tempStockMap);
-
         } catch (error) {
-            alert('載入商品失敗: ' + error.message);
+            console.error('載入商品失敗:', error);
+            if (!isSilent) alert('載入商品失敗: ' + error.message);
         } finally {
             setLoading(false);
         }
@@ -233,7 +230,22 @@ export default function ProductManagementPage({ user, apiUrl }) {
 
     useEffect(() => {
         if (user?.token) {
-            fetchProducts();
+            let hasCache = false;
+            try {
+                const cached = sessionStorage.getItem('pm_cache_data');
+                if (cached) {
+                    const { products: cProds, stockMap: cStock, tempFlavor: cFlavor } = JSON.parse(cached);
+                    if (Array.isArray(cProds) && cProds.length > 0) {
+                        setProducts(cProds);
+                        setStockMap(cStock || {});
+                        setTempFlavorChoices(cFlavor || {});
+                        setLoading(false);
+                        hasCache = true;
+                    }
+                }
+            } catch (_) {}
+
+            fetchProducts(hasCache);
             // 同時拉取開團大樓 (getBuildingSettings) 與社區清單 (getCommunities)，確保與「開團管理」100% 同步
             Promise.all([
                 callGAS(apiUrl, 'getBuildingSettings', {}, user.token).catch(() => []),
