@@ -3749,8 +3749,8 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                                   });
                                   if (comboList.length > 0) {
                                     return (
-                                      <div className="text-[11px] text-emerald-700 dark:text-emerald-300 font-bold block mt-1 leading-snug">
-                                        <span className="block">🎁 【內含：</span>
+                                      <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold block mt-1 leading-snug">
+                                        <span className="block">【內含：</span>
                                         <div className="pl-3 flex flex-col gap-0.5 mt-0.5">
                                           {comboList.map((cText, cIdx) => (
                                             <span key={cIdx} className="block whitespace-normal break-words">
@@ -4519,8 +4519,8 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                           });
                           if (comboList.length > 0) {
                             return (
-                              <div className="text-[11px] text-emerald-700 dark:text-emerald-300 font-bold block mt-1 leading-snug">
-                                <span className="block">🎁 【內含：</span>
+                              <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold block mt-1 leading-snug">
+                                <span className="block">【內含：</span>
                                 <div className="pl-3 flex flex-col gap-0.5 mt-0.5">
                                   {comboList.map((cText, cIdx) => (
                                     <span key={cIdx} className="block whitespace-normal break-words">
@@ -6585,15 +6585,12 @@ ${freeNote(newFee, newMin)}
                                   </span>
                                 )}
                                 {product.isCombo && Array.isArray(product.comboItems) && product.comboItems.length > 0 && (
-                                  <div className="inline-flex items-center gap-1 text-[10px] text-emerald-800 dark:text-emerald-300 bg-emerald-500/15 border border-emerald-400/50 px-1.5 py-0.5 rounded mt-1 font-bold shrink-0">
-                                    <span>🎁</span>
-                                    <span>
-                                      內含：{product.comboItems.map(ci => {
-                                        const child = products.find(p => String(p.id) === String(ci.productId) || String(p.productId) === String(ci.productId));
-                                        const cName = child ? (child.name || child.productName) : (ci.productName || ci.name || '商品');
-                                        return `${cName} x${ci.qty || 1}`;
-                                      }).join('、')}
-                                    </span>
+                                  <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold mt-0.5 block leading-snug">
+                                    【內含：{product.comboItems.map(ci => {
+                                      const child = products.find(p => String(p.id) === String(ci.productId) || String(p.productId) === String(ci.productId));
+                                      const cName = child ? (child.name || child.productName) : (ci.productName || ci.name || '商品');
+                                      return `${cName} x${ci.qty || 1}`;
+                                    }).join('、')}】
                                   </div>
                                 )}
                                 {(() => {
