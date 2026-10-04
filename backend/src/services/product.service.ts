@@ -119,6 +119,8 @@ export const ProductService = {
         sortWeight: p.sortWeight,
         isBundle: Boolean(p.isBundle),
         bundleSize: Number(p.bundleSize || 1),
+        isCombo: Boolean(p.isCombo),
+        comboItems: Array.isArray(p.comboItems) ? p.comboItems : [],
         maxTotalQty: p.maxTotalQty !== null && p.maxTotalQty !== undefined ? Number(p.maxTotalQty) : null,
         soldQty: Number(p.soldQty || 0),
         allowedCommunityIds: Array.isArray(p.allowedCommunityIds) ? p.allowedCommunityIds : [],
@@ -280,6 +282,8 @@ export const ProductService = {
           : undefined,
         isBundle: !isPosOnly && isBundle !== undefined ? Boolean(isBundle) : undefined,
         bundleSize: !isPosOnly && bundleSize !== undefined ? Number(bundleSize) : undefined,
+        isCombo: payload.isCombo !== undefined ? Boolean(payload.isCombo) : undefined,
+        comboItems: payload.comboItems !== undefined ? payload.comboItems : undefined,
         maxTotalQty: parsedMaxTotalQty,
         // 僅在活動上限實際變更（新值或清除）時，soldQty 才同步重設
         soldQty: shouldResetSoldQty ? 0 : undefined,

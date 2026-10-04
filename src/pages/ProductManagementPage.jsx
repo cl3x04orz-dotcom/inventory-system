@@ -250,6 +250,8 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 price: mergedProduct.price,
                 isBundle: mergedProduct.isBundle,
                 bundleSize: mergedProduct.bundleSize !== undefined ? Number(mergedProduct.bundleSize) : 1,
+                isCombo: mergedProduct.isCombo,
+                comboItems: Array.isArray(mergedProduct.comboItems) ? mergedProduct.comboItems : [],
                 maxTotalQty: (mergedProduct.maxTotalQty !== undefined && mergedProduct.maxTotalQty !== '' && mergedProduct.maxTotalQty !== null) ? Number(mergedProduct.maxTotalQty) : null,
                 allowedCommunityIds: Array.isArray(mergedProduct.allowedCommunityIds) ? mergedProduct.allowedCommunityIds : [],
                 communityQuotas: mergedProduct.communityQuotas || {},
@@ -1055,6 +1057,91 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                     });
                                                                 }}
                                                             />
+                                                        </div>
+
+                                                        {/* 跨商品組合包 (BOM) */}
+                                                        <div className="lg:col-span-4 flex flex-col gap-2.5 bg-amber-500/5 p-3 rounded-xl border border-amber-500/20">
+                                                            <div className="flex justify-between items-center">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="text-xs">🎁</span>
+                                                                    <span className="text-[10px] uppercase font-black text-amber-700 dark:text-amber-400 tracking-wider">跨商品組合包 (組合販售並自動扣除各子商品庫存)</span>
+                                                                </div>
+                                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        className="sr-only peer"
+                                                                        checked={!!product.isCombo}
+                                                                        onChange={(e) => {
+                                                                            const checked = e.target.checked;
+                                                                            handleFieldChange(product.id, 'isCombo', checked);
+                                                                            handleSaveProduct(product.id, { isCombo: checked });
+                                                                        }}
+                                                                    />
+                                                                    <div className="w-8 h-4 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-amber-500"></div>
+                                                                </label>
+                                                            </div>
+
+                                                            {product.isCombo && (
+                                                                <div className="flex flex-col gap-2 pt-1">
+                                                                    <div className="text-[11px] text-[var(--text-tertiary)] font-bold">
+                                                                        設定此組合包包含的子商品內容 (銷售 1 包時將自動連帶扣除以下子商品的實體庫存)：
+                                                                    </div>
+                                                                    {(product.comboItems || []).map((item, idx) => (
+                                                                        <div key={idx} className="flex items-center gap-2 bg-[var(--bg-secondary)] p-2 rounded-lg border border-[var(--border-primary)]">
+                                                                            <select
+                                                                                className="input-field text-xs flex-1 p-1.5"
+                                                                                value={item.productId || ''}
+                                                                                onChange={(e) => {
+                                                                                    const newItems = [...(product.comboItems || [])];
+                                                                                    newItems[idx] = { ...newItems[idx], productId: e.target.value };
+                                                                                    handleFieldChange(product.id, 'comboItems', newItems);
+                                                                                    handleSaveProduct(product.id, { comboItems: newItems });
+                                                                                }}
+                                                                            >
+                                                                                <option value="">-- 請選擇子商品 --</option>
+                                                                                {products.filter(p => p.id !== product.id && !p.isCombo).map(p => (
+                                                                                    <option key={p.id} value={p.id}>{p.name} (${p.price})</option>
+                                                                                ))}
+                                                                            </select>
+                                                                            <div className="flex items-center gap-1 shrink-0">
+                                                                                <span className="text-xs font-bold text-[var(--text-secondary)]">x</span>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    min="1"
+                                                                                    className="input-field text-xs w-16 p-1.5 font-mono text-center"
+                                                                                    value={item.qty || 1}
+                                                                                    onChange={(e) => {
+                                                                                        const newItems = [...(product.comboItems || [])];
+                                                                                        newItems[idx] = { ...newItems[idx], qty: Math.max(1, Number(e.target.value) || 1) };
+                                                                                        handleFieldChange(product.id, 'comboItems', newItems);
+                                                                                        handleSaveProduct(product.id, { comboItems: newItems });
+                                                                                    }}
+                                                                                />
+                                                                            </div>
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    const newItems = (product.comboItems || []).filter((_, i) => i !== idx);
+                                                                                    handleFieldChange(product.id, 'comboItems', newItems);
+                                                                                    handleSaveProduct(product.id, { comboItems: newItems });
+                                                                                }}
+                                                                                className="px-2 py-1 bg-rose-50 text-rose-600 rounded text-xs font-bold hover:bg-rose-100"
+                                                                            >
+                                                                                刪除
+                                                                            </button>
+                                                                        </div>
+                                                                    ))}
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            const newItems = [...(product.comboItems || []), { productId: '', qty: 1 }];
+                                                                            handleFieldChange(product.id, 'comboItems', newItems);
+                                                                            handleSaveProduct(product.id, { comboItems: newItems });
+                                                                        }}
+                                                                        className="self-start px-3 py-1.5 bg-amber-500/10 text-amber-700 font-bold rounded-lg text-xs hover:bg-amber-500/20 border border-amber-500/30 transition-colors"
+                                                                    >
+                                                                        + 新增組合內子商品
+                                                                    </button>
+                                                                </div>
+                                                            )}
                                                         </div>
 
                                                         {/* 滿件特惠 (階梯組合價) */}

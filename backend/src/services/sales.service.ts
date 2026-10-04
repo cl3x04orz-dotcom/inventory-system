@@ -1389,6 +1389,23 @@ export const SalesService = {
 
 // FIFO 庫存扣除邏輯 helper
 export async function deductInventory(productId: string, qtyToDeduct: number, targetType: string, storeCode?: string) {
+  // 0. 檢查目標商品是否為跨商品組合包 (isCombo)
+  const product = await prisma.product.findFirst({
+    where: { productId, ...(storeCode ? { storeCode } : {}) }
+  });
+
+  if (product && product.isCombo && Array.isArray(product.comboItems) && (product.comboItems as any[]).length > 0) {
+    const comboItems = product.comboItems as any[];
+    const consumedAll: Array<{ expiryDate: Date | null; quantity: number }> = [];
+    for (const item of comboItems) {
+      if (item.productId && Number(item.qty) > 0) {
+        const subConsumed = await deductInventory(String(item.productId), qtyToDeduct * Number(item.qty), targetType, storeCode);
+        consumedAll.push(...subConsumed);
+      }
+    }
+    return consumedAll;
+  }
+
   let remaining = qtyToDeduct;
   const consumed: Array<{ expiryDate: Date | null; quantity: number }> = [];
 

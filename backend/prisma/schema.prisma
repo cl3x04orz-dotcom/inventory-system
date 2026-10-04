@@ -46,6 +46,8 @@ model Product {
   stopPickupThreshold   Int?
   isBundle              Boolean                 @default(false)
   bundleSize            Int                     @default(1)
+  isCombo               Boolean                 @default(false)
+  comboItems            Json?                   @default("[]")
   maxTotalQty           Int?
   soldQty               Int                     @default(0)
   allowedCommunityIds   String[]                @default([])
