@@ -3739,11 +3739,34 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                               <span className="font-semibold text-[var(--text-primary)] block truncate">
                                 {displayName}
                               </span>
-                              {displayRemark ? (
-                                <span className="text-xs text-blue-600 block mt-0.5 truncate">
-                                  {displayRemark}
-                                </span>
-                              ) : null}
+                              {(() => {
+                                const prod = products.find(p => p.id === (item.productId || item.id) || p.name === displayName);
+                                let comboSubtext = '';
+                                if (displayRemark && displayRemark.includes('【組合內含')) {
+                                  comboSubtext = displayRemark;
+                                } else if (prod && prod.isCombo && Array.isArray(prod.comboItems) && prod.comboItems.length > 0) {
+                                  const parts = prod.comboItems.map(ci => {
+                                    const child = products.find(p => p.id === ci.productId || p.productId === ci.productId);
+                                    return `${child ? (child.name || child.productName) : '商品'} x${ci.qty || 1}`;
+                                  }).join('、');
+                                  if (parts) comboSubtext = `【組合內含：${parts}】`;
+                                }
+                                if (comboSubtext) {
+                                  return (
+                                    <span className="text-xs text-amber-700 dark:text-amber-300 font-bold block mt-0.5">
+                                      🎁 {comboSubtext}
+                                    </span>
+                                  );
+                                }
+                                if (displayRemark) {
+                                  return (
+                                    <span className="text-xs text-blue-600 block mt-0.5 truncate">
+                                      {displayRemark}
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
                               {expDate ? (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-700 bg-orange-50 border border-orange-300 px-2 py-0.5 rounded-full mt-1 shadow-xs">
                                   📅 效期至 {expDate}
@@ -4482,6 +4505,23 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                       <span className="font-semibold text-[var(--text-primary)] truncate block">
                         {item.name}
                       </span>
+                      {(() => {
+                        const prod = products.find(p => p.id === (item.productId || item.id) || p.name === item.name);
+                        if (prod && prod.isCombo && Array.isArray(prod.comboItems) && prod.comboItems.length > 0) {
+                          const parts = prod.comboItems.map(ci => {
+                            const child = products.find(p => p.id === ci.productId || p.productId === ci.productId);
+                            return `${child ? (child.name || child.productName) : '商品'} x${ci.qty || 1}`;
+                          }).join('、');
+                          if (parts) {
+                            return (
+                              <span className="text-[11px] text-amber-700 dark:text-amber-300 font-bold block mt-0.5">
+                                🎁 內含：{parts}
+                              </span>
+                            );
+                          }
+                        }
+                        return null;
+                      })()}
                       {item.expiryDate && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-700 bg-orange-50 border border-orange-300 px-2 py-0.5 rounded-full mt-1 shadow-xs">
                           📅 效期至 {item.expiryDate}
@@ -6531,6 +6571,17 @@ ${freeNote(newFee, newMin)}
                                   <span className="text-[10px] text-amber-800 bg-amber-500/10 border border-amber-200/30 px-1 py-0.5 rounded font-bold shrink-0">
                                     捆裝 {product.bundleSize}入
                                   </span>
+                                )}
+                                {product.isCombo && Array.isArray(product.comboItems) && product.comboItems.length > 0 && (
+                                  <div className="text-[11px] text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg mt-1 w-full flex items-center gap-1 font-bold">
+                                    <span>🎁</span>
+                                    <span>
+                                      組合內含：{product.comboItems.map(ci => {
+                                        const child = products.find(p => p.id === ci.productId || p.productId === ci.productId);
+                                        return `${child ? (child.name || child.productName) : '商品'} x${ci.qty || 1}`;
+                                      }).join('、')}
+                                    </span>
+                                  </div>
                                 )}
                                 {(() => {
                                   // 1. 優先使用綁定的團購促銷活動 (product.promotion)

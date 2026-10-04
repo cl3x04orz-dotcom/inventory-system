@@ -1266,6 +1266,28 @@ export const GroupBuyService = {
             item.subtotal = calcSub;
           }
         }
+        
+        // 🎁 若為跨商品組合包 (isCombo)，自動帶入組合內容備註
+        if (dbProd.isCombo && Array.isArray(dbProd.comboItems) && (dbProd.comboItems as any[]).length > 0) {
+          const childIds = (dbProd.comboItems as any[]).map((ci: any) => String(ci.productId)).filter(Boolean);
+          const childProducts = await prisma.product.findMany({
+            where: { productId: { in: childIds } },
+            select: { productId: true, productName: true }
+          });
+          const childMap = new Map(childProducts.map((p: any) => [p.productId, p.productName]));
+          const comboParts = (dbProd.comboItems as any[]).map((ci: any) => {
+            const cName = childMap.get(String(ci.productId)) || '子商品';
+            return `${cName} x${ci.qty || 1}`;
+          });
+          if (comboParts.length > 0) {
+            const comboStr = `【組合內含：${comboParts.join(', ')}】`;
+            if (!item.remark) {
+              item.remark = comboStr;
+            } else if (!item.remark.includes('【組合內含')) {
+              item.remark = `${comboStr} ${item.remark}`;
+            }
+          }
+        }
       }
     }
 

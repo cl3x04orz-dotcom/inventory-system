@@ -3425,6 +3425,29 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                                                             x {item.qty} {isBundle ? '組' : '瓶'}
                                                                                         </span>
                                                                                     </div>
+                                                                                     {(() => {
+                                                                                         const remarkStr = String(item.remark || item.productName || '');
+                                                                                         let comboText = '';
+                                                                                         if (remarkStr.includes('【組合內含')) {
+                                                                                             const m = remarkStr.match(/【組合內含：[^】]+】/);
+                                                                                             if (m) comboText = m[0];
+                                                                                         }
+                                                                                         if (!comboText && prod && prod.isCombo && Array.isArray(prod.comboItems) && prod.comboItems.length > 0) {
+                                                                                             const parts = prod.comboItems.map(ci => {
+                                                                                                 const child = products.find(p => p.id === ci.productId || p.productId === ci.productId);
+                                                                                                 return `${child ? (child.name || child.productName) : '商品'} x${ci.qty || 1}`;
+                                                                                             }).join('、');
+                                                                                             if (parts) comboText = `【組合內含：${parts}】`;
+                                                                                         }
+                                                                                         if (comboText) {
+                                                                                             return (
+                                                                                                 <div className="text-xs font-black text-amber-800 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md mt-0.5 self-start">
+                                                                                                     🎁 {comboText}
+                                                                                                 </div>
+                                                                                             );
+                                                                                         }
+                                                                                         return null;
+                                                                                     })()}
                                                                                     {freeQty > 0 && (
                                                                                         <span className="text-xs font-bold text-emerald-600">
                                                                                             (付費: {paidQty}, 贈送: {freeQty})
