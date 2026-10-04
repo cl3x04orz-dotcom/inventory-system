@@ -192,7 +192,8 @@ export default function ProductManagementPage({ user, apiUrl }) {
     }, [products, getDaysLeft]);
 
     const fetchProducts = useCallback(async (isSilent = false) => {
-        if (!isSilent) setLoading(true);
+        const silent = isSilent === true;
+        if (!silent) setLoading(true);
         try {
             const productsData = await callGAS(apiUrl, 'getProducts', {}, user.token);
 
@@ -222,7 +223,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
             }
         } catch (error) {
             console.error('載入商品失敗:', error);
-            if (!isSilent) alert('載入商品失敗: ' + error.message);
+            if (!silent) alert('載入商品失敗: ' + error.message);
         } finally {
             setLoading(false);
         }
@@ -731,7 +732,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                             <Link2 size={15} className={isSelectMode ? 'text-white' : 'text-blue-600'} />
                             <span>{isSelectMode ? '結束選取' : '專屬連結選取'}</span>
                         </button>
-                        <button onClick={fetchProducts} className="btn-secondary p-2 rounded-xl shrink-0" title="重新整理">
+                        <button onClick={() => fetchProducts(false)} className="btn-secondary p-2 rounded-xl shrink-0" title="重新整理">
                             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                         </button>
                     </div>
