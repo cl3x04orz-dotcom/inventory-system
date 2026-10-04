@@ -666,20 +666,20 @@ export default function ProductManagementPage({ user, apiUrl }) {
     return (
         <div className="max-w-6xl mx-auto h-[calc(100vh-6rem)] flex flex-col p-4 gap-4">
             {/* Header Area */}
-            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center bg-[var(--bg-secondary)] p-4 rounded-xl border border-[var(--border-primary)] shadow-sm gap-3">
+            <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center bg-[var(--bg-secondary)] p-3.5 sm:p-4 rounded-2xl border border-[var(--border-primary)] shadow-sm gap-3">
                 <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
-                    <Package className="text-blue-600" />
-                    商品屬性
+                    <Package className="text-blue-600 shrink-0" />
+                    <span>商品屬性</span>
                 </h2>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                     {/* Style A Custom Dropdown Selector */}
-                    <div className="relative w-full sm:w-52">
+                    <div className="relative flex-1 min-w-[140px] sm:w-48 sm:flex-none">
                         <Package size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                         <select
                             value={stockFilter}
                             onChange={(e) => setStockFilter(e.target.value)}
-                            className="w-full appearance-none pl-9 pr-8 py-2 text-xs font-bold rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500 hover:border-blue-300 transition-all cursor-pointer shadow-sm"
+                            className="w-full appearance-none pl-9 pr-8 py-2 text-xs font-bold rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500 hover:border-blue-300 transition-all cursor-pointer shadow-sm truncate"
                         >
                             <option value="ALL">📦 販售中商品 (預設)</option>
                             <option value="ONLINE">🟢 已網購上架</option>
@@ -692,25 +692,26 @@ export default function ProductManagementPage({ user, apiUrl }) {
                         <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
 
-                    <div className="flex items-center gap-2 flex-1 w-full sm:w-auto">
-                        <div className="relative flex-1 sm:w-64">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} />
-                            <input
-                                type="text"
-                                placeholder="搜尋商品名稱或ID..."
-                                className="input-field pl-9 py-2 text-xs w-full"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                            />
-                        </div>
+                    <div className="relative flex-1 min-w-[140px] sm:w-48 sm:flex-none">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} />
+                        <input
+                            type="text"
+                            placeholder="搜尋商品名稱或ID..."
+                            className="input-field pl-9 py-2 text-xs w-full"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0 ml-auto sm:ml-0">
                         <button
                             type="button"
                             onClick={handleAddNewProduct}
-                            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-primary)] shadow-2xs active:scale-95 transition-all cursor-pointer shrink-0"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-primary)] shadow-2xs active:scale-95 transition-all cursor-pointer shrink-0"
                             title="快速建立一個全新商品或禮包名稱"
                         >
                             <Plus size={16} className="text-blue-600 dark:text-blue-400" />
-                            <span>新增商品 / 禮包</span>
+                            <span>新增商品/禮包</span>
                         </button>
                         <button
                             type="button"
@@ -730,7 +731,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                             title={isSelectMode ? "關閉選取模式" : "點擊開來選取專屬商品連結"}
                         >
                             <Link2 size={15} className={isSelectMode ? 'text-white' : 'text-blue-600'} />
-                            <span>{isSelectMode ? '結束選取' : '專屬連結選取'}</span>
+                            <span>{isSelectMode ? '結束選取' : '專屬連結'}</span>
                         </button>
                         <button onClick={() => fetchProducts(false)} className="btn-secondary p-2 rounded-xl shrink-0" title="重新整理">
                             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
@@ -1746,12 +1747,12 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                         </div>
 
                                                         {product.isCombo ? (
-                                                            <div className="flex flex-col gap-3 pt-1 pb-36">
+                                                            <div className="flex flex-col gap-3 pt-1 pb-6">
                                                                 <div className="text-xs text-[var(--text-secondary)] font-semibold bg-[var(--bg-tertiary)] p-2.5 rounded-xl border border-[var(--border-primary)]">
                                                                     💡 請在下方選擇商品與數量：
                                                                 </div>
                                                                 {(product.comboItems || []).map((item, idx) => (
-                                                                    <div key={idx} className="flex items-center gap-2 bg-[var(--bg-secondary)] p-2.5 rounded-xl border border-[var(--border-primary)] shadow-2xs">
+                                                                    <div key={idx} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-[var(--bg-secondary)] p-3 rounded-2xl border border-[var(--border-primary)] shadow-2xs">
                                                                         <SearchableProductSelect
                                                                             value={item.productId || ''}
                                                                             products={products.filter(p => p.id !== product.id && !p.isCombo)}
@@ -1762,32 +1763,36 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                                 handleSaveProduct(product.id, { comboItems: newItems });
                                                                             }}
                                                                         />
-                                                                        <div className="flex items-center gap-1 shrink-0">
-                                                                            <span className="text-xs font-bold text-[var(--text-secondary)]">x</span>
-                                                                            <input
-                                                                                type="number"
-                                                                                min="1"
-                                                                                className="input-field text-xs w-16 p-2 font-mono font-bold text-center"
-                                                                                value={item.qty || 1}
-                                                                                onChange={(e) => {
-                                                                                    const newItems = [...(product.comboItems || [])];
-                                                                                    newItems[idx] = { ...newItems[idx], qty: Math.max(1, Number(e.target.value) || 1) };
+                                                                        <div className="flex items-center justify-between sm:justify-start gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-[var(--border-primary)]/30 shrink-0">
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <span className="text-xs font-bold text-[var(--text-tertiary)]">x</span>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    min="1"
+                                                                                    className="input-field text-xs w-20 p-2 font-mono font-bold text-center rounded-xl"
+                                                                                    value={item.qty || 1}
+                                                                                    onChange={(e) => {
+                                                                                        const newItems = [...(product.comboItems || [])];
+                                                                                        newItems[idx] = { ...newItems[idx], qty: Math.max(1, Number(e.target.value) || 1) };
+                                                                                        handleFieldChange(product.id, 'comboItems', newItems);
+                                                                                        handleSaveProduct(product.id, { comboItems: newItems });
+                                                                                    }}
+                                                                                />
+                                                                            </div>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    const newItems = (product.comboItems || []).filter((_, i) => i !== idx);
                                                                                     handleFieldChange(product.id, 'comboItems', newItems);
                                                                                     handleSaveProduct(product.id, { comboItems: newItems });
                                                                                 }}
-                                                                            />
+                                                                                className="flex items-center gap-1 px-3 py-1.5 bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200/60 dark:border-rose-800/60 rounded-xl text-xs font-bold transition-colors cursor-pointer shrink-0 ml-auto sm:ml-0"
+                                                                                title="刪除此組合內子商品"
+                                                                            >
+                                                                                <Trash2 size={14} />
+                                                                                <span>刪除</span>
+                                                                            </button>
                                                                         </div>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                const newItems = (product.comboItems || []).filter((_, i) => i !== idx);
-                                                                                handleFieldChange(product.id, 'comboItems', newItems);
-                                                                                handleSaveProduct(product.id, { comboItems: newItems });
-                                                                            }}
-                                                                            className="px-2.5 py-1.5 bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 rounded-lg text-xs font-bold hover:bg-rose-100 cursor-pointer shrink-0"
-                                                                        >
-                                                                            刪除
-                                                                        </button>
                                                                     </div>
                                                                 ))}
                                                                 <button
