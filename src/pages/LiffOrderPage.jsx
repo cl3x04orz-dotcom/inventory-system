@@ -3749,15 +3749,8 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                                   });
                                   if (comboList.length > 0) {
                                     return (
-                                      <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold block mt-1 leading-snug">
-                                        <span className="block">【內含：</span>
-                                        <div className="pl-3 flex flex-col gap-0.5 mt-0.5">
-                                          {comboList.map((cText, cIdx) => (
-                                            <span key={cIdx} className="block whitespace-normal break-words">
-                                              • {cText}{cIdx === comboList.length - 1 ? '】' : '、'}
-                                            </span>
-                                          ))}
-                                        </div>
+                                      <div className="inline-block text-[10px] text-emerald-800 dark:text-emerald-300 bg-emerald-500/15 border border-emerald-400/50 px-1.5 py-0.5 rounded mt-1 font-bold">
+                                        【內含：{comboList.join('、')}】
                                       </div>
                                     );
                                   }
@@ -4519,15 +4512,8 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                           });
                           if (comboList.length > 0) {
                             return (
-                              <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold block mt-1 leading-snug">
-                                <span className="block">【內含：</span>
-                                <div className="pl-3 flex flex-col gap-0.5 mt-0.5">
-                                  {comboList.map((cText, cIdx) => (
-                                    <span key={cIdx} className="block whitespace-normal break-words">
-                                      • {cText}{cIdx === comboList.length - 1 ? '】' : '、'}
-                                    </span>
-                                  ))}
-                                </div>
+                              <div className="inline-block text-[10px] text-emerald-800 dark:text-emerald-300 bg-emerald-500/15 border border-emerald-400/50 px-1.5 py-0.5 rounded mt-1 font-bold">
+                                【內含：{comboList.join('、')}】
                               </div>
                             );
                           }
