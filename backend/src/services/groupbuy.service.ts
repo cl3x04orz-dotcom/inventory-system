@@ -608,9 +608,10 @@ export const GroupBuyService = {
               const salesDetailsToCreate: any[] = [];
               for (const d of order.details as any[]) {
                 const prod = orderProdMap.get(d.productId);
-                if (prod && prod.isCombo && Array.isArray(prod.comboItems)) {
-                  const comboItems = (prod.comboItems as any[]).filter((ci: any) => ci && ci.productId && String(ci.productId).trim() !== '');
-                  if (comboItems.length > 0) {
+                const comboItems = (prod && prod.isCombo && Array.isArray(prod.comboItems))
+                  ? (prod.comboItems as any[]).filter((ci: any) => ci && ci.productId && String(ci.productId).trim() !== '')
+                  : [];
+                if (comboItems.length > 0) {
                   const comboPacksSold = Number(d.qty || 0);
                   const totalComboAmount = Number(d.subtotal || 0);
 
@@ -640,7 +641,7 @@ export const GroupBuyService = {
                       subtotal: childSubtotal,
                       unitPrice: childUnitPrice
                     });
-                  }
+                  });
                 } else {
                   const multiplier = (prod && prod.isBundle) ? Number(prod.bundleSize || 1) : 1;
                   const finalSold = Number(d.qty) * multiplier;
