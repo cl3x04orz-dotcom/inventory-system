@@ -6584,15 +6584,6 @@ ${freeNote(newFee, newMin)}
                                     捆裝 {product.bundleSize}入
                                   </span>
                                 )}
-                                {product.isCombo && Array.isArray(product.comboItems) && product.comboItems.length > 0 && (
-                                  <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold mt-0.5 block leading-snug">
-                                    【內含：{product.comboItems.map(ci => {
-                                      const child = products.find(p => String(p.id) === String(ci.productId) || String(p.productId) === String(ci.productId));
-                                      const cName = child ? (child.name || child.productName) : (ci.productName || ci.name || '商品');
-                                      return `${cName} x${ci.qty || 1}`;
-                                    }).join('、')}】
-                                  </div>
-                                )}
                                 {(() => {
                                   // 1. 優先使用綁定的團購促銷活動 (product.promotion)
                                   const groupPromo = product.promotion;
@@ -6650,6 +6641,15 @@ ${freeNote(newFee, newMin)}
                                   return null;
                                 })()}
                               </div>
+                              {product.isCombo && Array.isArray(product.comboItems) && product.comboItems.length > 0 && (
+                                <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold mt-1 block leading-snug">
+                                  【內含：{product.comboItems.map(ci => {
+                                    const child = products.find(p => String(p.id) === String(ci.productId) || String(p.productId) === String(ci.productId));
+                                    const cName = child ? (child.name || child.productName) : (ci.productName || ci.name || '商品');
+                                    return `${cName} x${ci.qty || 1}`;
+                                  }).join('、')}】
+                                </div>
+                              )}
                               {product.expiryDate && (
                                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-700 bg-orange-50 border border-orange-300 px-2 py-0.5 rounded-full mt-1 shadow-xs">
                                   📅 效期至 {product.expiryDate}
