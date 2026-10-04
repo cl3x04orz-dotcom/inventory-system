@@ -6642,7 +6642,7 @@ ${freeNote(newFee, newMin)}
                                 })()}
                               </div>
                               {product.isCombo && Array.isArray(product.comboItems) && product.comboItems.length > 0 && (
-                                <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold mt-1 block leading-snug">
+                                <div className="inline-block text-[10px] text-emerald-800 dark:text-emerald-300 bg-emerald-500/15 border border-emerald-400/50 px-1.5 py-0.5 rounded mt-1 font-bold">
                                   【內含：{product.comboItems.map(ci => {
                                     const child = products.find(p => String(p.id) === String(ci.productId) || String(p.productId) === String(ci.productId));
                                     const cName = child ? (child.name || child.productName) : (ci.productName || ci.name || '商品');
