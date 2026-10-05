@@ -3736,9 +3736,22 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
 
                           return (
                             <>
-                              <span className="font-semibold text-[var(--text-primary)] block truncate">
-                                {displayName}
-                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-semibold text-[var(--text-primary)] truncate">
+                                  {displayName}
+                                </span>
+                                {(() => {
+                                  const prod = products.find(p => p.id === (item.productId || item.id) || p.name === displayName);
+                                  if (prod && (prod.isBundle || Number(prod.bundleSize) > 1)) {
+                                    return (
+                                      <span className="text-[10px] text-amber-800 bg-amber-500/10 border border-amber-200/30 px-1 py-0.5 rounded font-bold shrink-0">
+                                        捆裝 {prod.bundleSize || 1}入
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                              </div>
                               {(() => {
                                 const prod = products.find(p => p.id === (item.productId || item.id) || p.name === displayName);
                                 if (prod && prod.isCombo && Array.isArray(prod.comboItems) && prod.comboItems.length > 0) {
@@ -4499,9 +4512,22 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start">
                     <div className="min-w-0 flex-1">
-                      <span className="font-semibold text-[var(--text-primary)] truncate block">
-                        {item.name}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-[var(--text-primary)] truncate">
+                          {item.name}
+                        </span>
+                        {(() => {
+                          const prod = products.find(p => p.id === (item.productId || item.id) || p.name === item.name);
+                          if (prod && (prod.isBundle || Number(prod.bundleSize) > 1)) {
+                            return (
+                              <span className="text-[10px] text-amber-800 bg-amber-500/10 border border-amber-200/30 px-1 py-0.5 rounded font-bold shrink-0">
+                                捆裝 {prod.bundleSize || 1}入
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
                       {(() => {
                         const prod = products.find(p => p.id === (item.productId || item.id) || p.name === item.name);
                         if (prod && prod.isCombo && Array.isArray(prod.comboItems) && prod.comboItems.length > 0) {
