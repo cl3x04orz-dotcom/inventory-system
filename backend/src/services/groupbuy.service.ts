@@ -866,10 +866,139 @@ export const GroupBuyService = {
     return result;
   },
 
+  // 9. 業務績效報表與防搶單審核 (Sales Performance & Poaching Audit Report)
+  async getSalesPerformanceReport(payload: any, user: any) {
+    const { startDate, endDate } = payload || {};
+
+    let dateFilter: any = {};
+    if (startDate && endDate) {
+      dateFilter = {
+        createdAt: {
+          gte: new Date(`${startDate}T00:00:00.000Z`),
+          lte: new Date(`${endDate}T23:59:59.999Z`)
+        }
+      };
+    }
+
+    // 1. 取得所有 User 帳號
+    const users = await prisma.user.findMany({
+      select: {
+        userId: true,
+        username: true,
+        role: true,
+        status: true
+      }
+    });
+
+    // 2. 取得大樓責任業務對應
+    const buildings = await prisma.buildingSetting.findMany();
+    const buildingMap = new Map<string, string[]>();
+    buildings.forEach(b => {
+      if (b.salesId) {
+        const list = buildingMap.get(b.salesId) || [];
+        list.push(b.building);
+        buildingMap.set(b.salesId, list);
+      }
+    });
+
+    // 3. 取得會員綁定數
+    const members = await prisma.member.findMany({
+      select: {
+        memberId: true,
+        assignedSalesId: true,
+        assignedSalesName: true,
+        boundBuilding: true
+      }
+    });
+
+    const memberCountMap = new Map<string, number>();
+    members.forEach(m => {
+      if (m.assignedSalesId) {
+        memberCountMap.set(m.assignedSalesId, (memberCountMap.get(m.assignedSalesId) || 0) + 1);
+      }
+    });
+
+    // 4. 取得符合條件的團購訂單
+    const orders = await prisma.groupBuyOrder.findMany({
+      where: {
+        status: { not: 'CANCELLED' },
+        ...dateFilter
+      },
+      select: {
+        orderId: true,
+        customerName: true,
+        customerPhone: true,
+        totalAmount: true,
+        status: true,
+        salesId: true,
+        salesName: true,
+        salesRef: true,
+        isPoachingAlert: true,
+        poachingReason: true,
+        createdAt: true,
+        deliveryAddress: true,
+        sourceGroup: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // 5. 彙整業務績效
+    const salesReportMap = new Map<string, any>();
+
+    users.forEach(u => {
+      salesReportMap.set(u.userId, {
+        salesId: u.userId,
+        salesName: u.username,
+        role: u.role,
+        assignedBuildings: buildingMap.get(u.userId) || [],
+        boundMemberCount: memberCountMap.get(u.userId) || 0,
+        totalRevenue: 0,
+        orderCount: 0,
+        poachingAlertCount: 0,
+        orders: []
+      });
+    });
+
+    orders.forEach(ord => {
+      const sId = ord.salesId || 'UNASSIGNED';
+      const sName = ord.salesName || '未歸屬/一般散客';
+
+      if (!salesReportMap.has(sId)) {
+        salesReportMap.set(sId, {
+          salesId: sId,
+          salesName: sName,
+          role: 'EMPLOYEE',
+          assignedBuildings: [],
+          boundMemberCount: 0,
+          totalRevenue: 0,
+          orderCount: 0,
+          poachingAlertCount: 0,
+          orders: []
+        });
+      }
+
+      const report = salesReportMap.get(sId)!;
+      report.totalRevenue += Number(ord.totalAmount || 0);
+      report.orderCount += 1;
+      if (ord.isPoachingAlert) report.poachingAlertCount += 1;
+      report.orders.push(ord);
+    });
+
+    const poachingAlertOrders = orders.filter(o => o.isPoachingAlert);
+
+    return {
+      success: true,
+      reportList: Array.from(salesReportMap.values()),
+      poachingAlertOrders,
+      totalOrdersCount: orders.length,
+      totalRevenueSum: orders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0)
+    };
+  },
+
   // 8. 儲存/更新大樓設定
   async saveBuildingSettings(payload: any, user: any) {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN') throw new Error('權限不足');
-    const { building, start_time, end_time, sort_order, admin_note, promotion_template } = payload;
+    const { building, start_time, end_time, sort_order, admin_note, promotion_template, sales_id, sales_name, address_keywords } = payload;
     if (!building) throw new Error('缺少大樓名稱');
 
     const updateData: any = {};
@@ -878,6 +1007,15 @@ export const GroupBuyService = {
     if (sort_order !== undefined) updateData.sortOrder = Number(sort_order);
     if (admin_note !== undefined) updateData.adminNote = admin_note || null;
     if (promotion_template !== undefined) updateData.promotionTemplate = promotion_template || null;
+    if (sales_id !== undefined) updateData.salesId = sales_id || null;
+    if (sales_name !== undefined) updateData.salesName = sales_name || null;
+    if (address_keywords !== undefined) {
+      updateData.addressKeywords = Array.isArray(address_keywords) 
+        ? address_keywords 
+        : typeof address_keywords === 'string' 
+          ? address_keywords.split(',').map((s: string) => s.trim()).filter(Boolean)
+          : [];
+    }
 
     const createData: any = {
       building,
@@ -885,7 +1023,10 @@ export const GroupBuyService = {
       endTime: end_time || null,
       sortOrder: sort_order !== undefined ? Number(sort_order) : 0,
       adminNote: admin_note || null,
-      promotionTemplate: promotion_template || null
+      promotionTemplate: promotion_template || null,
+      salesId: sales_id || null,
+      salesName: sales_name || null,
+      addressKeywords: updateData.addressKeywords || []
     };
 
     await prisma.buildingSetting.upsert({
@@ -894,7 +1035,7 @@ export const GroupBuyService = {
       create: createData
     });
 
-    // 自動同步：如果在 GroupBuyCommunity 中找不到同名社區，自動新增
+    // 自動同步：如果在 GroupBuyCommunity 中找不到同名社區，自動新增或同步
     const existingComm = await prisma.groupBuyCommunity.findFirst({
       where: { communityName: building }
     });
@@ -906,7 +1047,19 @@ export const GroupBuyService = {
           communityCode: code,
           communityName: building,
           status: 'ACTIVE',
-          orderingMode: 'OPEN'
+          orderingMode: 'OPEN',
+          salesId: sales_id || null,
+          salesName: sales_name || null,
+          addressKeywords: updateData.addressKeywords || []
+        }
+      });
+    } else {
+      await prisma.groupBuyCommunity.update({
+        where: { communityId: existingComm.communityId },
+        data: {
+          salesId: sales_id !== undefined ? (sales_id || null) : existingComm.salesId,
+          salesName: sales_name !== undefined ? (sales_name || null) : existingComm.salesName,
+          addressKeywords: updateData.addressKeywords !== undefined ? updateData.addressKeywords : existingComm.addressKeywords
         }
       });
     }
@@ -1517,6 +1670,96 @@ export const GroupBuyService = {
 
       await verifyAndDeductProductQuota(tx, items, CommunityId, commNameSnap || sourceGroup || '');
 
+      // 🎯 4-Layer Sales Attribution & Anti-Poaching Resolver
+      let finalSalesId: string | null = null;
+      let finalSalesName: string | null = null;
+      let isPoachingAlert = false;
+      let poachingReason = '';
+
+      let existingMember: any = null;
+      if (lineUserId) {
+        existingMember = await tx.member.findUnique({
+          where: { memberId_storeCode: { memberId: lineUserId, storeCode: payload.storeCode || 'MILI001' } }
+        });
+      }
+
+      // A. 比對大樓據點責任業務 (Building Territory Protection)
+      let buildingSalesId: string | null = null;
+      let buildingSalesName: string | null = null;
+      let matchedBuildingName: string | null = null;
+
+      const targetBuildingName = commNameSnap || sourceGroup || '';
+      if (targetBuildingName) {
+        const bSetting = await tx.buildingSetting.findFirst({
+          where: { building: targetBuildingName }
+        });
+        if (bSetting && bSetting.salesId) {
+          buildingSalesId = bSetting.salesId;
+          buildingSalesName = bSetting.salesName;
+          matchedBuildingName = bSetting.building;
+        }
+      }
+
+      // 若未直接比對出大樓，進行關卡 2 (地址關鍵字池模糊比對)
+      if (!buildingSalesId && deliveryAddress) {
+        const allBuildings = await tx.buildingSetting.findMany({
+          where: { salesId: { not: null } }
+        });
+        for (const b of allBuildings) {
+          const keywords = Array.isArray(b.addressKeywords) ? b.addressKeywords : [];
+          if (b.building && deliveryAddress.includes(b.building)) {
+            buildingSalesId = b.salesId;
+            buildingSalesName = b.salesName;
+            matchedBuildingName = b.building;
+            break;
+          }
+          for (const kw of keywords) {
+            if (kw && String(kw).trim() && deliveryAddress.includes(String(kw).trim())) {
+              buildingSalesId = b.salesId;
+              buildingSalesName = b.salesName;
+              matchedBuildingName = b.building;
+              break;
+            }
+          }
+          if (buildingSalesId) break;
+        }
+      }
+
+      // B. 比對個人推薦連結 (Ref Sales)
+      let refSalesId: string | null = null;
+      let refSalesName: string | null = null;
+      if (payload.salesRef) {
+        const refUser = await tx.user.findFirst({
+          where: { username: payload.salesRef }
+        }) || await tx.user.findFirst({
+          where: { userId: payload.salesRef }
+        });
+        if (refUser) {
+          refSalesId = refUser.userId;
+          refSalesName = refUser.username;
+        }
+      }
+
+      // 🛡️ 歸屬優先權算術演算
+      if (buildingSalesId) {
+        // 大樓據點絕對優先
+        finalSalesId = buildingSalesId;
+        finalSalesName = buildingSalesName;
+
+        if (refSalesId && refSalesId !== buildingSalesId) {
+          isPoachingAlert = true;
+          poachingReason = `跨區搶單疑慮：顧客經由業務 [${refSalesName || refSalesId}] 專屬連結下單，但配送地址歸屬大樓業務 [${buildingSalesName || buildingSalesId}] (${matchedBuildingName})`;
+        }
+      } else if (existingMember && existingMember.assignedSalesId) {
+        // 首單永久綁定
+        finalSalesId = existingMember.assignedSalesId;
+        finalSalesName = existingMember.assignedSalesName;
+      } else if (refSalesId) {
+        // 個人推廣連結
+        finalSalesId = refSalesId;
+        finalSalesName = refSalesName;
+      }
+
       await tx.groupBuyOrder.create({
         data: {
           orderId,
@@ -1536,6 +1779,11 @@ export const GroupBuyService = {
           source: 'LIFF_V2',
           confirmedAt: deductionApplied === totalAmount ? now : null, // 全額扣抵直接標記確認
           expectedDeliveryDate: payload.expectedDeliveryDate || '',
+          salesId: finalSalesId,
+          salesName: finalSalesName,
+          salesRef: payload.salesRef || null,
+          isPoachingAlert,
+          poachingReason: isPoachingAlert ? poachingReason : null,
           details: {
             create: items.map((item: any) => ({
               productId: item.productId || '',
@@ -1551,7 +1799,7 @@ export const GroupBuyService = {
         }
       });
 
-      // 訂單成立後，更新會員的可用累積額度與歷史總消費
+      // 訂單成立後，更新會員的可用累積額度、歷史總消費與業務綁定
       if (lineUserId) {
         await tx.member.upsert({
           where: { memberId_storeCode: { memberId: lineUserId, storeCode: payload.storeCode || 'MILI001' } },
@@ -1562,7 +1810,11 @@ export const GroupBuyService = {
             totalLifetimeSpend: {
               increment: netProductTotal
             },
-            displayName: lineDisplayName || undefined
+            displayName: lineDisplayName || undefined,
+            assignedSalesId: existingMember?.assignedSalesId ? undefined : (finalSalesId || undefined),
+            assignedSalesName: existingMember?.assignedSalesName ? undefined : (finalSalesName || undefined),
+            boundBuilding: existingMember?.boundBuilding ? undefined : (matchedBuildingName || undefined),
+            boundAt: existingMember?.boundAt ? undefined : (finalSalesId ? now : undefined)
           },
           create: {
             memberId: lineUserId,
@@ -1571,7 +1823,11 @@ export const GroupBuyService = {
             walletBalance: 0,
             redeemableSpendBalance: Math.max(0, netProductTotal - appliedRewardThreshold),
             totalLifetimeSpend: netProductTotal,
-            memberLevel: 'General'
+            memberLevel: 'General',
+            assignedSalesId: finalSalesId || null,
+            assignedSalesName: finalSalesName || null,
+            boundBuilding: matchedBuildingName || null,
+            boundAt: finalSalesId ? now : null
           }
         });
       }

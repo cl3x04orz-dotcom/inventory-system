@@ -315,6 +315,9 @@ model GroupBuyCommunity {
   deliveryInstruction   String?
   status                String                  @default("ACTIVE")
   notes                 String?
+  salesId               String?
+  salesName             String?
+  addressKeywords       String[]                @default([])
   createdBy             String?
   updatedBy             String?
   createdAt             DateTime                @default(now())
@@ -346,6 +349,11 @@ model GroupBuyOrder {
   expectedDeliveryDate String?
   rewardDiscountAmount Decimal                  @default(0)
   rewardTierThreshold  Decimal                  @default(0)
+  salesId              String?
+  salesName            String?
+  salesRef             String?
+  isPoachingAlert      Boolean                  @default(false)
+  poachingReason       String?
   createdAt            DateTime                 @default(now())
   updatedAt            DateTime                 @updatedAt
   details              GroupBuyOrderDetail[]
@@ -525,6 +533,9 @@ model BuildingSetting {
   sortOrder         Int      @default(0)
   adminNote         String?
   promotionTemplate String?
+  salesId           String?
+  salesName         String?
+  addressKeywords   String[] @default([])
   updatedAt         DateTime @updatedAt
   storeCode         String   @default("MILI001")
 }
@@ -546,6 +557,10 @@ model Member {
   redeemableSpendBalance Decimal             @default(0)
   totalLifetimeSpend     Decimal             @default(0)
   memberLevel            String              @default("General")
+  assignedSalesId        String?
+  assignedSalesName      String?
+  boundBuilding          String?
+  boundAt                DateTime?
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
   transactions           WalletTransaction[]

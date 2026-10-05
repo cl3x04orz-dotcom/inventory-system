@@ -373,7 +373,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         try {
           const stateStr = liffState.startsWith('?') ? liffState.slice(1) : liffState;
           liffStateParams = new URLSearchParams(stateStr);
-        } catch (_) {}
+        } catch (_) { }
       }
       const hashStr = window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '';
       const hashParams = new URLSearchParams(hashStr);
@@ -482,6 +482,24 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     handleUrlCheck();
     window.addEventListener("hashchange", handleUrlCheck);
     return () => window.removeEventListener("hashchange", handleUrlCheck);
+  }, []);
+
+  // 抓取並解析業務專屬推廣連結代碼 (?ref=xxx 或 ?salesRef=xxx)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      let ref = params.get('ref') || params.get('salesRef');
+      if (!ref && params.get('liff.state')) {
+        try {
+          const liffStateStr = params.get('liff.state').replace(/^\??/, '');
+          const stateParams = new URLSearchParams(liffStateStr);
+          ref = stateParams.get('ref') || stateParams.get('salesRef');
+        } catch (_) {}
+      }
+      if (ref) {
+        localStorage.setItem('mlw_sales_ref', ref.trim());
+      }
+    } catch (_) {}
   }, []);
 
   // 當進入「訂單」步驟且已取得 lineUserId 時，自動載入我的訂單列表
@@ -1345,7 +1363,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
             savedObj.building = "線上下單";
             localStorage.setItem(LS_KEY, JSON.stringify(savedObj));
           }
-        } catch (_) {}
+        } catch (_) { }
       }
       if (urlGrp) {
         setSourceGroup(urlGrp);
@@ -2909,6 +2927,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
           }
           return selectedBuilding === "其它" ? otherBuildingText.trim() : (selectedBuilding || "一般散客");
         })(),
+        salesRef: localStorage.getItem('mlw_sales_ref') || undefined,
         note,
         paymentMethod: (currentPayAmount === 0 && selectedRewardRule && (!useWallet || maxDeduction === 0))
           ? "滿額消費折抵"

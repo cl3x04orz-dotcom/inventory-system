@@ -32,6 +32,46 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
     const [rewardLoading, setRewardLoading] = useState(false);
     const [rewardSaving, setRewardSaving] = useState(false);
 
+    // 💼 業務人員與業績報表 state
+    const [salesList, setSalesList] = useState([]);
+    const [salesId, setSalesId] = useState('');
+    const [addressKeywords, setAddressKeywords] = useState('');
+    const [selectedSalesRef, setSelectedSalesRef] = useState('');
+    const [salesReportData, setSalesReportData] = useState(null);
+    const [loadingReport, setLoadingReport] = useState(false);
+    const [reportStartDate, setReportStartDate] = useState('');
+    const [reportEndDate, setReportEndDate] = useState('');
+
+    const fetchSalesList = useCallback(async () => {
+        try {
+            const res = await callGAS(apiUrl, 'getUsers', {}, user?.token);
+            const userArray = Array.isArray(res) ? res : (res?.list || res?.users || []);
+            setSalesList(userArray);
+        } catch (e) {
+            console.error('載入業務名單失敗:', e);
+        }
+    }, [apiUrl, user?.token]);
+
+    const fetchSalesReport = useCallback(async (start = reportStartDate, end = reportEndDate) => {
+        setLoadingReport(true);
+        try {
+            const res = await callGAS(apiUrl, 'getSalesPerformanceReport', { startDate: start, endDate: end }, user?.token);
+            if (res && res.success) {
+                setSalesReportData(res);
+            }
+        } catch (e) {
+            console.error('載入業務報表失敗:', e);
+        } finally {
+            setLoadingReport(false);
+        }
+    }, [apiUrl, user?.token, reportStartDate, reportEndDate]);
+
+    useEffect(() => {
+        if (user?.token) {
+            fetchSalesList();
+        }
+    }, [user?.token, fetchSalesList]);
+
     const fetchRewardConfig = useCallback(async () => {
         setRewardLoading(true);
         try {
@@ -481,6 +521,11 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
             // 備注
             setAdminNote(found.admin_note || '');
 
+            // 責任業務與地址防搶關鍵字
+            setSalesId(found.sales_id || found.salesId || '');
+            const kw = found.address_keywords || found.addressKeywords;
+            setAddressKeywords(Array.isArray(kw) ? kw.join(', ') : (kw || ''));
+
             // 社區專屬價格相關
             const commId = found.community_id || '';
             setSelectedCommunityId(commId);
@@ -504,6 +549,8 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
 
             // 備注預設
             setAdminNote('');
+            setSalesId('');
+            setAddressKeywords('');
 
             // 社區專屬價格相關
             setSelectedCommunityId('');
@@ -691,6 +738,7 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
             const sDateTime = combineDateTime(startDate, startTime);
             const eDateTime = combineDateTime(endDate, endTime);
 
+            const matchedUser = salesList.find(u => u.userId === salesId || u.username === salesId || u.id === salesId);
             const res = await callGAS(apiUrl, 'saveBuildingSettings', {
                 building: targetBuilding,
                 start_time: sDateTime,
@@ -701,6 +749,9 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                 auto_close_day: autoCloseDay !== '' ? Number(autoCloseDay) : '',
                 auto_close_time: autoCloseTime,
                 admin_note: adminNote.trim() || null,
+                sales_id: salesId || null,
+                sales_name: matchedUser ? matchedUser.username : null,
+                address_keywords: addressKeywords ? addressKeywords.split(',').map(s => s.trim()).filter(Boolean) : [],
             }, user.token);
 
             if (res && res.error) {
@@ -865,6 +916,22 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                 >
                     <Gift size={16} />
                     <span>🎁 線上會員滿額折抵</span>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        setActiveTab('SALES_PERFORMANCE');
+                        fetchSalesReport();
+                    }}
+                    className={`px-4 py-2.5 rounded-xl font-extrabold text-xs md:text-sm flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+                        activeTab === 'SALES_PERFORMANCE'
+                            ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+                            : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)]'
+                    }`}
+                >
+                    <User size={16} />
+                    <span>💼 業務業績與防搶單報表</span>
                 </button>
             </div>
 
@@ -1427,6 +1494,54 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                 </div>
                                             </div>
 
+                                            {/* 💼 責任業務與防搶單關鍵字設定 */}
+                                            {(!isAddingNew && selectedBuilding) && (
+                                                <div className="bg-purple-50/60 border border-purple-200/80 p-4 rounded-2xl flex flex-col gap-3.5 mt-2">
+                                                    <h4 className="text-sm font-extrabold text-purple-900 flex items-center gap-1.5 border-b border-purple-200 pb-2">
+                                                        <User size={16} className="text-purple-600" />
+                                                        開發責任業務與大樓防搶關鍵字設定
+                                                    </h4>
+
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                        {/* 責任業務選單 */}
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-xs font-bold text-purple-800">
+                                                                🏢 該大樓/社區開發責任業務：
+                                                            </label>
+                                                            <select
+                                                                value={salesId}
+                                                                onChange={(e) => setSalesId(e.target.value)}
+                                                                className="input-field w-full p-2.5 bg-white rounded-xl border border-purple-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-500"
+                                                            >
+                                                                <option value="">未指定 (屬於公海大樓)</option>
+                                                                {salesList.map(u => (
+                                                                    <option key={u.userId || u.username} value={u.userId || u.username}>
+                                                                        👤 {u.username} ({u.role || '業務'})
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+
+                                                        {/* 地址防搶關鍵字 */}
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-xs font-bold text-purple-800">
+                                                                🛡️ 地址比對關鍵字池 (用逗號隔開)：
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                className="input-field w-full p-2.5 bg-white rounded-xl border border-purple-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-500"
+                                                                placeholder="例: 遠雄, 信義路五段7號, Farglory"
+                                                                value={addressKeywords}
+                                                                onChange={(e) => setAddressKeywords(e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-[11px] text-purple-700/80 leading-relaxed">
+                                                        ※ 當顧客配送地址包含上述關鍵字或從此大樓網址開啟時，系統將自動實施「大樓據點絕對優先」，將業績硬性劃歸給負責業務，防止同公司業務跨區搶單。
+                                                    </p>
+                                                </div>
+                                            )}
+
                                             {/* 管理員備注 */}
                                             {!isAddingNew && selectedBuilding && (
                                                 <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-2xl flex flex-col gap-2 mt-2">
@@ -1581,10 +1696,280 @@ export default function GroupBuySettingsPage({ user, apiUrl }) {
                                                         </button>
                                                     </div>
                                                 </div>
+
+                                                {/* 💼 業務個人專屬推廣網址產生器 */}
+                                                <div className="p-4 bg-purple-50/60 border border-purple-200/80 rounded-2xl space-y-3">
+                                                    <h4 className="font-extrabold text-sm text-purple-900 flex items-center gap-1.5">
+                                                        <User size={16} className="text-purple-600" />
+                                                        💼 業務個人專屬推廣網址產生器 (?ref=業務帳號)
+                                                    </h4>
+                                                    <p className="text-xs text-purple-700/90 font-medium">
+                                                        可為個別業務生成全區通用的專屬 LIFF 網址（不限社區）。客戶開啟下單時，系統將自動實施「首單永久鎖定」與「業務業績歸屬」。
+                                                    </p>
+                                                    <div className="flex flex-col sm:flex-row gap-2.5 items-center">
+                                                        <select
+                                                            value={selectedSalesRef}
+                                                            onChange={(e) => setSelectedSalesRef(e.target.value)}
+                                                            className="input-field p-2.5 bg-white rounded-xl border border-purple-300 text-xs font-bold text-slate-800 focus:outline-none w-full sm:w-60"
+                                                        >
+                                                            <option value="">選擇業務人員...</option>
+                                                            {salesList.map(u => (
+                                                                <option key={u.userId || u.username} value={u.username || u.userId}>
+                                                                    👤 {u.username} ({u.role || '業務'})
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                        {selectedSalesRef && (
+                                                            <div className="flex flex-1 gap-2 w-full">
+                                                                <input
+                                                                    type="text"
+                                                                    readOnly
+                                                                    className="input-field flex-1 p-2.5 bg-white rounded-xl border border-purple-300 text-xs text-purple-900 font-mono font-bold focus:outline-none"
+                                                                    value={`https://liff.line.me/${LIFF_ID}?ref=${selectedSalesRef}`}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const url = `https://liff.line.me/${LIFF_ID}?ref=${selectedSalesRef}`;
+                                                                        copyToClipboard(url);
+                                                                        alert(`已複製業務 [${selectedSalesRef}] 的全區個人專屬推廣網址！\n${url}`);
+                                                                    }}
+                                                                    className="px-4 py-2.5 rounded-xl font-bold flex items-center gap-1 text-xs text-white bg-purple-600 hover:bg-purple-700 active:scale-95 transition-all cursor-pointer whitespace-nowrap shadow-sm"
+                                                                >
+                                                                    <Copy size={14} />
+                                                                    複製個人專屬網址
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
                                             </div>
                                         ) : (
                                             <div className="text-center py-10 text-xs text-slate-400">
                                                 請先在左側選擇大樓社區以查看專屬網址與文案。
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* 💼 頁籤六：業務業績與防搶單報表 */}
+                                {activeTab === 'SALES_PERFORMANCE' && (
+                                    <div className="bg-[var(--bg-secondary)] p-5 rounded-2xl border border-[var(--border-primary)] shadow-md flex flex-col gap-5">
+                                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-[var(--border-primary)]">
+                                            <div>
+                                                <h3 className="font-extrabold text-lg text-[var(--text-primary)] flex items-center gap-2">
+                                                    <User size={20} className="text-purple-600" />
+                                                    業務人員業績報表與防搶單審核儀表板
+                                                </h3>
+                                                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                                                    統計各業務銷售金額、開拓大樓數、專屬綁定會員，並即時預警跨區搶單疑慮。
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => fetchSalesReport()}
+                                                disabled={loadingReport}
+                                                className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
+                                            >
+                                                <RefreshCw size={14} className={loadingReport ? 'animate-spin' : ''} />
+                                                更新報表數據
+                                            </button>
+                                        </div>
+
+                                        {/* 📅 日期區間篩選 */}
+                                        <div className="flex flex-wrap items-center gap-3 p-3.5 bg-[var(--bg-tertiary)] rounded-2xl border border-[var(--border-primary)] text-xs">
+                                            <span className="font-extrabold text-[var(--text-primary)]">📅 篩選日期區間：</span>
+                                            <input
+                                                type="date"
+                                                value={reportStartDate}
+                                                onChange={(e) => setReportStartDate(e.target.value)}
+                                                className="px-2.5 py-1.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] font-bold text-[var(--text-primary)]"
+                                            />
+                                            <span>至</span>
+                                            <input
+                                                type="date"
+                                                value={reportEndDate}
+                                                onChange={(e) => setReportEndDate(e.target.value)}
+                                                className="px-2.5 py-1.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] font-bold text-[var(--text-primary)]"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => fetchSalesReport(reportStartDate, reportEndDate)}
+                                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-all cursor-pointer"
+                                            >
+                                                查詢
+                                            </button>
+                                            {(reportStartDate || reportEndDate) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setReportStartDate('');
+                                                        setReportEndDate('');
+                                                        fetchSalesReport('', '');
+                                                    }}
+                                                    className="text-slate-500 hover:text-slate-700 underline font-bold cursor-pointer"
+                                                >
+                                                    重置日期
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* 📊 核心指標 Overview Cards */}
+                                        {salesReportData && (
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex flex-col gap-1">
+                                                    <span className="text-xs font-extrabold text-purple-700">💰 篩選總銷售額</span>
+                                                    <span className="text-xl font-black text-purple-900 font-mono">
+                                                        ${salesReportData.totalRevenueSum?.toLocaleString() || 0}
+                                                    </span>
+                                                </div>
+                                                <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex flex-col gap-1">
+                                                    <span className="text-xs font-extrabold text-blue-700">📦 總有效訂單筆數</span>
+                                                    <span className="text-xl font-black text-blue-900 font-mono">
+                                                        {salesReportData.totalOrdersCount || 0} 筆
+                                                    </span>
+                                                </div>
+                                                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex flex-col gap-1">
+                                                    <span className="text-xs font-extrabold text-emerald-700">👥 業務人員總數</span>
+                                                    <span className="text-xl font-black text-emerald-900 font-mono">
+                                                        {salesReportData.reportList?.length || 0} 人
+                                                    </span>
+                                                </div>
+                                                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex flex-col gap-1">
+                                                    <span className="text-xs font-extrabold text-amber-700">⚠️ 搶單疑慮標記數</span>
+                                                    <span className="text-xl font-black text-amber-900 font-mono">
+                                                        {salesReportData.poachingAlertOrders?.length || 0} 筆
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* 💼 業務人員業績彙整表 */}
+                                        <div className="space-y-3">
+                                            <h4 className="font-extrabold text-sm text-[var(--text-primary)] flex items-center gap-1.5">
+                                                📊 業務人員銷售與開發績效表
+                                            </h4>
+                                            <div className="overflow-x-auto rounded-2xl border border-[var(--border-primary)]">
+                                                <table className="w-full text-xs text-left">
+                                                    <thead className="bg-[var(--bg-tertiary)] font-bold text-[var(--text-primary)] border-b border-[var(--border-primary)]">
+                                                        <tr>
+                                                            <th className="p-3">業務姓名/帳號</th>
+                                                            <th className="p-3">角色</th>
+                                                            <th className="p-3">負責大樓/社區</th>
+                                                            <th className="p-3">綁定會員數</th>
+                                                            <th className="p-3">累積銷售額</th>
+                                                            <th className="p-3">訂單筆數</th>
+                                                            <th className="p-3">搶單疑慮</th>
+                                                            <th className="p-3 text-center">專屬推廣網址</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-[var(--border-primary)] bg-[var(--bg-secondary)]">
+                                                        {salesReportData?.reportList && salesReportData.reportList.length > 0 ? (
+                                                            salesReportData.reportList.map(item => (
+                                                                <tr key={item.salesId} className="hover:bg-[var(--bg-tertiary)]/50 transition-colors">
+                                                                    <td className="p-3 font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                                                                        <User size={14} className="text-purple-500 shrink-0" />
+                                                                        {item.salesName}
+                                                                    </td>
+                                                                    <td className="p-3">
+                                                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                                                            {item.role || '員工'}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="p-3">
+                                                                        {item.assignedBuildings && item.assignedBuildings.length > 0 ? (
+                                                                            <div className="flex flex-wrap gap-1">
+                                                                                {item.assignedBuildings.map(b => (
+                                                                                    <span key={b} className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                                                                        🏢 {b}
+                                                                                    </span>
+                                                                                ))}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <span className="text-slate-400">無專屬大樓</span>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="p-3 font-mono font-bold text-emerald-600">
+                                                                        {item.boundMemberCount} 位
+                                                                    </td>
+                                                                    <td className="p-3 font-mono font-extrabold text-purple-700 text-sm">
+                                                                        ${item.totalRevenue?.toLocaleString() || 0}
+                                                                    </td>
+                                                                    <td className="p-3 font-mono font-bold text-slate-700">
+                                                                        {item.orderCount} 筆
+                                                                    </td>
+                                                                    <td className="p-3">
+                                                                        {item.poachingAlertCount > 0 ? (
+                                                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                                                                ⚠️ {item.poachingAlertCount} 筆疑慮
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="text-slate-400">正常</span>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="p-3 text-center">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                const url = `https://liff.line.me/${LIFF_ID}?ref=${item.salesName || item.salesId}`;
+                                                                                copyToClipboard(url);
+                                                                                alert(`已複製業務 [${item.salesName}] 的全區個人推廣網址！\n${url}`);
+                                                                            }}
+                                                                            className="px-2.5 py-1 bg-purple-500/10 hover:bg-purple-600 text-purple-600 hover:text-white rounded-lg border border-purple-200 active:scale-95 transition-all font-bold cursor-pointer"
+                                                                        >
+                                                                            複製個人連結
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))
+                                                        ) : (
+                                                            <tr>
+                                                                <td colSpan="8" className="text-center p-8 text-slate-400">
+                                                                    {loadingReport ? '資料載入中...' : '目前尚無業務數據紀錄。'}
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+
+                                        {/* ⚠️ 搶單疑慮審核紀錄表 */}
+                                        {salesReportData?.poachingAlertOrders && salesReportData.poachingAlertOrders.length > 0 && (
+                                            <div className="space-y-3 pt-3 border-t border-[var(--border-primary)]">
+                                                <h4 className="font-extrabold text-sm text-amber-800 flex items-center gap-1.5">
+                                                    <AlertTriangle size={16} className="text-amber-600" />
+                                                    ⚠️ 跨區搶單疑慮審核紀錄 (需主管/管理員關注)
+                                                </h4>
+                                                <div className="overflow-x-auto rounded-2xl border border-amber-200 bg-amber-50/30">
+                                                    <table className="w-full text-xs text-left">
+                                                        <thead className="bg-amber-100/60 font-bold text-amber-900 border-b border-amber-200">
+                                                            <tr>
+                                                                <th className="p-3">訂單編號</th>
+                                                                <th className="p-3">客戶姓名</th>
+                                                                <th className="p-3">配送社區/地址</th>
+                                                                <th className="p-3">訂單金額</th>
+                                                                <th className="p-3">衝突細節與原因</th>
+                                                                <th className="p-3">下單時間</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-amber-200/60 bg-white">
+                                                            {salesReportData.poachingAlertOrders.map(ord => (
+                                                                <tr key={ord.orderId} className="hover:bg-amber-50/50">
+                                                                    <td className="p-3 font-mono font-bold text-slate-900">#{ord.orderId}</td>
+                                                                    <td className="p-3 font-bold text-slate-800">{ord.customerName} ({ord.customerPhone})</td>
+                                                                    <td className="p-3 font-medium text-slate-700">{ord.sourceGroup || ord.deliveryAddress || '-'}</td>
+                                                                    <td className="p-3 font-mono font-bold text-purple-700">${ord.totalAmount}</td>
+                                                                    <td className="p-3 text-amber-900 font-bold">{ord.poachingReason}</td>
+                                                                    <td className="p-3 text-slate-500 font-mono">
+                                                                        {ord.createdAt ? new Date(ord.createdAt).toLocaleString('zh-TW', { hour12: false }) : '-'}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
