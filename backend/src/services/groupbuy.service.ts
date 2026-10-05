@@ -805,15 +805,24 @@ export const GroupBuyService = {
     } catch (e: any) {
       console.warn('[BuildingSetting] Fallback query:', e.message);
       try {
-        settings = await prisma.$queryRaw`SELECT building, "startTime", "endTime", "sortOrder", "adminNote" FROM "BuildingSetting" WHERE "storeCode" = ${storeCode} ORDER BY "sortOrder" ASC, building ASC`;
+        settings = await prisma.$queryRaw`SELECT building, "startTime", "endTime", "sortOrder", "adminNote", "salesId", "salesName", "addressKeywords" FROM "BuildingSetting" WHERE "storeCode" = ${storeCode} ORDER BY "sortOrder" ASC, building ASC`;
       } catch (err: any) {
         settings = [];
       }
     }
-    // 一次查出所有社區的運費設定（依名稱匹配）
+    // 一次查出所有社區的運費設定與業務設定（依名稱匹配）
     const allComms = await prisma.groupBuyCommunity.findMany({
       where: { storeCode },
-      select: { communityId: true, communityName: true, defaultFreeShipping: true, freeShippingMin: true, shippingFee: true }
+      select: { 
+        communityId: true, 
+        communityName: true, 
+        defaultFreeShipping: true, 
+        freeShippingMin: true, 
+        shippingFee: true,
+        salesId: true,
+        salesName: true,
+        addressKeywords: true
+      }
     });
     const commMap = new Map(allComms.map((c: any) => [c.communityName, c]));
 
@@ -836,6 +845,10 @@ export const GroupBuyService = {
         default_free_shipping: comm?.defaultFreeShipping || false,
         free_shipping_min: Number(comm?.freeShippingMin) || 0,
         shipping_fee: Number(comm?.shippingFee) || 0,
+        // 責任業務與地址防搶關鍵字
+        sales_id: s.salesId || comm?.salesId || null,
+        sales_name: s.salesName || comm?.salesName || null,
+        address_keywords: s.addressKeywords || comm?.addressKeywords || [],
       };
     });
 
@@ -858,7 +871,10 @@ export const GroupBuyService = {
           auto_close_time: '',
           default_free_shipping: c.defaultFreeShipping || false,
           free_shipping_min: Number(c.freeShippingMin) || 0,
-          shipping_fee: Number(c.shippingFee) || 0
+          shipping_fee: Number(c.shippingFee) || 0,
+          sales_id: c.salesId || null,
+          sales_name: c.salesName || null,
+          address_keywords: c.addressKeywords || []
         });
       }
     });
