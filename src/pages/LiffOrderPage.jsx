@@ -1047,6 +1047,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     // 2. 檢測手動加開開關團
     let isManualOpen = false;
     let isManualUpcoming = false;
+    let isManualEnded = false;
     const parseCustomDate = (dateStr) => {
       if (!dateStr) return null;
       const parts = dateStr.trim().split(' ');
