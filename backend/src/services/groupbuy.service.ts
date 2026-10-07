@@ -1051,6 +1051,10 @@ export const GroupBuyService = {
       create: createData
     });
 
+    // 清除 LIFF 快取，確保前端立刻取得最新開關團時間
+    liffCache.del('liff:buildings');
+    liffCache.del('liff:communities');
+
     // 自動同步：如果在 GroupBuyCommunity 中找不到同名社區，自動新增或同步
     const existingComm = await prisma.groupBuyCommunity.findFirst({
       where: { communityName: building }
@@ -1106,6 +1110,8 @@ export const GroupBuyService = {
       });
     }
 
+    liffCache.del('liff:buildings');
+    liffCache.del('liff:communities');
     return { success: true };
   },
 
@@ -1124,6 +1130,8 @@ export const GroupBuyService = {
         })
       )
     );
+    liffCache.del('liff:buildings');
+    liffCache.del('liff:communities');
     return { success: true };
   },
 

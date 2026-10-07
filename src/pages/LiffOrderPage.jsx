@@ -1047,12 +1047,19 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     // 2. 檢測手動加開開關團
     let isManualOpen = false;
     let isManualUpcoming = false;
-    let isManualEnded = false;
+    const parseCustomDate = (dateStr) => {
+      if (!dateStr) return null;
+      const parts = dateStr.trim().split(' ');
+      const dateParts = parts[0].split(/[/-]/).map(Number);
+      const timeParts = (parts[1] || '00:00').split(':').map(Number);
+      if (dateParts.length < 3) return null;
+      return new Date(dateParts[0], dateParts[1] - 1, dateParts[2], timeParts[0] || 0, timeParts[1] || 0, 0);
+    };
 
     if (start_time && end_time) {
-      const start = new Date(start_time.replace(/\//g, '-'));
-      const end = new Date(end_time.replace(/\//g, '-'));
-      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+      const start = parseCustomDate(start_time);
+      const end = parseCustomDate(end_time);
+      if (start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
         if (nowTime >= start.getTime() && nowTime <= end.getTime()) {
           isManualOpen = true;
         } else if (nowTime < start.getTime()) {
@@ -1098,8 +1105,8 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     }
 
     if (isManualOpen) {
-      const end = new Date(end_time.replace(/\//g, '-'));
-      const diffMs = end.getTime() - now.getTime();
+      const end = parseCustomDate(end_time);
+      const diffMs = end ? (end.getTime() - now.getTime()) : 0;
       let countdownStr = '';
       if (diffMs > 0) {
         const diffHrs = Math.floor(diffMs / 3600000);
