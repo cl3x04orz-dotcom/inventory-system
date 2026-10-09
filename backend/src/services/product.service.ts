@@ -446,5 +446,74 @@ export async function verifyAndDeductProductQuota(
       throw new Error(`【${prod.productName || prod.productId}】商品熱銷中，剩餘額度不足，請重新整理頁面`);
     }
   }
+
+  // ⚡ 即時無效化 LIFF 商品快取，確保下一位顧客或刷新頁面時能立刻看到最新的 soldQty
+  liffCache.del("liff:products");
+}
+
+export async function releaseProductQuota(
+  tx: any,
+  items: Array<{ productId: string; qty: number }>,
+  communityId?: string,
+  communityName?: string,
+  storeCode?: string
+) {
+  if (!items || !Array.isArray(items)) return;
+
+  for (const item of items) {
+    if (!item || !item.productId || !item.qty) continue;
+
+    const pid = String(item.productId).trim();
+    const releaseQty = Number(item.qty || 0);
+    if (releaseQty <= 0) continue;
+
+    const prod = await tx.product.findFirst({
+      where: { 
+        productId: pid,
+        ...(storeCode ? { storeCode } : {})
+      },
+      select: { productId: true, soldQty: true, communityQuotas: true }
+    });
+
+    if (!prod) continue;
+
+    const cQuotas: Record<string, { maxQty: number; soldQty: number }> = (prod.communityQuotas as any) || {};
+    const matchedCommKey = [communityId, communityName].find(key => key && cQuotas[key] && typeof cQuotas[key].maxQty === "number");
+
+    if (matchedCommKey && cQuotas[matchedCommKey]) {
+      const cItem = cQuotas[matchedCommKey];
+      const maxQty = Number(cItem.maxQty || 0);
+      const currentSold = Number(cItem.soldQty || 0);
+      cQuotas[matchedCommKey] = {
+        maxQty,
+        soldQty: Math.max(0, currentSold - releaseQty)
+      };
+
+      await tx.product.updateMany({
+        where: { 
+          productId: pid,
+          ...(storeCode ? { storeCode } : {})
+        },
+        data: {
+          communityQuotas: cQuotas,
+          soldQty: { decrement: Math.min(currentSold, releaseQty) }
+        }
+      });
+    } else {
+      const currentSold = Number(prod.soldQty || 0);
+      await tx.product.updateMany({
+        where: { 
+          productId: pid,
+          ...(storeCode ? { storeCode } : {})
+        },
+        data: {
+          soldQty: { decrement: Math.min(currentSold, releaseQty) }
+        }
+      });
+    }
+  }
+
+  // ⚡ 即時無效化 LIFF 商品快取
+  liffCache.del("liff:products");
 }
 

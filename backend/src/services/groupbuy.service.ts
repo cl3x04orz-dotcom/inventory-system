@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma, runInTransaction } from '../database/context.js';
-import { ProductService, verifyAndDeductProductQuota } from './product.service.js';
+import { ProductService, verifyAndDeductProductQuota, releaseProductQuota } from './product.service.js';
 import { deductInventory } from './sales.service.js';
 import { calculateItemSubtotal } from './pricing.service.js';
 import { NotificationService } from './notification.service.js';
@@ -491,8 +491,32 @@ export const GroupBuyService = {
       // 1. 更新主訂單
       await tx.groupBuyOrder.update({ where: { orderId }, data: updateData });
 
-      // 2. 如果有更新商品明細，刪舊重建
+      // 2. 如果有更新商品明細，刪舊重建 (並自動計算配額退回)
       if (Array.isArray(items) && items.length > 0) {
+        const oldDetails = await tx.groupBuyOrderDetail.findMany({ where: { orderId } });
+        const oldMap = new Map<string, number>();
+        oldDetails.forEach((d: any) => {
+          if (d.productId) oldMap.set(String(d.productId), (oldMap.get(String(d.productId)) || 0) + Number(d.qty || 0));
+        });
+
+        const newMap = new Map<string, number>();
+        items.forEach((it: any) => {
+          if (it.productId) newMap.set(String(it.productId), (newMap.get(String(it.productId)) || 0) + Number(it.qty || 0));
+        });
+
+        const releaseItems: Array<{ productId: string; qty: number }> = [];
+        oldMap.forEach((oldQty, pid) => {
+          const newQty = newMap.get(pid) || 0;
+          if (oldQty > newQty) {
+            releaseItems.push({ productId: pid, qty: oldQty - newQty });
+          }
+        });
+
+        if (releaseItems.length > 0) {
+          const ord = await tx.groupBuyOrder.findUnique({ where: { orderId }, select: { sourceGroup: true, storeCode: true } });
+          await releaseProductQuota(tx, releaseItems, ord?.sourceGroup || '', ord?.sourceGroup || '', ord?.storeCode || 'MILI001');
+        }
+
         await tx.groupBuyOrderDetail.deleteMany({ where: { orderId } });
         await tx.groupBuyOrderDetail.createMany({
           data: items.map((item: any) => ({
@@ -506,6 +530,7 @@ export const GroupBuyService = {
             expiryDate: item.expiryDate || null
           }))
         });
+        liffCache.del('liff:products');
       }
 
       // 3. 如果有更新團員分配明細，刪舊重建
@@ -706,12 +731,26 @@ export const GroupBuyService = {
     const { orderId } = payload;
     if (!orderId) throw new Error('缺少 orderId');
 
-    const order = await prisma.groupBuyOrder.findUnique({ where: { orderId } });
-    if (!order) throw new Error('找不到訂單：' + orderId);
+    return runInTransaction(async () => {
+      const order = await prisma.groupBuyOrder.findUnique({
+        where: { orderId },
+        include: { details: true }
+      });
+      if (!order) throw new Error('找不到訂單：' + orderId);
 
-    // Cascade 會自動刪除明細
-    await prisma.groupBuyOrder.delete({ where: { orderId } });
-    return { success: true, orderId };
+      // 若刪除的訂單非 CANCELLED，退回活動配額 (soldQty)
+      if (order.status !== 'CANCELLED' && Array.isArray(order.details) && order.details.length > 0) {
+        const itemsToRelease = order.details.map((d: any) => ({
+          productId: String(d.productId),
+          qty: Number(d.qty || 0)
+        }));
+        await releaseProductQuota(prisma, itemsToRelease, order.sourceGroup || '' , order.sourceGroup || '', order.storeCode || 'MILI001');
+      }
+
+      await prisma.groupBuyOrder.delete({ where: { orderId } });
+      liffCache.del('liff:products');
+      return { success: true, orderId };
+    });
   },
 
   // 5a. 批次確認出貨
@@ -750,9 +789,25 @@ export const GroupBuyService = {
     if (!orderIds || !Array.isArray(orderIds)) throw new Error('缺少 orderIds');
 
     return runInTransaction(async () => {
+      const orders = await prisma.groupBuyOrder.findMany({
+        where: { orderId: { in: orderIds } },
+        include: { details: true }
+      });
+
+      for (const order of orders) {
+        if (order.status !== 'CANCELLED' && Array.isArray(order.details) && order.details.length > 0) {
+          const itemsToRelease = order.details.map((d: any) => ({
+            productId: String(d.productId),
+            qty: Number(d.qty || 0)
+          }));
+          await releaseProductQuota(prisma, itemsToRelease, order.sourceGroup || '', order.sourceGroup || '', order.storeCode || 'MILI001');
+        }
+      }
+
       await prisma.groupBuyOrder.deleteMany({
         where: { orderId: { in: orderIds } }
       });
+      liffCache.del('liff:products');
       return { success: true, count: orderIds.length };
     });
   },
@@ -782,12 +837,31 @@ export const GroupBuyService = {
     const { orderId, status, paymentStatus } = payload;
     if (!orderId) throw new Error('缺少 orderId');
 
-    const updateData: any = { updatedAt: new Date() };
-    if (status !== undefined) updateData.status = status;
-    if (paymentStatus !== undefined) updateData.paymentStatus = paymentStatus;
+    return runInTransaction(async () => {
+      const order = await prisma.groupBuyOrder.findUnique({
+        where: { orderId },
+        include: { details: true }
+      });
+      if (!order) throw new Error('找不到訂單：' + orderId);
 
-    await prisma.groupBuyOrder.update({ where: { orderId }, data: updateData });
-    return { success: true };
+      const oldStatus = order.status;
+      const updateData: any = { updatedAt: new Date() };
+      if (status !== undefined) updateData.status = status;
+      if (paymentStatus !== undefined) updateData.paymentStatus = paymentStatus;
+
+      // 若狀態變更為 CANCELLED 且原本不是 CANCELLED，自動退回活動配額 (soldQty)
+      if (status === 'CANCELLED' && oldStatus !== 'CANCELLED' && Array.isArray(order.details) && order.details.length > 0) {
+        const itemsToRelease = order.details.map((d: any) => ({
+          productId: String(d.productId),
+          qty: Number(d.qty || 0)
+        }));
+        await releaseProductQuota(prisma, itemsToRelease, order.sourceGroup || '', order.sourceGroup || '', order.storeCode || 'MILI001');
+      }
+
+      await prisma.groupBuyOrder.update({ where: { orderId }, data: updateData });
+      liffCache.del('liff:products');
+      return { success: true };
+    });
   },
 
   // 7. 取得大樓設定列表（含對應社區的運費設定）
@@ -887,12 +961,21 @@ export const GroupBuyService = {
     const { startDate, endDate } = payload || {};
 
     let dateFilter: any = {};
-    if (startDate && endDate) {
+    if (startDate || endDate) {
+      const createdAtCond: any = {};
+      if (startDate) createdAtCond.gte = new Date(startDate + 'T00:00:00.000+08:00');
+      if (endDate)   createdAtCond.lte = new Date(endDate   + 'T23:59:59.999+08:00');
+
+      const deliveryCond: any = {};
+      if (startDate) deliveryCond.gte = startDate;
+      if (endDate)   deliveryCond.lte = endDate;
+
+      // 與訂單審核頁邏輯一致：createdAt 或 expectedDeliveryDate 符合其一即納入（台灣時區）
       dateFilter = {
-        createdAt: {
-          gte: new Date(`${startDate}T00:00:00.000Z`),
-          lte: new Date(`${endDate}T23:59:59.999Z`)
-        }
+        OR: [
+          { createdAt: createdAtCond },
+          { expectedDeliveryDate: deliveryCond }
+        ]
       };
     }
 
@@ -909,11 +992,13 @@ export const GroupBuyService = {
     // 2. 取得大樓責任業務對應
     const buildings = await prisma.buildingSetting.findMany();
     const buildingMap = new Map<string, string[]>();
+    const buildingSalesObjMap = new Map<string, { salesId: string, salesName: string }>();
     buildings.forEach(b => {
       if (b.salesId) {
         const list = buildingMap.get(b.salesId) || [];
         list.push(b.building);
         buildingMap.set(b.salesId, list);
+        buildingSalesObjMap.set(b.building, { salesId: b.salesId, salesName: b.salesName || '' });
       }
     });
 
@@ -976,8 +1061,20 @@ export const GroupBuyService = {
     });
 
     orders.forEach(ord => {
-      const sId = ord.salesId || 'UNASSIGNED';
-      const sName = ord.salesName || '未歸屬/一般散客';
+      let sId = ord.salesId;
+      let sName = ord.salesName;
+
+      // 若訂單原本未記錄 salesId，則依據社區/大樓名稱 (sourceGroup) 自動追溯與對應責任業務
+      if (!sId && ord.sourceGroup && buildingSalesObjMap.has(ord.sourceGroup)) {
+        const bMatched = buildingSalesObjMap.get(ord.sourceGroup)!;
+        sId = bMatched.salesId;
+        sName = bMatched.salesName;
+      }
+
+      if (!sId) {
+        sId = 'UNASSIGNED';
+        sName = '未歸屬/一般散客';
+      }
 
       if (!salesReportMap.has(sId)) {
         salesReportMap.set(sId, {

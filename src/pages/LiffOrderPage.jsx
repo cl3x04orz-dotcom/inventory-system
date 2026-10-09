@@ -821,6 +821,17 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     }, 2000);
   }, []);
 
+  // ⚡ 當切回視窗/頁面時，自動背景刷新最新商品與限量數據
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadAllData().catch(e => console.warn("Visibility auto refresh failed:", e));
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+
   // ── 載入商品與初始化資料（單次 API，後端已過濾） ─────────────────────────────────────────
   const loadAllData = async (overrideBuilding = '') => {
     setLoading(true);
