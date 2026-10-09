@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>正在前往 LINE Pay...</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background-color: #f9f9f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .loader {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #06C755;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .text {
+      color: #333;
+      font-size: 16px;
+      font-weight: bold;
+    }
+    .fallback {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background-color: #06C755;
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: bold;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="loader"></div>
+  <div class="text">正在為您開啟 LINE Pay，請稍候...</div>
+  <a id="fallback-btn" class="fallback" href="#">如果沒有自動跳轉，請點擊這裡</a>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      var params = new URLSearchParams(window.location.search);
+      var targetUrl = params.get("url");
+      
+      if (targetUrl) {
+        // 設定 fallback 按鈕
+        var btn = document.getElementById("fallback-btn");
+        btn.href = targetUrl;
+        
+        // 為了確保瀏覽器能夠順利開啟其他 APP (尤其是 iOS)，
+        // 給予一點點極短的延遲，讓頁面先 render 出來
+        setTimeout(function() {
+          window.location.href = targetUrl;
+        }, 100);
+
+        // 如果過了一秒還沒跳轉成功，顯示手動按鈕
+        setTimeout(function() {
+          btn.style.display = "block";
+        }, 1000);
+      } else {
+        document.querySelector(".text").innerText = "跳轉失敗：找不到網址";
+        document.querySelector(".loader").style.display = "none";
+      }
+    });
+  </script>
+</body>
+</html>
