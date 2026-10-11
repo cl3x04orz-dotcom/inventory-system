@@ -1861,9 +1861,12 @@ export const GroupBuyService = {
         }
       }
 
-      // 🛡️ 歸屬優先權算術演算
-      if (buildingSalesId) {
-        // 大樓據點絕對優先
+      // 🛡️ 歸屬優先權算術演算 (規則一：實體大樓優先 > 舊客永久綁定 > 業務推薦連結 > 官方線上下單)
+      const VIRTUAL_COMMUNITIES = ['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售'];
+      const isVirtualBuilding = matchedBuildingName && VIRTUAL_COMMUNITIES.includes(matchedBuildingName.trim());
+
+      // 1. 實體大樓據點絕對優先 (排除線上下單等通用虛擬社區)
+      if (buildingSalesId && !isVirtualBuilding) {
         finalSalesId = buildingSalesId;
         finalSalesName = buildingSalesName;
 
@@ -1871,14 +1874,21 @@ export const GroupBuyService = {
           isPoachingAlert = true;
           poachingReason = `跨區搶單疑慮：顧客經由業務 [${refSalesName || refSalesId}] 專屬連結下單，但配送地址歸屬大樓業務 [${buildingSalesName || buildingSalesId}] (${matchedBuildingName})`;
         }
-      } else if (existingMember && existingMember.assignedSalesId) {
-        // 首單永久綁定
+      }
+      // 2. 舊客首單永久綁定 (規則一核心：若客人過去已綁定業務，即使點其他人連結仍歸原負責人)
+      else if (existingMember && existingMember.assignedSalesId) {
         finalSalesId = existingMember.assignedSalesId;
         finalSalesName = existingMember.assignedSalesName;
-      } else if (refSalesId) {
-        // 個人推廣連結
+      }
+      // 3. 新客透過業務專屬推廣連結進來 (例如線上散客點擊黃世成專屬網址)
+      else if (refSalesId) {
         finalSalesId = refSalesId;
         finalSalesName = refSalesName;
+      }
+      // 4. 新客透過官方「線上下單」群或無推薦連結 (歸屬官方設定的負責業務)
+      else if (buildingSalesId) {
+        finalSalesId = buildingSalesId;
+        finalSalesName = buildingSalesName;
       }
 
       await tx.groupBuyOrder.create({
