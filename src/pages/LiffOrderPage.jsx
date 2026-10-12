@@ -861,6 +861,9 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
           }
         } catch (_) { }
       }
+      if (!buildingParam) {
+        buildingParam = "線上下單";
+      }
 
       // 載入滿額折抵設定
       try {

@@ -1380,8 +1380,17 @@ export const GroupBuyService = {
         });
       }
     }
+    if (!targetComm && payload?.grp) {
+      const grpName = String(payload.grp).trim();
+      targetComm = communities.find((c: any) =>
+        c.communityName === grpName || c.communityName?.includes(grpName)
+      );
+    }
+    // 🛡️ 安全 Fallback：若網址無指定社區，優先回歸官方「線上下單」/「一般散客」或預設社區，嚴禁盲目抓取實體大樓造成活動與定價外洩
     if (!targetComm) {
-      targetComm = communities[0] || null;
+      targetComm = communities.find((c: any) =>
+        c.communityName === '線上下單' || c.communityName === '一般散客'
+      ) || communities.find((c: any) => c.isDefault) || communities[0] || null;
     }
 
     if (!targetComm) {
@@ -1588,6 +1597,21 @@ export const GroupBuyService = {
           });
           if (calcSub > 0) {
             item.subtotal = calcSub;
+          }
+        }
+
+        // 🛡️ 促銷贈品與專屬定價社區歸屬防護：線上下單與一般散客嚴格使用常態定價，絕不外洩實體大樓專屬贈品與特價
+        const isGiftItem = item.isGift || Number(item.unitPrice) === 0 || (item.remark && item.remark.includes('贈品'));
+        const isOnlineComm = !CommunityId || ['線上下單', '一般散客', '一般用戶', '上線下單', '一般常態', '常態零售'].includes(commNameSnap || sourceGroup || '');
+        if (isOnlineComm) {
+          if (isGiftItem) {
+            item.isGift = false;
+            item.unitPrice = singlePrice;
+            item.subtotal = singlePrice * Number(item.qty || 1);
+            if (item.remark) item.remark = item.remark.replace(/（?贈品）?/g, '').trim();
+          } else if (Number(item.unitPrice) !== singlePrice && !dbProd.hasVolumePricing) {
+            item.unitPrice = singlePrice;
+            item.subtotal = singlePrice * Number(item.qty || 1);
           }
         }
         
