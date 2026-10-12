@@ -1875,10 +1875,15 @@ export const GroupBuyService = {
           poachingReason = `跨區搶單疑慮：顧客經由業務 [${refSalesName || refSalesId}] 專屬連結下單，但配送地址歸屬大樓業務 [${buildingSalesName || buildingSalesId}] (${matchedBuildingName})`;
         }
       }
-      // 2. 舊客首單永久綁定 (規則一核心：若客人過去已綁定業務，即使點其他人連結仍歸原負責人)
+      // 2. 舊客首單永久綁定 (規則一核心：若客人過去已綁定業務，即使點其他人連結仍歸原負責人，並標記提醒主管)
       else if (existingMember && existingMember.assignedSalesId) {
         finalSalesId = existingMember.assignedSalesId;
         finalSalesName = existingMember.assignedSalesName;
+
+        if (refSalesId && refSalesId !== existingMember.assignedSalesId) {
+          isPoachingAlert = true;
+          poachingReason = `跨區搶單疑慮（舊客導購）：原綁定業務 [${existingMember.assignedSalesName || existingMember.assignedSalesId}] 之舊客，經由業務 [${refSalesName || refSalesId}] 專屬連結下單 (已劃歸原負責人)`;
+        }
       }
       // 3. 新客透過業務專屬推廣連結進來 (例如線上散客點擊黃世成專屬網址)
       else if (refSalesId) {
