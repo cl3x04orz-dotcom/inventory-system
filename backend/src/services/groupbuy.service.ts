@@ -890,6 +890,7 @@ export const GroupBuyService = {
       select: { 
         communityId: true, 
         communityName: true, 
+        status: true,
         defaultFreeShipping: true, 
         freeShippingMin: true, 
         shippingFee: true,
@@ -898,7 +899,14 @@ export const GroupBuyService = {
         addressKeywords: true
       }
     });
-    const commMap = new Map(allComms.map((c: any) => [c.communityName, c]));
+    // 同名時優先使用未刪除的社區
+    const commMap = new Map<string, any>();
+    allComms.forEach((c: any) => {
+      const prev = commMap.get(c.communityName);
+      if (!prev || (prev.status === 'DELETED' && c.status !== 'DELETED')) {
+        commMap.set(c.communityName, c);
+      }
+    });
 
     const result = settings.map((s: any) => {
       const comm = commMap.get(s.building);
@@ -929,7 +937,10 @@ export const GroupBuyService = {
     // 補上所有在 GroupBuyCommunity 但尚未在 BuildingSetting 中的區域 (如台南市永康區等)
     const existingBuildings = new Set(result.map((r: any) => r.building));
     allComms.forEach((c: any) => {
+      // 🛡️ 已刪除的社區不可再補回清單，否則刪除後仍會顯示
+      if (c.status === 'DELETED') return;
       if (c.communityName && !existingBuildings.has(c.communityName)) {
+        existingBuildings.add(c.communityName);
         result.push({
           building: c.communityName,
           community_id: c.communityId,
@@ -1190,13 +1201,22 @@ export const GroupBuyService = {
     const { building } = payload;
     if (!building) throw new Error('缺少大樓名稱');
 
-    await prisma.buildingSetting.delete({
+    // 🛡️ 用 deleteMany：部分社區（如「來店自取」）只存在 GroupBuyCommunity、沒有 BuildingSetting，delete() 會因找不到紀錄而拋錯
+    const delRes = await prisma.buildingSetting.deleteMany({
       where: { building }
     });
 
     const comm = await prisma.groupBuyCommunity.findFirst({
-      where: { communityName: building }
+      where: { communityName: building, status: { not: 'DELETED' } }
     });
+
+    if (delRes.count === 0 && !comm) {
+      // 已不存在（先前已刪除）→ 視為成功，避免重複刪除報錯
+      liffCache.del('liff:buildings');
+      liffCache.del('liff:communities');
+      return { success: true, alreadyDeleted: true };
+    }
+
     if (comm) {
       await prisma.groupBuyCommunity.update({
         where: { communityId: comm.communityId },
@@ -1241,19 +1261,25 @@ export const GroupBuyService = {
     const oldSetting = await prisma.buildingSetting.findUnique({
       where: { building: oldName }
     });
-    if (!oldSetting) throw new Error('找不到大樓：' + oldName);
+    const oldComm = await prisma.groupBuyCommunity.findFirst({
+      where: { communityName: oldName, status: { not: 'DELETED' } }
+    });
+    if (!oldSetting && !oldComm) throw new Error('找不到大樓：' + oldName);
 
     await prisma.$transaction(async (tx) => {
-      await tx.buildingSetting.create({
-        data: {
-          building: newName,
-          startTime: oldSetting.startTime,
-          endTime: oldSetting.endTime
-        }
-      });
-      await tx.buildingSetting.delete({
-        where: { building: oldName }
-      });
+      // 只有社區、沒有大樓設定時，僅改社區名稱
+      if (oldSetting) {
+        await tx.buildingSetting.create({
+          data: {
+            building: newName,
+            startTime: oldSetting.startTime,
+            endTime: oldSetting.endTime
+          }
+        });
+        await tx.buildingSetting.delete({
+          where: { building: oldName }
+        });
+      }
 
       const comm = await tx.groupBuyCommunity.findFirst({
         where: { communityName: oldName }
@@ -1426,6 +1452,22 @@ export const GroupBuyService = {
       liffCache.set('liff:products', rawProducts);
     }
 
+    // ── ⚡ 限量配額即時覆蓋：商品主檔快取 5 分鐘，但配額 (soldQty / communityQuotas) 0 秒延遲即時查詢 ──
+    const quotaProducts = await prisma.product.findMany({
+      where: {
+        OR: [
+          { maxTotalQty: { not: null } },
+          { communityQuotas: { not: {} } }
+        ]
+      },
+      select: {
+        productId: true,
+        soldQty: true,
+        communityQuotas: true
+      }
+    });
+    const quotaMap = new Map(quotaProducts.map(p => [p.productId, p]));
+
     // ── 快取 4：社區自訂價格（5 分鐘，per community）──
     const cpKey = `liff:customprice:${targetComm.communityId}`;
     let customPrices = liffCache.get<any[]>(cpKey);
@@ -1448,17 +1490,27 @@ export const GroupBuyService = {
     ]));
 
     const mappedProducts = rawProducts.map((p: any) => {
+      let finalItem = p;
       if (customPriceMap.has(p.id)) {
         const cp = customPriceMap.get(p.id);
-        return {
-          ...p,
+        finalItem = {
+          ...finalItem,
           single_price: cp?.customPrice,
           promotions: cp?.promotions,
           promoId: cp?.promoId,
           promotion: cp?.promotion
         };
       }
-      return p;
+      const pid = p.id || p.productId;
+      if (quotaMap.has(pid)) {
+        const qp = quotaMap.get(pid)!;
+        finalItem = {
+          ...finalItem,
+          soldQty: Number(qp.soldQty || 0),
+          communityQuotas: qp.communityQuotas || finalItem.communityQuotas
+        };
+      }
+      return finalItem;
     });
 
     // 線上商城 LIFF 回傳完整活躍商品清單 (包含 allowedCommunityIds)，由前端 LiffOrderPage 依顧客切換社區進行動態過濾

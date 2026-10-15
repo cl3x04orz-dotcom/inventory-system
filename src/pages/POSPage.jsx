@@ -324,6 +324,8 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
             maxTotalQty: pos.maxTotalQty !== undefined ? pos.maxTotalQty : p.maxTotalQty,
             has_volume_pricing: pos.has_volume_pricing !== undefined ? Boolean(pos.has_volume_pricing) : Boolean(p.has_volume_pricing || p.hasVolumePricing),
             volume_pricing_settings: pos.volume_pricing_settings !== undefined ? pos.volume_pricing_settings : (p.volume_pricing_settings || p.volumePricingSettings || null),
+            isCombo: Boolean(p.isCombo),
+            comboItems: Array.isArray(p.comboItems) ? p.comboItems : [],
             posSettings: pos
           };
         });
@@ -650,8 +652,12 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                         <div className="font-black text-gray-900 text-base md:text-lg leading-tight group-hover:text-indigo-600 line-clamp-2">
                           {pName}
                         </div>
-                        <div className="text-xs text-gray-400 font-bold">
-                          {isBundle ? `1組(${bundleSize}入)` : (product.capacity || '')}
+                        <div className="text-xs text-gray-400 font-bold truncate">
+                          {product.isCombo
+                            ? (Array.isArray(product.comboItems) && product.comboItems.length > 0
+                                ? `含: ${product.comboItems.map(c => `${c.productName || '商品'}×${c.qty || 1}`).join(' + ')}`
+                                : (product.capacity || '組合包'))
+                            : isBundle ? `1組(${bundleSize}入)` : (product.capacity || '')}
                         </div>
                       </div>
 
@@ -687,6 +693,11 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                           <span className="inline-flex items-center space-x-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg font-extrabold border border-red-200">
                             <EyeOff className="w-3 h-3" />
                             <span>門市已下架</span>
+                          </span>
+                        )}
+                        {product.isCombo && (
+                          <span className="inline-flex items-center space-x-1 text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded-lg font-extrabold border border-purple-200">
+                            <span>🎁 組合包</span>
                           </span>
                         )}
                         {isBundle && (
@@ -798,6 +809,11 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                   <div className="flex-1 min-w-0 pr-2">
                     <div className="flex items-center space-x-1 flex-wrap gap-y-1">
                       <h4 className="font-extrabold text-gray-900 text-sm truncate">{item.productName}</h4>
+                      {item.isCombo && (
+                        <span className="bg-purple-100 text-purple-800 text-[11px] px-2 py-0.5 rounded-md font-extrabold whitespace-nowrap border border-purple-200">
+                          🎁 組合包
+                        </span>
+                      )}
                       {item.isBundle && (
                         <span className="bg-indigo-100 text-indigo-800 text-[11px] px-2 py-0.5 rounded-md font-extrabold whitespace-nowrap">
                           捆裝{item.bundleSize}入
@@ -824,6 +840,11 @@ export default function POSPage({ user, apiUrl, isHeaderHidden }) {
                     </div>
                     <div className="text-xs text-gray-500 mt-1 font-medium">
                       ${item.isBundle ? (item.unitPrice * item.bundleSize).toLocaleString() : item.unitPrice.toLocaleString()} {item.isBundle ? `/組(${item.bundleSize}入)` : (item.capacity ? `• ${item.capacity}` : '')}
+                      {item.isCombo && Array.isArray(item.comboItems) && item.comboItems.length > 0 && (
+                        <div className="text-[11px] text-purple-600 font-semibold mt-0.5">
+                          含: {item.comboItems.map(c => `${c.productName || '商品'}×${c.qty || 1}`).join(' + ')}
+                        </div>
+                      )}
                     </div>
                   </div>
 

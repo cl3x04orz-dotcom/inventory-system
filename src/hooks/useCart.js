@@ -46,7 +46,8 @@ export function useCart(storeCode = 'MILI001', terminalId = 'POS01') {
         volume_pricing_settings: product.volume_pricing_settings || product.volumePricingSettings || null,
         isBundle: Boolean(product.isBundle),
         bundleSize: Number(product.bundleSize || 1),
-        bundleSize: Number(product.bundleSize || 1)
+        isCombo: Boolean(product.isCombo),
+        comboItems: Array.isArray(product.comboItems) ? product.comboItems : []
       }];
     });
   }, []);

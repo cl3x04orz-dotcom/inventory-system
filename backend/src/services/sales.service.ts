@@ -495,6 +495,67 @@ export const SalesService = {
       // 3. 庫存退回 (Void Refund)
       const today = new Date();
       for (const d of sale.details) {
+        // 跨商品組合包 (isCombo) 為虛擬組合：將庫存退回補給背後設定的子商品
+        const isCombo = Boolean(d.product?.isCombo && Array.isArray(d.product?.comboItems) && (d.product.comboItems as any[]).length > 0);
+        if (isCombo) {
+          const comboItems = d.product!.comboItems as Array<{ productId: string; productName?: string; qty: number }>;
+          for (const ci of comboItems) {
+            if (!ci.productId) continue;
+            const subQty = Math.max(1, Number(ci.qty) || 1);
+            const returnQty = (d.picked || 0) * subQty;
+            if (returnQty <= 0) continue;
+
+            const lastInv = await prisma.inventory.findFirst({
+              where: { productId: String(ci.productId), type: 'STOCK' },
+              orderBy: { expiryDate: 'desc' }
+            });
+            const fallbackExpiry = lastInv?.expiryDate || today;
+
+            await prisma.inventory.create({
+              data: {
+                productId: String(ci.productId),
+                quantity: returnQty,
+                expiryDate: fallbackExpiry,
+                entryDate: today,
+                type: 'STOCK',
+                cost: 0,
+                productName: ci.productName || '組合包回補商品',
+                storeCode
+              }
+            });
+
+            // 同步流水帳與快照庫存
+            await prisma.inventoryMovement.create({
+              data: {
+                productId: String(ci.productId),
+                storeCode,
+                type: 'VOID_SALE',
+                qty: returnQty,
+                refId: saleId,
+                operator: user?.username || 'ADMIN',
+                note: `銷售作廢退回 (${sale.receiptNo || saleId}) [來自組合包: ${d.product.productName} ×${d.picked}]`
+              }
+            });
+
+            await prisma.inventorySnapshot.upsert({
+              where: {
+                productId_storeCode: { productId: String(ci.productId), storeCode }
+              },
+              create: {
+                productId: String(ci.productId),
+                storeCode,
+                onHandQty: returnQty,
+                availableQty: returnQty
+              },
+              update: {
+                onHandQty: { increment: returnQty },
+                availableQty: { increment: returnQty }
+              }
+            });
+          }
+          continue;
+        }
+
         if (d.picked > 0) {
           // 找到該商品的最新批次效期作為退回參考
           const lastInventory = await prisma.inventory.findFirst({

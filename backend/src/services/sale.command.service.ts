@@ -72,9 +72,98 @@ export const SaleCommandService = {
       const saleId = `POS_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const now = new Date();
 
+      // 0. 批次查詢 dbProducts 獲取商品屬性 (支援 isCombo 組合包與 isBundle 捆裝)
+      const allProductIds = items.map(i => i.productId).filter(Boolean);
+      const dbProducts = await prisma.product.findMany({
+        where: { productId: { in: allProductIds } }
+      });
+      const prodMap = new Map(dbProducts.map(p => [p.productId, p]));
+
+      // 1. 展開銷售明細：若為跨商品組合包 (isCombo)，自動拆解為旗下的子產品
+      const finalDetails: Array<{
+        productId: string;
+        productName: string;
+        picked: number;
+        original: number;
+        sold: number;
+        unitPrice: number;
+        unitCost: number;
+        discountAmount: number;
+        subtotal: number;
+        storeCode: string;
+      }> = [];
+
+      for (const item of items) {
+        const dbProd = prodMap.get(item.productId);
+        const isCombo = Boolean(dbProd?.isCombo && Array.isArray(dbProd?.comboItems) && (dbProd.comboItems as any[]).length > 0);
+
+        const discInfo = itemDiscountedMap.get(item.productId) || {
+          discountedTotal: item.unitPrice * item.qty - (item.discountAmount || 0),
+          savings: item.discountAmount || 0
+        };
+        const comboTotalAmount = discInfo.discountedTotal;
+        const comboSavings = discInfo.savings;
+
+        if (isCombo) {
+          const comboItems = (dbProd!.comboItems as any[]).filter((ci: any) => ci && ci.productId);
+          const totalChildUnits = comboItems.reduce((sum, ci) => sum + Math.max(1, Number(ci.qty) || 1), 0);
+
+          let allocatedTotal = 0;
+          let allocatedSavings = 0;
+
+          comboItems.forEach((ci, idx) => {
+            const subQtyPerPack = Math.max(1, Number(ci.qty) || 1);
+            const totalChildSold = item.qty * subQtyPerPack;
+
+            let childSubtotal = 0;
+            let childSavings = 0;
+            if (idx === comboItems.length - 1) {
+              childSubtotal = Math.round((comboTotalAmount - allocatedTotal) * 100) / 100;
+              childSavings = Math.round((comboSavings - allocatedSavings) * 100) / 100;
+            } else {
+              childSubtotal = Math.round((comboTotalAmount * (subQtyPerPack / totalChildUnits)) * 100) / 100;
+              childSavings = Math.round((comboSavings * (subQtyPerPack / totalChildUnits)) * 100) / 100;
+              allocatedTotal += childSubtotal;
+              allocatedSavings += childSavings;
+            }
+
+            const childUnitPrice = totalChildSold > 0 ? Number((childSubtotal / totalChildSold).toFixed(4)) : 0;
+
+            finalDetails.push({
+              productId: String(ci.productId),
+              productName: ci.productName || item.productName,
+              picked: totalChildSold,
+              original: 0,
+              sold: totalChildSold,
+              unitPrice: childUnitPrice,
+              unitCost: 0,
+              discountAmount: childSavings,
+              subtotal: childSubtotal,
+              storeCode
+            });
+          });
+        } else {
+          const isBundle = Boolean(item.isBundle || dbProd?.isBundle);
+          const bundleSize = Number(item.bundleSize || dbProd?.bundleSize || 1);
+          const totalPickedQty = isBundle && bundleSize > 1 ? item.qty * bundleSize : item.qty;
+          const effectiveUnitPrice = totalPickedQty > 0 ? Number((comboTotalAmount / totalPickedQty).toFixed(4)) : item.unitPrice;
+
+          finalDetails.push({
+            productId: item.productId,
+            productName: item.productName,
+            picked: totalPickedQty,
+            original: 0,
+            sold: totalPickedQty,
+            unitPrice: effectiveUnitPrice,
+            unitCost: item.unitCost || 0,
+            discountAmount: comboSavings,
+            subtotal: comboTotalAmount,
+            storeCode
+          });
+        }
+      }
+
       // (A) 建立 Sales 主單與明細
-      // 🔑 原貨 (original) 設為 0，商品出貨只記錄在領貨 (picked)
-      // 🔑 單價與小計依照 POS 組合價精算分攤 (例: 55/3 = 18.3333)
       const sale = await prisma.sales.create({
         data: {
           saleId,
@@ -95,35 +184,8 @@ export const SaleCommandService = {
           totalCash: payments.find(p => p.method === 'CASH')?.amount || 0,
           paymentMethod: payments.map(p => p.method).join(','),
           
-          // 明細：領貨 (picked) 填入實際出貨量，原貨 (original) 設為 0
           details: {
-            create: items.map(item => {
-              const isBundle = Boolean(item.isBundle);
-              const bundleSize = Number(item.bundleSize || 1);
-              const totalPickedQty = isBundle && bundleSize > 1 ? item.qty * bundleSize : item.qty;
-
-              const discInfo = itemDiscountedMap.get(item.productId) || {
-                discountedTotal: item.unitPrice * item.qty - (item.discountAmount || 0),
-                savings: item.discountAmount || 0
-              };
-
-              const lineSubtotal = discInfo.discountedTotal;
-              const lineDiscount = discInfo.savings;
-              const effectiveUnitPrice = totalPickedQty > 0 ? Number((lineSubtotal / totalPickedQty).toFixed(4)) : item.unitPrice;
-
-              return {
-                productId: item.productId,
-                productName: item.productName,
-                picked: totalPickedQty, // 領貨處記錄實際出貨數量
-                original: 0,            // 原貨不用重複記錄，設為 0
-                sold: totalPickedQty,   // 實售數量
-                unitPrice: effectiveUnitPrice, // 🔑 依單件算出的平均成交單價
-                unitCost: item.unitCost || 0,
-                discountAmount: lineDiscount,  // 🔑 多件/組合折抵金額
-                subtotal: lineSubtotal,        // 🔑 實際成交小計 ($18.3333 * 3 = $55)
-                storeCode
-              };
-            })
+            create: finalDetails
           },
 
           // 多重付款紀錄
@@ -143,20 +205,16 @@ export const SaleCommandService = {
         }
       });
 
-      // (B) 扣減庫存：若商品為捆裝 (isBundle)，扣減數量 = 購買組數 * bundleSize
-      for (const item of items) {
-        const isBundle = Boolean(item.isBundle);
-        const bundleSize = Number(item.bundleSize || 1);
-        const deduceQty = isBundle && bundleSize > 1 ? item.qty * bundleSize : item.qty;
-
+      // (B) 扣減庫存：finalDetails 已經全部是實體出庫品項（組合包已展開）
+      for (const d of finalDetails) {
         await InventoryService.recordMovement({
-          productId: item.productId,
+          productId: d.productId,
           storeCode,
           type: 'SALE',
-          qty: -deduceQty, // 扣減實際庫存
+          qty: -d.sold,
           refId: sale.saleId,
           operator: cashierId,
-          note: `POS結帳 (${receiptNo})${isBundle ? ` [捆裝${bundleSize}入×${item.qty}組]` : ''}`
+          note: `POS結帳 (${receiptNo})`
         });
       }
 

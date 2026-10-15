@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { linePayService } from '../services/linepay.service.js';
-import { GroupBuyService } from '../services/groupbuy.service.js';
+import { GroupBuyService, liffCache } from '../services/groupbuy.service.js';
+import { releaseProductQuota } from '../services/product.service.js';
 import { prisma } from '../database/context.js';
 
 import fs from 'fs';
@@ -1058,7 +1059,7 @@ export async function linePayRoutes(app: FastifyInstance) {
             lt: twentyFourHoursAgo
           }
         },
-        select: { orderId: true, note: true }
+        include: { details: true }
       });
 
       if (expiredOrders.length === 0) {
@@ -1068,6 +1069,15 @@ export async function linePayRoutes(app: FastifyInstance) {
       let canceledCount = 0;
       for (const order of expiredOrders) {
         try {
+          // 釋放被逾期訂單鎖定的限量活動配額 (soldQty)
+          if (Array.isArray(order.details) && order.details.length > 0) {
+            const itemsToRelease = order.details.map((d: any) => ({
+              productId: String(d.productId),
+              qty: Number(d.qty || 0)
+            }));
+            await releaseProductQuota(prisma, itemsToRelease, order.sourceGroup || '', order.sourceGroup || '', order.storeCode || 'MILI001');
+          }
+
           await prisma.groupBuyOrder.update({
             where: { orderId: order.orderId },
             data: {
@@ -1082,7 +1092,8 @@ export async function linePayRoutes(app: FastifyInstance) {
         }
       }
 
-      return reply.send({ success: true, message: `成功作廢了 ${canceledCount} 筆逾期訂單`, count: canceledCount });
+      liffCache.del('liff:products');
+      return reply.send({ success: true, message: `成功作廢了 ${canceledCount} 筆逾期訂單並回補配額`, count: canceledCount });
     } catch (err: any) {
       return reply.status(500).send({ success: false, error: err.message });
     }
@@ -1101,19 +1112,34 @@ export async function linePayRoutes(app: FastifyInstance) {
             status: 'PENDING',
             createdAt: { lt: twentyFourHoursAgo }
           },
-          select: { orderId: true, note: true }
+          include: { details: true }
         });
 
         for (const order of expiredOrders) {
-          await prisma.groupBuyOrder.update({
-            where: { orderId: order.orderId },
-            data: {
-              status: 'CANCELLED',
-              paymentStatus: '已作廢',
-              note: (order.note || '') + '\n【系統自動作廢：超過24小時未完成 LINE Pay 授權】'
+          try {
+            if (Array.isArray(order.details) && order.details.length > 0) {
+              const itemsToRelease = order.details.map((d: any) => ({
+                productId: String(d.productId),
+                qty: Number(d.qty || 0)
+              }));
+              await releaseProductQuota(prisma, itemsToRelease, order.sourceGroup || '', order.sourceGroup || '', order.storeCode || 'MILI001');
             }
-          });
-          console.log(`[LINE Pay Cron] Auto canceled expired order #${order.orderId}`);
+
+            await prisma.groupBuyOrder.update({
+              where: { orderId: order.orderId },
+              data: {
+                status: 'CANCELLED',
+                paymentStatus: '已作廢',
+                note: (order.note || '') + '\n【系統自動作廢：超過24小時未完成 LINE Pay 授權】'
+              }
+            });
+            console.log(`[LINE Pay Cron] Auto canceled expired order #${order.orderId} and released quota`);
+          } catch (err) {
+            console.error(`Failed to auto-cancel order ${order.orderId}:`, err);
+          }
+        }
+        if (expiredOrders.length > 0) {
+          liffCache.del('liff:products');
         }
       } catch (err) {
         console.error('[LINE Pay Cron] Failed to run auto cancel job:', err);

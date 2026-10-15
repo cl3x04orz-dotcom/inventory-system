@@ -56,9 +56,16 @@ export function POSReceiptPrint({ receiptData }) {
           <span>小計</span>
         </div>
         {items.map((item, idx) => (
-          <div key={idx} className="flex justify-between py-0.5">
-            <span className="truncate max-w-[55mm]">{item.productName} × {item.qty}</span>
-            <span>${((item.unitPrice * item.qty) - (item.discountAmount || 0)).toLocaleString()}</span>
+          <div key={idx} className="py-0.5">
+            <div className="flex justify-between">
+              <span className="truncate max-w-[55mm]">{item.productName} × {item.qty}</span>
+              <span>${((item.unitPrice * item.qty) - (item.discountAmount || 0)).toLocaleString()}</span>
+            </div>
+            {item.isCombo && Array.isArray(item.comboItems) && item.comboItems.length > 0 && (
+              <div className="text-[10px] text-gray-700 pl-2">
+                * 內含: {item.comboItems.map(c => `${c.productName || '商品'}×${c.qty || 1}`).join(', ')}
+              </div>
+            )}
           </div>
         ))}
       </div>
