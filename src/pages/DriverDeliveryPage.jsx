@@ -621,15 +621,17 @@ export default function DriverDeliveryPage({ apiUrl, onBack }) {
                                                                                     const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
                                                                                     const exp = item.expiryDate || (prod?.expiryDate || prod?.expiry_date || '');
                                                                                     return (
-                                                                                        <div key={iIdx} className="flex justify-between items-center text-sm text-slate-900 font-bold">
-                                                                                            <span className="flex items-center gap-1.5 flex-wrap">
+                                                                                        <div key={iIdx} className="flex justify-between items-start text-sm text-slate-900 font-bold py-1">
+                                                                                            <div className="flex-1 pr-2">
                                                                                                 <span>{item.productName}</span>
                                                                                                 {exp && (
-                                                                                                    <span className="text-[10px] font-black text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md">
-                                                                                                        📅 效期至 {exp}
-                                                                                                    </span>
+                                                                                                    <div className="mt-0.5">
+                                                                                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-700 bg-orange-50 border border-orange-300 px-2 py-0.5 rounded-full shadow-xs">
+                                                                                                            📅 效期至 {exp}
+                                                                                                        </span>
+                                                                                                    </div>
                                                                                                 )}
-                                                                                            </span>
+                                                                                            </div>
                                                                                             <span className="font-mono font-black text-slate-900 text-base">x{item.qty}</span>
                                                                                         </div>
                                                                                     );
@@ -654,15 +656,17 @@ export default function DriverDeliveryPage({ apiUrl, onBack }) {
                                                                                                     const rProd = products.find(p => p.id === ri.productId || p.name === ri.productName || p.name === ri.productId);
                                                                                                     const exp = ri.expiryDate || (rProd?.expiryDate || rProd?.expiry_date || '');
                                                                                                     return (
-                                                                                                        <div key={riIdx} className="flex justify-between items-center text-xs text-slate-800 font-bold">
-                                                                                                            <span className="flex items-center gap-1 flex-wrap">
+                                                                                                        <div key={riIdx} className="flex justify-between items-start text-xs text-slate-800 font-bold py-0.5">
+                                                                                                            <div className="flex-1 pr-2">
                                                                                                                 <span>{ri.productName}</span>
                                                                                                                 {exp && (
-                                                                                                                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1 py-0.2 rounded">
-                                                                                                                        📅 {exp}
-                                                                                                                    </span>
+                                                                                                                    <div className="mt-0.5">
+                                                                                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-700 bg-orange-50 border border-orange-300 px-2 py-0.5 rounded-full shadow-xs">
+                                                                                                                            📅 效期至 {exp}
+                                                                                                                        </span>
+                                                                                                                    </div>
                                                                                                                 )}
-                                                                                                            </span>
+                                                                                                            </div>
                                                                                                             <span className="font-mono font-black text-slate-900 text-sm">x{ri.qty}</span>
                                                                                                         </div>
                                                                                                     );

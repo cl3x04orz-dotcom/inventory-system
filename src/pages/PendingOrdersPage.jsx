@@ -3471,12 +3471,14 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                                                         <span className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-extrabold">
                                                                                             x {item.qty} {isBundle ? '組' : '瓶'}
                                                                                         </span>
-                                                                                        {(item.expiryDate || prod?.expiryDate || prod?.expiry_date) && (
-                                                                                            <span className="inline-flex items-center gap-1 text-[11px] font-black text-amber-800 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md shadow-2xs">
+                                                                                    </div>
+                                                                                    {(item.expiryDate || prod?.expiryDate || prod?.expiry_date) && (
+                                                                                        <div className="mt-0.5">
+                                                                                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/40 border border-orange-300 dark:border-orange-800 px-2 py-0.5 rounded-full shadow-xs">
                                                                                                 📅 效期至 {item.expiryDate || prod?.expiryDate || prod?.expiry_date}
                                                                                             </span>
-                                                                                        )}
-                                                                                    </div>
+                                                                                        </div>
+                                                                                    )}
                                                                                      {(() => {
                                                                                          const remarkStr = String(item.remark || item.productName || '');
                                                                                          let comboText = '';
@@ -3614,28 +3616,33 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                                                     const qtyDisplay = isGift
                                                                                         ? `x${ri.qty} (贈品)`
                                                                                         : (freeQty > 0 ? `x${ri.qty} (付費:${paidQty},送:${freeQty})` : `x${ri.qty}`);
+                                                                                    const rProd = products.find(p => p.id === ri.productId || p.name === ri.productName || p.name === ri.productId);
+                                                                                    const exp = ri.expiryDate || (rProd?.expiryDate || rProd?.expiry_date || '');
+
                                                                                     return (
-                                                                                        <div key={riIdx} className="flex justify-between items-start font-mono">
-                                                                                            <span className="pr-2 text-[var(--text-secondary)] break-words leading-snug">
-                                                                                                <span className="text-[var(--text-primary)] font-normal text-sm md:text-base">
-                                                                                                    {formatted.pNameDisplay}
-                                                                                                    {isGift && (
-                                                                                                        <span className="text-[10px] md:text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded-md ml-1.5 border border-emerald-500/20">
-                                                                                                            免費贈品
-                                                                                                        </span>
-                                                                                                    )}
-                                                                                                    {(() => {
-                                                                                                        const rProd = products.find(p => p.id === ri.productId || p.name === ri.productName || p.name === ri.productId);
-                                                                                                        const exp = ri.expiryDate || (rProd?.expiryDate || rProd?.expiry_date || '');
-                                                                                                        if (!exp) return null;
-                                                                                                        return (
-                                                                                                            <span className="inline-flex items-center text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md ml-1.5">
-                                                                                                                📅 {exp}
+                                                                                        <div key={riIdx} className="flex justify-between items-start font-mono py-1 first:pt-0 last:pb-0">
+                                                                                            <div className="flex-1 pr-2">
+                                                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                                                    <span className="text-[var(--text-primary)] font-normal text-sm md:text-base">
+                                                                                                        {formatted.pNameDisplay}
+                                                                                                        {isGift && (
+                                                                                                            <span className="text-[10px] md:text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded-md ml-1.5 border border-emerald-500/20">
+                                                                                                                免費贈品
                                                                                                             </span>
-                                                                                                        );
-                                                                                                    })()}
-                                                                                                </span> <span className={`font-normal ${isGift ? 'text-emerald-600 font-bold' : 'text-blue-600 dark:text-blue-400'}`}>{qtyDisplay}</span>
-                                                                                            </span>
+                                                                                                        )}
+                                                                                                    </span>
+                                                                                                    <span className={`font-normal ${isGift ? 'text-emerald-600 font-bold' : 'text-blue-600 dark:text-blue-400'}`}>
+                                                                                                        {qtyDisplay}
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                                {exp && (
+                                                                                                    <div className="mt-1">
+                                                                                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/40 border border-orange-300 dark:border-orange-800 px-2 py-0.5 rounded-full shadow-xs">
+                                                                                                            📅 效期至 {exp}
+                                                                                                        </span>
+                                                                                                    </div>
+                                                                                                )}
+                                                                                            </div>
                                                                                             <span className="flex-shrink-0 font-normal text-[var(--text-primary)] mt-0.5 text-sm md:text-base">
                                                                                                 {isGift ? <span className="text-emerald-600 font-bold">$0</span> : `$${sub}`}
                                                                                             </span>
@@ -3998,7 +4005,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                                 const exp = item.expiryDate || pInfo?.expiryDate || pInfo?.expiry_date;
                                                                 if (!exp) return null;
                                                                 return (
-                                                                    <span className="text-[10px] font-bold text-amber-800 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md">
+                                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/40 border border-orange-300 dark:border-orange-800 px-2 py-0.5 rounded-full shadow-xs">
                                                                         📅 效期至 {exp}
                                                                     </span>
                                                                 );
