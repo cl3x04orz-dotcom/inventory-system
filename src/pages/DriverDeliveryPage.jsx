@@ -626,7 +626,10 @@ export default function DriverDeliveryPage({ apiUrl, onBack }) {
                                                                                                 <span>{item.productName}</span>
                                                                                                 {exp && (
                                                                                                     <div className="mt-0.5">
-                                                                                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-700 bg-orange-50 border border-orange-300 px-2 py-0.5 rounded-full shadow-xs">
+                                                                                                        <span
+                                                                                                            className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-0.5 rounded-full shadow-xs border"
+                                                                                                            style={{ backgroundColor: '#fff7ed', color: '#c2410c', borderColor: '#fdba74' }}
+                                                                                                        >
                                                                                                             📅 效期至 {exp}
                                                                                                         </span>
                                                                                                     </div>
@@ -661,7 +664,10 @@ export default function DriverDeliveryPage({ apiUrl, onBack }) {
                                                                                                                 <span>{ri.productName}</span>
                                                                                                                 {exp && (
                                                                                                                     <div className="mt-0.5">
-                                                                                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-700 bg-orange-50 border border-orange-300 px-2 py-0.5 rounded-full shadow-xs">
+                                                                                                                        <span
+                                                                                                                            className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full shadow-xs border"
+                                                                                                                            style={{ backgroundColor: '#fff7ed', color: '#c2410c', borderColor: '#fdba74' }}
+                                                                                                                        >
                                                                                                                             📅 效期至 {exp}
                                                                                                                         </span>
                                                                                                                     </div>

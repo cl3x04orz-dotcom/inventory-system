@@ -3474,7 +3474,10 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                                                     </div>
                                                                                     {(item.expiryDate || prod?.expiryDate || prod?.expiry_date) && (
                                                                                         <div className="mt-0.5">
-                                                                                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/40 border border-orange-300 dark:border-orange-800 px-2 py-0.5 rounded-full shadow-xs">
+                                                                                            <span
+                                                                                                className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-0.5 rounded-full shadow-xs border"
+                                                                                                style={{ backgroundColor: '#fff7ed', color: '#c2410c', borderColor: '#fdba74' }}
+                                                                                            >
                                                                                                 📅 效期至 {item.expiryDate || prod?.expiryDate || prod?.expiry_date}
                                                                                             </span>
                                                                                         </div>
@@ -3637,7 +3640,10 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                                                                 </div>
                                                                                                 {exp && (
                                                                                                     <div className="mt-1">
-                                                                                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/40 border border-orange-300 dark:border-orange-800 px-2 py-0.5 rounded-full shadow-xs">
+                                                                                                        <span
+                                                                                                            className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-0.5 rounded-full shadow-xs border"
+                                                                                                            style={{ backgroundColor: '#fff7ed', color: '#c2410c', borderColor: '#fdba74' }}
+                                                                                                        >
                                                                                                             📅 效期至 {exp}
                                                                                                         </span>
                                                                                                     </div>
@@ -4005,7 +4011,10 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                                 const exp = item.expiryDate || pInfo?.expiryDate || pInfo?.expiry_date;
                                                                 if (!exp) return null;
                                                                 return (
-                                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/40 border border-orange-300 dark:border-orange-800 px-2 py-0.5 rounded-full shadow-xs">
+                                                                    <span
+                                                                        className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full shadow-xs border"
+                                                                        style={{ backgroundColor: '#fff7ed', color: '#c2410c', borderColor: '#fdba74' }}
+                                                                    >
                                                                         📅 效期至 {exp}
                                                                     </span>
                                                                 );
