@@ -85,7 +85,7 @@ const stripTrailingQty = (str) => {
     if (/[,，+]/.test(trimmed)) {
         return trimmed;
     }
-    return trimmed.replace(/x1$/i, '').trim();
+    return trimmed.replace(/\s*[*xX×:：]\s*\d+$/i, '').trim();
 };
 
 // --- 📝 訂單備註解析輔助函數：區分「顧客留言」與「系統/金流紀錄」 ---
@@ -522,9 +522,15 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                 // 若計算出的活動優惠小計存在且與原價不同（命中階梯特價），優先採用精算小計；否則保留原始小計
                 const sub = isGift ? 0 : (calcSub !== null ? calcSub : (hasOriginalSubtotal ? Number(ri.subtotal) : (Number(ri.price ?? ri.unitPrice) * rQty)));
                 const avgPrice = isGift ? 0 : (rQty > 0 ? Math.round(sub / rQty) : (Number(ri.price ?? ri.unitPrice) || 0));
+                let riRemark = ri.remark || '';
+                const prodFlavors = prod?.flavor_choices || [];
+                if (prod && (prod.has_flavor_attributes || prod.hasFlavorAttributes) && prodFlavors.length === 1 && rQty > 0) {
+                    riRemark = formatFlavorMapToRemark({ [prodFlavors[0]]: rQty });
+                }
                 const expiryDate = ri.expiryDate || (prod?.expiryDate || prod?.expiry_date || '');
                 return {
                     ...ri,
+                    remark: riRemark,
                     expiryDate,
                     price: avgPrice,
                     unitPrice: avgPrice,
@@ -570,6 +576,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
 
             let finalRemark = item.remark || '';
             const prodHasFlavors = prod && (prod.has_flavor_attributes || prod.hasFlavorAttributes);
+            const flavorChoices = prod?.flavor_choices || [];
             if (hasRecipients && prodHasFlavors) {
                 const flavorMap = {};
                 const rawRemarks = [];
@@ -581,24 +588,34 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                         const isMatch = (ri.productId && item.productId && ri.productId === item.productId) ||
                                         (cleanItemName && cleanItemName === cleanRiName);
                         if (isMatch) {
-                            const remStr = ri.remark || ri.productName || '';
-                            const riFMap = parseRemarkToFlavorMap(remStr);
-                            if (Object.keys(riFMap).length > 0) {
-                                Object.entries(riFMap).forEach(([f, q]) => {
-                                    flavorMap[f] = (flavorMap[f] || 0) + q;
-                                });
-                            } else if (ri.remark && !ri.remark.includes('贈品')) {
-                                const clean = ri.remark.trim();
-                                if (clean && !rawRemarks.includes(clean)) rawRemarks.push(clean);
+                            const rQty = Number(ri.qty) || 0;
+                            if (flavorChoices.length === 1 && rQty > 0) {
+                                flavorMap[flavorChoices[0]] = (flavorMap[flavorChoices[0]] || 0) + rQty;
+                            } else {
+                                const remStr = ri.remark || ri.productName || '';
+                                const riFMap = parseRemarkToFlavorMap(remStr);
+                                if (Object.keys(riFMap).length > 0) {
+                                    Object.entries(riFMap).forEach(([f, q]) => {
+                                        flavorMap[f] = (flavorMap[f] || 0) + q;
+                                    });
+                                } else if (ri.remark && !ri.remark.includes('贈品')) {
+                                    const clean = ri.remark.trim();
+                                    if (clean && !rawRemarks.includes(clean)) rawRemarks.push(clean);
+                                }
                             }
                         }
                     });
                 });
                 if (Object.keys(flavorMap).length > 0) {
+                    if (flavorChoices.length === 1 && flavorMap[flavorChoices[0]] !== undefined) {
+                        flavorMap[flavorChoices[0]] = Number(item.qty) || 0;
+                    }
                     const fParts = Object.entries(flavorMap).map(([k, v]) => `${k}x${v}`);
                     if (rawRemarks.length > 0) fParts.push(...rawRemarks);
                     finalRemark = `【口味備註：${fParts.join(', ')}】`;
                 }
+            } else if (finalRemark && prodHasFlavors && flavorChoices.length === 1) {
+                finalRemark = `【口味備註：${flavorChoices[0]}x${item.qty}】`;
             } else if (finalRemark) {
                 // 若無團員或主項目自身有口味備註（例如歷史合併資料），亦進行口味加總聚合
                 const fMap = parseRemarkToFlavorMap(finalRemark);
@@ -934,6 +951,11 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
 
             let finalRemark = item.remark || "";
             if (item.flavorMap && Object.keys(item.flavorMap).length > 0) {
+                const pInfo = products.find(p => p.id === item.productId);
+                const choices = pInfo?.flavor_choices || [];
+                if (choices.length === 1 && item.flavorMap[choices[0]] !== undefined) {
+                    item.flavorMap[choices[0]] = item.qty;
+                }
                 const fParts = Object.entries(item.flavorMap).map(([k, v]) => `${k}x${v}`);
                 if (item.rawRemarks && item.rawRemarks.length > 0) fParts.push(...item.rawRemarks);
                 finalRemark = `【口味備註：${fParts.join(', ')}】`;
@@ -969,11 +991,27 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
 
     const handleRecipientQtyChange = (recipientId, productId, newQty) => {
         const qty = Math.max(0, parseInt(newQty) || 0);
+        const prod = products.find(p => p.id === productId);
+        const hasFlavors = prod && (prod.has_flavor_attributes || prod.hasFlavorAttributes);
+        const flavorChoices = prod?.flavor_choices || [];
+
         const nextRecipients = editingOrder.recipients.map(r => {
             if (r.recipientId === recipientId) {
                 const nextItems = r.items.map(ri => {
                     if (ri.productId === productId) {
-                        return { ...ri, qty };
+                        let nextRemark = ri.remark;
+                        if (hasFlavors && qty > 0) {
+                            if (flavorChoices.length === 1) {
+                                nextRemark = formatFlavorMapToRemark({ [flavorChoices[0]]: qty });
+                            } else if (ri.remark) {
+                                const fMap = parseRemarkToFlavorMap(ri.remark, flavorChoices, qty);
+                                const activeKeys = Object.keys(fMap).filter(k => fMap[k] > 0);
+                                if (activeKeys.length === 1) {
+                                    nextRemark = formatFlavorMapToRemark({ [activeKeys[0]]: qty });
+                                }
+                            }
+                        }
+                        return { ...ri, qty, remark: nextRemark };
                     }
                     return ri;
                 }).filter(ri => ri.qty > 0);
@@ -1157,16 +1195,25 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
 
     const handleItemQtyChange = (productId, qty) => {
         setEditingOrder(prev => {
+            const prod = products.find(p => p.id === productId);
+            const hasFlavors = prod && (prod.has_flavor_attributes || prod.hasFlavorAttributes);
+            const flavorChoices = prod?.flavor_choices || [];
+
             const newItems = prev.items.map(item => {
                 if (item.productId === productId) {
                     const newQty = Math.max(0, Number(qty) || 0);
                     const subtotal = calculateItemSubtotal(productId, newQty);
                     const avgPrice = newQty > 0 ? (subtotal / newQty) : item.unitPrice;
+                    let nextRemark = item.remark;
+                    if (hasFlavors && newQty > 0 && flavorChoices.length === 1) {
+                        nextRemark = formatFlavorMapToRemark({ [flavorChoices[0]]: newQty });
+                    }
                     return {
                         ...item,
                         qty: newQty,
                         unitPrice: avgPrice,
-                        subtotal: subtotal
+                        subtotal: subtotal,
+                        remark: nextRemark
                     };
                 }
                 return item;
