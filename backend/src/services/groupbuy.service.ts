@@ -538,6 +538,12 @@ export const GroupBuyService = {
         await tx.groupBuyOrderRecipient.deleteMany({ where: { orderId } });
 
         if (Array.isArray(recipients) && recipients.length > 0) {
+          const allPids = Array.from(new Set(recipients.flatMap((r: any) => (r.items || []).map((ri: any) => ri.productId)).filter(Boolean)));
+          const dbProducts = await tx.product.findMany({
+            where: { productId: { in: allPids } }
+          });
+          const dbProdMap = new Map(dbProducts.map(p => [p.productId, p]));
+
           for (const r of recipients) {
             await tx.groupBuyOrderRecipient.create({
               data: {
@@ -546,15 +552,43 @@ export const GroupBuyService = {
                 note: r.note || '',
                 items: {
                   create: (r.items || []).map((ri: any) => {
-                    const sub = Math.round(Number(ri.subtotal !== undefined ? ri.subtotal : Number(ri.price) * Number(ri.qty))) || 0;
+                    const rQty = Number(ri.qty) || 0;
+                    const isGift = Number(ri.price) === 0 || (ri.remark && String(ri.remark).includes('贈品')) || (ri.productName && String(ri.productName).includes('贈品'));
+                    let price = Math.round(Number(ri.price)) || 0;
+                    let sub = Math.round(Number(ri.subtotal !== undefined ? ri.subtotal : price * rQty)) || 0;
+
+                    const dbP = dbProdMap.get(ri.productId);
+                    if (!isGift && dbP?.hasVolumePricing && dbP.volumePricingSettings && rQty > 0) {
+                      let settings: any = null;
+                      if (typeof dbP.volumePricingSettings === 'string') {
+                        try { settings = JSON.parse(dbP.volumePricingSettings); } catch (e) {}
+                      } else {
+                        settings = dbP.volumePricingSettings;
+                      }
+                      if (settings) {
+                        const vSub = calculateItemSubtotal({
+                          productId: dbP.productId,
+                          productName: dbP.productName,
+                          unitPrice: Number(dbP.singlePrice || dbP.defaultPrice || price),
+                          qty: rQty,
+                          has_volume_pricing: true,
+                          volume_pricing_settings: settings
+                        });
+                        if (vSub > 0) {
+                          sub = vSub;
+                          price = Math.round(vSub / rQty);
+                        }
+                      }
+                    }
+
                     const rem = ri.remark || '';
                     const pName = (ri.productName || '') + (rem && !String(ri.productName || '').includes(rem) ? ` (${rem})` : '');
                     return {
                       productId: ri.productId,
                       productName: pName,
-                      qty: Number(ri.qty) || 0,
-                      price: Math.round(Number(ri.price)) || 0,
-                      subtotal: sub,
+                      qty: rQty,
+                      price: isGift ? 0 : price,
+                      subtotal: isGift ? 0 : sub,
                       remark: rem,
                       expiryDate: ri.expiryDate || null
                     };
@@ -1710,7 +1744,7 @@ export const GroupBuyService = {
     }
 
     const netProductTotal = Math.max(0, productTotal - appliedRewardDiscount);
-    const totalAmount = netProductTotal + appliedShippingFee;
+    let totalAmount = netProductTotal + appliedShippingFee;
 
     let finalNote = note || '';
     let deductionApplied = 0;
@@ -1772,56 +1806,150 @@ export const GroupBuyService = {
     }
 
     let recipientsInput: any = undefined;
-    if (isGroupOrder && payload.groupDetails && typeof payload.groupDetails === 'object') {
-      recipientsInput = {
-        create: Object.entries(payload.groupDetails).map(([name, recipientItems]: [string, any]) => {
-          return {
-            recipientName: name,
-            note: payload.groupNotes?.[name] || '',
-            items: {
-              create: (recipientItems || []).map((ri: any) => {
-                const sub = Math.round(Number(ri.subtotal !== undefined ? ri.subtotal : Number(ri.price) * Number(ri.qty))) || 0;
-                const rem = ri.remark || '';
-                const pName = (ri.productName || ri.productId || '') + (rem && !String(ri.productName || '').includes(rem) ? ` (${rem})` : '');
-                return {
-                  productId: ri.productId || '',
-                  productName: pName,
-                  qty: Number(ri.qty) || 0,
-                  price: Math.round(Number(ri.price)) || 0,
-                  subtotal: sub,
-                  remark: rem,
-                  expiryDate: ri.expiryDate || null
-                };
-              })
-            }
-          };
-        })
-      };
-    } else if (isGroupOrder && groupCart && typeof groupCart === 'object') {
-      recipientsInput = {
-        create: Object.entries(groupCart).map(([name, recipientItems]: [string, any]) => {
-          return {
-            recipientName: name,
-            note: '',
-            items: {
-              create: Object.entries(recipientItems).map(([productId, qty]: [string, any]) => {
-                const matchedItem = items.find((it: any) => it.productId === productId);
-                const pName = matchedItem ? matchedItem.productName : productId;
-                const price = matchedItem ? Math.round(Number(matchedItem.unitPrice)) : 0;
-                return {
-                  productId,
-                  productName: pName,
-                  qty: Number(qty) || 0,
-                  price: price,
-                  subtotal: Math.round(price * (Number(qty) || 0)),
-                  remark: matchedItem?.remark || '',
-                  expiryDate: matchedItem?.expiryDate || null
-                };
-              })
-            }
-          };
-        })
-      };
+    if (isGroupOrder && (payload.groupDetails || groupCart)) {
+      const allRecipientPids = new Set<string>();
+      if (payload.groupDetails && typeof payload.groupDetails === 'object') {
+        Object.values(payload.groupDetails).forEach((rItems: any) => {
+          (rItems || []).forEach((ri: any) => {
+            if (ri.productId) allRecipientPids.add(String(ri.productId).trim());
+          });
+        });
+      } else if (groupCart && typeof groupCart === 'object') {
+        Object.values(groupCart).forEach((rItems: any) => {
+          Object.keys(rItems || {}).forEach((pid: string) => allRecipientPids.add(pid.trim()));
+        });
+      }
+
+      const recDbProducts = await prisma.product.findMany({
+        where: { productId: { in: Array.from(allRecipientPids) } }
+      });
+      const recDbProdMap = new Map(recDbProducts.map(p => [p.productId, p]));
+      const recipientProductSubtotals = new Map<string, number>();
+
+      if (payload.groupDetails && typeof payload.groupDetails === 'object') {
+        recipientsInput = {
+          create: Object.entries(payload.groupDetails).map(([name, recipientItems]: [string, any]) => {
+            return {
+              recipientName: name,
+              note: payload.groupNotes?.[name] || '',
+              items: {
+                create: (recipientItems || []).map((ri: any) => {
+                  const rQty = Number(ri.qty) || 0;
+                  const isGift = Number(ri.price) === 0 || (ri.remark && String(ri.remark).includes('贈品'));
+                  let price = Math.round(Number(ri.price)) || 0;
+                  let sub = Math.round(Number(ri.subtotal !== undefined ? ri.subtotal : price * rQty)) || 0;
+
+                  const dbP = recDbProdMap.get(ri.productId);
+                  if (!isGift && dbP?.hasVolumePricing && dbP.volumePricingSettings && rQty > 0) {
+                    let settings: any = null;
+                    if (typeof dbP.volumePricingSettings === 'string') {
+                      try { settings = JSON.parse(dbP.volumePricingSettings); } catch (e) {}
+                    } else {
+                      settings = dbP.volumePricingSettings;
+                    }
+                    if (settings) {
+                      const vSub = calculateItemSubtotal({
+                        productId: dbP.productId,
+                        productName: dbP.productName,
+                        unitPrice: Number(dbP.singlePrice || dbP.defaultPrice || price),
+                        qty: rQty,
+                        has_volume_pricing: true,
+                        volume_pricing_settings: settings
+                      });
+                      if (vSub > 0) {
+                        sub = vSub;
+                        price = Math.round(vSub / rQty);
+                      }
+                    }
+                  }
+
+                  const rem = ri.remark || '';
+                  const pName = (ri.productName || ri.productId || '') + (rem && !String(ri.productName || '').includes(rem) ? ` (${rem})` : '');
+                  if (!isGift && ri.productId) {
+                    const cur = recipientProductSubtotals.get(ri.productId) || 0;
+                    recipientProductSubtotals.set(ri.productId, cur + sub);
+                  }
+                  return {
+                    productId: ri.productId || '',
+                    productName: pName,
+                    qty: rQty,
+                    price: isGift ? 0 : price,
+                    subtotal: isGift ? 0 : sub,
+                    remark: rem,
+                    expiryDate: ri.expiryDate || null
+                  };
+                })
+              }
+            };
+          })
+        };
+      } else if (groupCart && typeof groupCart === 'object') {
+        recipientsInput = {
+          create: Object.entries(groupCart).map(([name, recipientItems]: [string, any]) => {
+            return {
+              recipientName: name,
+              note: '',
+              items: {
+                create: Object.entries(recipientItems).map(([productId, qty]: [string, any]) => {
+                  const matchedItem = items.find((it: any) => it.productId === productId);
+                  const pName = matchedItem ? matchedItem.productName : productId;
+                  const rQty = Number(qty) || 0;
+                  let price = matchedItem ? Math.round(Number(matchedItem.unitPrice)) : 0;
+                  let sub = Math.round(price * rQty);
+
+                  const dbP = recDbProdMap.get(productId);
+                  if (dbP?.hasVolumePricing && dbP.volumePricingSettings && rQty > 0) {
+                    let settings: any = null;
+                    if (typeof dbP.volumePricingSettings === 'string') {
+                      try { settings = JSON.parse(dbP.volumePricingSettings); } catch (e) {}
+                    } else {
+                      settings = dbP.volumePricingSettings;
+                    }
+                    if (settings) {
+                      const vSub = calculateItemSubtotal({
+                        productId: dbP.productId,
+                        productName: dbP.productName,
+                        unitPrice: Number(dbP.singlePrice || dbP.defaultPrice || price),
+                        qty: rQty,
+                        has_volume_pricing: true,
+                        volume_pricing_settings: settings
+                      });
+                      if (vSub > 0) {
+                        sub = vSub;
+                        price = Math.round(vSub / rQty);
+                      }
+                    }
+                  }
+
+                  const cur = recipientProductSubtotals.get(productId) || 0;
+                  recipientProductSubtotals.set(productId, cur + sub);
+
+                  return {
+                    productId,
+                    productName: pName,
+                    qty: rQty,
+                    price: price,
+                    subtotal: sub,
+                    remark: matchedItem?.remark || '',
+                    expiryDate: matchedItem?.expiryDate || null
+                  };
+                })
+              }
+            };
+          })
+        };
+      }
+
+      // 🛡️ 團員代訂單：主訂單商品小計嚴格對齊各團員獨立計算後之加總
+      if (recipientProductSubtotals.size > 0) {
+        items.forEach((item: any) => {
+          if (item?.productId && recipientProductSubtotals.has(item.productId)) {
+            item.subtotal = recipientProductSubtotals.get(item.productId)!;
+            item.unitPrice = item.qty > 0 ? Math.round(item.subtotal / item.qty) : item.unitPrice;
+          }
+        });
+        totalAmount = Math.max(0, items.reduce((sum: number, it: any) => sum + Number(it.subtotal || 0), 0) + Number(shippingFee || 0) - appliedRewardDiscount - deductionApplied);
+      }
     }
 
     await prisma.$transaction(async (tx) => {

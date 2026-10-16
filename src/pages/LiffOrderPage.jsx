@@ -2522,7 +2522,19 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
         item.freeQty = legacyFreeQty;
         item.subtotal = singlePrice * (item.qty - legacyFreeQty);
       } else if (p.has_volume_pricing && p.volume_pricing_settings) {
-        item.subtotal = calculateProductSubtotal(p, item.qty);
+        if (isGroupOrder && groupCart && typeof groupCart === 'object') {
+          // 團員代訂模式下：依各團員獨立購買數量精算優惠，主訂單嚴格等於各團員獨立加總
+          let groupVolumeSubtotal = 0;
+          for (const memberItems of Object.values(groupCart)) {
+            const mQty = Number(memberItems?.[item.id] || 0);
+            if (mQty > 0) {
+              groupVolumeSubtotal += calculateProductSubtotal(p, mQty);
+            }
+          }
+          item.subtotal = groupVolumeSubtotal;
+        } else {
+          item.subtotal = calculateProductSubtotal(p, item.qty);
+        }
       } else {
         item.subtotal = singlePrice * item.qty;
       }

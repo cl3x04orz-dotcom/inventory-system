@@ -512,13 +512,20 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                     (ri.productName && String(ri.productName).includes('贈品'))
                 );
                 const prod = currentProducts.find(p => p.id === ri.productId || p.name === ri.productName || p.name === ri.productId);
-                // 🛡️ 歷史快照保護：若有原始小計則保留，避免隨新促銷活動變動歷史訂單金額
+                const rQty = Number(ri.qty) || 0;
+                // 依各團員獨立購買數量精算活動階梯價
+                let calcSub = null;
+                if (!isGift && prod) {
+                    calcSub = calculateItemSubtotal(ri.productId || ri.productName, rQty, ri.price ?? ri.unitPrice);
+                }
                 const hasOriginalSubtotal = ri.subtotal !== undefined && ri.subtotal !== null && !isNaN(Number(ri.subtotal));
-                const sub = isGift ? 0 : (hasOriginalSubtotal ? Number(ri.subtotal) : calculateItemSubtotal(ri.productId || ri.productName, ri.qty, ri.price ?? ri.unitPrice));
+                // 若計算出的活動優惠小計存在且與原價不同（命中階梯特價），優先採用精算小計；否則保留原始小計
+                const sub = isGift ? 0 : (calcSub !== null ? calcSub : (hasOriginalSubtotal ? Number(ri.subtotal) : (Number(ri.price ?? ri.unitPrice) * rQty)));
+                const avgPrice = isGift ? 0 : (rQty > 0 ? Math.round(sub / rQty) : (Number(ri.price ?? ri.unitPrice) || 0));
                 return {
                     ...ri,
-                    price: isGift ? 0 : (ri.price ?? ri.unitPrice),
-                    unitPrice: isGift ? 0 : (ri.unitPrice ?? ri.price),
+                    price: avgPrice,
+                    unitPrice: avgPrice,
                     subtotal: isGift ? 0 : (Number(sub) || 0)
                 };
             })
@@ -535,8 +542,26 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
             const prod = currentProducts.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
             let sub = isGift ? 0 : item.subtotal;
             if (!isGift) {
-                // 🛡️ 歷史快照保護：若歷史訂單已有寫入的小計 (item.subtotal)，優先保留快照，避免受日後新活動影響！
-                if (sub == null || isNaN(Number(sub))) {
+                if (hasRecipients) {
+                    // 🛡️ 團員代訂單：主商品小計嚴格等於各團員獨立計算後之加總（避免跨團員硬湊優惠）
+                    let recipientSubTotal = 0;
+                    let foundInRecipients = false;
+                    normalizedRecipients.forEach(r => {
+                        (r.items || []).forEach(ri => {
+                            const isMatch = (ri.productId && item.productId && ri.productId === item.productId) ||
+                                            (cleanBaseProductName(ri.productName) && cleanBaseProductName(ri.productName) === cleanBaseProductName(item.productName));
+                            if (isMatch) {
+                                recipientSubTotal += Number(ri.subtotal || 0);
+                                foundInRecipients = true;
+                            }
+                        });
+                    });
+                    if (foundInRecipients) {
+                        sub = recipientSubTotal;
+                    } else if (sub == null || isNaN(Number(sub))) {
+                        sub = calculateItemSubtotal(item.productId, item.qty, item.unitPrice);
+                    }
+                } else if (sub == null || isNaN(Number(sub))) {
                     sub = calculateItemSubtotal(item.productId, item.qty, item.unitPrice);
                 }
             }
@@ -852,6 +877,18 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
             if (r.items) {
                 r.items.forEach(ri => {
                     const pid = ri.productId;
+                    const rQty = Number(ri.qty) || 0;
+                    const isGift = Boolean(
+                        ri.isGift ||
+                        Number(ri.price) === 0 ||
+                        Number(ri.unitPrice) === 0 ||
+                        (ri.remark && String(ri.remark).includes('贈品')) ||
+                        (ri.productName && String(ri.productName).includes('贈品'))
+                    );
+                    const riSub = isGift ? 0 : calculateItemSubtotal(pid || ri.productName, rQty, ri.price ?? ri.unitPrice);
+                    ri.subtotal = riSub;
+                    ri.price = isGift ? 0 : (rQty > 0 ? Math.round(riSub / rQty) : Number(ri.price || 0));
+
                     if (!productTotals[pid]) {
                         const origItem = editingOrder?.items?.find(it => it.productId === pid);
                         productTotals[pid] = {
@@ -859,6 +896,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                             productName: ri.productName,
                             unitPrice: Number(ri.price),
                             qty: 0,
+                            subtotal: 0,
                             remark: ri.remark || origItem?.remark || "",
                             flavorMap: {},
                             rawRemarks: []
@@ -879,15 +917,16 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                             }
                         });
                     }
-                    productTotals[pid].qty += Number(ri.qty) || 0;
+                    productTotals[pid].qty += rQty;
+                    productTotals[pid].subtotal += riSub;
                 });
             }
         });
 
         const newItems = Object.values(productTotals).map((item) => {
-            const subtotal = calculateItemSubtotal(item.productId, item.qty);
+            const subtotal = item.subtotal;
             const prod = products.find(p => p.id === item.productId);
-            const displayPrice = prod ? (Number(prod.single_price) || Number(prod.price)) : item.unitPrice;
+            const displayPrice = item.qty > 0 ? Math.round(item.subtotal / item.qty) : (prod ? (Number(prod.single_price) || Number(prod.price)) : item.unitPrice);
 
             let finalRemark = item.remark || "";
             if (item.flavorMap && Object.keys(item.flavorMap).length > 0) {
@@ -1002,6 +1041,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                     return r;
                 }
                 const initialRemark = hasFlavors ? formatFlavorMapToRemark({ [prod.flavor_choices[0]]: 1 }) : '';
+                const initialSub = calculateItemSubtotal(productId, 1, Number(prod.single_price) || Number(prod.price));
                 const newItem = {
                     id: 'temp-item-' + Math.random().toString(36).substring(2, 9),
                     recipientId,
@@ -1009,6 +1049,7 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                     productName: prod.name,
                     qty: 1,
                     price: Number(prod.single_price) || Number(prod.price),
+                    subtotal: initialSub,
                     remark: initialRemark
                 };
                 if (hasFlavors) {
@@ -1089,9 +1130,13 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                 if (r.recipientId === adminFlavorModal.recipientId) {
                     const nextItems = r.items.map(ri => {
                         if (ri.productId === adminFlavorModal.productId) {
+                            const newSub = calculateItemSubtotal(ri.productId, newTotalQty, ri.price);
+                            const avgPrice = newTotalQty > 0 ? Math.round(newSub / newTotalQty) : ri.price;
                             return {
                                 ...ri,
                                 qty: newTotalQty,
+                                price: avgPrice,
+                                subtotal: newSub,
                                 remark: newRemark
                             };
                         }
