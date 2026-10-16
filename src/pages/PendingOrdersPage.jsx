@@ -522,8 +522,10 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                 // 若計算出的活動優惠小計存在且與原價不同（命中階梯特價），優先採用精算小計；否則保留原始小計
                 const sub = isGift ? 0 : (calcSub !== null ? calcSub : (hasOriginalSubtotal ? Number(ri.subtotal) : (Number(ri.price ?? ri.unitPrice) * rQty)));
                 const avgPrice = isGift ? 0 : (rQty > 0 ? Math.round(sub / rQty) : (Number(ri.price ?? ri.unitPrice) || 0));
+                const expiryDate = ri.expiryDate || (prod?.expiryDate || prod?.expiry_date || '');
                 return {
                     ...ri,
+                    expiryDate,
                     price: avgPrice,
                     unitPrice: avgPrice,
                     subtotal: isGift ? 0 : (Number(sub) || 0)
@@ -605,8 +607,10 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                 }
             }
 
+            const expiryDate = item.expiryDate || (prod?.expiryDate || prod?.expiry_date || '');
             return {
                 ...item,
+                expiryDate,
                 unitPrice: isGift ? 0 : (item.unitPrice ?? (prod ? (Number(prod.single_price) || Number(prod.price)) : 0)),
                 subtotal: isGift ? 0 : (Number(sub) || 0),
                 remark: finalRemark
@@ -3467,6 +3471,11 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                                                         <span className="text-xs md:text-sm text-blue-600 dark:text-blue-400 font-extrabold">
                                                                                             x {item.qty} {isBundle ? '組' : '瓶'}
                                                                                         </span>
+                                                                                        {(item.expiryDate || prod?.expiryDate || prod?.expiry_date) && (
+                                                                                            <span className="inline-flex items-center gap-1 text-[11px] font-black text-amber-800 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md shadow-2xs">
+                                                                                                📅 效期至 {item.expiryDate || prod?.expiryDate || prod?.expiry_date}
+                                                                                            </span>
+                                                                                        )}
                                                                                     </div>
                                                                                      {(() => {
                                                                                          const remarkStr = String(item.remark || item.productName || '');
@@ -3615,6 +3624,16 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                                                                             免費贈品
                                                                                                         </span>
                                                                                                     )}
+                                                                                                    {(() => {
+                                                                                                        const rProd = products.find(p => p.id === ri.productId || p.name === ri.productName || p.name === ri.productId);
+                                                                                                        const exp = ri.expiryDate || (rProd?.expiryDate || rProd?.expiry_date || '');
+                                                                                                        if (!exp) return null;
+                                                                                                        return (
+                                                                                                            <span className="inline-flex items-center text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md ml-1.5">
+                                                                                                                📅 {exp}
+                                                                                                            </span>
+                                                                                                        );
+                                                                                                    })()}
                                                                                                 </span> <span className={`font-normal ${isGift ? 'text-emerald-600 font-bold' : 'text-blue-600 dark:text-blue-400'}`}>{qtyDisplay}</span>
                                                                                             </span>
                                                                                             <span className="flex-shrink-0 font-normal text-[var(--text-primary)] mt-0.5 text-sm md:text-base">
@@ -3974,6 +3993,16 @@ export default function PendingOrdersPage({ user, apiUrl, setPage }) {
                                                     <div className="flex-1 mr-4">
                                                         <div className="flex items-center gap-2 flex-wrap">
                                                             <span className="font-bold text-[var(--text-primary)]">{item.productName}</span>
+                                                            {(() => {
+                                                                const pInfo = products.find(p => p.id === item.productId || p.name === item.productName);
+                                                                const exp = item.expiryDate || pInfo?.expiryDate || pInfo?.expiry_date;
+                                                                if (!exp) return null;
+                                                                return (
+                                                                    <span className="text-[10px] font-bold text-amber-800 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md">
+                                                                        📅 效期至 {exp}
+                                                                    </span>
+                                                                );
+                                                            })()}
                                                             {(() => {
                                                                 const pInfo = products.find(p => p.id === item.productId);
                                                                 const hasFlavors = pInfo?.has_flavor_attributes && Array.isArray(pInfo.flavor_choices) && pInfo.flavor_choices.length > 0;

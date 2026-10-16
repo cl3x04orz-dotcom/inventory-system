@@ -256,7 +256,8 @@ export const GroupBuyService = {
           qty: Number(ri.qty),
           price: Number(ri.price),
           subtotal: ri.subtotal !== null && ri.subtotal !== undefined ? Number(ri.subtotal) : (Number(ri.price) * Number(ri.qty)),
-          remark: ri.remark || ''
+          remark: ri.remark || '',
+          expiryDate: ri.expiryDate || ''
         }))
       })),
       items: (o.details || []).map((d: any) => ({
@@ -265,7 +266,8 @@ export const GroupBuyService = {
         unitPrice: Number(d.unitPrice),
         qty: Number(d.qty),
         subtotal: Number(d.subtotal),
-        remark: d.remark || ''
+        remark: d.remark || '',
+        expiryDate: d.expiryDate || ''
       }))
     }));
   },
@@ -590,7 +592,7 @@ export const GroupBuyService = {
                       price: isGift ? 0 : price,
                       subtotal: isGift ? 0 : sub,
                       remark: rem,
-                      expiryDate: ri.expiryDate || null
+                      expiryDate: ri.expiryDate || dbP?.expiryDate || null
                     };
                   })
                 }
@@ -1665,6 +1667,9 @@ export const GroupBuyService = {
         where: { productId: String(item.productId).trim() }
       });
       if (dbProd) {
+        if (!item.expiryDate && dbProd.expiryDate) {
+          item.expiryDate = dbProd.expiryDate;
+        }
         const singlePrice = Number(dbProd.singlePrice || dbProd.defaultPrice || item.unitPrice || 0);
         let settings: any = null;
         if (dbProd.volumePricingSettings) {
@@ -1876,7 +1881,7 @@ export const GroupBuyService = {
                     price: isGift ? 0 : price,
                     subtotal: isGift ? 0 : sub,
                     remark: rem,
-                    expiryDate: ri.expiryDate || null
+                    expiryDate: ri.expiryDate || dbP?.expiryDate || null
                   };
                 })
               }
@@ -1931,7 +1936,7 @@ export const GroupBuyService = {
                     price: price,
                     subtotal: sub,
                     remark: matchedItem?.remark || '',
-                    expiryDate: matchedItem?.expiryDate || null
+                    expiryDate: matchedItem?.expiryDate || dbP?.expiryDate || null
                   };
                 })
               }

@@ -617,12 +617,23 @@ export default function DriverDeliveryPage({ apiUrl, onBack }) {
                                                                         {order.items && order.items.length > 0 && (
                                                                             <div className="space-y-1">
                                                                                 <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">主訂單品項：</div>
-                                                                                {order.items.map((item, iIdx) => (
-                                                                                    <div key={iIdx} className="flex justify-between items-center text-sm text-slate-900 font-bold">
-                                                                                        <span>{item.productName}</span>
-                                                                                        <span className="font-mono font-black text-slate-900 text-base">x{item.qty}</span>
-                                                                                    </div>
-                                                                                ))}
+                                                                                {order.items.map((item, iIdx) => {
+                                                                                    const prod = products.find(p => p.id === item.productId || p.name === item.productName || p.name === item.productId);
+                                                                                    const exp = item.expiryDate || (prod?.expiryDate || prod?.expiry_date || '');
+                                                                                    return (
+                                                                                        <div key={iIdx} className="flex justify-between items-center text-sm text-slate-900 font-bold">
+                                                                                            <span className="flex items-center gap-1.5 flex-wrap">
+                                                                                                <span>{item.productName}</span>
+                                                                                                {exp && (
+                                                                                                    <span className="text-[10px] font-black text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md">
+                                                                                                        📅 效期至 {exp}
+                                                                                                    </span>
+                                                                                                )}
+                                                                                            </span>
+                                                                                            <span className="font-mono font-black text-slate-900 text-base">x{item.qty}</span>
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
                                                                             </div>
                                                                         )}
 
@@ -639,12 +650,23 @@ export default function DriverDeliveryPage({ apiUrl, onBack }) {
                                                                                                 <span className="text-emerald-700 font-mono font-bold text-xs">（小計 ${rTotal}）</span>
                                                                                             </div>
                                                                                             <div className="space-y-1 pt-0.5">
-                                                                                                {(r.items || []).map((ri, riIdx) => (
-                                                                                                    <div key={riIdx} className="flex justify-between items-center text-xs text-slate-800 font-bold">
-                                                                                                        <span>{ri.productName}</span>
-                                                                                                        <span className="font-mono font-black text-slate-900 text-sm">x{ri.qty}</span>
-                                                                                                    </div>
-                                                                                                ))}
+                                                                                                {(r.items || []).map((ri, riIdx) => {
+                                                                                                    const rProd = products.find(p => p.id === ri.productId || p.name === ri.productName || p.name === ri.productId);
+                                                                                                    const exp = ri.expiryDate || (rProd?.expiryDate || rProd?.expiry_date || '');
+                                                                                                    return (
+                                                                                                        <div key={riIdx} className="flex justify-between items-center text-xs text-slate-800 font-bold">
+                                                                                                            <span className="flex items-center gap-1 flex-wrap">
+                                                                                                                <span>{ri.productName}</span>
+                                                                                                                {exp && (
+                                                                                                                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1 py-0.2 rounded">
+                                                                                                                        📅 {exp}
+                                                                                                                    </span>
+                                                                                                                )}
+                                                                                                            </span>
+                                                                                                            <span className="font-mono font-black text-slate-900 text-sm">x{ri.qty}</span>
+                                                                                                        </div>
+                                                                                                    );
+                                                                                                })}
                                                                                             </div>
                                                                                         </div>
                                                                                     );
