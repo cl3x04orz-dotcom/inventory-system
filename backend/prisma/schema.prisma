@@ -37,6 +37,7 @@ model Product {
   hasFlavorAttributes   Boolean                 @default(false)
   flavorChoices         Json                    @default("[]")
   singlePrice           Decimal                 @default(0)
+  originalPrice         Decimal?                @default(0) // 建議原價/市價 (若大於售價則在前台劃線)
   hasVolumePricing      Boolean                 @default(false)
   volumePricingSettings Json?
   packSize              Int                     @default(1)

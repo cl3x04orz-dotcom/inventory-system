@@ -6665,8 +6665,20 @@ ${freeNote(newFee, newMin)}
 
                             {/* 價格與按鈕 */}
                             <div className="mt-2.5 pt-2 border-t border-[var(--border-primary)] flex items-center justify-between">
-                              <div className="text-amber-600 dark:text-amber-400 font-black text-sm">
-                                ${product.single_price || product.price || 0}
+                              <div className="flex flex-col">
+                                {product.original_price && Number(product.original_price) > Number(product.single_price || product.price || 0) && (
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[11px] text-slate-400 line-through font-mono">
+                                      ${product.original_price}
+                                    </span>
+                                    <span className="text-[9px] font-black text-rose-600 bg-rose-50 dark:bg-rose-950/40 border border-rose-200/60 dark:border-rose-800 px-1 rounded leading-none">
+                                      省${Number(product.original_price) - Number(product.single_price || product.price || 0)}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="text-amber-600 dark:text-amber-400 font-black text-sm">
+                                  ${product.single_price || product.price || 0}
+                                </div>
                               </div>
                               {isSoldOut ? (
                                 <span className="h-7 px-2.5 flex items-center justify-center rounded-lg text-xs font-bold bg-gray-200 text-gray-400">
@@ -6888,11 +6900,21 @@ ${freeNote(newFee, newMin)}
                             <div className="flex flex-col mt-1.5">
                               <div className="flex justify-between items-center">
                                 <div className="flex flex-col">
-                                  <span className="text-sm font-bold text-blue-600 font-mono flex items-center gap-1.5">
+                                  <span className="text-sm font-bold text-blue-600 font-mono flex items-center gap-1.5 flex-wrap">
+                                    {product.original_price && Number(product.original_price) > Number(product.single_price || product.price || 0) && (
+                                      <span className="text-xs text-slate-400 line-through font-normal">
+                                        ${product.original_price}
+                                      </span>
+                                    )}
                                     <span>
                                       $
                                       {product.single_price || product.price}
                                     </span>
+                                    {product.original_price && Number(product.original_price) > Number(product.single_price || product.price || 0) && (
+                                      <span className="text-[10px] text-rose-600 bg-rose-50 border border-rose-200 px-1 py-0.2 rounded font-bold leading-none">
+                                        省${Number(product.original_price) - Number(product.single_price || product.price || 0)}
+                                      </span>
+                                    )}
                                     {qty > 0 && freeQty > 0 && (
                                       <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 border border-emerald-100 px-1 py-0.5 rounded leading-none flex items-center">
                                         贈{freeQty},共{qty + freeQty}件

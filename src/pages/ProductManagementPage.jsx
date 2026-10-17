@@ -426,7 +426,8 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 isPurchasable: mergedProduct.isPurchasable,
                 isDiscontinued: mergedProduct.isDiscontinued,
                 isPinned: mergedProduct.isPinned !== undefined ? Boolean(mergedProduct.isPinned) : false,
-                pinnedOrder: (mergedProduct.pinnedOrder !== undefined && mergedProduct.pinnedOrder !== '' && mergedProduct.pinnedOrder !== null) ? Number(mergedProduct.pinnedOrder) : 0
+                pinnedOrder: (mergedProduct.pinnedOrder !== undefined && mergedProduct.pinnedOrder !== '' && mergedProduct.pinnedOrder !== null) ? Number(mergedProduct.pinnedOrder) : 0,
+                original_price: (mergedProduct.original_price !== undefined && mergedProduct.original_price !== '' && mergedProduct.original_price !== null) ? Number(mergedProduct.original_price) : null
             }, user.token);
             
             if (res && res.error) {
@@ -1277,15 +1278,37 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                             </div>
                                                         </div>
 
-                                                        {/* 銷售原價 */}
+                                                        {/* 建議原價 (市價劃線用) */}
                                                         <div className="flex flex-col gap-1.5 bg-[var(--bg-tertiary)]/30 p-3 rounded-xl border border-[var(--border-primary)]/50">
-                                                            <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">銷售原價</span>
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-[10px] uppercase font-extrabold text-[var(--text-secondary)] tracking-wider">建議原價 (市價)</span>
+                                                                <span className="text-[9px] text-amber-600 dark:text-amber-400 font-bold">填寫於商城劃線</span>
+                                                            </div>
                                                             <div className="relative">
                                                                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-bold font-mono text-xs">$</span>
                                                                 <input
                                                                     type="number"
                                                                     className="input-field text-xs pl-6 p-2 w-full font-mono font-bold"
-                                                                    placeholder="銷售原價"
+                                                                    placeholder="例: 85 (留空不劃線)"
+                                                                    value={product.original_price || ''}
+                                                                    onChange={(e) => handleFieldChange(product.id, 'original_price', e.target.value !== '' ? Number(e.target.value) : '')}
+                                                                    onBlur={(e) => handleSaveProduct(product.id, { original_price: e.target.value !== '' ? Number(e.target.value) : null })}
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        {/* 商城售價 (實付) */}
+                                                        <div className="flex flex-col gap-1.5 bg-blue-500/5 p-3 rounded-xl border border-blue-500/30">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-[10px] uppercase font-extrabold text-blue-600 dark:text-blue-400 tracking-wider">商城售價 (實付)</span>
+                                                                <span className="text-[9px] text-blue-600 dark:text-blue-400 font-bold">客人結帳價</span>
+                                                            </div>
+                                                            <div className="relative">
+                                                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-blue-500 font-bold font-mono text-xs">$</span>
+                                                                <input
+                                                                    type="number"
+                                                                    className="input-field text-xs pl-6 p-2 w-full font-mono font-bold text-blue-600 dark:text-blue-400"
+                                                                    placeholder="客人結帳價"
                                                                     value={product.single_price || ''}
                                                                     onChange={(e) => handleFieldChange(product.id, 'single_price', e.target.value !== '' ? Number(e.target.value) : '')}
                                                                     onBlur={(e) => handleSaveProduct(product.id, { single_price: e.target.value !== '' ? Number(e.target.value) : '' })}

@@ -114,6 +114,7 @@ export const ProductService = {
         has_flavor_attributes: p.hasFlavorAttributes,
         flavor_choices: flavorChoices,
         single_price: Number(p.singlePrice),
+        original_price: p.originalPrice !== null && p.originalPrice !== undefined && Number(p.originalPrice) > 0 ? Number(p.originalPrice) : null,
         has_volume_pricing: p.hasVolumePricing,
         volume_pricing_settings: p.volumePricingSettings,
         sortWeight: p.sortWeight,
@@ -219,7 +220,9 @@ export const ProductService = {
       posSettings,
       barcodes,
       isPinned,
-      pinnedOrder
+      pinnedOrder,
+      original_price,
+      originalPrice
     } = payload;
 
     if (!productId) {
@@ -316,6 +319,9 @@ export const ProductService = {
         isDiscontinued: payload.isDiscontinued !== undefined ? Boolean(payload.isDiscontinued) : undefined,
         isPinned: isPinned !== undefined ? Boolean(isPinned) : undefined,
         pinnedOrder: pinnedOrder !== undefined ? (pinnedOrder === '' || pinnedOrder === null ? 0 : Number(pinnedOrder)) : undefined,
+        originalPrice: (original_price !== undefined || originalPrice !== undefined)
+          ? ((original_price === '' || original_price === null || originalPrice === '' || originalPrice === null) ? null : Number(original_price ?? originalPrice))
+          : undefined,
       }
     });
 
