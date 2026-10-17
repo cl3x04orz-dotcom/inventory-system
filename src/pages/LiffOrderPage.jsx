@@ -320,6 +320,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   const [customerPhone, setCustomerPhone] = useState("");
   const [phoneExt, setPhoneExt] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [note, setNote] = useState("");
   const [paymentMethod, setPaymentMethod] = useState(() => {
     try {
       const saved = localStorage.getItem("mlw_preferred_payment");
