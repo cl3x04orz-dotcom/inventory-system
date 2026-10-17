@@ -117,6 +117,8 @@ export const ProductService = {
         has_volume_pricing: p.hasVolumePricing,
         volume_pricing_settings: p.volumePricingSettings,
         sortWeight: p.sortWeight,
+        isPinned: Boolean(p.isPinned),
+        pinnedOrder: Number(p.pinnedOrder || 0),
         isBundle: Boolean(p.isBundle),
         bundleSize: Number(p.bundleSize || 1),
         isCombo: Boolean(p.isCombo),
@@ -215,7 +217,9 @@ export const ProductService = {
       allowedCommunityIds,
       communityQuotas,
       posSettings,
-      barcodes
+      barcodes,
+      isPinned,
+      pinnedOrder
     } = payload;
 
     if (!productId) {
@@ -310,6 +314,8 @@ export const ProductService = {
         posSettings: posSettings !== undefined ? posSettings : undefined,
         isPurchasable: payload.isPurchasable !== undefined ? Boolean(payload.isPurchasable) : undefined,
         isDiscontinued: payload.isDiscontinued !== undefined ? Boolean(payload.isDiscontinued) : undefined,
+        isPinned: isPinned !== undefined ? Boolean(isPinned) : undefined,
+        pinnedOrder: pinnedOrder !== undefined ? (pinnedOrder === '' || pinnedOrder === null ? 0 : Number(pinnedOrder)) : undefined,
       }
     });
 

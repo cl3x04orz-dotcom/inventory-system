@@ -141,6 +141,11 @@ export default function ProductManagementPage({ user, apiUrl }) {
     const [isAllowedCommOpen, setIsAllowedCommOpen] = useState(false); // 開放社區折疊 (預設收合)
     const [isCommQuotaOpen, setIsCommQuotaOpen] = useState(false); // 社區配額折疊 (預設收合)
 
+    // ── 商城置頂專區自訂名稱 State ──────────────────────────────────
+    const [pinnedSectionTitle, setPinnedSectionTitle] = useState('🔥 限時置頂推薦');
+    const [isSavingPinnedTitle, setIsSavingPinnedTitle] = useState(false);
+    const [pinnedTitleSavedMsg, setPinnedTitleSavedMsg] = useState(false);
+
     // 計算可見社區清單 (排除行政區與隱藏社區)
     const visibleCommunities = useMemo(() => {
         let hiddenBuildings = [];
@@ -247,6 +252,13 @@ export default function ProductManagementPage({ user, apiUrl }) {
             } catch (_) {}
 
             fetchProducts(hasCache);
+            // 讀取商城置頂專區自訂標題
+            callGAS(apiUrl, 'getPinnedSectionTitle', {}, user.token)
+                .then(res => {
+                    if (res && res.title) setPinnedSectionTitle(res.title);
+                })
+                .catch(() => {});
+
             // 同時拉取開團大樓 (getBuildingSettings) 與社區清單 (getCommunities)，確保與「開團管理」100% 同步
             Promise.all([
                 callGAS(apiUrl, 'getBuildingSettings', {}, user.token).catch(() => []),
@@ -412,7 +424,9 @@ export default function ProductManagementPage({ user, apiUrl }) {
                 posSettings: mergedProduct.posSettings,
                 barcodes: mergedProduct.barcodes || [],
                 isPurchasable: mergedProduct.isPurchasable,
-                isDiscontinued: mergedProduct.isDiscontinued
+                isDiscontinued: mergedProduct.isDiscontinued,
+                isPinned: mergedProduct.isPinned !== undefined ? Boolean(mergedProduct.isPinned) : false,
+                pinnedOrder: (mergedProduct.pinnedOrder !== undefined && mergedProduct.pinnedOrder !== '' && mergedProduct.pinnedOrder !== null) ? Number(mergedProduct.pinnedOrder) : 0
             }, user.token);
             
             if (res && res.error) {
@@ -466,6 +480,9 @@ export default function ProductManagementPage({ user, apiUrl }) {
             if (qty > 0 || isDiscontinued) return false;
         } else if (stockFilter === 'DISCONTINUED') {
             if (!isDiscontinued) return false;
+        } else if (stockFilter === 'PINNED') {
+            const isPinned = p.isPinned === true || Number(p.pinnedOrder) > 0;
+            if (!isPinned || isDiscontinued) return false;
         } else if (stockFilter === 'ALL') {
             if (isDiscontinued) return false;
         }
@@ -663,6 +680,23 @@ export default function ProductManagementPage({ user, apiUrl }) {
         }).length;
     }, [activeModalConfig.allowedCommunityIds, visibleCommunities]);
 
+    const pinnedCount = useMemo(() => {
+        return products.filter(p => !p.isDiscontinued && (Boolean(p.isPinned) || Number(p.pinnedOrder) > 0)).length;
+    }, [products]);
+
+    const handleSavePinnedTitle = async () => {
+        setIsSavingPinnedTitle(true);
+        try {
+            await callGAS(apiUrl, 'savePinnedSectionTitle', { title: pinnedSectionTitle }, user.token);
+            setPinnedTitleSavedMsg(true);
+            setTimeout(() => setPinnedTitleSavedMsg(false), 2500);
+        } catch (err) {
+            alert('儲存置頂名稱失敗: ' + (err.message || err));
+        } finally {
+            setIsSavingPinnedTitle(false);
+        }
+    };
+
     return (
         <div className="max-w-6xl mx-auto h-[calc(100vh-6rem)] flex flex-col p-4 gap-4">
             {/* Header Area */}
@@ -682,6 +716,7 @@ export default function ProductManagementPage({ user, apiUrl }) {
                             className="w-full appearance-none pl-8 pr-7 py-2 text-xs font-bold rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-blue-500 hover:border-blue-300 transition-all cursor-pointer shadow-xs truncate h-9"
                         >
                             <option value="ALL">📦 販售中商品 (預設)</option>
+                            <option value="PINNED">📌 已商城置頂商品 ({pinnedCount})</option>
                             <option value="ONLINE">🟢 已網購上架</option>
                             <option value="OFFLINE">🔴 已網購下架</option>
                             <option value="HAS_STOCK">🟢 只看有庫存</option>
@@ -738,6 +773,59 @@ export default function ProductManagementPage({ user, apiUrl }) {
                             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
                         </button>
                     </div>
+                </div>
+            </div>
+
+            {/* 商城置頂專區控制列 */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/5 border border-amber-500/30 rounded-2xl shadow-xs shrink-0">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                        <Zap size={18} />
+                    </div>
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs md:text-sm font-black text-amber-900 dark:text-amber-200">
+                                商城置頂推薦專區
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setStockFilter(stockFilter === 'PINNED' ? 'ALL' : 'PINNED')}
+                                className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold transition-all cursor-pointer border ${
+                                    stockFilter === 'PINNED'
+                                        ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                                        : 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300'
+                                }`}
+                            >
+                                {stockFilter === 'PINNED' ? '✕ 查看所有商品' : `📌 目前已置頂 ${pinnedCount} 件商品`}
+                            </button>
+                        </div>
+                        <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">
+                            有設定序號的商品將優先展示於手機 LINE 商城首頁最上方與所屬分類頂部。
+                        </p>
+                    </div>
+                </div>
+
+                {/* 自訂專區名稱 */}
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:w-64">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-amber-700 dark:text-amber-400 font-bold pointer-events-none">專區名稱:</span>
+                        <input
+                            type="text"
+                            value={pinnedSectionTitle}
+                            onChange={(e) => setPinnedSectionTitle(e.target.value)}
+                            placeholder="例如：🔥 限時置頂推薦"
+                            className="input-field pl-20 pr-3 py-1.5 text-xs font-bold rounded-xl h-9 w-full bg-[var(--bg-primary)] border-amber-300 dark:border-amber-700 focus:border-amber-500"
+                        />
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleSavePinnedTitle}
+                        disabled={isSavingPinnedTitle}
+                        className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs active:scale-95 transition-all cursor-pointer h-9 shrink-0 flex items-center gap-1"
+                    >
+                        {isSavingPinnedTitle ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />}
+                        <span>{pinnedTitleSavedMsg ? '已儲存！' : '儲存名稱'}</span>
+                    </button>
                 </div>
             </div>
 
@@ -860,6 +948,59 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                 
                                                 {/* 上架與停售開關 */}
                                                 <div className="flex items-center gap-1.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                                                    {/* 商城置頂控制項 */}
+                                                    <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[10px] font-bold transition-all shadow-2xs ${
+                                                        product.isPinned || Number(product.pinnedOrder) > 0
+                                                            ? 'bg-amber-100/90 border-amber-300 text-amber-900 dark:bg-amber-950/60 dark:border-amber-700 dark:text-amber-200'
+                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-amber-300'
+                                                    }`}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const isCurrentlyPinned = Boolean(product.isPinned) || Number(product.pinnedOrder) > 0;
+                                                                if (isCurrentlyPinned) {
+                                                                    handleFieldChange(product.id, 'isPinned', false);
+                                                                    handleFieldChange(product.id, 'pinnedOrder', 0);
+                                                                    handleSaveProduct(product.id, { isPinned: false, pinnedOrder: 0 });
+                                                                } else {
+                                                                    const maxOrder = products.reduce((max, p) => Math.max(max, Number(p.pinnedOrder) || 0), 0);
+                                                                    const nextOrder = maxOrder + 1;
+                                                                    handleFieldChange(product.id, 'isPinned', true);
+                                                                    handleFieldChange(product.id, 'pinnedOrder', nextOrder);
+                                                                    handleSaveProduct(product.id, { isPinned: true, pinnedOrder: nextOrder });
+                                                                }
+                                                            }}
+                                                            className="flex items-center gap-0.5 cursor-pointer whitespace-nowrap hover:opacity-80"
+                                                            title={product.isPinned || Number(product.pinnedOrder) > 0 ? "點擊取消商城置頂" : "點擊設為商城置頂品"}
+                                                        >
+                                                            <span>📌</span>
+                                                            <span>{product.isPinned || Number(product.pinnedOrder) > 0 ? '已置頂' : '置頂'}</span>
+                                                        </button>
+
+                                                        {(product.isPinned || Number(product.pinnedOrder) > 0) && (
+                                                            <div className="flex items-center gap-0.5 pl-1 border-l border-amber-300 dark:border-amber-700">
+                                                                <span className="text-[9px] text-amber-700 dark:text-amber-400">第</span>
+                                                                <input
+                                                                    type="number"
+                                                                    min="1"
+                                                                    max="99"
+                                                                    value={product.pinnedOrder !== undefined ? product.pinnedOrder : ''}
+                                                                    onChange={(e) => {
+                                                                        const val = e.target.value === '' ? '' : Math.max(1, Number(e.target.value));
+                                                                        handleFieldChange(product.id, 'pinnedOrder', val);
+                                                                    }}
+                                                                    onBlur={(e) => {
+                                                                        const val = Number(e.target.value) || 1;
+                                                                        handleSaveProduct(product.id, { isPinned: true, pinnedOrder: val });
+                                                                    }}
+                                                                    className="w-7 text-center py-0 px-0.5 text-[11px] font-black bg-white dark:bg-zinc-800 rounded border border-amber-300 text-amber-900 dark:text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                                                    title="手動指定商城第幾置頂（數字越小越前）"
+                                                                />
+                                                                <span className="text-[9px] text-amber-700 dark:text-amber-400">位</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
                                                     {/* 停售狀態按鈕 */}
                                                     <button
                                                         type="button"
@@ -1240,6 +1381,49 @@ export default function ProductManagementPage({ user, apiUrl }) {
                                                                     });
                                                                 }}
                                                             />
+                                                        </div>
+
+                                                        {/* 商城置頂推薦與自訂序號 */}
+                                                        <div className="flex flex-col gap-2 bg-amber-500/10 p-3 rounded-xl border border-amber-500/30">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-[10px] uppercase font-extrabold text-amber-800 dark:text-amber-300 tracking-wider">📌 商城置頂推薦</span>
+                                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        className="sr-only peer"
+                                                                        checked={!!product.isPinned || Number(product.pinnedOrder) > 0}
+                                                                        onChange={(e) => {
+                                                                            const checked = e.target.checked;
+                                                                            const nextOrder = checked ? (Number(product.pinnedOrder) > 0 ? Number(product.pinnedOrder) : 1) : 0;
+                                                                            handleFieldChange(product.id, 'isPinned', checked);
+                                                                            handleFieldChange(product.id, 'pinnedOrder', nextOrder);
+                                                                            handleSaveProduct(product.id, { isPinned: checked, pinnedOrder: nextOrder });
+                                                                        }}
+                                                                    />
+                                                                    <div className="w-8 h-4 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-amber-500"></div>
+                                                                </label>
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5 mt-auto">
+                                                                <span className="text-[11px] text-[var(--text-secondary)] font-medium">置頂順位:</span>
+                                                                <input
+                                                                    type="number"
+                                                                    min="1"
+                                                                    max="99"
+                                                                    disabled={!product.isPinned && Number(product.pinnedOrder) <= 0}
+                                                                    className="input-field text-xs p-1.5 flex-1 font-bold text-center font-mono disabled:opacity-50"
+                                                                    placeholder="例：1"
+                                                                    value={product.pinnedOrder !== undefined ? product.pinnedOrder : ''}
+                                                                    onChange={(e) => {
+                                                                        const val = e.target.value === '' ? '' : Math.max(1, Number(e.target.value));
+                                                                        handleFieldChange(product.id, 'pinnedOrder', val);
+                                                                    }}
+                                                                    onBlur={(e) => {
+                                                                        const val = Number(e.target.value) || 1;
+                                                                        handleSaveProduct(product.id, { isPinned: true, pinnedOrder: val });
+                                                                    }}
+                                                                />
+                                                                <span className="text-[11px] text-[var(--text-tertiary)]">號</span>
+                                                            </div>
                                                         </div>
 
                                                         {/* 滿件特惠 (階梯組合價) */}

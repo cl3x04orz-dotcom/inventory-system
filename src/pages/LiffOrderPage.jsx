@@ -324,6 +324,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   const [paymentMethod, setPaymentMethod] = useState("現金");
   const [transferLastFive, setTransferLastFive] = useState("");
   const [useWallet, setUseWallet] = useState(false);
+  const [pinnedSectionTitle, setPinnedSectionTitle] = useState("🔥 限時置頂推薦");
 
   // ── 送出 state ───────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -923,6 +924,10 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
       if (initData) {
         // V2 回傳包裝在 data 屬性內
         const resData = initData.data || initData;
+
+        if (resData.pinnedSectionTitle) {
+          setPinnedSectionTitle(resData.pinnedSectionTitle);
+        }
 
         // A. 處理商品
         if (Array.isArray(resData.products)) {
@@ -1586,6 +1591,18 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     return list.filter((p) => p.name && p.name.toLowerCase().includes(query));
   }, [products, searchQuery, selectedCommunityId, selectedBuilding, currentCommunity, allCommunities, urlAllowedProducts]);
 
+  // ── 置頂推薦商品清單 (依指定序號 1, 2, 3... 排序) ─────────────────────────────
+  const pinnedProducts = useMemo(() => {
+    return filteredProducts
+      .filter((p) => Boolean(p.isPinned) || Number(p.pinnedOrder) > 0)
+      .sort((a, b) => {
+        const orderA = Number(a.pinnedOrder) || 9999;
+        const orderB = Number(b.pinnedOrder) || 9999;
+        if (orderA !== orderB) return orderA - orderB;
+        return (Number(a.sortWeight) || 0) - (Number(b.sortWeight) || 0);
+      });
+  }, [filteredProducts]);
+
   // ── 分類邏輯 ─────────────────────────────────────────────────
   const categories = useMemo(() => {
     const cats = filteredProducts.map((p) => p.category?.trim() || "其他");
@@ -1601,8 +1618,25 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
       if (!map[cat]) map[cat] = [];
       map[cat].push(p);
     });
+
     return categories
-      .map((cat) => ({ cat, items: map[cat] || [] }))
+      .map((cat) => {
+        const rawItems = map[cat] || [];
+        // 分類內優先將置頂品排在最前 (依序號升序)，其餘品項照原本順序
+        const sortedItems = [...rawItems].sort((a, b) => {
+          const isPinA = Boolean(a.isPinned) || Number(a.pinnedOrder) > 0;
+          const isPinB = Boolean(b.isPinned) || Number(b.pinnedOrder) > 0;
+          if (isPinA && !isPinB) return -1;
+          if (!isPinA && isPinB) return 1;
+          if (isPinA && isPinB) {
+            const orderA = Number(a.pinnedOrder) || 9999;
+            const orderB = Number(b.pinnedOrder) || 9999;
+            if (orderA !== orderB) return orderA - orderB;
+          }
+          return 0; // 維持原陣列順序
+        });
+        return { cat, items: sortedItems };
+      })
       .filter((g) => g.items.length > 0);
   }, [filteredProducts, categories]);
 
@@ -6577,7 +6611,85 @@ ${freeNote(newFee, newMin)}
                   : (searchQuery ? `找不到符合「${searchQuery}」的商品` : "目前沒有商品")}
               </div>
             ) : (
-              groupedProducts.map(({ cat, items }) => (
+              <>
+                {/* 🔥 頂部置頂推薦專區 (若無置頂品則自動完全隱藏) */}
+                {pinnedProducts.length > 0 && !searchQuery.trim() && (
+                  <div className="mx-4 mt-3 mb-2 p-3.5 rounded-2xl bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-transparent border border-amber-500/25 shadow-xs">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-base font-black text-amber-950 dark:text-amber-200">
+                          {pinnedSectionTitle || "🔥 限時置頂推薦"}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-extrabold text-amber-800 dark:text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30">
+                        熱銷爆款
+                      </span>
+                    </div>
+
+                    {/* 橫向滾動特惠商品卡片 */}
+                    <div className="flex gap-2.5 overflow-x-auto pb-1.5 -mx-1 px-1 scrollbar-none">
+                      {pinnedProducts.map((product, pIdx) => {
+                        const qty = isGroupOrder ? (groupCart[activeRecipient]?.[product.id] || 0) : (cart[product.id] || 0);
+                        const qInfo = getProductQuotaInfo(product);
+                        const isSoldOut = qInfo.hasQuota && qInfo.remaining === 0;
+                        return (
+                          <div
+                            key={`pinned-${product.id}`}
+                            className="w-[145px] shrink-0 bg-[var(--bg-secondary)] border border-[var(--border-primary)] hover:border-amber-400 rounded-2xl p-2.5 flex flex-col justify-between shadow-xs transition-all relative overflow-hidden"
+                          >
+                            {/* 順位徽章 */}
+                            <div className="absolute top-2 left-2 z-10 bg-amber-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md shadow-xs">
+                              TOP {product.pinnedOrder && Number(product.pinnedOrder) > 0 ? product.pinnedOrder : pIdx + 1}
+                            </div>
+
+                            <div>
+                              {/* 圖片 */}
+                              <div className="w-full h-24 rounded-xl bg-[var(--bg-tertiary)] overflow-hidden mb-2 flex items-center justify-center">
+                                {product.imageUrl ? (
+                                  <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <Package className="text-[var(--text-tertiary)]" size={24} />
+                                )}
+                              </div>
+
+                              {/* 品名 */}
+                              <div className="font-extrabold text-[13px] text-[var(--text-primary)] line-clamp-2 leading-tight">
+                                {product.name}
+                              </div>
+                              {product.capacity && String(product.capacity).trim() && (
+                                <div className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate">
+                                  {String(product.capacity).trim()}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* 價格與按鈕 */}
+                            <div className="mt-2.5 pt-2 border-t border-[var(--border-primary)] flex items-center justify-between">
+                              <div className="text-amber-600 dark:text-amber-400 font-black text-sm">
+                                ${product.single_price || product.price || 0}
+                              </div>
+                              <button
+                                onClick={() => !isSoldOut && handleProductAction(product, true)}
+                                disabled={isSoldOut}
+                                className={`h-7 px-2.5 flex items-center justify-center gap-1 rounded-lg text-xs font-bold transition-all ${
+                                  isSoldOut
+                                    ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
+                                    : qty > 0
+                                      ? 'bg-slate-700 text-white'
+                                      : 'bg-amber-500 hover:bg-amber-600 text-white shadow-xs active:scale-95'
+                                }`}
+                              >
+                                {isSoldOut ? '售完' : qty > 0 ? `${qty}` : '+ 搶購'}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {groupedProducts.map(({ cat, items }) => (
                 <div
                   key={cat}
                   ref={(el) => {
@@ -6647,6 +6759,12 @@ ${freeNote(newFee, newMin)}
                                 {product.isBundle && (
                                   <span className="text-[10px] text-amber-800 bg-amber-500/10 border border-amber-200/30 px-1 py-0.5 rounded font-bold shrink-0">
                                     捆裝 {product.bundleSize}入
+                                  </span>
+                                )}
+                                {Boolean(product.isPinned || Number(product.pinnedOrder) > 0) && (
+                                  <span className="text-[10px] text-amber-900 bg-amber-500/15 border border-amber-300/50 px-1.5 py-0.5 rounded font-black shrink-0 flex items-center gap-0.5">
+                                    <span>📌</span>
+                                    <span>置頂特惠</span>
                                   </span>
                                 )}
                                 {(() => {
@@ -6861,7 +6979,8 @@ ${freeNote(newFee, newMin)}
                     })}
                   </div>
                 </div>
-              ))
+              ))}
+              </>
             )}
             {renderMobileFooter()}
           </div>

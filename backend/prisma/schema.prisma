@@ -26,6 +26,8 @@ model Product {
   reserve               Decimal                 @default(0)
   safetyStock           Int                     @default(0)
   sortWeight            Int                     @default(0)
+  isPinned              Boolean                 @default(false) // 商城置頂標記
+  pinnedOrder           Int                     @default(0) // 商城置頂序號 (1, 2, 3...)
   isActive              Boolean                 @default(true)
   isPurchasable         Boolean                 @default(true) // 是否出現在進貨清單（與前台上架 isActive 完全獨立）
   isDiscontinued        Boolean                 @default(false) // 停售/停產狀態（全系統隱藏）

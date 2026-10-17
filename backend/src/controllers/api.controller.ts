@@ -105,6 +105,10 @@ export async function apiRouter(action: string, payload: any, user: any): Promis
       return GroupBuyService.getLiffAnnouncement(payload);
     case 'saveLiffAnnouncement':
       return GroupBuyService.saveLiffAnnouncement(payload, user);
+    case 'getPinnedSectionTitle':
+      return GroupBuyService.getPinnedSectionTitle(payload);
+    case 'savePinnedSectionTitle':
+      return GroupBuyService.savePinnedSectionTitle(payload, user);
     case 'getSaleToClone':
       return SalesService.getSaleToClone(payload);
     case 'voidAndFetchSale':

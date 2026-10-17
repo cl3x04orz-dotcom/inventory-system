@@ -124,6 +124,29 @@ export const GroupBuyService = {
     });
     return { success: true };
   },
+
+  // 置頂推薦專區自訂名稱 (LIFF Pinned Section Title)
+  async getPinnedSectionTitle(payload: any) {
+    const setting = await prisma.groupBuySystemSetting.findUnique({
+      where: { settingKey: 'LIFF_PINNED_SECTION_TITLE' }
+    });
+    return { success: true, title: setting?.settingValue || '🔥 限時置頂推薦' };
+  },
+
+  async savePinnedSectionTitle(payload: any, user: any) {
+    if (user?.role !== 'BOSS' && user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
+      throw new Error('權限不足');
+    }
+    const { title, storeCode = 'MILI001' } = payload || {};
+    const val = String(title || '🔥 限時置頂推薦').trim();
+    await prisma.groupBuySystemSetting.upsert({
+      where: { settingKey: 'LIFF_PINNED_SECTION_TITLE' },
+      update: { settingValue: val, storeCode },
+      create: { settingKey: 'LIFF_PINNED_SECTION_TITLE', settingValue: val, storeCode }
+    });
+    liffCache.del('liff:pinned_title');
+    return { success: true, title: val };
+  },
   // 1. 取得訂單列表（按狀態篩選）
   async getPendingOrders(payload: any, user: any) {
     if (user.role !== 'BOSS' && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') throw new Error('權限不足');
@@ -1592,6 +1615,16 @@ export const GroupBuyService = {
       groupBindings[b.groupId] = b.groupName;
     });
 
+    // ── 快取 7：置頂推薦專區自訂名稱 (10 分鐘) ──
+    let pinnedSectionTitle = liffCache.get<string>('liff:pinned_title');
+    if (pinnedSectionTitle === undefined) {
+      const pinnedTitleSetting = await prisma.groupBuySystemSetting.findUnique({
+        where: { settingKey: 'LIFF_PINNED_SECTION_TITLE' }
+      });
+      pinnedSectionTitle = pinnedTitleSetting?.settingValue || '🔥 限時置頂推薦';
+      liffCache.set('liff:pinned_title', pinnedSectionTitle, 600);
+    }
+
     return {
       success: true,
       data: {
@@ -1607,6 +1640,7 @@ export const GroupBuyService = {
           DeliveryEndTime: activeCampaign.deliveryEndTime || ''
         } : null,
         nextOpenTime: nextCampaign?.startTime || null,
+        pinnedSectionTitle,
         products,
         buildingSettings,
         groupBindings,
