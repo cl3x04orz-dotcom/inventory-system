@@ -2613,6 +2613,40 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
     return { cartItems: finalCartItems, cartTotal: totalAmount, discountDetails: discounts, availableGiftCredits, memberGiftCredits };
   }, [cart, giftSelections, groupGiftSelections, products, flavorSelections, groupFlavorSelections, isGroupOrder, groupCart]);
 
+  // 💰 全站購物車累積省額 (方案 C)
+  const cartSavings = useMemo(() => {
+    let totalSavings = 0;
+    if (isGroupOrder) {
+      Object.values(groupCart || {}).forEach((memberCart) => {
+        if (!memberCart || typeof memberCart !== 'object') return;
+        Object.entries(memberCart).forEach(([pid, qty]) => {
+          const numQty = Number(qty) || 0;
+          if (numQty <= 0) return;
+          const p = products.find((x) => x.id === pid);
+          if (!p) return;
+          const currentPrice = Number(p.single_price || p.price || 0);
+          const origPrice = Number(p.original_price || 0);
+          if (origPrice > currentPrice) {
+            totalSavings += (origPrice - currentPrice) * numQty;
+          }
+        });
+      });
+    } else {
+      Object.entries(cart || {}).forEach(([pid, qty]) => {
+        const numQty = Number(qty) || 0;
+        if (numQty <= 0) return;
+        const p = products.find((x) => x.id === pid);
+        if (!p) return;
+        const currentPrice = Number(p.single_price || p.price || 0);
+        const origPrice = Number(p.original_price || 0);
+        if (origPrice > currentPrice) {
+          totalSavings += (origPrice - currentPrice) * numQty;
+        }
+      });
+    }
+    return totalSavings;
+  }, [cart, groupCart, isGroupOrder, products]);
+
   // 🧹 自動重置/清理不足額度之贈品：當商品減購或刪除導致已選數量 > 可得數量時，直接重置讓客人重新挑選
   useEffect(() => {
     if (step === "success") return; // 避免在訂單成立後清空對帳單上的贈品紀錄！
@@ -4861,6 +4895,12 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                     <span>商品小計</span>
                     <span className="font-mono">${cartTotal}</span>
                   </div>
+                  {cartSavings > 0 && (
+                    <div className="flex justify-between items-center text-sm text-rose-600 font-bold">
+                      <span className="flex items-center gap-1">🎉 促銷特惠折抵</span>
+                      <span className="font-mono">-已省 ${cartSavings}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center text-sm">
                     <span className={isFree ? 'text-emerald-600 font-semibold' : 'text-[var(--text-secondary)]'}>運費</span>
                     {isFree ? (
@@ -6642,12 +6682,21 @@ ${freeNote(newFee, newMin)}
                               TOP {product.pinnedOrder && Number(product.pinnedOrder) > 0 ? product.pinnedOrder : pIdx + 1}
                             </div>
 
-                            {/* 省錢特惠徽章（右上角） */}
-                            {product.original_price && Number(product.original_price) > Number(product.single_price || product.price || 0) && (
-                              <div className="absolute top-2 right-2 z-10 bg-gradient-to-r from-rose-500 to-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md shadow-xs">
-                                省${Number(product.original_price) - Number(product.single_price || product.price || 0)}
-                              </div>
-                            )}
+                            {/* 省錢特惠徽章（右上角 - 方案 A 動態激勵） */}
+                            {product.original_price && Number(product.original_price) > Number(product.single_price || product.price || 0) && (() => {
+                              const diff = Number(product.original_price) - Number(product.single_price || product.price || 0);
+                              const isSelected = qty > 0;
+                              const currentSaved = isSelected ? diff * qty : diff;
+                              return (
+                                <div className={`absolute top-2 right-2 z-10 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md shadow-xs transition-all ${
+                                  isSelected
+                                    ? "bg-gradient-to-r from-red-600 to-rose-600 ring-2 ring-rose-300 dark:ring-rose-800 scale-105"
+                                    : "bg-gradient-to-r from-rose-500 to-red-600"
+                                }`}>
+                                  {isSelected ? `已省$${currentSaved}` : `省$${diff}`}
+                                </div>
+                              );
+                            })()}
 
                             <div>
                               {/* 圖片 */}
@@ -6912,11 +6961,20 @@ ${freeNote(newFee, newMin)}
                                       $
                                       {product.single_price || product.price}
                                     </span>
-                                    {product.original_price && Number(product.original_price) > Number(product.single_price || product.price || 0) && (
-                                      <span className="text-[10px] text-rose-600 bg-rose-50 border border-rose-200 px-1 py-0.2 rounded font-bold leading-none">
-                                        省${Number(product.original_price) - Number(product.single_price || product.price || 0)}
-                                      </span>
-                                    )}
+                                    {product.original_price && Number(product.original_price) > Number(product.single_price || product.price || 0) && (() => {
+                                      const diff = Number(product.original_price) - Number(product.single_price || product.price || 0);
+                                      const isSelected = qty > 0;
+                                      const currentSaved = isSelected ? diff * qty : diff;
+                                      return (
+                                        <span className={`text-[10px] px-1 py-0.2 rounded font-bold leading-none transition-all ${
+                                          isSelected
+                                            ? "text-white bg-rose-600 shadow-2xs"
+                                            : "text-rose-600 bg-rose-50 border border-rose-200"
+                                        }`}>
+                                          {isSelected ? `已省$${currentSaved}` : `省$${diff}`}
+                                        </span>
+                                      );
+                                    })()}
                                     {qty > 0 && freeQty > 0 && (
                                       <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 border border-emerald-100 px-1 py-0.5 rounded leading-none flex items-center">
                                         贈{freeQty},共{qty + freeQty}件
@@ -7147,8 +7205,15 @@ ${freeNote(newFee, newMin)}
                     <div className="text-[10px] text-[var(--text-secondary)] font-semibold flex items-center gap-1">
                       已選 {totalQty} 件 <span className="text-blue-500 font-bold">查看購物車</span>
                     </div>
-                    <div className="text-2xl font-black text-blue-600 font-mono">
-                      ${cartTotal}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-2xl font-black text-blue-600 font-mono">
+                        ${cartTotal}
+                      </span>
+                      {cartSavings > 0 && (
+                        <span className="text-[11px] font-black text-rose-600 bg-rose-50 dark:bg-rose-950/50 border border-rose-200/80 dark:border-rose-800 px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5 shadow-2xs leading-none">
+                          🔥 已省${cartSavings}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
