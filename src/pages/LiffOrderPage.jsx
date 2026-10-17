@@ -4686,7 +4686,26 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
                   <div className="flex justify-between items-center mt-1 text-xs text-[var(--text-secondary)]">
                     {!item.isGift && (
                       <div className="flex flex-col gap-1">
-                        <span>單價 ${item.price}</span>
+                        <span className="flex items-center gap-1.5 flex-wrap">
+                          <span>單價 ${item.price}</span>
+                          {(() => {
+                            const prod = item.product || products.find(p => p.id === (item.productId || item.id));
+                            if (prod && prod.original_price && Number(prod.original_price) > Number(item.price)) {
+                              const itemSavings = (Number(prod.original_price) - Number(item.price)) * item.qty;
+                              return (
+                                <>
+                                  <span className="text-slate-400 line-through text-[11px] font-mono">
+                                    ${prod.original_price}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40 border border-rose-200/60 dark:border-rose-800 px-1 py-0.2 rounded leading-none">
+                                    省${itemSavings}
+                                  </span>
+                                </>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </span>
                       </div>
                     )}
                     {(() => {
@@ -4914,7 +4933,14 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
             })()}
 
             <div className="flex justify-between items-center px-4 py-3 bg-[var(--bg-tertiary)]">
-              <span className="font-bold text-[var(--text-primary)]">應付總金額</span>
+              <div className="flex flex-col">
+                <span className="font-bold text-[var(--text-primary)]">應付總金額</span>
+                {cartSavings > 0 && (
+                  <span className="text-[11px] font-black text-rose-600 flex items-center gap-1 mt-0.5">
+                    🔥 本單已現省 ${cartSavings} 元
+                  </span>
+                )}
+              </div>
               <span className="font-mono text-xl font-extrabold text-blue-600">
                 ${orderTotal}
               </span>
@@ -5089,14 +5115,14 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
           label: "現金",
         },
         {
-          value: "轉帳",
-          Icon: CreditCard,
-          label: "銀行轉帳",
-        },
-        {
           value: "LINE Pay",
           Icon: Smartphone,
           label: "LINE Pay",
+        },
+        {
+          value: "轉帳",
+          Icon: CreditCard,
+          label: "銀行轉帳",
         },
       ];
 
@@ -5118,7 +5144,7 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
               配送資訊
             </h2>
             <p className="text-xs text-[var(--text-secondary)]">
-              {totalQty} 件商品，合計 ${orderTotal}{shippingFee > 0 ? `（含運 $${shippingFee}）` : ''}
+              {totalQty} 件商品，合計 ${orderTotal}{shippingFee > 0 ? `（含運 $${shippingFee}）` : ''}{cartSavings > 0 ? `・已省 $${cartSavings}` : ''}
             </p>
           </div>
         </div>
