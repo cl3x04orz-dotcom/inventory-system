@@ -320,9 +320,19 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
   const [customerPhone, setCustomerPhone] = useState("");
   const [phoneExt, setPhoneExt] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
-  const [note, setNote] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("現金");
-  const [transferLastFive, setTransferLastFive] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState(() => {
+    try {
+      const saved = localStorage.getItem("mlw_preferred_payment");
+      if (saved && ["現金", "LINE Pay", "轉帳"].includes(saved)) return saved;
+    } catch (_) { }
+    return "現金";
+  });
+  const [transferLastFive, setTransferLastFive] = useState(() => {
+    try {
+      return localStorage.getItem("mlw_transfer_last_five") || "";
+    } catch (_) { }
+    return "";
+  });
   const [useWallet, setUseWallet] = useState(false);
   const [pinnedSectionTitle, setPinnedSectionTitle] = useState("🔥 限時置頂推薦");
 
@@ -2997,6 +3007,14 @@ export default function LiffOrderPage({ user, apiUrl, setting }) {
           address: getFullAddress(),
         }),
       );
+      try {
+        if (paymentMethod && paymentMethod !== "奶包金扣抵") {
+          localStorage.setItem("mlw_preferred_payment", paymentMethod);
+        }
+        if (paymentMethod === "轉帳" && transferLastFive) {
+          localStorage.setItem("mlw_transfer_last_five", transferLastFive);
+        }
+      } catch (_) { }
 
       let lineDisplayName = "";
       let finalLineUserId = lineUserId || "";
@@ -5791,7 +5809,14 @@ ${freeNote(newFee, newMin)}
                         name="payment"
                         value={value}
                         checked={active}
-                        onChange={() => setPaymentMethod(value)}
+                        onChange={() => {
+                          setPaymentMethod(value);
+                          try {
+                            if (value !== "奶包金扣抵") {
+                              localStorage.setItem("mlw_preferred_payment", value);
+                            }
+                          } catch (_) { }
+                        }}
                         className="hidden"
                       />
                       <div
@@ -5832,11 +5857,13 @@ ${freeNote(newFee, newMin)}
                               className="input-field w-full p-3 rounded-xl border border-blue-300 bg-white text-center font-mono tracking-[0.5em] text-lg focus:bg-white focus:outline-none"
                               placeholder="_ _ _ _ _"
                               value={transferLastFive}
-                              onChange={(e) =>
-                                setTransferLastFive(
-                                  e.target.value.replace(/\D/g, "").slice(0, 5),
-                                )
-                              }
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/\D/g, "").slice(0, 5);
+                                setTransferLastFive(val);
+                                try {
+                                  localStorage.setItem("mlw_transfer_last_five", val);
+                                } catch (_) { }
+                              }}
                             />
                           </div>
                         )}
