@@ -6668,19 +6668,44 @@ ${freeNote(newFee, newMin)}
                               <div className="text-amber-600 dark:text-amber-400 font-black text-sm">
                                 ${product.single_price || product.price || 0}
                               </div>
-                              <button
-                                onClick={() => !isSoldOut && handleProductAction(product, true)}
-                                disabled={isSoldOut}
-                                className={`h-7 px-2.5 flex items-center justify-center gap-1 rounded-lg text-xs font-bold transition-all ${
-                                  isSoldOut
-                                    ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
-                                    : qty > 0
-                                      ? 'bg-slate-700 text-white'
-                                      : 'bg-amber-500 hover:bg-amber-600 text-white shadow-xs active:scale-95'
-                                }`}
-                              >
-                                {isSoldOut ? '售完' : qty > 0 ? `${qty}` : '+ 搶購'}
-                              </button>
+                              {isSoldOut ? (
+                                <span className="h-7 px-2.5 flex items-center justify-center rounded-lg text-xs font-bold bg-gray-200 text-gray-400">
+                                  售完
+                                </span>
+                              ) : qty > 0 ? (
+                                <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] p-0.5 rounded-lg border border-[var(--border-primary)] shadow-2xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleProductAction(product, false)}
+                                    className="w-6 h-6 flex items-center justify-center rounded-md bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] active:scale-90 transition-all cursor-pointer"
+                                    title="減少"
+                                  >
+                                    <Minus size={12} />
+                                  </button>
+                                  <span
+                                    onClick={() => product.has_flavor_attributes && handleProductAction(product, true)}
+                                    className={`min-w-5 px-0.5 text-center font-black font-mono text-xs select-none ${product.has_flavor_attributes ? 'cursor-pointer text-blue-600 underline' : 'text-[var(--text-primary)]'}`}
+                                  >
+                                    {qty}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleProductAction(product, true)}
+                                    className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-500 hover:bg-amber-600 text-white active:scale-90 transition-all shadow-xs cursor-pointer"
+                                    title="增加"
+                                  >
+                                    <Plus size={12} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleProductAction(product, true)}
+                                  className="h-7 px-2.5 flex items-center justify-center gap-1 rounded-lg text-xs font-black bg-amber-500 hover:bg-amber-600 text-white shadow-xs active:scale-95 transition-all cursor-pointer"
+                                >
+                                  + 搶購
+                                </button>
+                              )}
                             </div>
                           </div>
                         );
@@ -6759,12 +6784,6 @@ ${freeNote(newFee, newMin)}
                                 {product.isBundle && (
                                   <span className="text-[10px] text-amber-800 bg-amber-500/10 border border-amber-200/30 px-1 py-0.5 rounded font-bold shrink-0">
                                     捆裝 {product.bundleSize}入
-                                  </span>
-                                )}
-                                {Boolean(product.isPinned || Number(product.pinnedOrder) > 0) && (
-                                  <span className="text-[10px] text-amber-900 bg-amber-500/15 border border-amber-300/50 px-1.5 py-0.5 rounded font-black shrink-0 flex items-center gap-0.5">
-                                    <span>📌</span>
-                                    <span>置頂特惠</span>
                                   </span>
                                 )}
                                 {(() => {
