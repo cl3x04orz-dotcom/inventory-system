@@ -6642,6 +6642,13 @@ ${freeNote(newFee, newMin)}
                               TOP {product.pinnedOrder && Number(product.pinnedOrder) > 0 ? product.pinnedOrder : pIdx + 1}
                             </div>
 
+                            {/* 省錢特惠徽章（右上角） */}
+                            {product.original_price && Number(product.original_price) > Number(product.single_price || product.price || 0) && (
+                              <div className="absolute top-2 right-2 z-10 bg-gradient-to-r from-rose-500 to-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md shadow-xs">
+                                省${Number(product.original_price) - Number(product.single_price || product.price || 0)}
+                              </div>
+                            )}
+
                             <div>
                               {/* 圖片 */}
                               <div className="w-full h-24 rounded-xl bg-[var(--bg-tertiary)] overflow-hidden mb-2 flex items-center justify-center">
@@ -6664,56 +6671,51 @@ ${freeNote(newFee, newMin)}
                             </div>
 
                             {/* 價格與按鈕 */}
-                            <div className="mt-2.5 pt-2 border-t border-[var(--border-primary)] flex items-center justify-between">
-                              <div className="flex flex-col">
+                            <div className="mt-2.5 pt-2 border-t border-[var(--border-primary)] flex items-center justify-between gap-1">
+                              <div className="flex flex-col min-w-0">
                                 {product.original_price && Number(product.original_price) > Number(product.single_price || product.price || 0) && (
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-[11px] text-slate-400 line-through font-mono">
-                                      ${product.original_price}
-                                    </span>
-                                    <span className="text-[9px] font-black text-rose-600 bg-rose-50 dark:bg-rose-950/40 border border-rose-200/60 dark:border-rose-800 px-1 rounded leading-none">
-                                      省${Number(product.original_price) - Number(product.single_price || product.price || 0)}
-                                    </span>
-                                  </div>
+                                  <span className="text-[10px] text-slate-400 line-through font-mono leading-none">
+                                    ${product.original_price}
+                                  </span>
                                 )}
-                                <div className="text-amber-600 dark:text-amber-400 font-black text-sm">
+                                <div className="text-amber-600 dark:text-amber-400 font-black text-sm leading-tight">
                                   ${product.single_price || product.price || 0}
                                 </div>
                               </div>
                               {isSoldOut ? (
-                                <span className="h-7 px-2.5 flex items-center justify-center rounded-lg text-xs font-bold bg-gray-200 text-gray-400">
+                                <span className="h-7 px-2 flex items-center justify-center rounded-lg text-xs font-bold bg-gray-200 text-gray-400 shrink-0">
                                   售完
                                 </span>
                               ) : qty > 0 ? (
-                                <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] p-0.5 rounded-lg border border-[var(--border-primary)] shadow-2xs">
+                                <div className="flex items-center gap-0.5 bg-[var(--bg-tertiary)] p-0.5 rounded-lg border border-[var(--border-primary)] shadow-2xs shrink-0">
                                   <button
                                     type="button"
                                     onClick={() => handleProductAction(product, false)}
-                                    className="w-6 h-6 flex items-center justify-center rounded-md bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] active:scale-90 transition-all cursor-pointer"
+                                    className="w-5.5 h-5.5 flex items-center justify-center rounded-md bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] active:scale-90 transition-all cursor-pointer"
                                     title="減少"
                                   >
-                                    <Minus size={12} />
+                                    <Minus size={11} />
                                   </button>
                                   <span
                                     onClick={() => product.has_flavor_attributes && handleProductAction(product, true)}
-                                    className={`min-w-5 px-0.5 text-center font-black font-mono text-xs select-none ${product.has_flavor_attributes ? 'cursor-pointer text-blue-600 underline' : 'text-[var(--text-primary)]'}`}
+                                    className={`min-w-4 px-0.5 text-center font-black font-mono text-xs select-none ${product.has_flavor_attributes ? 'cursor-pointer text-blue-600 underline' : 'text-[var(--text-primary)]'}`}
                                   >
                                     {qty}
                                   </span>
                                   <button
                                     type="button"
                                     onClick={() => handleProductAction(product, true)}
-                                    className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-500 hover:bg-amber-600 text-white active:scale-90 transition-all shadow-xs cursor-pointer"
+                                    className="w-5.5 h-5.5 flex items-center justify-center rounded-md bg-amber-500 hover:bg-amber-600 text-white active:scale-90 transition-all shadow-xs cursor-pointer"
                                     title="增加"
                                   >
-                                    <Plus size={12} />
+                                    <Plus size={11} />
                                   </button>
                                 </div>
                               ) : (
                                 <button
                                   type="button"
                                   onClick={() => handleProductAction(product, true)}
-                                  className="h-7 px-2.5 flex items-center justify-center gap-1 rounded-lg text-xs font-black bg-amber-500 hover:bg-amber-600 text-white shadow-xs active:scale-95 transition-all cursor-pointer"
+                                  className="h-7 px-2.5 flex items-center justify-center gap-1 rounded-lg text-xs font-black bg-amber-500 hover:bg-amber-600 text-white shadow-xs active:scale-95 transition-all cursor-pointer shrink-0"
                                 >
                                   + 搶購
                                 </button>
